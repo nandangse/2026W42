@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.6.0.0",
+    date: "2026-09-28",
+    module: "The report reordered, delivery by client, and the board tidied",
+    items: [
+      "<b>THE REPORT \u2014 page 1 is now the year, month by month:</b> jobs, value and throughput as bars, <b>solid for what has gone out of the door and outlined for what is still on the board</b>. Three rows rather than one chart, because a count of jobs and a figure in crores cannot share an axis \u2014 nine jobs and nine crore are the same height only by accident. The projections move to page 2: a projection is an argument, and it was asking to be believed before any evidence had been shown.",
+      "<b>Delivery by client, two customers to a page</b>, every client from most jobs to fewest \u2014 name, pending count, then <b>Job No, TDD, Product family, Customer tag, Delay days</b>. By number of jobs rather than by value, because a customer with nine machines outstanding is nine dates and nine conversations whatever they are worth. Every client, not a top ten: the long tail is exactly where a forgotten single job sits.",
+      "<b>Then one page per escalation level, worst first \u2014 L3, then L2, then L1</b>, each with every task at that level and how many days past due it is. A page each because the levels are different audiences: L3 is Management\u2019s to answer and L1 is not, and on one page somebody has to sort them by eye every time.",
+      "<b>THE BOARD \u2014 past due spills sideways, not downwards.</b> A column is capped at the busiest day of the week or five, whichever is greater, and the rest open another column beside it, spread evenly \u2014 so sixteen reads <b>6+5+5</b> and the board stays the height of its tallest day. Sixteen in one column was making the whole board sixteen boxes tall to hold the one column nobody wants to be long, pushing the week that can still be acted on off the bottom of the screen.",
+      "<b>The owner\u2019s name comes off the box; the OTD goes on.</b> The name was being said twice \u2014 the colour of the box already IS the owner, with the key across the top. In its place: the date the customer was <b>originally</b> given, and how far past it we are, or how long is left. It is the only number on this board that says whether we have kept our word.",
+      "<b>And the job box opens the lightbox the boards already use</b>, not one of my own. A second box showing the same job differently is a second thing to learn and a second thing to keep true \u2014 and the shared one edits through to the ERP, which mine did not.",
+    ],
+  },
+  {
     v: "5.5.1.2",
     date: "2026-09-28",
     module: "Past due shows six, and says how many more",

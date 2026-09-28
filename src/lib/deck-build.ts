@@ -180,6 +180,10 @@ export function buildDeck(I: DeckInput): Deck {
     val: cr(num(j.val)),
     tp: cr(tpOf(j)),
     tdd: j.tdd,
+    fam: (j.fam || "").trim() || null,
+    /* Days past the date as at the REPORT date, not as at now — a deck
+       printed on Monday and read on Friday must not quietly age. */
+    delay: j.tdd && j.tdd < T ? Math.round((Date.parse(`${T}T00:00:00Z`) - Date.parse(`${j.tdd}T00:00:00Z`)) / 86400000) : 0,
     esc: !!(j.escalation && j.escalation.trim()),
     tasks: (openBy.get(jobNo(j.id)) || []).length,
   });
@@ -207,6 +211,57 @@ export function buildDeck(I: DeckInput): Deck {
     escLevels[l] = (escLevels[l] || 0) + 1;
   }
   const escTop = escTaskRows.map(asTask).sort(byDue).slice(0, 8);
+  /**
+   * EVERY ESCALATED TASK, KEPT IN ITS LEVEL (Dr Raghu, 28 Sep 2026: "show
+   * Escalations L3, Next Page Escalations L2, Next Escalations L1").
+   *
+   * A page per level, worst first, because L3 is Management's and L1 is not
+   * — putting them on one page makes somebody sort them by eye every time,
+   * and the sorting is the whole decision.
+   */
+  const LEVELS = ["L3", "L2", "L1"];
+  const escByLevel = LEVELS.map((lvl) => ({
+    lvl,
+    tasks: escTaskRows.filter((t) => escOf(t.esc) === lvl).map(asTask).sort(byDue),
+  })).filter((g) => g.tasks.length > 0);
+
+  /**
+   * THE YEAR, month by month, delivered and booked kept apart.
+   *
+   * Added together they would read as one number per month and hide the
+   * difference that matters: what has gone out is earned, what is on the
+   * board is a promise.
+   */
+  const yearKeys = [...new Set([...done.map((m) => m.k), ...months.map((m) => m.k)])].sort();
+  const zero = (k: string): MonthRow => ({ k, n: 0, v: 0, t: 0 });
+  const year = yearKeys.map((k) => ({
+    k,
+    done: done.find((m) => m.k === k) || zero(k),
+    book: months.find((m) => m.k === k) || zero(k),
+  }));
+
+  /**
+   * DELIVERY BY CLIENT (Dr Raghu, 28 Sep 2026: "Page no 9 onwards have a
+   * graph of Delivery by client ... Show for all clients from highest to
+   * lowest by nos").
+   *
+   * BY NUMBER OF JOBS, not by value — his words, and the right measure for
+   * this page: a customer with nine machines outstanding is nine
+   * conversations and nine dates, whatever they are worth.
+   */
+  const custMap = new Map<string, DeckJob[]>();
+  for (const j of jobs) {
+    const c = (j.cust || "").trim() || "Unnamed customer";
+    custMap.set(c, [...(custMap.get(c) || []), toJob(j)]);
+  }
+  const byCustomer = [...custMap.entries()]
+    .map(([cust, js]) => ({
+      cust,
+      n: js.length,
+      tp: cr(js.reduce((a, x) => a + x.tp, 0) * 1e7),
+      jobs: js.sort((a, b) => String(a.tdd || "9999").localeCompare(String(b.tdd || "9999"))),
+    }))
+    .sort((a, b) => b.n - a.n || b.tp - a.tp);
   const escQuotes = jobs
     .filter((j) => j.escalation && j.escalation.trim().length > 25)
     .map((j) => ({ id: jobNo(j.id), tp: cr(tpOf(j)), text: j.escalation!.trim().replace(/\s+/g, " ") }))
@@ -265,6 +320,9 @@ export function buildDeck(I: DeckInput): Deck {
     escLevels,
     escTop,
     escQuotes,
+    year,
+    byCustomer,
+    escByLevel,
     focus: {
       name: FOCUS.name,
       n: focusJobs.length,

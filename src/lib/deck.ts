@@ -41,6 +41,9 @@ export interface DeckJob {
   val?: number;
   tdd?: string | null;
   cust?: string | null;
+  fam?: string | null;
+  /** Days past the TDD as at the report date; 0 when it is not late yet. */
+  delay?: number;
   tasks?: number;
   esc?: boolean;
 }
@@ -88,6 +91,20 @@ export interface Deck {
   escLevels: Record<string, number>;
   escTop: DeckTask[];
   escQuotes: { id: string; tp: number; text: string }[];
+  /**
+   * THE YEAR IN ONE PICTURE, month by month (Dr Raghu, 28 Sep 2026: "show a
+   * graph of month wise jobs, value, throughput as a bar graph").
+   *
+   * Delivered and still-on-the-board are kept APART inside each month rather
+   * than added into one bar. A month that is half gone out and half promised
+   * is not the same month as one that has already shipped the lot, and a
+   * single bar would say it was.
+   */
+  year: { k: string; done: MonthRow; book: MonthRow }[];
+  /** Every customer with something still on the board, most jobs first. */
+  byCustomer: { cust: string; n: number; tp: number; jobs: DeckJob[] }[];
+  /** Every escalated task, kept in its level. L3 is Management. */
+  escByLevel: { lvl: string; tasks: DeckTask[] }[];
   /** One product family, looked at on its own. */
   focus: Focus;
 }
@@ -163,6 +180,59 @@ function bars(rows: MonthRow[], max: number): string {
     }).join("")}
     <text x="${L}" y="14" font-size="10" fill="${P.accent}" font-weight="700">&#9632; Sales &#8377; Cr</text>
     <text x="${L + 95}" y="14" font-size="10" fill="${P.green}" font-weight="700">&#9632; Throughput &#8377; Cr</text>
+  </svg>`;
+}
+
+/**
+ * THE YEAR IN THREE ROWS — jobs, value, throughput, month by month.
+ *
+ * Dr Raghu, 28 Sep 2026: "show a graph of month wise jobs, value,
+ * throughput as a bar graph. This should be page 1."
+ *
+ * THREE ROWS AND NOT ONE CHART, because a count of jobs and a figure in
+ * crores cannot share an axis: nine jobs and nine crore are the same height
+ * only by accident, and one of the two bars is always invisible. Each row
+ * keeps its own scale and they share the months underneath, so the shapes
+ * can be compared without the numbers being pretended equal.
+ *
+ * DELIVERED IS SOLID, THE BOARD IS OUTLINED. What has gone out is earned;
+ * what is on the board is a promise, and a report that adds them into one
+ * bar has told its most important lie in its first picture.
+ */
+function yearChart(rows: { k: string; done: MonthRow; book: MonthRow }[]): string {
+  if (!rows.length) return "";
+  const W = 1160, L = 46, R = 12, GAP = 16;
+  const ROW = 150, LBL = 34;
+  const bw = (W - L - R) / rows.length;
+  const metrics: { key: "n" | "v" | "t"; label: string; colour: string; fmt: (v: number) => string }[] = [
+    { key: "n", label: "JOBS", colour: P.navy, fmt: (v) => String(Math.round(v)) },
+    { key: "v", label: "VALUE \u20b9 Cr", colour: P.accent, fmt: (v) => v.toFixed(2) },
+    { key: "t", label: "THROUGHPUT \u20b9 Cr", colour: P.green, fmt: (v) => v.toFixed(2) },
+  ];
+  const H = metrics.length * (ROW + GAP) + LBL;
+  let out = "";
+  metrics.forEach((m, mi) => {
+    const top = mi * (ROW + GAP);
+    const base = top + ROW - 22;
+    const max = Math.max(0.01, ...rows.map((r) => r.done[m.key] + r.book[m.key])) * 1.2;
+    const h = (v: number) => ((ROW - 40) * v) / max;
+    out += `<text x="0" y="${top + 11}" font-size="10" font-weight="700" fill="${m.colour}">${m.label}</text>
+      <line x1="${L}" y1="${base}" x2="${W - R}" y2="${base}" stroke="${P.line}"/>`;
+    rows.forEach((r, i) => {
+      const x = L + i * bw + bw * 0.22, w = bw * 0.56;
+      const hd = h(r.done[m.key]), hb = h(r.book[m.key]);
+      const total = r.done[m.key] + r.book[m.key];
+      /* Delivered sits on the floor; the board is stacked on top of it,
+         outlined, so the eye reads earned-then-promised in that order. */
+      out += hd > 0 ? `<rect x="${x}" y="${base - hd}" width="${w}" height="${hd}" fill="${m.colour}" rx="2"/>` : "";
+      out += hb > 0 ? `<rect x="${x}" y="${base - hd - hb}" width="${w}" height="${hb}" fill="${m.colour}" fill-opacity="0.18" stroke="${m.colour}" stroke-dasharray="3 2" rx="2"/>` : "";
+      out += total > 0 ? `<text x="${x + w / 2}" y="${base - hd - hb - 5}" text-anchor="middle" font-size="10.5" font-weight="700" fill="${m.colour}">${m.fmt(total)}</text>` : "";
+    });
+  });
+  out += rows.map((r, i) => `<text x="${L + i * bw + bw / 2}" y="${H - 12}" text-anchor="middle" font-size="11.5" fill="${P.sub}">${MON(r.k)}</text>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${out}
+    <text x="${W - R - 232}" y="12" font-size="10" fill="${P.sub}">&#9632; delivered</text>
+    <text x="${W - R - 160}" y="12" font-size="10" fill="${P.sub}">&#9633; still on the board</text>
   </svg>`;
 }
 
@@ -255,7 +325,25 @@ export function deckHtml(D: Deck): string {
   const s: string[] = [];
   const nJobs = D.book.n;
 
-  /* 1 — the year, and the date this report was run */
+  /**
+   * 1 — THE YEAR IN ONE PICTURE (Dr Raghu, 28 Sep 2026: "This page 1 should
+   * show a graph of month wise jobs, value, throughput as a bar graph. This
+   * should be page 1... Put the projections on page 2").
+   *
+   * The projections were opening the report, and a projection is an argument
+   * — it asks to be believed before anything has been shown. The months are
+   * the evidence, so they go first and the argument follows them.
+   */
+  s.push(`<section>
+  ${hd(D, `Nandan GSE · ${esc(D.fy)}`, "The year, month by month", P.navy)}
+  <div class="repdate" style="color:${P.sub}">Date of Report &nbsp;<b>${esc(D.asOfLong)}</b> &nbsp;·&nbsp; day ${D.day} of ${D.total}</div>
+  ${D.year.length
+    ? `<div class="donewrap">${yearChart(D.year)}</div>
+       <p class="close">Solid is what has gone out of the door and is earned. Outlined is what is still on the board — dated, not delivered. ${plural(D.delivered.n, "job")} delivered so far; ${plural(D.book.n, "job")} still to build.</p>`
+    : `<p class="close">Nothing is dated this financial year.</p>`}
+</section>`);
+
+  /* 2 — the year, and the date this report was run */
   s.push(`<section class="dark">
   <div class="kick gold">NANDAN GSE · ${esc(D.fy)}</div>
   <h1>The year, as the book stands today</h1>
@@ -283,7 +371,7 @@ export function deckHtml(D: Deck): string {
   <div class="foot">delivered since 1 April&nbsp; +&nbsp; every job still on the board</div>
 </section>`);
 
-  /* 2 — what has actually been billed */
+  /* 3 — what has actually been billed */
   const last = D.done[D.done.length - 1];
   const best = [...D.done].sort((a, b) => b.v - a.v)[0];
   s.push(`<section>
@@ -303,7 +391,7 @@ export function deckHtml(D: Deck): string {
     : `<p class="close">Nothing has been delivered against a date this financial year.</p>`}
 </section>`);
 
-  /* 3 — the order book, and where it stops */
+  /* 4 — the order book, and where it stops */
   const lastMon = D.months[D.months.length - 1];
   const span = D.months.length ? `${MONF(D.months[0].k)}–${MONF(lastMon.k)}` : "—";
   s.push(`<section>
@@ -323,14 +411,14 @@ export function deckHtml(D: Deck): string {
   <p class="close b">This is not a delivery problem. Even built perfectly and on time, the current book cannot reach the target — the shortfall is orders, not output.</p>
 </section>`);
 
-  /* 4 — what the book is made of */
+  /* 5 — what the book is made of */
   s.push(`<section>
   ${hd(D, "The book by product", `What the ${nJobs} jobs actually are`, P.navy)}
   <div class="hbwrap"><div class="hb hbhead"><span class="hbn"></span><span class="hbt bare"></span><span class="hbj">Jobs</span><span class="hbv">&#8377; Cr TP</span></div>${hbars(D.fams)}</div>
   <p class="close">Ordered by throughput — what the company actually earns on a job, rather than what it invoices. The top ${D.famTop} of ${D.famCount} families carry four-fifths of it.${D.famCount > D.fams.length ? ` ${D.fams.length} are shown; the ${D.famCount - D.fams.length} left off come to ${plural(D.famRest.n, "job")} and ${cr(D.famRest.t)} between them.` : ""}</p>
 </section>`);
 
-  /* 5 — kitting against production */
+  /* 6 — kitting against production */
   s.push(`<section>
   ${hd(D, "Kitting against production", "Where the money is sitting on the floor", P.amber)}
   <div class="two">
@@ -356,7 +444,7 @@ export function deckHtml(D: Deck): string {
   </div>
 </section>`);
 
-  /* 6 — the jobs closest to going out */
+  /* 7 — the jobs closest to going out */
   s.push(`<section>
   ${hd(D, "The near side of the line", `The ${plural(D.ready.n, "job")} closest to going out`, P.green)}
   <table class="t"><thead><tr><th>Job</th><th>What it is</th><th class="c">Kit</th><th class="c">Built</th><th class="c">₹ Cr</th><th class="c">Due</th><th class="c">Open tasks</th></tr></thead><tbody>
@@ -374,10 +462,10 @@ export function deckHtml(D: Deck): string {
   })()}.</p>` : `<p class="close b">Nothing is open on any of them.</p>`}
 </section>`);
 
-  /* 7 — the focus family, looked at on its own */
+  /* 8 — the focus family, looked at on its own */
   s.push(focusSlide(D));
 
-  /* 8 — what is being escalated */
+  /* 9 — what is being escalated */
   s.push(`<section class="dark">
   <div class="kick gold">WHAT IS BEING ESCALATED</div>
   <h1 class="sm">The same problem, on job after job</h1>
@@ -393,6 +481,86 @@ export function deckHtml(D: Deck): string {
   ${D.escQuotes.slice(0, 3).map((q) => `<div class="quote"><b>${esc(q.id)}</b> <span class="qv">${q.tp.toFixed(2)} Cr</span> — &ldquo;${esc(q.text)}&rdquo;</div>`).join("")}
   <div class="callout">Read the escalation text and it is the same theme on job after job: drawings not signed off, design not released, components not frozen. The constraint is upstream of the shop floor.</div>
 </section>`);
+
+  /**
+   * 10 ONWARDS — DELIVERY BY CLIENT, two to a page.
+   *
+   * Dr Raghu, 28 Sep 2026: "Page no 9 onwards have a graph of Delivery by
+   * client. Divide the page into two first. Customer: <name> {pending jobs}.
+   * Make table below: Job No - TDD - Product Family - Customer Tag - Delay
+   * days. Show for all clients from highest to lowest by nos."
+   *
+   * ORDERED BY NUMBER OF JOBS, not by value. A customer with nine machines
+   * outstanding is nine dates and nine conversations whatever they are
+   * worth, and this is the page somebody reads before picking up the phone.
+   *
+   * EVERY CUSTOMER, not a top ten. The long tail is where a forgotten single
+   * job sits, and a report that stops at ten is the reason it stays
+   * forgotten.
+   */
+  for (let i = 0; i < D.byCustomer.length; i += 2) {
+    const pair = D.byCustomer.slice(i, i + 2);
+    s.push(`<section>
+  ${hd(D, "Delivery by client", i === 0 ? "Who is waiting, and for how many" : "Who is waiting, continued", P.navy)}
+  <div class="custpair">
+    ${pair.map((c) => `<div class="custcol">
+      <div class="custhd">
+        <div class="custname">${esc(cut(c.cust, 44))}</div>
+        <div class="custn">${plural(c.n, "job")} pending${c.tp ? ` · ${cr(c.tp)} throughput` : ""}</div>
+      </div>
+      <table class="t small"><thead><tr><th>Job</th><th class="c">TDD</th><th>Family</th><th>Customer tag</th><th class="c">Delay</th></tr></thead><tbody>
+      ${c.jobs.map((j) => `<tr>
+        <td class="jn">${esc(j.id)}</td>
+        <td class="c">${dd(j.tdd)}</td>
+        <td>${esc(cut(j.fam || "—", 22))}</td>
+        <td>${esc(cut(j.tag, 30))}</td>
+        <td class="c" style="${j.delay ? `color:${P.red};font-weight:700` : `color:${P.faint}`}">${j.delay ? `${j.delay}d` : "—"}</td>
+      </tr>`).join("")}
+      </tbody></table>
+    </div>`).join("")}
+    ${pair.length === 1 ? `<div class="custcol"></div>` : ""}
+  </div>
+</section>`);
+  }
+
+  /**
+   * THEN ONE PAGE PER ESCALATION LEVEL, WORST FIRST.
+   *
+   * Dr Raghu, 28 Sep 2026: "then show Escalations L3, Next Page Escalations
+   * L2, Next Escalations L1."
+   *
+   * A page each because the levels are different audiences: L3 is
+   * Management's to answer and L1 is not. Put on one page, somebody has to
+   * sort them by eye every time they read it — and that sorting is the whole
+   * decision the page exists to make.
+   */
+  const LEVEL_TONE: Record<string, string> = { L3: P.red, L2: P.amber, L1: P.navy };
+  const LEVEL_WHOSE: Record<string, string> = {
+    L3: "Management — these are the ones that have run out of other people to escalate to.",
+    L2: "Head of department.",
+    L1: "The first raise — still inside the team that owns the work.",
+  };
+  for (const g of D.escByLevel) {
+    const tone = LEVEL_TONE[g.lvl] || P.navy;
+    s.push(`<section>
+  ${hd(D, `Escalations · ${esc(g.lvl)}`, `${plural(g.tasks.length, "task")} sitting at ${esc(g.lvl)}`, tone)}
+  <p class="close" style="margin-top:0">${esc(LEVEL_WHOSE[g.lvl] || "")}</p>
+  <table class="t"><thead><tr><th>Job</th><th>What is open</th><th>Category</th><th>Who</th><th class="c">Due</th><th class="c">Late by</th></tr></thead><tbody>
+  ${g.tasks.map((t) => {
+    const late = t.due && t.due < D.asOf
+      ? Math.round((Date.parse(`${D.asOf}T00:00:00Z`) - Date.parse(`${t.due}T00:00:00Z`)) / 86400000) : 0;
+    return `<tr>
+      <td class="jn">${esc(t.job)}</td>
+      <td>${esc(cut(t.title, 64))}</td>
+      <td>${esc(cut(t.cat, 22))}</td>
+      <td>${esc(cut(t.who, 20))}</td>
+      <td class="c">${dd(t.due)}</td>
+      <td class="c" style="${late ? `color:${P.red};font-weight:700` : `color:${P.faint}`}">${late ? `${late}d` : "—"}</td>
+    </tr>`;
+  }).join("")}
+  </tbody></table>
+</section>`);
+  }
 
   return page(D, s.join(""));
 }
@@ -528,6 +696,16 @@ h2{font-family:Cambria,Georgia,serif;font-size:27pt;margin:0 0 16px;line-height:
 .t th.c,.t td.c{text-align:center}
 .t td{padding:3px 9px;border-bottom:1px solid ${P.line};color:${P.slate}}
 .t .jn{font-weight:700;color:${P.navy}}
+/* Two clients to a page, side by side, each with its own list under it.
+   A column rather than one long table because the name is the heading a
+   reader looks for, and one table of four hundred rows has no headings. */
+.custpair{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.custcol{min-width:0}
+.custhd{border-bottom:2px solid ${P.navy};padding-bottom:4px;margin-bottom:6px}
+.custname{font-size:13.5pt;font-weight:700;color:${P.navy};line-height:1.2}
+.custn{font-size:9.5pt;color:${P.sub};margin-top:1px}
+.t.small{font-size:9pt}
+.t.small th,.t.small td{padding:2.5px 4px}
 .fx{display:flex;gap:.3in;align-items:flex-start}
 .fxl{flex:1.32}.fxr{flex:1;display:flex;flex-direction:column;gap:8px}
 .fxstats{display:flex;gap:9px}

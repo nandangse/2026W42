@@ -13,6 +13,12 @@ import { useMyWeek, HowsMyDay, ImageQuote, Birthdays, MyLearningCard } from "../
 import { hhmm } from "@/lib/lms";
 import { Board, Job, TODAY, Task, assignees, myHandles, stamp, taskJobRef, taskLate } from "./shared";
 import { TaskModal } from "./Tasking";
+/* THE LIGHTBOX IS THE ONE THE BOARDS ALREADY USE (Dr Raghu, 28 Sep 2026:
+   "dont invent your own lightbox... we already have the one from before").
+   A second box showing the same job differently is a second thing to learn
+   and a second thing to keep true — and this one edits through
+   /api/job-field, so corrections still reach the ERP. */
+import { JobLightbox, type WipJob } from "../JobsInProgress";
 
 /**
  * DELIVERY, AS A CALENDAR (Dr Raghu, 28 Sep 2026: "instead of this list show
@@ -75,9 +81,19 @@ function nextDays(from: string, n: number): string[] {
   return out;
 }
 
+/** Where this job stands against the date the customer was first given. */
+function otdLine(j: Job): { text: string; tone: string } {
+  if (!j.otd) return { text: "no OTD set", tone: "#B8B5AC" };
+  const d = daysBetween(TODAY, j.otd);
+  if (d < 0) return { text: `OTD ${fmt(j.otd)} · ${-d}d over`, tone: "var(--red)" };
+  if (d === 0) return { text: `OTD ${fmt(j.otd)} · today`, tone: "#8A5B00" };
+  return { text: `OTD ${fmt(j.otd)} · in ${d}d`, tone: d <= 7 ? "#8A5B00" : "var(--dim)" };
+}
+
 function JobBox({ j, onPeek, dense }: { j: Job; onPeek: (j: Job) => void; dense?: boolean }) {
   const who = ownerOf(j);
   const c = ownerColour(who);
+  const otd = otdLine(j);
   return (
     <button onClick={() => onPeek(j)} className="rounded-lg text-left w-full"
       style={{ border: `1px solid ${c}44`, borderLeft: `4px solid ${c}`, background: `${c}0D`, padding: dense ? "5px 7px" : "7px 8px" }}
@@ -90,7 +106,16 @@ function JobBox({ j, onPeek, dense }: { j: Job; onPeek: (j: Job) => void; dense?
       <div style={{ fontSize: 11, color: "var(--ink)", lineHeight: 1.3, marginTop: 1, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
         {j.tag}
       </div>
-      <div className="truncate" style={{ fontSize: 10.5, color: c, fontWeight: 600, marginTop: 2 }}>{who}</div>
+      {/* THE OTD, NOT THE OWNER (Dr Raghu, 28 Sep 2026: "remove project
+          owners name, put in delay from OTD (if passed) or days to OTD if in
+          future").
+
+          The name was already being said twice — the colour of the box IS
+          the owner, with the key across the top — so the line was a label on
+          a thing that had already labelled itself. The OTD is the date the
+          customer was ORIGINALLY given, and the distance from it is the only
+          number on this board that says whether we have kept our word. */}
+      <div className="truncate" style={{ fontSize: 10.5, marginTop: 2, fontWeight: 700, color: otd.tone }}>{otd.text}</div>
       <div className="rounded" style={{ height: 3, background: "rgba(0,0,0,.08)", marginTop: 3 }}>
         <div style={{ height: 3, width: `${Math.max(0, Math.min(100, j.pct))}%`, background: j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#D97706" : "var(--red)", borderRadius: 3 }} />
       </div>
@@ -99,20 +124,59 @@ function JobBox({ j, onPeek, dense }: { j: Job; onPeek: (j: Job) => void; dense?
 }
 
 /**
- * HOW MANY LATE JOBS THE COLUMN SHOWS BEFORE IT ASKS.
+ * PAST DUE SPILLS SIDEWAYS, NOT DOWNWARDS.
  *
- * Dr Raghu, 28 Sep 2026: "past due should reduce!! It will always be 5-6
- * jobs anyways always." Six is the normal state of that column, so six is
- * what it is built for; today's sixteen is the abnormality and it should
- * look like one rather than quietly setting the height of the board.
+ * Dr Raghu, 28 Sep 2026: "in this past due make it limited to as many jobs
+ * as are listed for one day or 5, whichever is higher. Make multiple past
+ * due columns if needed. Eg currently it being 16, show as 6+5+5."
  *
- * NOTHING IS HIDDEN. The count is in the heading whatever is drawn, and the
- * rest are one press away — a board that made late work smaller by not
- * mentioning it would be the worst thing this page could do.
+ * A COLUMN SHOULD NOT BE TALLER THAN THE BOARD IT SITS IN. Sixteen boxes in
+ * one column made the whole board sixteen boxes tall to hold a column nobody
+ * wants to be long — the week beside it, which is the part that can still be
+ * acted on, was pushed off the bottom of the screen by the part that cannot.
+ *
+ * SO: the column's height is the busiest day of the week, or five, whichever
+ * is greater — and anything more opens another column beside it. The jobs are
+ * then spread EVENLY across those columns rather than filling the first to
+ * the brim, so three columns of sixteen read 6+5+5 and the board stays the
+ * height of its tallest day.
+ *
+ * Three columns is the limit. Past its third, late work is not a layout
+ * problem any more, and the rest go behind a count that says how many.
  */
-const LATE_SHOWN = 6;
+const LATE_MIN = 5;
+const LATE_COLS_MAX = 3;
 
-function DeliveryBoard({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => void }) {
+/** Spread n items over `cols` columns as evenly as possible, biggest first. */
+function spread<T>(items: T[], cols: number): T[][] {
+  if (cols <= 1) return [items];
+  const base = Math.floor(items.length / cols);
+  const extra = items.length % cols;
+  const out: T[][] = [];
+  let at = 0;
+  for (let i = 0; i < cols; i++) {
+    const take = base + (i < extra ? 1 : 0);
+    out.push(items.slice(at, at + take));
+    at += take;
+  }
+  return out.filter((c) => c.length > 0);
+}
+
+/** The board's job, in the shape the shared lightbox reads. */
+const toWip = (j: Job): WipJob => ({
+  id: j.id, tag: j.tag || "", cust: j.cust || "", fam: j.fam || "",
+  tdd: j.tdd, otd: j.otd, stat: j.stat || "",
+  val: Number(j.val) || 0, tpv: Number(j.tpv) || 0, tpp: Number(j.tpp) || 0,
+  kit: Number(j.kit) || 0, pct: Number(j.pct) || 0, note: j.note || "",
+  escalation: j.escalation ?? null, amtNeeded: j.amtNeeded ?? null,
+  payOnDelivery: j.payOnDelivery ?? null, mandays: j.mandays ?? null,
+  ownerInitials: j.ownerInitials, ownerName: j.ownerName,
+});
+
+function DeliveryBoard({ jobs, onOpen, V, reload, canEdit }: {
+  jobs: Job[]; onOpen: (id: string) => void; V: (v: number) => string;
+  reload: () => Promise<Board | null>; canEdit: boolean;
+}) {
   const [peek, setPeek] = useState<Job | null>(null);
   const [allLate, setAllLate] = useState(false);
 
@@ -128,6 +192,14 @@ function DeliveryBoard({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => 
     .slice(0, 20);
   const onDay = (d: string) => coming.filter((j) => j.tdd === d);
   const later = dated.filter((j) => (j.tdd as string) > horizon).length;
+
+  /* The tallest day decides how tall a late column may be. */
+  const busiestDay = Math.max(0, ...days.map((d) => onDay(d).length));
+  const cap = Math.max(LATE_MIN, busiestDay);
+  const room = cap * LATE_COLS_MAX;
+  const lateShown = allLate ? past : past.slice(0, room);
+  const lateHidden = past.length - lateShown.length;
+  const lateCols = spread(lateShown, Math.min(LATE_COLS_MAX, Math.max(1, Math.ceil(lateShown.length / cap))));
 
   /* Who is carrying this board, so the colours have a key rather than being
      decoration somebody has to decode. */
@@ -146,24 +218,30 @@ function DeliveryBoard({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => 
         </div>
       </div>
 
-      <div className="grid gap-2" style={{ gridTemplateColumns: "minmax(170px,1.1fr) repeat(7, minmax(150px,1fr))", overflowX: "auto" }}>
-        {/* ---- past due ---- */}
-        <div style={{ minWidth: 0 }}>
+      <div className="grid gap-2" style={{
+        gridTemplateColumns: `repeat(${Math.max(1, lateCols.length)}, minmax(160px,1fr)) repeat(7, minmax(150px,1fr))`,
+        overflowX: "auto",
+      }}>
+        {/* ---- past due, spilling sideways ---- */}
+        {lateCols.map((col, ci) => (
+        <div key={`late-${ci}`} style={{ minWidth: 0 }}>
           <div className="rounded px-2 py-1 mb-1.5" style={{ background: "var(--red)" }}>
-            <div className="text-xs font-bold" style={{ color: "#fff" }}>Past due</div>
+            <div className="text-xs font-bold" style={{ color: "#fff" }}>Past due{lateCols.length > 1 ? ` ${ci + 1}/${lateCols.length}` : ""}</div>
             {/* WHAT THE COLUMN IS ASKING FOR (Dr Raghu, 28 Sep 2026: "else
                 the planning engineer will anyways have to change the TDD").
                 A late job is not a fact to be noted, it is a date that has
                 stopped being true and a person who must re-date it. Said
                 that way, a long column reads as work owed rather than as
-                bad news nobody owns. */}
+                bad news nobody owns. Only the first column says it — three
+                columns repeating one sentence is three times the noise. */}
             <div style={{ fontSize: 10.5, color: "#FFD9D2" }}>
-              {past.length} job{past.length === 1 ? "" : "s"} · oldest first · the TDD needs revising
+              {ci === 0
+                ? `${past.length} job${past.length === 1 ? "" : "s"} · oldest first · the TDD needs revising`
+                : "continued"}
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            {past.length === 0 && <div className="text-xs py-3 text-center" style={{ color: "var(--green)", fontWeight: 700 }}>Nothing late.</div>}
-            {(allLate ? past : past.slice(0, LATE_SHOWN)).map((j) => (
+            {col.map((j) => (
               <div key={j.id}>
                 {/* How late, on the box: "4 days" is the fact a date makes
                     the reader work out. */}
@@ -173,14 +251,23 @@ function DeliveryBoard({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => 
                 <JobBox j={j} onPeek={setPeek} dense />
               </div>
             ))}
-            {past.length > LATE_SHOWN && (
+            {ci === lateCols.length - 1 && (lateHidden > 0 || allLate) && (
               <button onClick={() => setAllLate(!allLate)} className="rounded text-xs font-bold py-1.5"
                 style={{ border: "1px solid var(--red)", color: "var(--red)", background: "#fff" }}>
-                {allLate ? "Show the worst 6" : `+ ${past.length - LATE_SHOWN} more past due`}
+                {allLate ? "Show fewer" : `+ ${lateHidden} more past due`}
               </button>
             )}
           </div>
         </div>
+        ))}
+        {past.length === 0 && (
+          <div style={{ minWidth: 0 }}>
+            <div className="rounded px-2 py-1 mb-1.5" style={{ background: "var(--green)" }}>
+              <div className="text-xs font-bold" style={{ color: "#fff" }}>Past due</div>
+              <div style={{ fontSize: 10.5, color: "#D7F0DF" }}>nothing late</div>
+            </div>
+          </div>
+        )}
 
         {/* ---- one column per day ---- */}
         {days.map((d) => {
@@ -211,63 +298,17 @@ function DeliveryBoard({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => 
         </div>
       )}
 
-      {peek && <JobPeek job={peek} onClose={() => setPeek(null)} onOpen={onOpen} />}
-    </div>
-  );
-}
-
-/**
- * The box, opened. Enough to decide whether to act without leaving the
- * morning page — and one button to the job itself when it is not enough.
- */
-function JobPeek({ job: j, onClose, onOpen }: { job: Job; onClose: () => void; onOpen: (id: string) => void }) {
-  const overdue = !!j.tdd && j.tdd < TODAY;
-  const L = ({ k, v, tone }: { k: string; v: React.ReactNode; tone?: string }) => (
-    <div className="flex gap-2 py-1 border-b" style={{ borderColor: "var(--line-soft)" }}>
-      <span className="text-xs" style={{ color: "var(--muted)", minWidth: 118 }}>{k}</span>
-      <span className="text-xs font-semibold" style={{ color: tone || "var(--ink)", flex: 1 }}>{v || "—"}</span>
-    </div>
-  );
-  return (
-    <div onClick={onClose} role="button" tabIndex={0}
-      style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(22,35,47,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} role="button" tabIndex={0} className="rounded-lg bg-white"
-        style={{ width: "min(520px,100%)", maxHeight: "calc(100vh - 32px)", overflowY: "auto" }}>
-        <div className="flex items-start gap-3 px-4 py-3" style={{ background: "var(--navy)", borderRadius: "8px 8px 0 0" }}>
-          <div style={{ flex: 1 }}>
-            <div className="text-xs font-bold" style={{ color: "#8FA1B3", letterSpacing: 1.2 }}>JOB {jobNo(j.id)}</div>
-            <div className="font-bold text-white" style={{ fontSize: 15, lineHeight: 1.3 }}>{j.tag}</div>
-          </div>
-          <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3", fontSize: 18, lineHeight: 1 }}>✕</button>
-        </div>
-        <div className="p-3">
-          <div className="flex gap-2 mb-2">
-            <Chip label="Production" value={`${j.pct}%`} color={j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#8A5B00" : "var(--red)"} />
-            <Chip label="TDD" value={fmtFull(j.tdd)} color={overdue ? "var(--red)" : "var(--ink)"} />
-            {j.otd && <Chip label="OTD" value={fmtFull(j.otd)} />}
-          </div>
-          <L k="Customer" v={j.cust} />
-          <L k="Planning owner" v={j.ownerName || j.ownerInitials || (j.own ? j.own.split("@")[0] : "")} />
-          <L k="Production owner" v={j.productionOwner} />
-          <L k="Quality owner" v={j.qualityOwner} />
-          <L k="Project" v={j.proj} />
-          <L k="Status" v={j.stat} />
-          <L k="On the floor" v={j.onFloor ? `yes${j.onFloorAt ? ` · since ${fmtFull(j.onFloorAt)}` : ""}` : "not yet"} tone={j.onFloor ? "var(--green)" : "var(--muted)"} />
-          {j.escalation && j.escalation !== "None" && <L k="Escalation" v={j.escalation} tone="var(--red)" />}
-          {j.floorSummary && (
-            <div className="rounded p-2 mt-2" style={{ background: "#F4F2EC" }}>
-              <div className="text-xs font-bold mb-0.5" style={{ color: "var(--muted)", letterSpacing: 1 }}>
-                FROM THE FLOOR{j.floorSummaryAt ? ` · ${fmtFull(j.floorSummaryAt)}` : ""}
-              </div>
-              <div className="text-xs" style={{ color: "var(--ink)", lineHeight: 1.5 }}>{j.floorSummary}</div>
-            </div>
-          )}
-          <button onClick={() => { onClose(); onOpen(j.id); }}
-            className="w-full rounded font-bold mt-3 py-2" style={{ background: "var(--accent)", color: "#fff", fontSize: 13 }}>
-            Open the full job →
-          </button>
-        </div>
-      </div>
+      {peek && (
+        <JobLightbox
+          job={toWip(peek)}
+          V={V}
+          colour={ownerColour(ownerOf(peek))}
+          onClose={() => setPeek(null)}
+          onOpenPlan={() => { setPeek(null); onOpen(peek.id); }}
+          canEdit={canEdit}
+          onSaved={reload}
+        />
+      )}
     </div>
   );
 }
@@ -464,7 +505,10 @@ export function MyWeek({
            Dr Raghu, 28 Sep 2026: "this should come full width. above the
            tasks this week". It is the shop's question, not one person's —
            a third of the page was making it look like a personal panel. */}
-      <div className="mb-4"><DeliveryBoard jobs={board.jobs} onOpen={onOpen} /></div>
+      <div className="mb-4">
+        <DeliveryBoard jobs={board.jobs} onOpen={onOpen} V={V} reload={reload}
+          canEdit={me.role === "admin" || me.role === "planner" || me.role === "project_owner"} />
+      </div>
 
       {/* ===== three columns ===== */}
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
