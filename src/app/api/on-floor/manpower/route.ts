@@ -43,6 +43,34 @@ export async function GET(req: Request) {
       return NextResponse.json({ rows: data || [] });
     }
 
+    /**
+     * A WINDOW OF DAYS, for the week grid (Dr Raghu, 28 Sep 2026:
+     * "workforce planning ... next column YESTERDAY, then TODAY and date,
+     * then the next 7 days").
+     *
+     * One read for the whole window rather than nine reads a day apart: a
+     * grid that fetches per column flickers in nine steps and asks the
+     * database nine questions it could have asked once.
+     */
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    if (from && to) {
+      /* Today is inside the window, so the rollover still gets its chance to
+         heal a missed night before anybody reads it. */
+      if (from <= istToday() && istToday() <= to) {
+        try { await ensureManpowerRollover(); } catch (e) { swallow("on-floor/manpower", e); }
+      }
+      const { data, error } = await admin
+        .from("job_manpower").select("job_id, day, crew, noted_by, updated_at")
+        .gte("day", from).lte("day", to);
+      if (error) {
+        if (/job_manpower|schema cache|does not exist/i.test(error.message))
+          return NextResponse.json({ rows: [], needsMigration: true });
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ rows: data || [] });
+    }
+
     const day = url.searchParams.get("day") || istToday();
     // Reading today's ledger is also what heals it: if the 4 AM cron slept,
     // the missing days fill themselves in — back-dated correctly — the first

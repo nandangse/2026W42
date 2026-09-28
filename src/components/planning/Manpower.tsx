@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 
 import { TRADES, type Crew } from "@/lib/templates";
-import { today, fmt, fmtFull, jobNo, computeSchedule, manDays, type Plan } from "@/lib/schedule";
+import { today, fmt, fmtFull, jobNo, computeSchedule, manDays, type Plan, addDays } from "@/lib/schedule";
 
 import { Job, TODAY } from "./shared";
 
@@ -566,3 +566,211 @@ export function ManpowerEditor({ jobId, value, onSaved }: { jobId: string; value
     </div>
   );
 }
+
+/**
+ * THE WEEK, AS A GRID (Dr Raghu, 28 Sep 2026: "workforce planning — show on
+ * the left column Job no and cust tag with the usual click and lightbox etc,
+ * next column YESTERDAY, then TODAY and date, then the next 7 days. In the
+ * cell where the job and the date intersect there should be F H W Hd").
+ *
+ * WHY A GRID AND NOT NINE COPIES OF THE DAY SCREEN. Manpower is not decided
+ * a day at a time. The question is "who is on what, all week" — and the
+ * answer is only visible when the days sit beside each other, because moving
+ * two fitters off Thursday means putting them somewhere, and that somewhere
+ * is a column you must be able to see while you take them.
+ *
+ * YESTERDAY IS THERE, AND IT IS READ-ONLY IN SPIRIT. It is the only column
+ * that is a fact rather than an intention, and it is what makes today's
+ * number believable: a job that had four men yesterday and none planned for
+ * today is either finished or forgotten, and the pair of cells says which.
+ *
+ * A CELL SHOWS ONLY THE TRADES THAT HAVE A NUMBER. Printing six zeroes in
+ * every empty cell would make an empty week look busy.
+ */
+export function WorkforceWeek({
+  jobs, today: t0, onOpenJob, canEdit, onSaved,
+}: {
+  jobs: Job[];
+  today: string;
+  onOpenJob: (j: Job) => void;
+  canEdit: boolean;
+  onSaved: () => void;
+}) {
+  const [rows, setRows] = useState<Record<string, Record<string, Crew>>>({});
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [edit, setEdit] = useState<{ job: string; day: string } | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [q, setQ] = useState("");
+  const [onlyManned, setOnlyManned] = useState(false);
+
+  const days: string[] = [];
+  for (let i = -1; i <= 7; i++) days.push(addDays(t0, i));
+  const from = days[0], to = days[days.length - 1];
+
+  const load = useCallback(() => {
+    api.get(`/api/on-floor/manpower?from=${from}&to=${to}`)
+      .then((r: { rows?: { job_id: string; day: string; crew: Crew }[] }) => {
+        const by: Record<string, Record<string, Crew>> = {};
+        for (const x of r.rows || []) (by[x.job_id] ||= {})[x.day] = x.crew;
+        setRows(by);
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [from, to]);
+  useEffect(() => { load(); }, [load]);
+
+  const total = (c?: Crew) => (c ? TRADES.reduce((n, t) => n + (Number(c[t.key]) || 0), 0) : 0);
+  const needle = q.trim().toLowerCase();
+  const shown = jobs
+    .filter((j) => !needle || j.tag.toLowerCase().includes(needle) || jobNo(j.id).includes(needle))
+    .filter((j) => !onlyManned || days.some((d) => total(rows[j.id]?.[d]) > 0));
+
+  const save = async () => {
+    if (!edit) return;
+    setBusy(true); setErr("");
+    try {
+      const crew: Record<string, number> = {};
+      for (const t of TRADES) crew[t.key] = Math.max(0, Math.round(Number(draft[t.key]) || 0));
+      await api.post("/api/on-floor/manpower", { job_id: edit.job, day: edit.day, crew });
+      setEdit(null); load(); onSaved();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
+  /* Down each day, so a column says how many hands it is asking for. */
+  const dayTotal = (d: string) => shown.reduce((n, j) => n + total(rows[j.id]?.[d]), 0);
+
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: "var(--line)" }}>
+      <div className="flex items-baseline gap-2 flex-wrap mb-2">
+        <div className="font-bold text-sm">Workforce planning</div>
+        <div className="text-xs" style={{ color: "var(--muted)" }}>yesterday, today, and the seven days after</div>
+        <div className="flex-1" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 job or tag"
+          className="text-xs border rounded px-2 py-1" style={{ borderColor: "var(--line)", width: 150 }} />
+        <label className="flex items-center gap-1 text-xs" style={{ color: "var(--muted)", cursor: "pointer" }}>
+          <input type="checkbox" checked={onlyManned} onChange={(e) => setOnlyManned(e.target.checked)} />
+          only jobs with crew
+        </label>
+      </div>
+      {err && <div className="text-xs font-bold mb-2" style={{ color: "var(--red)" }}>{err}</div>}
+
+      <div style={{ overflowX: "auto" }}>
+        <table className="w-full" style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th style={{ ...hcell, textAlign: "left", position: "sticky", left: 0, zIndex: 2, background: "var(--navy)", minWidth: 210 }}>Job</th>
+              {days.map((d, i) => {
+                const isToday = d === t0, isYest = i === 0;
+                return (
+                  <th key={d} style={{
+                    ...hcell, minWidth: 86,
+                    background: isToday ? "#E4610F" : isYest ? "#46545F" : "var(--navy)",
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 800 }}>
+                      {isYest ? "YESTERDAY" : isToday ? "TODAY" : dayName(d)}
+                    </div>
+                    <div style={{ fontSize: 10, opacity: .85 }}>{fmt(d)}</div>
+                    <div style={{ fontSize: 10, opacity: .85 }}>{dayTotal(d) || "—"}</div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((j) => (
+              <tr key={j.id}>
+                <td style={{ ...cell, position: "sticky", left: 0, zIndex: 1, background: "#fff", textAlign: "left" }}>
+                  {/* The usual click: the job opens the lightbox the boards use. */}
+                  <button onClick={() => onOpenJob(j)} className="text-left">
+                    <span className="font-bold tnum" style={{ color: "var(--blue)" }}>{jobNo(j.id)}</span>
+                    <span style={{ color: "var(--ink)" }}> · {j.tag}</span>
+                  </button>
+                </td>
+                {days.map((d, i) => {
+                  const c = rows[j.id]?.[d];
+                  const n = total(c);
+                  const isYest = i === 0, isToday = d === t0;
+                  return (
+                    <td key={d} style={{
+                      ...cell,
+                      background: isToday ? "#FFF3E8" : isYest ? "#FAFBFD" : "#fff",
+                      cursor: canEdit ? "pointer" : "default",
+                    }}
+                      onClick={() => {
+                        if (!canEdit) return;
+                        const cur = rows[j.id]?.[d];
+                        const dr: Record<string, string> = {};
+                        for (const t of TRADES) dr[t.key] = String(Number(cur?.[t.key]) || 0);
+                        setDraft(dr); setEdit({ job: j.id, day: d });
+                      }}
+                      title={canEdit ? `Set the crew on ${fmt(d)}` : undefined}>
+                      {n === 0 ? (
+                        <span style={{ color: "#D8D5CC" }}>·</span>
+                      ) : (
+                        <span className="flex gap-1 justify-center flex-wrap">
+                          {TRADES.filter((t) => Number(c?.[t.key]) > 0).map((t) => (
+                            <span key={t.key} style={{ color: t.color, fontWeight: 700, fontSize: 11 }}>
+                              {t.tiny}{Number(c?.[t.key])}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            {shown.length === 0 && (
+              <tr><td colSpan={days.length + 1} style={{ ...cell, color: "var(--muted)", padding: 16 }}>No jobs match.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {edit && (
+        <div onClick={() => setEdit(null)} role="button" tabIndex={0}
+          style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(22,35,47,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} role="button" tabIndex={0} className="rounded-lg bg-white p-4" style={{ width: "min(420px,100%)" }}>
+            <div className="font-bold mb-1" style={{ fontSize: 14 }}>
+              Crew on {fmt(edit.day)}
+              {edit.day === t0 ? " · today" : edit.day < t0 ? " · yesterday" : ""}
+            </div>
+            <div className="text-xs mb-2" style={{ color: "var(--muted)" }}>
+              Job {jobNo(edit.job)}
+              {edit.day < t0 && " — a past day is a record of what happened, not a plan."}
+            </div>
+            <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
+              {TRADES.map((t) => (
+                <label key={t.key} style={{ fontSize: 11, color: "var(--muted)" }}>
+                  <span style={{ color: t.color, fontWeight: 700 }}>{t.tiny}</span> {t.label}
+                  <input value={draft[t.key] ?? "0"} inputMode="numeric"
+                    onChange={(e) => setDraft({ ...draft, [t.key]: e.target.value.replace(/[^0-9]/g, "") })}
+                    className="w-full rounded border px-2 py-1 tnum" style={{ borderColor: "var(--line)", fontSize: 14 }} />
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button onClick={save} disabled={busy} className="rounded px-3 py-1.5 font-bold"
+                style={{ background: "var(--green)", color: "#fff", fontSize: 12.5 }}>{busy ? "Saving…" : "Save"}</button>
+              <button onClick={() => { const dr: Record<string, string> = {}; for (const t of TRADES) dr[t.key] = "0"; setDraft(dr); }}
+                className="rounded px-3 py-1.5" style={{ border: "1px solid var(--line)", color: "var(--muted)", fontSize: 12.5 }}>Clear</button>
+              <div className="flex-1" />
+              <button onClick={() => setEdit(null)} className="rounded px-3 py-1.5" style={{ color: "var(--muted)", fontSize: 12.5 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const hcell: React.CSSProperties = {
+  background: "var(--navy)", color: "#fff", padding: "4px 6px", textAlign: "center",
+  border: "1px solid rgba(255,255,255,.12)", position: "sticky", top: 0,
+};
+const cell: React.CSSProperties = {
+  padding: "4px 6px", textAlign: "center", border: "1px solid var(--line-soft)", verticalAlign: "middle",
+};
+const DAYS3 = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const dayName = (iso: string) => DAYS3[new Date(`${iso}T00:00:00`).getDay()];

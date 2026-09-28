@@ -44,6 +44,7 @@ import { UpdateToErp } from "./planning/Admin";
 const Admin = dynamic(() => import("./planning/Admin").then((m) => m.Admin), { loading: () => <TabLoading /> });
 const ConsultRaghu = dynamic(() => import("./planning/Consult").then((m) => m.ConsultRaghu), { loading: () => <TabLoading /> });
 const Principles = dynamic(() => import("./planning/Consult").then((m) => m.Principles), { loading: () => <TabLoading /> });
+import ManpowerPlan from "./planning/ManpowerPlan";
 import { TaskModal } from "./planning/Tasking";
 const Tasking = dynamic(() => import("./planning/Tasking").then((m) => m.Tasking), { loading: () => <TabLoading /> });
 import { ChangePasswordModal, ProfileModal } from "./planning/Profile";
@@ -141,7 +142,7 @@ export default function PlanningSuite({
   }, [workspace, canSeeDelivered]);
 
   // land on "My Week" within the suite, not the delivery board
-  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "mplan" | "projects" | "jobcomm" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature" | "opsbook" | "backups">(() => {
+  const [tab, setTab] = useState<"home" | "wip" | "liveproj" | "delivery" | "load" | "plan" | "mplan" | "manpower" | "projects" | "jobcomm" | "floor" | "material" | "esc" | "erp" | "upload" | "admin" | "feature" | "opsbook" | "backups">(() => {
     if (typeof window === "undefined") return "home";
     /**
      * A LINK MAY NAME THE TAB. The back-arrow on a project page says
@@ -152,7 +153,7 @@ export default function PlanningSuite({
      * Home every time, from wherever you had been.
      */
     const OK = ["home", "wip", "liveproj", "delivery", "load", "plan", "mplan",
-      "projects", "jobcomm", "floor", "material", "esc", "erp", "upload", "admin", "feature", "opsbook", "backups"];
+      "projects", "jobcomm", "floor", "material", "esc", "manpower", "erp", "upload", "admin", "feature", "opsbook", "backups"];
     try {
       const asked = new URLSearchParams(window.location.search).get("tab");
       if (asked && OK.includes(asked)) return asked as "home";
@@ -533,6 +534,10 @@ export default function PlanningSuite({
     ["delivery", "Job Delivery Board"],
     ["material", "Pending Material"],
     ["esc", "Escalations"],
+    /* Dr Raghu, 28 Sep 2026: "in the Planning add a new module called
+       Manpower Planning." Beside On Floor and Escalations, because it is a
+       screen the production side opens every morning, not a report. */
+    ["manpower", "Manpower Planning"],
     ["load", "Load Board"],
     ["plan", "Job Plan"],
     ["mplan", "Month & Qtr Plan"],
@@ -720,6 +725,10 @@ export default function PlanningSuite({
       )}
       {workspace === "suite" && tab === "floor" && <OnFloor board={board} V={V} onOpen={openJobPlan} reload={reload} canEdit={canEdit} canTask={role !== "viewer"} isStrat={canSeeForward} myName={(displayName || email.split("@")[0]).split(" ")[0]} />}
       {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canEdit} />}
+      {workspace === "suite" && tab === "manpower" && (
+        <ManpowerPlan board={board} canEdit={canEdit}
+          onOpenJob={(j) => openJobPlan(j.id)} />
+      )}
       {workspace === "suite" && tab === "esc" && <Escalations board={board} V={V} onOpen={openJobPlan} reload={reload} isAdmin={isAdmin} />}
       {workspace === "suite" && tab === "load" && <LoadBoard board={board} byTDD={byTDD} />}
       {workspace === "suite" && tab === "mplan" && <MonthQuarterPlan V={V} />}

@@ -89,6 +89,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.7.0.0",
+    date: "2026-09-28",
+    module: "Manpower Planning \u2014 the week, by name",
+    items: [
+      "<b>A new module in Planning.</b> Jobs down the left, then <b>yesterday, today, and the seven days after</b> across. In each cell, the <b>people</b> on that job that day \u2014 by name, drawn from HRMS, 207 on the rolls and 129 of them in Production. The job number opens the lightbox the boards already use.",
+      "<b>Drag a man from one cell to another</b>, job to job or day to day \u2014 and out of the <b>UNASSIGNED TODAY</b> pool at the top, which answers the question a grid cannot: not where everybody is, but who is <b>nowhere</b>.",
+      "<b>Two plus signs, two different jobs.</b> <b>+</b> on a day\u2019s heading copies that whole day forward; <b>+\u2192</b> in a cell carries just that job\u2019s crew forward. Most days are yesterday repeated, and a plan that must be retyped every morning is a plan nobody is keeping by Wednesday. Both <b>add</b> rather than replace \u2014 somebody who has already planned tomorrow does not lose it because a colleague pressed copy.",
+      "<b>A man in two places is red, and counts as half a day on each</b> (his rule). A man is one man: let two jobs each claim a whole day of him and every costing downstream is inflated by however loose the planning was. Three jobs is a third each \u2014 the rule is one man, one day.",
+      "<b>Trade is read off the designation</b> \u2014 <i>Prod - Fitter</i>, <i>Prod - Hydraulic Technician</i> \u2014 and where it does not read, it says nothing rather than guessing. A supervisor filed as a welder is a wrong man-day in somebody\u2019s costing.",
+      "<b>Today and yesterday carry a box for what actually happened</b>, written by the production side, per job per day. Tomorrow has no such box: a note about tomorrow is a plan, and the cell above it is already the plan.",
+      "<b>Milestones land in the cells</b> on the day they are due, so the crew and the commitment are read together.",
+      "<b>The old crew counts are untouched.</b> 585 days of recorded crew carry nobody\u2019s name; inventing names for them would be fabricating a record of who worked where. Names and counts live side by side and the labour costing reads what it always read. <b>Needs migration 0171.</b>",
+    ],
+  },
+  {
     v: "5.6.0.5",
     date: "2026-09-28",
     module: "The picture was totalling the wrong table \u2014 fixed",
