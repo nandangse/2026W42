@@ -41,89 +41,144 @@ function dayHead(iso: string): { day: string; weekday: string } {
 const daysBetween = (a: string, b: string) =>
   Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86400000);
 
-function DeliveryCalendar({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => void }) {
+/**
+ * ONE COLUMN PER DAY, AND PAST DUE FIRST (Dr Raghu, 28 Sep 2026: "First
+ * column show past due in one column sort by TDD ... then make one column
+ * for each day of the week").
+ *
+ * WHY PAST DUE GETS ITS OWN COLUMN AND NOT ITS OWN DATE ROWS. Sixteen
+ * overdue machines spread over eleven past dates was eleven headings before
+ * the reader reached today — and on the first cut the overdue jobs ate the
+ * twenty, so only four upcoming ones survived to be seen. The thing that has
+ * slipped and the thing that is coming are two different questions; they get
+ * two different shapes, and the twenty is spent on what is coming.
+ *
+ * COLOUR IS THE PLANNING OWNER. The eye groups by colour before it reads
+ * anything, so a week's board answers "how much is Pankaj carrying on
+ * Thursday" at a glance. The colour is derived from the name itself, so a
+ * person keeps their colour everywhere without a table to maintain.
+ */
+const OWNER_INK = ["#1B3A5C", "#B45309", "#0D7A3F", "#7C3AED", "#B3392E", "#0E7490", "#8A5B00", "#4338CA", "#9D174D", "#155E75"];
+function ownerColour(name: string): string {
+  const n = String(name || "").trim().toLowerCase();
+  if (!n) return "#8B8F87";
+  let h = 0;
+  for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0;
+  return OWNER_INK[h % OWNER_INK.length];
+}
+const ownerOf = (j: Job) => j.ownerName || j.ownerInitials || (j.own ? j.own.split("@")[0] : "—");
+
+/** The seven columns after today, whether or not anything lands on them. */
+function nextDays(from: string, n: number): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) out.push(addDays(from, i));
+  return out;
+}
+
+function JobBox({ j, onPeek, dense }: { j: Job; onPeek: (j: Job) => void; dense?: boolean }) {
+  const who = ownerOf(j);
+  const c = ownerColour(who);
+  return (
+    <button onClick={() => onPeek(j)} className="rounded-lg text-left w-full"
+      style={{ border: `1px solid ${c}44`, borderLeft: `4px solid ${c}`, background: `${c}0D`, padding: dense ? "5px 7px" : "7px 8px" }}
+      title={`${j.tag} — ${who}`}>
+      <div className="flex items-baseline gap-1.5">
+        <span className="font-bold tnum" style={{ color: c, fontSize: 13.5 }}>{jobNo(j.id)}</span>
+        <div className="flex-1" />
+        <span className="font-bold tnum" style={{ fontSize: 11.5, color: j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#8A5B00" : "var(--red)" }}>{j.pct}%</span>
+      </div>
+      <div style={{ fontSize: 11, color: "var(--ink)", lineHeight: 1.3, marginTop: 1, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+        {j.tag}
+      </div>
+      <div className="truncate" style={{ fontSize: 10.5, color: c, fontWeight: 600, marginTop: 2 }}>{who}</div>
+      <div className="rounded" style={{ height: 3, background: "rgba(0,0,0,.08)", marginTop: 3 }}>
+        <div style={{ height: 3, width: `${Math.max(0, Math.min(100, j.pct))}%`, background: j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#D97706" : "var(--red)", borderRadius: 3 }} />
+      </div>
+    </button>
+  );
+}
+
+function DeliveryBoard({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => void }) {
   const [peek, setPeek] = useState<Job | null>(null);
 
-  /* Grouped in order, so the days come out oldest first and each day keeps
-     the jobs in the order the run gave them. */
-  const days: { date: string; jobs: Job[] }[] = [];
-  for (const j of jobs) {
-    const d = j.tdd as string;
-    const last = days[days.length - 1];
-    if (last && last.date === d) last.jobs.push(j);
-    else days.push({ date: d, jobs: [j] });
-  }
-  const late = jobs.filter((j) => (j.tdd || "") < TODAY).length;
+  const dated = jobs.filter((j) => !!j.tdd);
+  const past = dated.filter((j) => (j.tdd as string) < TODAY)
+    .sort((a, b) => ((a.tdd as string) < (b.tdd as string) ? -1 : 1));
+  const days = nextDays(TODAY, 7);
+  const horizon = days[days.length - 1];
+  /* The twenty is spent on what is COMING — the overdue column is complete
+     on its own and must not eat the allowance. */
+  const coming = dated.filter((j) => (j.tdd as string) >= TODAY && (j.tdd as string) <= horizon)
+    .sort((a, b) => ((a.tdd as string) < (b.tdd as string) ? -1 : 1))
+    .slice(0, 20);
+  const onDay = (d: string) => coming.filter((j) => j.tdd === d);
+  const later = dated.filter((j) => (j.tdd as string) > horizon).length;
+
+  /* Who is carrying this board, so the colours have a key rather than being
+     decoration somebody has to decode. */
+  const owners = [...new Set([...past, ...coming].map(ownerOf))].sort();
 
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: "var(--line)" }}>
       <div className="flex items-baseline gap-2 flex-wrap mb-2">
         <div className="font-bold text-sm">Delivery run</div>
-        <div className="text-xs" style={{ color: "var(--muted)" }}>the next {jobs.length} going out</div>
+        <div className="text-xs" style={{ color: "var(--muted)" }}>past due, then the week ahead</div>
         <div className="flex-1" />
-        {late > 0 && (
-          <div className="text-xs font-bold rounded px-1.5 py-0.5" style={{ background: "var(--red)", color: "#fff" }}>
-            {late} past due
-          </div>
-        )}
+        <div className="flex gap-1.5 flex-wrap">
+          {owners.map((o) => (
+            <span key={o} className="rounded px-1.5" style={{ fontSize: 10.5, fontWeight: 700, color: ownerColour(o), background: `${ownerColour(o)}14` }}>{o}</span>
+          ))}
+        </div>
       </div>
 
-      {days.length === 0 ? (
-        <div className="text-sm py-4 text-center" style={{ color: "var(--muted)" }}>Nothing has a delivery date.</div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {days.map(({ date, jobs: onDay }) => {
-            const h = dayHead(date);
-            const isToday = date === TODAY;
-            const overdue = date < TODAY;
-            const off = daysBetween(TODAY, date);
-            return (
-              <div key={date}>
-                <div className="flex items-baseline gap-2 rounded px-2 py-1"
-                  style={{ background: overdue ? "#FBEAE8" : isToday ? "var(--navy)" : "#F4F2EC" }}>
-                  <span className="text-xs font-bold" style={{ color: overdue ? "var(--red)" : isToday ? "#fff" : "var(--ink)" }}>
-                    {h.day}, {h.weekday}
-                  </span>
-                  <span className="text-xs" style={{ color: overdue ? "#B3392E" : isToday ? "#8FA1B3" : "var(--muted)" }}>
-                    {isToday ? "today" : overdue ? `${-off} day${off === -1 ? "" : "s"} late` : off === 1 ? "tomorrow" : `in ${off} days`}
-                  </span>
-                  <div className="flex-1" />
-                  <span className="text-xs tnum" style={{ color: overdue ? "#B3392E" : isToday ? "#8FA1B3" : "var(--muted)" }}>
-                    {onDay.length} job{onDay.length === 1 ? "" : "s"}
-                  </span>
+      <div className="grid gap-2" style={{ gridTemplateColumns: "minmax(170px,1.1fr) repeat(7, minmax(150px,1fr))", overflowX: "auto" }}>
+        {/* ---- past due ---- */}
+        <div style={{ minWidth: 0 }}>
+          <div className="rounded px-2 py-1 mb-1.5" style={{ background: "var(--red)" }}>
+            <div className="text-xs font-bold" style={{ color: "#fff" }}>Past due</div>
+            <div style={{ fontSize: 10.5, color: "#FFD9D2" }}>{past.length} job{past.length === 1 ? "" : "s"} · oldest first</div>
+          </div>
+          <div className="flex flex-col gap-1.5" style={{ maxHeight: 430, overflowY: "auto" }}>
+            {past.length === 0 && <div className="text-xs py-3 text-center" style={{ color: "var(--muted)" }}>Nothing late.</div>}
+            {past.map((j) => (
+              <div key={j.id}>
+                {/* How late, on the box: "4 days" is the fact a date makes
+                    the reader work out. */}
+                <div style={{ fontSize: 10, color: "var(--red)", fontWeight: 700 }}>
+                  {fmt(j.tdd)} · {Math.abs(daysBetween(TODAY, j.tdd as string))}d late
                 </div>
+                <JobBox j={j} onPeek={setPeek} dense />
+              </div>
+            ))}
+          </div>
+        </div>
 
-                <div className="grid gap-1.5 mt-1.5" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(168px,1fr))" }}>
-                  {onDay.map((j) => (
-                    <button key={j.id} onClick={() => setPeek(j)}
-                      className="rounded-lg border text-left p-2"
-                      style={{ borderColor: overdue ? "#F0C6C0" : "var(--line)", background: "#fff" }}
-                      title={`${j.tag} — open`}>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="font-bold tnum" style={{ color: "var(--blue)", fontSize: 14 }}>{jobNo(j.id)}</span>
-                        <div className="flex-1" />
-                        {/* Per cent is the one number on the box that can be
-                            read without reading: colour says whether it is
-                            going to make it, the figure says how far. */}
-                        <span className="font-bold tnum" style={{ fontSize: 12, color: j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#8A5B00" : "var(--red)" }}>
-                          {j.pct}%
-                        </span>
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: "var(--ink)", lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                        {j.tag}
-                      </div>
-                      <div className="text-xs mt-1 truncate" style={{ color: "var(--dim)" }} title={j.own || undefined}>
-                        {j.ownerName || j.ownerInitials || (j.own ? j.own.split("@")[0] : "—")}
-                      </div>
-                      <div className="rounded mt-1" style={{ height: 3, background: "var(--line-soft)" }}>
-                        <div style={{ height: 3, width: `${Math.max(0, Math.min(100, j.pct))}%`, background: j.pct >= 100 ? "var(--green)" : j.pct >= 60 ? "#D97706" : "var(--red)", borderRadius: 3 }} />
-                      </div>
-                    </button>
-                  ))}
+        {/* ---- one column per day ---- */}
+        {days.map((d) => {
+          const h = dayHead(d);
+          const mine = onDay(d);
+          const isToday = d === TODAY;
+          return (
+            <div key={d} style={{ minWidth: 0 }}>
+              <div className="rounded px-2 py-1 mb-1.5" style={{ background: isToday ? "var(--navy)" : "#F4F2EC" }}>
+                <div className="text-xs font-bold" style={{ color: isToday ? "#fff" : "var(--ink)" }}>{h.day}</div>
+                <div style={{ fontSize: 10.5, color: isToday ? "#8FA1B3" : "var(--muted)" }}>
+                  {h.weekday}{isToday ? " · today" : ""} · {mine.length}
                 </div>
               </div>
-            );
-          })}
+              <div className="flex flex-col gap-1.5" style={{ maxHeight: 430, overflowY: "auto" }}>
+                {mine.length === 0
+                  ? <div className="text-xs py-3 text-center" style={{ color: "#C9C6BD" }}>—</div>
+                  : mine.map((j) => <JobBox key={j.id} j={j} onPeek={setPeek} dense />)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {later > 0 && (
+        <div className="text-xs mt-2" style={{ color: "var(--muted)" }}>
+          {later} more with a date beyond {fmtFull(horizon)}.
         </div>
       )}
 
@@ -303,27 +358,6 @@ export function MyWeek({
     [board.jobs, weekEnd],
   );
 
-  /**
-   * THE DELIVERY RUN — what is going out, oldest first (Dr Raghu, 28 Sep
-   * 2026: "Today, day... all previous jobs also ... Show the next 20 jobs").
-   *
-   * IT STARTS BEHIND TODAY, NOT AT IT. A machine that was due on the 24th and
-   * has not gone is the most urgent thing on the floor, and a list that began
-   * at today would be the one list in Genie that hides its worst news. The
-   * overdue days come first, in their own dated rows, and say how late.
-   *
-   * Twenty boxes, because the question this answers is "what is going out
-   * next" and the twenty-first is not that question.
-   */
-  const deliveryRun = useMemo(
-    () =>
-      board.jobs
-        .filter((j) => !!j.tdd)
-        .sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1))
-        .slice(0, 20),
-    [board.jobs],
-  );
-
   // milestones of mine landing this week
   // this week's landings, and — behind "See more" — everything undone that
   // lands after it (Dr Raghu, 29 Aug 2026: "they can scroll further away")
@@ -397,6 +431,12 @@ export function MyWeek({
         <HowsMyDay data={mw} onSaved={reloadMw} />
       </div>
 
+      {/* ===== what is going out, full width, above everything else =====
+           Dr Raghu, 28 Sep 2026: "this should come full width. above the
+           tasks this week". It is the shop's question, not one person's —
+           a third of the page was making it look like a personal panel. */}
+      <div className="mb-4"><DeliveryBoard jobs={board.jobs} onOpen={onOpen} /></div>
+
       {/* ===== three columns ===== */}
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
         {/* LEFT — my tasks */}
@@ -454,8 +494,6 @@ export function MyWeek({
 
         {/* CENTRE — what is going out, and what I am driving */}
         <div className="flex flex-col gap-4" style={{ minWidth: 0 }}>
-        {/* what is going out, day by day */}
-        <DeliveryCalendar jobs={deliveryRun} onOpen={onOpen} />
         {/* goal work owed today — the merge of the two layers */}
         {goalItems.length > 0 && (
           <div className="bg-white rounded-lg border p-3" style={{ borderColor: "var(--line)" }}>

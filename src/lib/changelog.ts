@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.5.1.1",
+    date: "2026-09-28",
+    module: "The delivery run becomes a board, across the whole page",
+    items: [
+      "<b>Full width, above everything.</b> What is going out is the shop\u2019s question, not one person\u2019s \u2014 sitting in a third of the page it read as a personal panel next to somebody\u2019s own tasks.",
+      "<b>Past due has its own column, oldest first, and each box says how late.</b> Sixteen overdue machines spread over eleven past dates was eleven headings before the reader ever reached today. The thing that has slipped and the thing that is coming are two different questions, so they now have two different shapes.",
+      "<b>Then one column per day for the week ahead.</b> A day\u2019s load is a column you can see the bottom of, which is what makes Thursday\u2019s four machines look like four machines.",
+      "<b>The twenty is now spent on what is COMING.</b> On the first cut the overdue jobs ate the allowance and only four upcoming ones survived to be seen \u2014 which is the opposite of useful. The past-due column is complete on its own and no longer takes from the week ahead.",
+      "<b>Every box is coloured by its planning owner</b>, with a key across the top. The eye groups by colour before it reads anything, so the board answers \u201chow much is Pankaj carrying on Thursday\u201d without being read. The colour comes from the name itself, so a person keeps theirs everywhere and there is no table to maintain.",
+    ],
+  },
+  {
     v: "5.5.1.0",
     date: "2026-09-28",
     module: "Delivery becomes a calendar, and a job becomes a box",
