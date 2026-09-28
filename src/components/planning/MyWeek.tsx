@@ -98,8 +98,23 @@ function JobBox({ j, onPeek, dense }: { j: Job; onPeek: (j: Job) => void; dense?
   );
 }
 
+/**
+ * HOW MANY LATE JOBS THE COLUMN SHOWS BEFORE IT ASKS.
+ *
+ * Dr Raghu, 28 Sep 2026: "past due should reduce!! It will always be 5-6
+ * jobs anyways always." Six is the normal state of that column, so six is
+ * what it is built for; today's sixteen is the abnormality and it should
+ * look like one rather than quietly setting the height of the board.
+ *
+ * NOTHING IS HIDDEN. The count is in the heading whatever is drawn, and the
+ * rest are one press away — a board that made late work smaller by not
+ * mentioning it would be the worst thing this page could do.
+ */
+const LATE_SHOWN = 6;
+
 function DeliveryBoard({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => void }) {
   const [peek, setPeek] = useState<Job | null>(null);
+  const [allLate, setAllLate] = useState(false);
 
   const dated = jobs.filter((j) => !!j.tdd);
   const past = dated.filter((j) => (j.tdd as string) < TODAY)
@@ -136,11 +151,19 @@ function DeliveryBoard({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => 
         <div style={{ minWidth: 0 }}>
           <div className="rounded px-2 py-1 mb-1.5" style={{ background: "var(--red)" }}>
             <div className="text-xs font-bold" style={{ color: "#fff" }}>Past due</div>
-            <div style={{ fontSize: 10.5, color: "#FFD9D2" }}>{past.length} job{past.length === 1 ? "" : "s"} · oldest first</div>
+            {/* WHAT THE COLUMN IS ASKING FOR (Dr Raghu, 28 Sep 2026: "else
+                the planning engineer will anyways have to change the TDD").
+                A late job is not a fact to be noted, it is a date that has
+                stopped being true and a person who must re-date it. Said
+                that way, a long column reads as work owed rather than as
+                bad news nobody owns. */}
+            <div style={{ fontSize: 10.5, color: "#FFD9D2" }}>
+              {past.length} job{past.length === 1 ? "" : "s"} · oldest first · the TDD needs revising
+            </div>
           </div>
-          <div className="flex flex-col gap-1.5" style={{ maxHeight: 430, overflowY: "auto" }}>
-            {past.length === 0 && <div className="text-xs py-3 text-center" style={{ color: "var(--muted)" }}>Nothing late.</div>}
-            {past.map((j) => (
+          <div className="flex flex-col gap-1.5">
+            {past.length === 0 && <div className="text-xs py-3 text-center" style={{ color: "var(--green)", fontWeight: 700 }}>Nothing late.</div>}
+            {(allLate ? past : past.slice(0, LATE_SHOWN)).map((j) => (
               <div key={j.id}>
                 {/* How late, on the box: "4 days" is the fact a date makes
                     the reader work out. */}
@@ -150,6 +173,12 @@ function DeliveryBoard({ jobs, onOpen }: { jobs: Job[]; onOpen: (id: string) => 
                 <JobBox j={j} onPeek={setPeek} dense />
               </div>
             ))}
+            {past.length > LATE_SHOWN && (
+              <button onClick={() => setAllLate(!allLate)} className="rounded text-xs font-bold py-1.5"
+                style={{ border: "1px solid var(--red)", color: "var(--red)", background: "#fff" }}>
+                {allLate ? "Show the worst 6" : `+ ${past.length - LATE_SHOWN} more past due`}
+              </button>
+            )}
           </div>
         </div>
 

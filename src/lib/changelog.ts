@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.5.1.2",
+    date: "2026-09-28",
+    module: "Past due shows six, and says how many more",
+    items: [
+      "<b>The late column is built for six</b> (Dr Raghu: \u201cIt will always be 5-6 jobs anyways\u201d). Six is the normal state of that column; today\u2019s sixteen is the abnormality, and it should look like one rather than quietly setting the height of the whole board.",
+      "<b>Nothing is hidden.</b> The heading still counts every late job, the button says <b>+ 10 more past due</b> in words, and one press opens them. A board that made late work smaller by not mentioning it would be the worst thing this page could do.",
+      "<b>And when there is nothing late it says so in green.</b> An empty column and a column that has earned being empty should not look the same.",
+      "<b>The column says what it is asking for:</b> <i>the TDD needs revising</i>. A late job is not a fact to be noted, it is a date that has stopped being true and a planning engineer who must re-date it \u2014 said that way, a long column reads as work owed rather than as bad news nobody owns.",
+    ],
+  },
+  {
     v: "5.5.1.1",
     date: "2026-09-28",
     module: "The delivery run becomes a board, across the whole page",
