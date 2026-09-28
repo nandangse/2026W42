@@ -179,8 +179,8 @@ const toWip = (j: Job): WipJob => ({
   ownerInitials: j.ownerInitials, ownerName: j.ownerName,
 });
 
-function DeliveryBoard({ jobs, onOpen, V, reload, canEdit, isStrat }: {
-  jobs: Job[]; onOpen: (id: string) => void; V: (v: number) => string;
+function DeliveryBoard({ jobs, board, onOpen, V, reload, canEdit, isStrat }: {
+  jobs: Job[]; board: Board; onOpen: (id: string) => void; V: (v: number) => string;
   reload: () => Promise<Board | null>; canEdit: boolean; isStrat: boolean;
 }) {
   /**
@@ -263,6 +263,12 @@ function DeliveryBoard({ jobs, onOpen, V, reload, canEdit, isStrat }: {
                     nextJobs: next20.length, nextVal: sum(next20, "val"), nextTp: sum(next20, "tpv"),
                   };
                 })(),
+                /* What actually went out, by the day it went, so the three
+                   clocks can say what each period earned. Delivered jobs
+                   leave the live board for `archived`, so both are read. */
+                [...jobs, ...Object.values(board.archived || {})]
+                  .filter((j) => j.delivered && j.delivered_on)
+                  .map((j) => ({ on: j.delivered_on as string, val: Number(j.val) || 0, tp: Number(j.tpv) || 0 })),
               );
               if (!url) { window.alert("This browser would not draw the picture."); return; }
               const a = document.createElement("a");
@@ -560,7 +566,7 @@ export function MyWeek({
            tasks this week". It is the shop's question, not one person's —
            a third of the page was making it look like a personal panel. */}
       <div className="mb-4">
-        <DeliveryBoard jobs={board.jobs} onOpen={onOpen} V={V} reload={reload} isStrat={isStrat}
+        <DeliveryBoard jobs={board.jobs} board={board} onOpen={onOpen} V={V} reload={reload} isStrat={isStrat}
           canEdit={me.role === "admin" || me.role === "planner" || me.role === "project_owner"} />
       </div>
 

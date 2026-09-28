@@ -44,7 +44,9 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
  *
  * THE QUARTER IS THE FINANCIAL QUARTER: Apr–Jun, Jul–Sep, Oct–Dec, Jan–Mar.
  */
-export function clocks(today: string): { label: string; done: number; total: number }[] {
+export interface Clock { label: string; done: number; total: number; from: string; to: string }
+
+export function clocks(today: string): Clock[] {
   const t = d0(today);
   const y = t.getFullYear(), m = t.getMonth();
   const fyStart = new Date(m >= 3 ? y : y - 1, 3, 1);
@@ -57,10 +59,15 @@ export function clocks(today: string): { label: string; done: number; total: num
   const mStart = new Date(y, m, 1);
   const mEnd = new Date(y, m + 1, 0);
   const span = (a: Date, b: Date) => days(iso(a), iso(b)) + 1;   // inclusive
+  const fy = `${fyStart.getFullYear()}-${String(fyStart.getFullYear() + 1).slice(2)}`;
   return [
-    { label: "Year", done: span(fyStart, t), total: span(fyStart, fyEnd) },
-    { label: "Quarter", done: span(qStart, t), total: span(qStart, qEnd) },
-    { label: "Month", done: span(mStart, t), total: span(mStart, mEnd) },
+    /* NAMED, NOT JUST "YEAR" (Dr Raghu, 28 Sep 2026: "year is financial
+       year"). It was already counted from 1 April — the label was the only
+       thing that did not say so, and a bar marked "YEAR" beside a calendar
+       date invites exactly the wrong reading. */
+    { label: `FY ${fy}`, done: span(fyStart, t), total: span(fyStart, fyEnd), from: iso(fyStart), to: iso(fyEnd) },
+    { label: "Quarter", done: span(qStart, t), total: span(qStart, qEnd), from: iso(qStart), to: iso(qEnd) },
+    { label: "Month", done: span(mStart, t), total: span(mStart, mEnd), from: iso(mStart), to: iso(mEnd) },
   ];
 }
 
@@ -86,7 +93,12 @@ export interface RunTotals {
  * it could not show. A summary that silently ends early is worse than one
  * that admits where it stopped.
  */
-export function runJpg(today: string, past: RunJob[], week: RunDay[], heldCr: number, tot: RunTotals): string {
+export interface DeliveredRow { on: string; val: number; tp: number }
+
+export function runJpg(
+  today: string, past: RunJob[], week: RunDay[], heldCr: number, tot: RunTotals,
+  delivered: DeliveredRow[] = [],
+): string {
   const W = 1080, H = 1350, PAD = 34;
   const rowH = 58;
   const colTitle = 36;
@@ -100,37 +112,54 @@ export function runJpg(today: string, past: RunJob[], week: RunDay[], heldCr: nu
   x.fillStyle = C.paper; x.fillRect(0, 0, W, H);
 
   // ---- the header band -----------------------------------------------
-  x.fillStyle = C.navy; x.fillRect(0, 0, W, 226);
+  x.fillStyle = C.navy; x.fillRect(0, 0, W, 240);
   const t = d0(today);
   x.fillStyle = "#8FA1B3"; x.font = F(19, "700");
   x.fillText("NANDAN GSE · DELIVERY RUN", PAD, 46);
   x.fillStyle = "#fff"; x.font = F(40, "700");
   x.fillText(`${LONG_DAY[t.getDay()]}, ${t.getDate()} ${LONG_MON[t.getMonth()]} ${t.getFullYear()}`, PAD, 92);
 
-  // the three clocks
+  // the three clocks — days gone, days left, and what was delivered in them
   const cl = clocks(today);
   const cw = (W - PAD * 2 - 24) / 3;
   cl.forEach((c, i) => {
-    const cx = PAD + i * (cw + 12), cy = 116;
+    const cx = PAD + i * (cw + 12), cy = 112;
     const left = c.total - c.done;
-    x.fillStyle = "rgba(255,255,255,.08)"; roundRect(x, cx, cy, cw, 88, 8); x.fill();
+    x.fillStyle = "rgba(255,255,255,.08)"; roundRect(x, cx, cy, cw, 108, 8); x.fill();
     x.fillStyle = "#8FA1B3"; x.font = F(15, "700");
     x.fillText(c.label.toUpperCase(), cx + 14, cy + 24);
     x.fillStyle = "#fff"; x.font = F(26, "700");
     x.fillText(`${c.done}`, cx + 14, cy + 54);
-    x.fillStyle = "#8FA1B3"; x.font = F(15);
+    /* MEASURED IN THE BIG FONT, BEFORE SWITCHING. It was measured after the
+       switch to 15px, so "done · 184 left" began inside the number and
+       printed over it. */
     const dw = x.measureText(`${c.done}`).width;
-    x.fillText(` done  ·  ${left} left`, cx + 18 + dw, cy + 54);
+    x.fillStyle = "#8FA1B3"; x.font = F(15);
+    x.fillText(`done  ·  ${left} left`, cx + 22 + dw, cy + 54);
     // the bar
-    x.fillStyle = "rgba(255,255,255,.16)"; roundRect(x, cx + 14, cy + 66, cw - 28, 7, 4); x.fill();
-    x.fillStyle = "#F0A02A"; roundRect(x, cx + 14, cy + 66, (cw - 28) * (c.done / c.total), 7, 4); x.fill();
+    x.fillStyle = "rgba(255,255,255,.16)"; roundRect(x, cx + 14, cy + 64, cw - 28, 7, 4); x.fill();
+    x.fillStyle = "#F0A02A"; roundRect(x, cx + 14, cy + 64, (cw - 28) * (c.done / c.total), 7, 4); x.fill();
+    /* WHAT WENT OUT IN THAT PERIOD (Dr Raghu, 28 Sep 2026: "Also show the
+       values and Throughput in it"). Days on their own say how much of the
+       period is spent; these say what was got for it — which is the only
+       reason the days matter. */
+    const inPeriod = delivered.filter((d) => d.on >= c.from && d.on <= today);
+    const v = inPeriod.reduce((a, d) => a + d.val, 0);
+    const tp = inPeriod.reduce((a, d) => a + d.tp, 0);
+    x.fillStyle = "#F0A02A"; x.font = F(17, "700");
+    x.fillText(`₹${(v / 1e7).toFixed(2)} Cr`, cx + 14, cy + 95);
+    const vw = x.measureText(`₹${(v / 1e7).toFixed(2)} Cr`).width;
+    x.fillStyle = "#7BC67E"; x.font = F(17, "700");
+    x.fillText(`₹${(tp / 1e7).toFixed(2)} Cr`, cx + 14 + vw + 14, cy + 95);
+    x.fillStyle = "#6E8298"; x.font = F(11.5);
+    x.fillText("DELIVERED  ·  THROUGHPUT", cx + 14, cy + 79);
   });
 
   // ---- what the board is worth ----------------------------------------
   /* Dr Raghu, 28 Sep 2026: "Total Jobs: <> | Value | Throughput. Next 20
      Jobs <> | Value | Throughput." The two together say the size of the book
      and the size of the next bite of it — a count on its own says neither. */
-  let y = 244;
+  let y = 258;
   const money = (r: number) => `₹${(r / 1e7).toFixed(2)} Cr`;
   const sumLine = (label: string, n: number, val: number, tp: number, tone: string) => {
     x.fillStyle = C.band; roundRect(x, PAD, y, W - PAD * 2, 42, 6); x.fill();

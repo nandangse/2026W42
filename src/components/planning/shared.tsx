@@ -174,6 +174,9 @@ export interface Job {
   active: boolean;
   archived: boolean;
   delivered?: boolean;
+  /** The day it actually went. The board has carried it since 0100; this
+   *  type simply never declared it. */
+  delivered_on?: string | null;
   updated_at: string | null;
   ownerInitials: string | null;
   ownerName: string | null;

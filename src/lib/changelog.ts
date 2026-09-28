@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.6.0.3",
+    date: "2026-09-28",
+    module: "The picture says FY, and what each period earned",
+    items: [
+      "<b>The year bar is now labelled <i>FY 2026-27</i>.</b> It was already counted from 1 April \u2014 the label was the only thing that did not say so, and a bar marked \u201cYEAR\u201d beside a calendar date invites exactly the wrong reading.",
+      "<b>Each clock carries what was delivered in it</b> \u2014 value and throughput, for the financial year, the quarter and the month. Days on their own say how much of a period is spent; these say what was got for it, which is the only reason the days matter.",
+      "<b>And the numbers no longer print on top of their own labels.</b> \u201c181\u201d was measured in the small font after being drawn in the large one, so \u201cdone \u00b7 184 left\u201d began inside the number. Measured in the font it is drawn in now \u2014 the same fault, in the same file, as the heading yesterday.",
+    ],
+  },
+  {
     v: "5.6.0.2",
     date: "2026-09-28",
     module: "The WhatsApp picture: the totals, and one page always",
