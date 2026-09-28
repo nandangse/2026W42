@@ -102,7 +102,6 @@ export async function jobBoardBody(jobs: BoardJob[], on: string, by: string, ver
 
 export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, version: string): Promise<string> {
   const page = async (j: BoardJob) => {
-    const late = j.otd && j.otd < on ? daysBetween(j.otd, on) : 0;
     const owner = (label: string, v: string | null) =>
       `<div class="ow"><span class="owl">${esc(label)}</span><b>${esc(v || "—")}</b></div>`;
     const boxes = (vals: (string | number)[], wide = false) =>
@@ -112,7 +111,7 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
   <div class="main">
     <div class="hd">
       <img class="logo" src="${LOGO}" alt="Nandan GSE">
-      <div class="ttl">JOB DISPLAY BOARD</div>
+      <div class="ttl">NANDAN GSE BREAKTHROUGH 2027</div>
     </div>
 
     <div class="idrow">
@@ -124,7 +123,7 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
     </div>
 
     <div class="owners">
-      ${owner("PM", j.pm)}${owner("KIT", j.kitting)}${owner("PRD", j.production)}${owner("DSG", j.design)}
+      ${owner("PROJECT MANAGER", j.pm)}${owner("KITTING", j.kitting)}${owner("PRODUCTION", j.production)}${owner("DESIGN", j.design)}
     </div>
 
     <div class="grid">
@@ -142,11 +141,6 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
     <div class="dbox">
       <div class="dl">TARGET DELIVERY</div>
       <div class="dv">${dmy(j.tdd)}</div>
-    </div>
-    <div class="obox">
-      <div class="ol">OTD</div>
-      <div class="ov">${dmy(j.otd)}</div>
-      ${late ? `<div class="olate">${late} days ago</div>` : ""}
     </div>
     <div class="qr">${await qrSvg(j.url || boardUrl(j.id), 118)}</div>
     <div class="qrl">SCAN FOR<br>LIVE STATUS</div>
@@ -170,24 +164,33 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
   .logo { height:9mm; display:block; }
   .ttl { margin-left:auto; font-size:9pt; letter-spacing:.18em; color:#6B7280; font-weight:bold; }
 
-  .idrow { display:flex; align-items:center; gap:4mm; margin-top:2.5mm; }
-  .jno { font-size:40pt; font-weight:bold; line-height:.95; letter-spacing:-.02em; }
+  .idrow { display:flex; align-items:flex-start; gap:5mm; margin-top:1mm; }
+  /* FOUR TIMES BIGGER (Dr Raghu, 28 Sep 2026: "this is what's seen from
+     far"). It is the one thing on the sheet that has to be legible across a
+     shop floor, so it gets the space and everything else arranges around it. */
+  .jno { font-size:150pt; font-weight:bold; line-height:.82; letter-spacing:-.04em; }
   .tagwrap { min-width:0; }
-  .tag { font-size:15pt; font-weight:bold; line-height:1.1; }
+  .tagwrap { padding-top:3mm; }
+  .tag { font-size:16pt; font-weight:bold; line-height:1.15; }
   .fam { font-size:9.5pt; color:#6B7280; margin-top:.8mm; }
 
-  .owners { display:grid; grid-template-columns: repeat(4,1fr); gap:1.5mm; margin-top:2.5mm; }
+  .owners { display:grid; grid-template-columns: repeat(4,1fr); gap:1.5mm; margin-top:1.5mm; }
   .ow { border:.3mm solid #C9C6BD; border-radius:1mm; padding:1mm 1.5mm; text-align:center; }
   .owl { display:block; font-size:6.5pt; letter-spacing:.1em; color:#8B8F87; }
-  .ow b { font-size:12pt; }
+  .ow b { font-size:13pt; }
+  .owl { text-transform:uppercase; }
 
-  .grid { display:grid; grid-template-columns: 24mm 1fr; gap:1mm 2mm; margin-top:2.5mm; align-items:center; }
+  .grid { display:grid; grid-template-columns: 24mm 1fr; gap:1.2mm 2mm; margin-top:2mm; align-items:center; }
   .gl { font-size:8.5pt; font-weight:bold; letter-spacing:.06em; }
   .gb { display:flex; gap:1mm; }
   /* Big enough to write 12/10 into with a marker — the whole point. */
-  .bx { flex:1; height:8mm; border:.3mm solid #16232F; border-radius:.8mm; position:relative; }
-  .bx span { position:absolute; top:.4mm; left:.6mm; font-size:5.5pt; color:#B8B5AC; }
-  .bx.w span { font-size:5pt; letter-spacing:.02em; }
+  /* FULL WIDTH, and the faint label CENTRED so a marker writes straight over
+     it (his note). A label in the corner makes the pen avoid the corner; a
+     label in the middle is simply under the ink. */
+  .bx { flex:1 1 0; min-width:0; height:9mm; border:.3mm solid #16232F; border-radius:.8mm;
+        display:flex; align-items:center; justify-content:center; }
+  .bx span { font-size:7pt; color:#C9C6BD; }
+  .bx.w span { font-size:5.5pt; letter-spacing:.02em; text-align:center; line-height:1.1; }
 
   .esc { margin-top:2mm; font-size:8pt; color:#B3392E; font-weight:bold; line-height:1.25; }
   .notes { margin-top:auto; display:flex; align-items:flex-end; gap:2mm; }
@@ -203,7 +206,7 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
   .ov { font-size:11pt; font-weight:bold; }
   .olate { font-size:7pt; color:#B3392E; font-weight:bold; }
   .qr { margin-top:auto; text-align:center; }
-  .qr svg { width:32mm; height:32mm; }
+  .qr svg { width:34mm; height:34mm; }
   .qrl { font-size:6.5pt; letter-spacing:.1em; color:#8B8F87; text-align:center; line-height:1.3; }
 
   .ft { grid-column:1 / -1; font-size:6.5pt; color:#8B8F87; border-top:.3mm solid #DCD8CC; padding-top:1mm; }

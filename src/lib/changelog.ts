@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.7.1.1",
+    date: "2026-09-28",
+    module: "The board, read from across the shop floor",
+    items: [
+      "<b>The job number is four times bigger</b> \u2014 it is the one thing on the sheet that has to carry across a shop floor, so it gets the space and everything else arranges around it. <b>OTD comes off</b>, the header reads <b>NANDAN GSE BREAKTHROUGH 2027</b>, and the four owners are named in full: Project Manager, Kitting, Production, Design.",
+      "<b>The boxes run the full width and their faint labels are centred</b>, so a marker writes straight over the top. A label in the corner makes the pen avoid the corner; a label in the middle is simply under the ink.",
+      "<b>The page the QR opens now offers what you can do standing at the machine</b> \u2014 details, milestones, kitting and production per cent, status, to-do with its count, photos with theirs, commercials, labour. On a phone the sheet scales to fit, because that is where it will be read.",
+      "<b>And the tiles with nowhere to go say so.</b> Half that list has no home in Genie yet \u2014 there is no QC record anywhere in it and the document shelf is empty, so <b>QC to-do, QC records, GAD and QAP are drawn greyed and marked <i>not built yet</i></b>. Live buttons that quietly went nowhere would teach the floor that this page does not work, which is the one thing a board on a machine cannot afford.",
+    ],
+  },
+  {
     v: "5.7.1.0",
     date: "2026-09-28",
     module: "The Job Display Board \u2014 A5, for the machine",
