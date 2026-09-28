@@ -99,9 +99,19 @@ export function runJpg(
   today: string, past: RunJob[], week: RunDay[], heldCr: number, tot: RunTotals,
   delivered: DeliveredRow[] = [],
 ): string {
-  const W = 1080, H = 1350, PAD = 34;
-  const rowH = 58;
-  const colTitle = 36;
+  /**
+   * TALLER, AND THE ROWS TIGHTER — because twenty must actually appear.
+   *
+   * Dr Raghu, 28 Sep 2026: "only 12 are seen in the jpg and NOT the 20!"
+   *
+   * At 4:5 with 58-point rows there was room for twelve, so the picture was
+   * promising twenty in its heading and showing twelve underneath. A summary
+   * that contradicts its own headline is worse than no summary. 2:3 is still
+   * one page on a phone, and a 44-point row still holds two lines.
+   */
+  const W = 1080, H = 1620, PAD = 34;
+  const rowH = 44;
+  const colTitle = 34;
 
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
@@ -112,7 +122,7 @@ export function runJpg(
   x.fillStyle = C.paper; x.fillRect(0, 0, W, H);
 
   // ---- the header band -----------------------------------------------
-  x.fillStyle = C.navy; x.fillRect(0, 0, W, 240);
+  x.fillStyle = C.navy; x.fillRect(0, 0, W, 256);
   const t = d0(today);
   x.fillStyle = "#8FA1B3"; x.font = F(19, "700");
   x.fillText("NANDAN GSE · DELIVERY RUN", PAD, 46);
@@ -125,7 +135,7 @@ export function runJpg(
   cl.forEach((c, i) => {
     const cx = PAD + i * (cw + 12), cy = 112;
     const left = c.total - c.done;
-    x.fillStyle = "rgba(255,255,255,.08)"; roundRect(x, cx, cy, cw, 108, 8); x.fill();
+    x.fillStyle = "rgba(255,255,255,.08)"; roundRect(x, cx, cy, cw, 124, 8); x.fill();
     x.fillStyle = "#8FA1B3"; x.font = F(15, "700");
     x.fillText(c.label.toUpperCase(), cx + 14, cy + 24);
     x.fillStyle = "#fff"; x.font = F(26, "700");
@@ -147,19 +157,21 @@ export function runJpg(
     const v = inPeriod.reduce((a, d) => a + d.val, 0);
     const tp = inPeriod.reduce((a, d) => a + d.tp, 0);
     x.fillStyle = "#F0A02A"; x.font = F(17, "700");
-    x.fillText(`₹${(v / 1e7).toFixed(2)} Cr`, cx + 14, cy + 95);
+    x.fillText(`₹${(v / 1e7).toFixed(2)} Cr`, cx + 14, cy + 112);
     const vw = x.measureText(`₹${(v / 1e7).toFixed(2)} Cr`).width;
     x.fillStyle = "#7BC67E"; x.font = F(17, "700");
-    x.fillText(`₹${(tp / 1e7).toFixed(2)} Cr`, cx + 14 + vw + 14, cy + 95);
-    x.fillStyle = "#6E8298"; x.font = F(11.5);
-    x.fillText("DELIVERED  ·  THROUGHPUT", cx + 14, cy + 79);
+    x.fillText(`₹${(tp / 1e7).toFixed(2)} Cr`, cx + 14 + vw + 14, cy + 112);
+    /* UNDER the bar, not on it. At 79 it was printing across the bar it
+       was meant to caption. */
+    x.fillStyle = "#6E8298"; x.font = F(11);
+    x.fillText("DELIVERED  ·  THROUGHPUT", cx + 14, cy + 90);
   });
 
   // ---- what the board is worth ----------------------------------------
   /* Dr Raghu, 28 Sep 2026: "Total Jobs: <> | Value | Throughput. Next 20
      Jobs <> | Value | Throughput." The two together say the size of the book
      and the size of the next bite of it — a count on its own says neither. */
-  let y = 258;
+  let y = 276;
   const money = (r: number) => `₹${(r / 1e7).toFixed(2)} Cr`;
   const sumLine = (label: string, n: number, val: number, tp: number, tone: string) => {
     x.fillStyle = C.band; roundRect(x, PAD, y, W - PAD * 2, 42, 6); x.fill();
@@ -213,6 +225,17 @@ export function runJpg(
   const blocksWanted = 1 + week.filter((d) => d.jobs.length).length;
   let room = Math.floor((H - y - FOOT - blocksWanted * (colTitle + 6)) / rowH);
   let notShown = 0;
+  /**
+   * THE WEEK IS SERVED FIRST, UP TO TWENTY.
+   *
+   * The heading says "next 20 going out", so the twenty is the promise the
+   * picture has already made. Past due takes what is left — never nothing,
+   * because late work must always be visible, but it no longer takes half
+   * the page and leaves the twenty unshowable.
+   */
+  const comingRows = week.reduce((a, d) => a + d.jobs.length, 0);
+  const forDays = Math.min(20, comingRows, Math.max(0, room - 3));
+  const pastRoomMax = Math.max(0, room - forDays);
 
   // ---- one list per block ---------------------------------------------
   const block = (title: string, sub: string, tone: string, jobs: RunJob[]) => {
@@ -233,38 +256,36 @@ export function runJpg(
       return;
     }
     for (const j of jobs) {
-      x.fillStyle = j.colour + "14"; roundRect(x, PAD, y, W - PAD * 2, rowH - 6, 6); x.fill();
-      x.fillStyle = j.colour; roundRect(x, PAD, y, 5, rowH - 6, 3); x.fill();
-      x.fillStyle = j.colour; x.font = F(20, "700");
-      x.fillText(j.id, PAD + 16, y + 24);
-      x.fillStyle = C.ink; x.font = F(17);
-      x.fillText(cut(x, j.tag, W - PAD * 2 - 320), PAD + 86, y + 24);
-      x.fillStyle = C.sub; x.font = F(14);
+      x.fillStyle = j.colour + "14"; roundRect(x, PAD, y, W - PAD * 2, rowH - 5, 6); x.fill();
+      x.fillStyle = j.colour; roundRect(x, PAD, y, 5, rowH - 5, 3); x.fill();
+      x.fillStyle = j.colour; x.font = F(18, "700");
+      x.fillText(j.id, PAD + 16, y + 20);
+      x.fillStyle = C.ink; x.font = F(16);
+      x.fillText(cut(x, j.tag, W - PAD * 2 - 300), PAD + 82, y + 20);
       const otd = j.otd
         ? (days(today, j.otd) < 0 ? `OTD ${dm(j.otd)} · ${-days(today, j.otd)}d over` : `OTD ${dm(j.otd)} · in ${days(today, j.otd)}d`)
         : "no OTD set";
+      x.font = F(13);
       x.fillStyle = j.otd && days(today, j.otd) < 0 ? C.red : C.sub;
-      x.fillText(otd, PAD + 86, y + 44);
-      x.fillStyle = C.faint; x.font = F(14);
-      x.fillText(j.owner, PAD + 320, y + 44);
+      x.fillText(otd, PAD + 82, y + 36);
+      x.fillStyle = C.faint; x.font = F(13);
+      x.fillText(j.owner, PAD + 300, y + 36);
       // per cent, right-aligned
-      x.font = F(20, "700");
+      x.font = F(18, "700");
       x.fillStyle = j.pct >= 100 ? C.green : j.pct >= 60 ? C.amber : C.red;
       const p = `${j.pct}%`;
-      x.fillText(p, W - PAD - 16 - x.measureText(p).width, y + 24);
+      x.fillText(p, W - PAD - 16 - x.measureText(p).width, y + 20);
       if (j.lateDays > 0) {
-        x.font = F(14, "700"); x.fillStyle = C.red;
+        x.font = F(13, "700"); x.fillStyle = C.red;
         const l = `${j.lateDays}d late`;
-        x.fillText(l, W - PAD - 16 - x.measureText(l).width, y + 44);
+        x.fillText(l, W - PAD - 16 - x.measureText(l).width, y + 36);
       }
       y += rowH;
     }
     y += 8;
   };
 
-  /* Past due gets at most half the room, so a bad week cannot crowd out the
-     week ahead entirely — the days are the part somebody can still act on. */
-  const pastRoom = Math.max(1, Math.min(past.length, Math.ceil(room / 2)));
+  const pastRoom = Math.min(past.length, Math.max(past.length ? 1 : 0, pastRoomMax));
   notShown += past.length - pastRoom;
   room -= Math.min(pastRoom, past.length);
   block("Past due", past.length > pastRoom ? `${pastRoom} of ${past.length} · oldest first` : "oldest first",

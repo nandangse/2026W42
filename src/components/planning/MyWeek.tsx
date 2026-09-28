@@ -244,7 +244,7 @@ function DeliveryBoard({ jobs, board, onOpen, V, reload, canEdit, isStrat }: {
             * the point, and also the reason it is not a button everybody has.
             */}
           {isStrat && (
-            <button onClick={() => {
+            <button onClick={async () => {
               const toRun = (j: Job): RunJob => ({
                 id: jobNo(j.id), tag: j.tag, pct: j.pct, tdd: j.tdd, otd: j.otd,
                 owner: ownerOf(j), colour: ownerColour(ownerOf(j)),
@@ -265,12 +265,19 @@ function DeliveryBoard({ jobs, board, onOpen, V, reload, canEdit, isStrat }: {
                     nextJobs: next20.length, nextVal: sum(next20, "val"), nextTp: sum(next20, "tpv"),
                   };
                 })(),
-                /* What actually went out, by the day it went, so the three
-                   clocks can say what each period earned. Delivered jobs
-                   leave the live board for `archived`, so both are read. */
-                [...jobs, ...Object.values(board.archived || {})]
-                  .filter((j) => j.delivered && j.delivered_on)
-                  .map((j) => ({ on: j.delivered_on as string, val: Number(j.val) || 0, tp: Number(j.tpv) || 0 })),
+                /**
+                 * WHAT ACTUALLY WENT OUT — from `delivered_jobs`, which is
+                 * the table the year report reads, so the picture and the
+                 * report cannot disagree.
+                 *
+                 * It was being totalled off the job board, which holds what
+                 * is still being BUILT. That reported ₹6.52 Cr against a
+                 * true ₹24.38 Cr, in a picture meant to be sent to people.
+                 */
+                await fetch("/api/delivered-summary", { cache: "no-store" })
+                  .then((r) => r.json())
+                  .then((j) => (j.rows || []) as { on: string; val: number; tp: number }[])
+                  .catch(() => []),
               );
               if (!url) { window.alert("This browser would not draw the picture."); return; }
               const a = document.createElement("a");

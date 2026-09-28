@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.6.0.5",
+    date: "2026-09-28",
+    module: "The picture was totalling the wrong table \u2014 fixed",
+    items: [
+      "<b>The delivered figures were a quarter of the truth.</b> They were being totalled off the JOB BOARD, which holds what is still being <i>built</i> \u2014 so the year read <b>\u20b96.52 Cr</b> against a real <b>\u20b924.38 Cr</b>, in a picture meant to be sent to people. It now reads <code>delivered_jobs</code>, the same table the year report reads, so the picture and the report cannot disagree.",
+      "<b>And it was reading the wrong column.</b> <code>tpv</code> stands at \u20b90.31 Cr across all eighty-one deliveries; <code>tp</code> at \u20b911.73 Cr, which is what the report prints. Reading the wrong one of two similarly named columns is how a number comes out thirty times too small and still looks like money. <b>FY, quarter and month now differ from one another</b>, which they always should have \u2014 seeing the same figure in two boxes was the clue.",
+      "<b>Twenty jobs now actually appear.</b> At 4:5 with the old row height there was room for twelve, so the picture promised twenty in its heading and showed twelve underneath \u2014 a summary contradicting its own headline. The page is 2:3 now, the rows are tighter, <b>and the week is served first</b>: the twenty is the promise already made, and past due takes what is left rather than half the page.",
+      "<b>The DELIVERED \u00b7 THROUGHPUT caption sat across the bar it was captioning.</b> It is under it now.",
+    ],
+  },
+  {
     v: "5.6.0.4",
     date: "2026-09-28",
     module: "The board fits the screen, and Status is a list",
