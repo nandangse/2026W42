@@ -68,16 +68,28 @@ const LONG_DAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 const LONG_MON = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
 
-export function runJpg(today: string, past: RunJob[], week: RunDay[], heldCr: number): string {
-  const W = 1080, PAD = 34;
-  /* Height is measured before a pixel is drawn — a canvas sized by guess
-     either clips the last column or pads the picture with white. */
+export interface RunTotals {
+  jobs: number; val: number; tp: number;          // the whole board
+  nextJobs: number; nextVal: number; nextTp: number;   // the next 20 going out
+}
+
+/**
+ * ONE PAGE, ALWAYS (Dr Raghu, 28 Sep 2026: "Always fit to one page").
+ *
+ * A picture whose height depends on how bad the week is cannot be sent: on a
+ * heavy Monday it becomes a ribbon that WhatsApp shrinks to a thumbnail
+ * nobody can read, and the worse the week the less readable the message
+ * about it. So the canvas is a fixed 4:5 — the shape a phone shows whole —
+ * and what fits is decided against that height.
+ *
+ * WHAT DOES NOT FIT IS COUNTED, NOT DROPPED. The picture says how many jobs
+ * it could not show. A summary that silently ends early is worse than one
+ * that admits where it stopped.
+ */
+export function runJpg(today: string, past: RunJob[], week: RunDay[], heldCr: number, tot: RunTotals): string {
+  const W = 1080, H = 1350, PAD = 34;
   const rowH = 58;
-  const headH = 300;
-  const colTitle = 34;
-  const listH = (n: number) => colTitle + Math.max(1, n) * rowH + 14;
-  const H = headH + listH(Math.min(past.length, 10))
-    + week.reduce((a, d) => a + (d.jobs.length ? listH(d.jobs.length) : 0), 0) + 70;
+  const colTitle = 36;
 
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
@@ -114,29 +126,77 @@ export function runJpg(today: string, past: RunJob[], week: RunDay[], heldCr: nu
     x.fillStyle = "#F0A02A"; roundRect(x, cx + 14, cy + 66, (cw - 28) * (c.done / c.total), 7, 4); x.fill();
   });
 
+  // ---- what the board is worth ----------------------------------------
+  /* Dr Raghu, 28 Sep 2026: "Total Jobs: <> | Value | Throughput. Next 20
+     Jobs <> | Value | Throughput." The two together say the size of the book
+     and the size of the next bite of it — a count on its own says neither. */
+  let y = 244;
+  const money = (r: number) => `₹${(r / 1e7).toFixed(2)} Cr`;
+  const sumLine = (label: string, n: number, val: number, tp: number, tone: string) => {
+    x.fillStyle = C.band; roundRect(x, PAD, y, W - PAD * 2, 42, 6); x.fill();
+    x.fillStyle = tone; x.font = F(17, "700");
+    x.fillText(label, PAD + 14, y + 27);
+    const lw = x.measureText(label).width;
+    x.fillStyle = C.ink; x.font = F(21, "700");
+    x.fillText(String(n), PAD + 24 + lw, y + 27);
+    const nw2 = x.measureText(String(n)).width;
+    x.fillStyle = C.faint; x.font = F(17);
+    x.fillText("  |  ", PAD + 26 + lw + nw2, y + 27);
+    const barW = x.measureText("  |  ").width;
+    x.fillStyle = C.accent; x.font = F(19, "700");
+    x.fillText(money(val), PAD + 26 + lw + nw2 + barW, y + 27);
+    const vw = x.measureText(money(val)).width;
+    x.fillStyle = C.faint; x.font = F(17);
+    x.fillText("  |  ", PAD + 28 + lw + nw2 + barW + vw, y + 27);
+    x.fillStyle = C.green; x.font = F(19, "700");
+    x.fillText(money(tp), PAD + 28 + lw + nw2 + barW + vw + barW, y + 27);
+    /* The labels for the two figures, said once, on the right. */
+    x.fillStyle = C.faint; x.font = F(13);
+    const t = "value  ·  throughput";
+    x.fillText(t, W - PAD - 14 - x.measureText(t).width, y + 27);
+    y += 48;
+  };
+  sumLine("Total jobs", tot.jobs, tot.val, tot.tp, C.navy);
+  sumLine("Next 20 going out", tot.nextJobs, tot.nextVal, tot.nextTp, C.accent);
+
   // ---- the headline number --------------------------------------------
-  let y = 262;
+  y += 8;
   x.fillStyle = past.length ? C.red : C.green;
   x.font = F(34, "700");
-  x.fillText(`${past.length}`, PAD, y);
+  x.fillText(`${past.length}`, PAD, y + 12);
   const nw = x.measureText(`${past.length}`).width;
   x.fillStyle = C.ink; x.font = F(20);
-  x.fillText(past.length ? "  past due" : "  nothing past due", PAD + nw, y);
+  x.fillText(past.length ? "  past due" : "  nothing past due", PAD + nw, y + 12);
   if (heldCr > 0) {
     x.fillStyle = C.sub; x.font = F(17);
     const s = `₹${heldCr.toFixed(2)} Cr held up`;
-    x.fillText(s, W - PAD - x.measureText(s).width, y);
+    x.fillText(s, W - PAD - x.measureText(s).width, y + 12);
   }
-  y += 22;
+  y += 34;
+
+  /**
+   * HOW MANY ROWS THERE IS ROOM FOR — counted before anything is drawn.
+   *
+   * Past due is served first because it is the part that cannot wait, then
+   * the days in order until the page is full.
+   */
+  const FOOT = 40;
+  const blocksWanted = 1 + week.filter((d) => d.jobs.length).length;
+  let room = Math.floor((H - y - FOOT - blocksWanted * (colTitle + 6)) / rowH);
+  let notShown = 0;
 
   // ---- one list per block ---------------------------------------------
   const block = (title: string, sub: string, tone: string, jobs: RunJob[]) => {
     x.fillStyle = tone; roundRect(x, PAD, y, W - PAD * 2, 30, 6); x.fill();
     x.fillStyle = "#fff"; x.font = F(17, "700");
     x.fillText(title, PAD + 12, y + 21);
+    /* MEASURED IN THE TITLE'S OWN FONT. It was measured after switching to
+       the smaller one, so the subtitle started too far left and printed on
+       top of the title. */
+    const tw = x.measureText(title).width;
     x.font = F(14);
     x.fillStyle = "rgba(255,255,255,.75)";
-    x.fillText(sub, PAD + 16 + x.measureText(title).width + 8, y + 21);
+    if (sub) x.fillText(sub, PAD + 12 + tw + 14, y + 21);
     y += 30 + 6;
     if (!jobs.length) {
       x.fillStyle = C.faint; x.font = F(15);
@@ -173,15 +233,31 @@ export function runJpg(today: string, past: RunJob[], week: RunDay[], heldCr: nu
     y += 8;
   };
 
-  block("Past due", past.length > 10 ? `showing 10 of ${past.length} · oldest first` : "oldest first",
-    past.length ? C.red : C.green, past.slice(0, 10));
+  /* Past due gets at most half the room, so a bad week cannot crowd out the
+     week ahead entirely — the days are the part somebody can still act on. */
+  const pastRoom = Math.max(1, Math.min(past.length, Math.ceil(room / 2)));
+  notShown += past.length - pastRoom;
+  room -= Math.min(pastRoom, past.length);
+  block("Past due", past.length > pastRoom ? `${pastRoom} of ${past.length} · oldest first` : "oldest first",
+    past.length ? C.red : C.green, past.slice(0, pastRoom));
+
   for (const d of week) {
     if (!d.jobs.length) continue;
-    block(`${d.label} · ${d.weekday}`, d.date === today ? "today" : "", C.navy, d.jobs);
+    if (room <= 0) { notShown += d.jobs.length; continue; }
+    const take = Math.min(d.jobs.length, room);
+    room -= take;
+    notShown += d.jobs.length - take;
+    block(`${d.label} · ${d.weekday}`, d.date === today ? "today" : "", C.navy, d.jobs.slice(0, take));
   }
 
   x.fillStyle = C.faint; x.font = F(14);
   x.fillText(`Genie · as at ${dm(today)}-${d0(today).getFullYear()}`, PAD, H - 22);
+  if (notShown > 0) {
+    /* Said, not silently dropped. */
+    const m = `${notShown} more not shown — open Genie for the rest`;
+    x.fillStyle = C.sub;
+    x.fillText(m, W - PAD - x.measureText(m).width, H - 22);
+  }
 
   return cv.toDataURL("image/jpeg", 0.92);
 }

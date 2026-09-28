@@ -253,6 +253,16 @@ function DeliveryBoard({ jobs, onOpen, V, reload, canEdit, isStrat }: {
                 past.map(toRun),
                 days.map((d) => ({ date: d, label: dayHead(d).day, weekday: dayHead(d).weekday, jobs: onDay(d).map(toRun) })),
                 totalTp / 1e7,
+                /* The whole board, and the next twenty going out — the size
+                   of the book and the size of the next bite of it. */
+                (() => {
+                  const next20 = [...past, ...coming].slice(0, 20);
+                  const sum = (rows: Job[], k: "val" | "tpv") => rows.reduce((a, j) => a + (Number(j[k]) || 0), 0);
+                  return {
+                    jobs: jobs.length, val: sum(jobs, "val"), tp: sum(jobs, "tpv"),
+                    nextJobs: next20.length, nextVal: sum(next20, "val"), nextTp: sum(next20, "tpv"),
+                  };
+                })(),
               );
               if (!url) { window.alert("This browser would not draw the picture."); return; }
               const a = document.createElement("a");

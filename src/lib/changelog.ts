@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.6.0.2",
+    date: "2026-09-28",
+    module: "The WhatsApp picture: the totals, and one page always",
+    items: [
+      "<b>Two lines at the top: Total jobs, and the next 20 going out</b> \u2014 each with its count, its value and its throughput. The two together say the size of the book and the size of the next bite of it; a count on its own says neither.",
+      "<b>It is always one page.</b> A fixed 4:5 \u2014 the shape a phone shows whole. A picture whose height grew with how bad the week was could not be sent: on a heavy Monday it became a ribbon that WhatsApp shrinks to a thumbnail, so the worse the week, the less readable the message about it.",
+      "<b>What does not fit is counted, not dropped</b> \u2014 the foot says how many more there are. And past due may take at most half the page, so a bad week cannot crowd out the days ahead, which are the part somebody can still act on.",
+      "<b>The heading no longer prints on top of itself.</b> The subtitle\u2019s position was measured in the small font after the title had been drawn in the large one, so \u201coldest first\u201d started inside the word \u201cdue\u201d.",
+    ],
+  },
+  {
     v: "5.6.0.1",
     date: "2026-09-28",
     module: "Two past-due columns, one heading, and a picture for WhatsApp",
