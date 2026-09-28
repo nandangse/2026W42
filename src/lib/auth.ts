@@ -43,13 +43,37 @@ export async function currentUser(): Promise<AuthedUser | null> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  // Read the role with the service client so a strict profiles RLS never hides
-  // the caller's own role from this lookup.
-  const { data: profile } = await adminClient()
+  /**
+   * Read the role with the service client so a strict profiles RLS never
+   * hides the caller's own role from this lookup.
+   *
+   * THE COLUMNS THIS ASKS FOR MUST ALL EXIST, ALWAYS.
+   *
+   * 28 Sep 2026: lms_only was added to this list before migration 0170 had
+   * been run. PostgREST rejects the WHOLE select when one column is unknown,
+   * so `profile` came back null for everybody — and the line below reads a
+   * null profile as role "planner" with no initials and no name. Every
+   * person in the company silently lost their role, and the Admin menu with
+   * it, because of a column that did not exist yet.
+   *
+   * So the identity read is split. These columns have always been there and
+   * this query cannot fail; anything newer is asked for separately, below,
+   * where its absence costs only that one field. A login must never depend
+   * on a migration having been run.
+   */
+  const admin = adminClient();
+  const { data: profile } = await admin
     .from("profiles")
-    .select("role, disabled, email, initials, display_name, erp_owner, lc, stratcom, management, lms_only")
+    .select("role, disabled, email, initials, display_name, erp_owner, lc, stratcom, management")
     .eq("id", user.id)
     .maybeSingle();
+  /* Newer than the line above, and asked for on its own so that a database
+     without it loses the flag rather than the person's whole identity. */
+  let lmsOnly = false;
+  {
+    const { data } = await admin.from("profiles").select("lms_only").eq("id", user.id).maybeSingle();
+    lmsOnly = !!data?.lms_only;
+  }
   const role = (profile?.role as Role) ?? "planner";
   const email = (profile?.email || user.email || "").toLowerCase();
   return {
@@ -74,7 +98,7 @@ export async function currentUser(): Promise<AuthedUser | null> {
      * to be applied once. Undefined until migration 0170, which reads as
      * false: an existing user does not become a learner by our forgetting.
      */
-    lmsOnly: !!profile?.lms_only,
+    lmsOnly,
   };
 }
 

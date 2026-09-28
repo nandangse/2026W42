@@ -33,12 +33,26 @@ export async function GET(req: Request) {
       admin.from("lms_section").select("*").order("sort_order"),
       admin.from("lms_lesson").select("*").eq("active", true).order("title"),
       admin.from("lms_lesson_book").select("*"),
-      admin.from("profiles").select("id,email,display_name,initials,designation,department_id,reports_to,disabled,lms_groups,lms_only"),
+      /* Asked for tolerantly: before 0170 these two columns do not exist, and
+         PostgREST refuses the whole select when one is unknown — which would
+         empty the roster, the team cascade and every name on the screen. */
+      admin.from("profiles").select("id,email,display_name,initials,designation,department_id,reports_to,disabled,lms_groups,lms_only")
+        .then(async (r) => (r.error && /lms_groups|lms_only/.test(r.error.message)
+          ? admin.from("profiles").select("id,email,display_name,initials,designation,department_id,reports_to,disabled")
+          : r)),
     ]);
     const firstErr = bookRes.error || secRes.error || lessonRes.error || shelfRes.error || profRes.error;
     if (firstErr) throw new Error(firstErr.message);
 
-    const people = (profRes.data || []).filter((p) => !p.disabled);
+    /* The two 0170 columns may not exist yet, so they are read off a widened
+       shape rather than assumed present. Absent reads as "no groups, not a
+       learner-only login" — which is what an un-migrated database means. */
+    type Person = {
+      id: string; email: string; display_name: string | null; initials: string | null;
+      designation: string | null; department_id: string | null; reports_to: string | null; disabled: boolean;
+      lms_groups?: string[] | null; lms_only?: boolean | null;
+    };
+    const people = ((profRes.data || []) as unknown as Person[]).filter((p) => !p.disabled);
     const team = teamOf(people, user.id);
     const teamIds = new Set(team.map((m) => m.id));
     const isAdmin = user.role === "admin" || user.isOwner;

@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.5.0.1",
+    date: "2026-09-28",
+    module: "Everybody had quietly become a planner. Fixed.",
+    items: [
+      "<b>A column that did not exist yet erased every person\u2019s role.</b> 5.5.0.0 added <code>lms_only</code> to the one query that reads who you are \u2014 but migration 0170 had not been run, and the database refuses the <b>whole</b> query when a single column in it is unknown. The answer came back empty, and an empty answer was being read as \u201crole: planner, no initials, no name\u201d. So Dr Raghu, and everybody else, lost their role and the Admin menu with it.",
+      "<b>The identity read is now split in two.</b> The columns that have always existed are asked for on their own and that query cannot fail; anything added later is asked for separately, where its absence costs only that one field. <b>A login must never depend on a migration having been run.</b>",
+      "<b>The same fault is closed in the LMS.</b> Its read of everybody also named the two new columns; it now falls back to the old shape, so before 0170 the roster simply has no groups rather than having no people.",
+      "<b>What this did not do:</b> nothing was written. No role was changed in the database \u2014 the wrong role was being computed fresh on every page load from an answer that never arrived. Everyone is exactly as they were.",
+    ],
+  },
+  {
     v: "5.5.0.0",
     date: "2026-09-27",
     module: "LMS: who a library is for, and a login that is only a library",
