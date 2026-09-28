@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.7.1.0",
+    date: "2026-09-28",
+    module: "The Job Display Board \u2014 A5, for the machine",
+    items: [
+      "<b>A tick beside Target Delivery on the Job Delivery Board</b>, and once anything is ticked a button appears: <b>Generate the Job Display Board</b>. It opens a page of A5 landscape sheets, one per job, ready to print \u2014 one for the machine, one for the file.",
+      "<b>Nothing on it is pre-ticked.</b> The boxes are empty and 8mm tall so a marker fits <i>12/10</i> inside them, because the floor writes the date in and strikes it out on delivery. A board that arrived with our answers already filled in is a board people write around rather than on.",
+      "<b>No customer name</b> \u2014 outsiders walk past these. The tag says which machine it is to anybody who needs to know and nothing to anybody who does not. Owners are initials, for the people who work here.",
+      "<b>The QR opens <code>genie.nandan.co.in/job/2162</code></b> \u2014 the short number painted on the machine, not Genie\u2019s ten-digit id, which nobody on the floor knows or should have to. It asks for a Genie login and then shows <b>the same board, read from the database now</b>. That is the whole answer to the one real problem with paper: it is out of date the moment it is pinned up.",
+      "<b>I wrote the QR encoder myself first and it did not work.</b> It drew something that looked exactly like a QR code and no scanner could read it \u2014 found only by printing the page and decoding it, which is the only test that counts. A code that looks right and does not scan is worse than none: nobody checks a square that has always been there, so the board would have carried a dead link for months. It is a proper library now, and the code was decoded off the printed PDF before this shipped.",
+    ],
+  },
+  {
     v: "5.7.0.0",
     date: "2026-09-28",
     module: "Manpower Planning \u2014 the week, by name",

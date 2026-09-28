@@ -353,6 +353,10 @@ export function DeliveryBoard({
    * actually wanted the plan.
    */
   const [picked, setPicked] = useState<Job | null>(null);
+  /* Which jobs are to get a printed board. Ticks, not a mode: somebody
+     scanning the list for late work should be able to tick one as they go
+     without leaving what they were doing. */
+  const [boardPick, setBoardPick] = useState<Set<string>>(new Set());
   /**
    * Jumping from the summary row to the family's own jobs. The group name is
    * free text off the ERP -- "AGSE - Hi Lift", "DEF-Customised" -- so it is
@@ -871,6 +875,26 @@ export function DeliveryBoard({
               </span>
               {prio && <button onClick={() => setPrio(null)} className="font-bold" style={{ color: "var(--accent)" }}>↺ Reset to TDD order</button>}
             </div>
+            {/* THE BUTTON APPEARS ONLY WHEN SOMETHING IS TICKED. A permanent
+                one would have to say "0 jobs" most of the time, which is a
+                button that does nothing sitting on a screen people read all
+                day. */}
+            {boardPick.size > 0 && (
+              <div className="px-3 pb-2 flex items-center gap-2 flex-wrap">
+                <a href={`/job-board/print?jobs=${encodeURIComponent([...boardPick].join(","))}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="rounded px-3 py-1.5 font-bold text-xs"
+                  style={{ background: "var(--accent)", color: "#fff" }}>
+                  🖨 Generate the Job Display Board ({boardPick.size})
+                </a>
+                <span className="text-xs" style={{ color: "var(--muted)" }}>
+                  A5 landscape · the QR opens the job for anyone signed in to Genie
+                </span>
+                <button onClick={() => setBoardPick(new Set())} className="text-xs font-bold" style={{ color: "var(--muted)" }}>
+                  clear
+                </button>
+              </div>
+            )}
             {/* the header sticks while the rows scroll */}
             <div className="overflow-auto" style={{ maxHeight: "68vh" }}>
             <table className="w-full text-xs genie-table" style={{ minWidth: 1040, borderCollapse: "separate", borderSpacing: 0 }}>
@@ -885,6 +909,16 @@ export function DeliveryBoard({
                   <SortTh k="tag" label="Customer Tag" />
                   <SortTh k="fam" label="Product Family" />
                   <SortTh k="tdd" label="Target Delivery" align="center" />
+                  {/* THE TICK THAT MAKES A BOARD (Dr Raghu, 28 Sep 2026:
+                      "after the Target Delivery Date have a checkbox").
+                      Beside the date because the date is what somebody is
+                      reading when they decide a job needs a board on it. */}
+                  <th className="px-1 py-2 text-center" title="Tick to print a Job Display Board">
+                    <input type="checkbox"
+                      checked={boardPick.size > 0 && plist.every((j) => boardPick.has(j.id))}
+                      onChange={(e) => setBoardPick(e.target.checked ? new Set(plist.map((j) => j.id)) : new Set())}
+                      title="Tick every job in this list" />
+                  </th>
                   <SortTh k="otd" label="OTD Date" align="center" />
                   <SortTh k="own" label="Planning Owner" />
                   {/* Job Status is gone from this table — it is a 32-value
@@ -923,6 +957,15 @@ export function DeliveryBoard({
                     <td className="px-2 py-1.5 font-medium">{j.tag}</td>
                     <td className="px-2 py-1.5" style={{ color: "var(--dim)" }}>{j.fam}</td>
                     <td className="px-2 py-1.5 text-center font-bold whitespace-nowrap tnum" style={{ color: j.tdd && j.tdd < TODAY ? "var(--red)" : "var(--ink)" }}>{fmtFull(j.tdd)}</td>
+                    <td className="px-1 py-1.5 text-center">
+                      <input type="checkbox" checked={boardPick.has(j.id)}
+                        onChange={(e) => {
+                          const n = new Set(boardPick);
+                          if (e.target.checked) n.add(j.id); else n.delete(j.id);
+                          setBoardPick(n);
+                        }}
+                        title={`Print a Job Display Board for ${jobNo(j.id)}`} />
+                    </td>
                     <td className="px-2 py-1.5 text-center font-bold whitespace-nowrap tnum" style={{ color: otdColor(j.otd) }}>{fmtFull(j.otd)}{otdDelay(j) && (<div style={{ fontSize: 10 }}>+{otdDelay(j)}d late</div>)}</td>
                     <td className="px-2 py-1.5" style={{ color: j.ownerInitials ? "var(--blue)" : "#B8B5AC" }} title={j.own ? `Jobmaster: ${j.own}` : "No owner in the Jobmaster"}>
                       {j.ownerInitials ? (
@@ -950,7 +993,7 @@ export function DeliveryBoard({
                   </tr>
                 ))}
                 {plist.length === 0 && (
-                  <tr><td colSpan={15} className="py-6 text-center" style={{ color: "var(--muted)" }}>No jobs match this filter.</td></tr>
+                  <tr><td colSpan={16} className="py-6 text-center" style={{ color: "var(--muted)" }}>No jobs match this filter.</td></tr>
                 )}
               </tbody>
             </table>
