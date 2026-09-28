@@ -706,7 +706,7 @@ export default function PlanningSuite({
 
       <QuoteOfDay trigger={quoteTrigger} />
 
-      {workspace === "suite" && tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={openJobPlan} reload={reload} goTasks={() => setWorkspace("tasking")} goGoals={() => setWorkspace("goals")} goalsAccess={!!goalsAccess} goLms={() => setWorkspace("lms")} isAdmin={isAdmin} />}
+      {workspace === "suite" && tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={openJobPlan} reload={reload} goTasks={() => setWorkspace("tasking")} goGoals={() => setWorkspace("goals")} goalsAccess={!!goalsAccess} goLms={() => setWorkspace("lms")} isAdmin={isAdmin} isStrat={canSeeForward} />}
       {/* Kept MOUNTED and merely hidden, so its filters, search, sort and view
           survive a round-trip through Job Plan — unmounting was wiping them. */}
       <div style={{ display: workspace === "suite" && tab === "delivery" ? undefined : "none" }}>

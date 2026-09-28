@@ -19,6 +19,7 @@ import { TaskModal } from "./Tasking";
    and a second thing to keep true — and this one edits through
    /api/job-field, so corrections still reach the ERP. */
 import { JobLightbox, type WipJob } from "../JobsInProgress";
+import { runJpg, type RunJob } from "@/lib/run-jpg";
 
 /**
  * DELIVERY, AS A CALENDAR (Dr Raghu, 28 Sep 2026: "instead of this list show
@@ -145,7 +146,12 @@ function JobBox({ j, onPeek, dense }: { j: Job; onPeek: (j: Job) => void; dense?
  * problem any more, and the rest go behind a count that says how many.
  */
 const LATE_MIN = 5;
-const LATE_COLS_MAX = 3;
+/* TWO COLUMNS, ONE HEADING (Dr Raghu, 28 Sep 2026: "past due just make two
+   columns. Show both with one heading. Show total past due."). Three columns
+   each carrying their own red heading read as three separate problems; it is
+   one problem, counted once, in a block two columns wide. */
+const LATE_COLS = 2;
+const LATE_MAX = 24;
 
 /** Spread n items over `cols` columns as evenly as possible, biggest first. */
 function spread<T>(items: T[], cols: number): T[][] {
@@ -173,11 +179,23 @@ const toWip = (j: Job): WipJob => ({
   ownerInitials: j.ownerInitials, ownerName: j.ownerName,
 });
 
-function DeliveryBoard({ jobs, onOpen, V, reload, canEdit }: {
+function DeliveryBoard({ jobs, onOpen, V, reload, canEdit, isStrat }: {
   jobs: Job[]; onOpen: (id: string) => void; V: (v: number) => string;
-  reload: () => Promise<Board | null>; canEdit: boolean;
+  reload: () => Promise<Board | null>; canEdit: boolean; isStrat: boolean;
 }) {
-  const [peek, setPeek] = useState<Job | null>(null);
+  /**
+   * THE OPEN BOX IS HELD BY ID, NOT BY VALUE.
+   *
+   * Dr Raghu, 28 Sep 2026: "after changing date in the lightbox, it still
+   * shows old one. but on closing and reopening it has changed."
+   *
+   * It was holding the job OBJECT taken at the moment of the click. Saving
+   * refreshes the board, but the box was still rendering that first copy —
+   * so the field it had just written was the one field on screen that had
+   * not changed. Holding the id and looking the job up on every render means
+   * the box is always reading the same board everybody else is.
+   */
+  const [peekId, setPeekId] = useState<string | null>(null);
   const [allLate, setAllLate] = useState(false);
 
   const dated = jobs.filter((j) => !!j.tdd);
@@ -193,13 +211,12 @@ function DeliveryBoard({ jobs, onOpen, V, reload, canEdit }: {
   const onDay = (d: string) => coming.filter((j) => j.tdd === d);
   const later = dated.filter((j) => (j.tdd as string) > horizon).length;
 
-  /* The tallest day decides how tall a late column may be. */
-  const busiestDay = Math.max(0, ...days.map((d) => onDay(d).length));
-  const cap = Math.max(LATE_MIN, busiestDay);
-  const room = cap * LATE_COLS_MAX;
-  const lateShown = allLate ? past : past.slice(0, room);
+  const lateShown = allLate ? past : past.slice(0, LATE_MAX);
   const lateHidden = past.length - lateShown.length;
-  const lateCols = spread(lateShown, Math.min(LATE_COLS_MAX, Math.max(1, Math.ceil(lateShown.length / cap))));
+  const lateCols = spread(lateShown, Math.min(LATE_COLS, Math.max(1, Math.ceil(lateShown.length / LATE_MIN))));
+  const totalTp = past.reduce((a, j) => a + (Number(j.tpv) || 0), 0);
+  /* Looked up fresh every render, so a saved field is visible immediately. */
+  const peek = peekId ? jobs.find((j) => j.id === peekId) || null : null;
 
   /* Who is carrying this board, so the colours have a key rather than being
      decoration somebody has to decode. */
@@ -211,63 +228,88 @@ function DeliveryBoard({ jobs, onOpen, V, reload, canEdit }: {
         <div className="font-bold text-sm">Delivery run</div>
         <div className="text-xs" style={{ color: "var(--muted)" }}>past due, then the week ahead</div>
         <div className="flex-1" />
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap items-center">
           {owners.map((o) => (
             <span key={o} className="rounded px-1.5" style={{ fontSize: 10.5, fontWeight: 700, color: ownerColour(o), background: `${ownerColour(o)}14` }}>{o}</span>
           ))}
+          {/**
+            * A PICTURE FOR WHATSAPP (Dr Raghu, 28 Sep 2026: "make a jpg there
+            * which can be seen by stratcom members — Download jpg. This will
+            * be useful to send to the whatsapp").
+            *
+            * Stratcom only, because it carries the whole shop's late work and
+            * the money held up in it out of Genie and into a chat — which is
+            * the point, and also the reason it is not a button everybody has.
+            */}
+          {isStrat && (
+            <button onClick={() => {
+              const toRun = (j: Job): RunJob => ({
+                id: jobNo(j.id), tag: j.tag, pct: j.pct, tdd: j.tdd, otd: j.otd,
+                owner: ownerOf(j), colour: ownerColour(ownerOf(j)),
+                lateDays: j.tdd && j.tdd < TODAY ? Math.abs(daysBetween(TODAY, j.tdd)) : 0,
+              });
+              const url = runJpg(
+                TODAY,
+                past.map(toRun),
+                days.map((d) => ({ date: d, label: dayHead(d).day, weekday: dayHead(d).weekday, jobs: onDay(d).map(toRun) })),
+                totalTp / 1e7,
+              );
+              if (!url) { window.alert("This browser would not draw the picture."); return; }
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `delivery-run-${TODAY}.jpg`;
+              a.click();
+            }} className="rounded px-2 py-1 font-bold" style={{ fontSize: 11, background: "var(--navy)", color: "#fff" }}
+              title="A picture of the run — date, the year/quarter/month clocks, and every job. For WhatsApp.">
+              ⤓ JPG
+            </button>
+          )}
         </div>
       </div>
 
       <div className="grid gap-2" style={{
-        gridTemplateColumns: `repeat(${Math.max(1, lateCols.length)}, minmax(160px,1fr)) repeat(7, minmax(150px,1fr))`,
+        gridTemplateColumns: `minmax(330px,2.05fr) repeat(7, minmax(150px,1fr))`,
         overflowX: "auto",
       }}>
-        {/* ---- past due, spilling sideways ---- */}
-        {lateCols.map((col, ci) => (
-        <div key={`late-${ci}`} style={{ minWidth: 0 }}>
-          <div className="rounded px-2 py-1 mb-1.5" style={{ background: "var(--red)" }}>
-            <div className="text-xs font-bold" style={{ color: "#fff" }}>Past due{lateCols.length > 1 ? ` ${ci + 1}/${lateCols.length}` : ""}</div>
-            {/* WHAT THE COLUMN IS ASKING FOR (Dr Raghu, 28 Sep 2026: "else
-                the planning engineer will anyways have to change the TDD").
-                A late job is not a fact to be noted, it is a date that has
-                stopped being true and a person who must re-date it. Said
-                that way, a long column reads as work owed rather than as
-                bad news nobody owns. Only the first column says it — three
-                columns repeating one sentence is three times the noise. */}
-            <div style={{ fontSize: 10.5, color: "#FFD9D2" }}>
-              {ci === 0
-                ? `${past.length} job${past.length === 1 ? "" : "s"} · oldest first · the TDD needs revising`
-                : "continued"}
+        {/* ---- past due: ONE heading, two columns under it ---- */}
+        <div style={{ minWidth: 0 }}>
+          <div className="rounded px-2 py-1 mb-1.5" style={{ background: past.length ? "var(--red)" : "var(--green)" }}>
+            <div className="flex items-baseline gap-2">
+              <div className="text-xs font-bold" style={{ color: "#fff" }}>Past due</div>
+              {/* THE TOTAL, ON THE HEADING. One problem counted once — three
+                  columns each with their own red heading read as three
+                  separate problems. */}
+              <div className="tnum font-bold" style={{ color: "#fff", fontSize: 15, lineHeight: 1 }}>{past.length}</div>
+              <div className="flex-1" />
+              {totalTp > 0 && <div style={{ fontSize: 10.5, color: past.length ? "#FFD9D2" : "#D7F0DF" }}>₹{(totalTp / 1e7).toFixed(2)} Cr held up</div>}
+            </div>
+            <div style={{ fontSize: 10.5, color: past.length ? "#FFD9D2" : "#D7F0DF" }}>
+              {past.length ? "oldest first · the TDD needs revising" : "nothing late"}
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            {col.map((j) => (
-              <div key={j.id}>
-                {/* How late, on the box: "4 days" is the fact a date makes
-                    the reader work out. */}
-                <div style={{ fontSize: 10, color: "var(--red)", fontWeight: 700 }}>
-                  {fmt(j.tdd)} · {Math.abs(daysBetween(TODAY, j.tdd as string))}d late
-                </div>
-                <JobBox j={j} onPeek={setPeek} dense />
+          <div className="grid gap-2" style={{ gridTemplateColumns: lateCols.length > 1 ? "1fr 1fr" : "1fr" }}>
+            {lateCols.map((col, ci) => (
+              <div key={`late-${ci}`} className="flex flex-col gap-1.5" style={{ minWidth: 0 }}>
+                {col.map((j) => (
+                  <div key={j.id}>
+                    {/* How late, on the box: "4 days" is the fact a date
+                        makes the reader work out. */}
+                    <div style={{ fontSize: 10, color: "var(--red)", fontWeight: 700 }}>
+                      {fmt(j.tdd)} · {Math.abs(daysBetween(TODAY, j.tdd as string))}d late
+                    </div>
+                    <JobBox j={j} onPeek={(j) => setPeekId(j.id)} dense />
+                  </div>
+                ))}
               </div>
             ))}
-            {ci === lateCols.length - 1 && (lateHidden > 0 || allLate) && (
-              <button onClick={() => setAllLate(!allLate)} className="rounded text-xs font-bold py-1.5"
-                style={{ border: "1px solid var(--red)", color: "var(--red)", background: "#fff" }}>
-                {allLate ? "Show fewer" : `+ ${lateHidden} more past due`}
-              </button>
-            )}
           </div>
+          {(lateHidden > 0 || allLate) && (
+            <button onClick={() => setAllLate(!allLate)} className="rounded text-xs font-bold py-1.5 w-full mt-1.5"
+              style={{ border: "1px solid var(--red)", color: "var(--red)", background: "#fff" }}>
+              {allLate ? "Show fewer" : `+ ${lateHidden} more past due`}
+            </button>
+          )}
         </div>
-        ))}
-        {past.length === 0 && (
-          <div style={{ minWidth: 0 }}>
-            <div className="rounded px-2 py-1 mb-1.5" style={{ background: "var(--green)" }}>
-              <div className="text-xs font-bold" style={{ color: "#fff" }}>Past due</div>
-              <div style={{ fontSize: 10.5, color: "#D7F0DF" }}>nothing late</div>
-            </div>
-          </div>
-        )}
 
         {/* ---- one column per day ---- */}
         {days.map((d) => {
@@ -285,7 +327,7 @@ function DeliveryBoard({ jobs, onOpen, V, reload, canEdit }: {
               <div className="flex flex-col gap-1.5" style={{ maxHeight: 430, overflowY: "auto" }}>
                 {mine.length === 0
                   ? <div className="text-xs py-3 text-center" style={{ color: "#C9C6BD" }}>—</div>
-                  : mine.map((j) => <JobBox key={j.id} j={j} onPeek={setPeek} dense />)}
+                  : mine.map((j) => <JobBox key={j.id} j={j} onPeek={(j) => setPeekId(j.id)} dense />)}
               </div>
             </div>
           );
@@ -303,8 +345,8 @@ function DeliveryBoard({ jobs, onOpen, V, reload, canEdit }: {
           job={toWip(peek)}
           V={V}
           colour={ownerColour(ownerOf(peek))}
-          onClose={() => setPeek(null)}
-          onOpenPlan={() => { setPeek(null); onOpen(peek.id); }}
+          onClose={() => setPeekId(null)}
+          onOpenPlan={() => { setPeekId(null); onOpen(peek.id); }}
           canEdit={canEdit}
           onSaved={reload}
         />
@@ -368,6 +410,7 @@ export function MyWeek({
   goalsAccess,
   goLms,
   isAdmin,
+  isStrat,
 }: {
   board: Board;
   me: { email: string; initials: string | null; displayName: string | null; erpOwner: string | null; role: string };
@@ -379,6 +422,7 @@ export function MyWeek({
   goalsAccess: boolean;
   goLms: () => void;
   isAdmin: boolean;
+  isStrat: boolean;
 }) {
   const home = useHome();
   const isAdminHere = isAdmin;
@@ -506,7 +550,7 @@ export function MyWeek({
            tasks this week". It is the shop's question, not one person's —
            a third of the page was making it look like a personal panel. */}
       <div className="mb-4">
-        <DeliveryBoard jobs={board.jobs} onOpen={onOpen} V={V} reload={reload}
+        <DeliveryBoard jobs={board.jobs} onOpen={onOpen} V={V} reload={reload} isStrat={isStrat}
           canEdit={me.role === "admin" || me.role === "planner" || me.role === "project_owner"} />
       </div>
 

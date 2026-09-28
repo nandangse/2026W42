@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.6.0.1",
+    date: "2026-09-28",
+    module: "Two past-due columns, one heading, and a picture for WhatsApp",
+    items: [
+      "<b>Past due is two columns under one heading, with the total on it</b> \u2014 and the throughput held up beside it. Three columns each carrying their own red heading read as three separate problems; it is one problem, counted once.",
+      "<b>A \u2039 JPG \u203a button for Stratcom.</b> It draws the run as a picture for WhatsApp: the date and day, then <b>how many days of the year, the quarter and the month are done and how many are left</b>, then every past-due job and the week ahead \u2014 job, what it is, the OTD and how far past it, the owner, the per cent. The year is the <b>financial</b> year and the quarters are financial quarters, because those are what the targets beside it are set against.",
+      "<b>Drawn, not screenshotted.</b> Turning a live page into an image needs a library that re-implements CSS and gets fonts and scroll positions wrong in ways nobody notices until the picture is already in a group of thirty people. This one is drawn here, so it is exactly what the code says \u2014 and it is legible on a phone, which a screenshot of a nine-column board is not.",
+      "<b>The lightbox shows a saved change at once.</b> It was holding the job as it was at the moment of the click, so after saving, the field just written was the one field on screen that had not changed. It now holds the job\u2019s number and reads the board every time \u2014 so the box is always showing what everybody else is showing.",
+    ],
+  },
+  {
     v: "5.6.0.0",
     date: "2026-09-28",
     module: "The report reordered, delivery by client, and the board tidied",
