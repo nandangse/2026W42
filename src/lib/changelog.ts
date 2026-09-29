@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.7.1.2",
+    date: "2026-09-29",
+    module: "The job page is built for the phone that scanned it",
+    items: [
+      "<b>It is no longer the printed sheet, shrunk.</b> The A5 board is laid out to be read across a shop floor and written on with a marker; this is read at arm\u2019s length by somebody at the machine with one hand free. Same facts, different shape \u2014 and <b>no QR</b>, because whoever is reading it has already scanned it.",
+      "<b>The head is frozen:</b> job number, customer tag, product family, OTD and TDD stay on screen however far you scroll. The question being answered is always \u201con THIS job\u201d, and a page you can scroll until you have forgotten which job you are on is a page that eventually gets the wrong one updated.",
+      "<b>When a job is delivered the page says ACTUAL DELIVERY and drops the target.</b> A delivered job still showing a target date is a page arguing about a deadline that no longer concerns anybody.",
+      "<b>The per-cent boxes are filled in here.</b> On the paper they are empty for a pen; on the screen Genie knows, so it says \u2014 kitting and production as ten marks each, plus the status, the current update and the four owners.",
+    ],
+  },
+  {
     v: "5.7.1.1",
     date: "2026-09-28",
     module: "The board, read from across the shop floor",

@@ -1,141 +1,140 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { currentUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { jobBoardBody, type BoardJob } from "@/lib/job-board";
-import { APP_VERSION } from "@/lib/version";
 import { today } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Job Display Board · Nandan Genie" };
+export const metadata: Metadata = { title: "Job · Nandan Genie" };
+/* Its own viewport: this page is opened by a camera pointed at a machine,
+   so it must fit the phone rather than be pinched into shape. */
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 /**
  * /job/<4-digit number> — what the QR on the machine opens.
  *
- * Dr Raghu, 28 Sep 2026: "the QR should point to a page called
- * genie.nandan.co.in/job/<XXXX>. This will open up to whoever is logged in
- * to genie."
+ * Dr Raghu, 29 Sep 2026: "the page should be mobile friendly!! Have the job
+ * number on the top in small number and freeze it along with the OTD and
+ * customer tag and product family. The QR doesn't need to be on the mobile
+ * page."
  *
- * THE SHORT NUMBER IS THE ONE PAINTED ON THE MACHINE. Genie's own id is
- * 2025262162 — the year and the number together — and nobody on the floor
- * knows it or should have to. The URL takes 2162, because that is what is
- * written on the job, on the drawing and on the board.
+ * IT IS NOT THE PRINTED SHEET, SHRUNK. The A5 board is laid out to be read
+ * from across a shop floor and written on with a marker; this is read at
+ * arm's length by somebody standing at the machine with one hand free. The
+ * same facts, a different shape — and no QR, because the person reading this
+ * has already scanned it.
  *
- * IT IS THE SAME BOARD, ONLY TRUE. The paper is out of date the moment it is
- * pinned up; this page is the same layout read from the database now. That
- * is the entire reason the code is on the paper.
+ * THE HEADER IS FROZEN because the question being answered is always "on
+ * THIS job" — and a page you can scroll until you have forgotten which job
+ * you are looking at is a page that will eventually have somebody update the
+ * wrong one.
+ *
+ * THE BOXES ON THE PAPER ARE EMPTY FOR A PEN. Here they are filled in,
+ * because the screen knows.
  */
+const PCT = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+const dmy = (s: string | null | undefined) =>
+  s ? `${s.slice(8, 10)}-${s.slice(5, 7)}-${s.slice(0, 4)}` : "—";
+const daysBetween = (a: string, b: string) =>
+  Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+
 export default async function JobBoardPage({ params }: { params: { no: string } }) {
   const user = await currentUser();
-  if (!user || user.disabled) {
-    return (
-      <div style={{ padding: 40, fontFamily: "system-ui, sans-serif" }}>
-        <h1 style={{ fontSize: 20 }}>Sign in to Genie to see this job.</h1>
-        <p style={{ color: "#6B7280" }}>
-          This board is for people who work here. <a href="/login" style={{ color: "#E4610F", fontWeight: 700 }}>Sign in</a>.
-        </p>
-      </div>
-    );
-  }
+  if (!user || user.disabled) return <Plain title="Sign in to Genie to see this job." sub="This board is for people who work here." link="/login" linkText="Sign in" />;
 
   const no = String(params.no || "").replace(/\D/g, "");
-  if (!no) return <Missing what="That is not a job number." />;
+  if (!no) return <Plain title="That is not a job number." sub="The number on the board is the short one — 2162." link="/" linkText="Go to Genie" />;
 
-  /* The number as painted on the machine, matched against the id's tail —
-     ordered newest first, because a four-digit number can repeat across
-     years and the one somebody is standing in front of is the recent one. */
   const { data } = await adminClient()
     .from("jobs")
-    .select("id, tag, fam, tdd, otd, escalation, own, quality_owner, production_owner, kitting_owner, design_owner, active, pct, kit")
+    .select("id, tag, fam, tdd, otd, escalation, note, stat, own, production_owner, kitting_owner, design_owner, pct, kit, delivered, delivered_on")
     .like("id", `%${no}`)
     .order("id", { ascending: false })
     .limit(1);
   const j = (data || [])[0];
-  if (!j) return <Missing what={`No job ${no} on the board.`} />;
+  if (!j) return <Plain title={`No job ${no} on the board.`} sub="It may have been delivered and archived." link="/" linkText="Go to Genie" />;
 
-  const init = (v: unknown) => {
-    const s = String(v || "").trim();
-    if (!s) return null;
-    if (s.includes("@")) return s.split("@")[0].slice(0, 4).toUpperCase();
-    return s.length <= 4 ? s.toUpperCase() : s.split(/\s+/).map((w) => w[0]).join("").slice(0, 4).toUpperCase();
-  };
-
-  const job: BoardJob = {
-    id: no,
-    tag: String(j.tag || ""),
-    fam: String(j.fam || ""),
-    tdd: (j.tdd as string) || null,
-    otd: (j.otd as string) || null,
-    pm: init(j.own),
-    kitting: init(j.kitting_owner),
-    production: init(j.production_owner),
-    design: init(j.design_owner),
-    escalation: (j.escalation as string) || null,
-    url: "",
-  };
-  const { css, html } = await jobBoardBody([job], today(), user.email.split("@")[0], APP_VERSION);
-
-  /* What is actually on file for this job, counted rather than promised. */
   const full = String(j.id);
   const [photos, docs, tasks] = await Promise.all([
     adminClient().from("job_photo").select("id", { count: "exact", head: true }).eq("job_id", full),
     adminClient().from("project_doc").select("id", { count: "exact", head: true }).eq("job_id", full).then((r) => r, () => ({ count: null })),
     adminClient().from("erp_tasks").select("job_id", { count: "exact", head: true }).eq("job_id", full).eq("done", false),
   ]);
-  const inProduction = Number(j.pct) > 0 || Number(j.kit) > 0;
+
+  const kit = Math.round(Number(j.kit) || 0);
+  const pct = Math.round(Number(j.pct) || 0);
+  const delivered = !!j.delivered;
+  const on = today();
+  /**
+   * WHEN IT HAS GONE, THE DATE ON THE PAGE IS THE DATE IT WENT (his rule).
+   * A delivered job still showing a target delivery is a page arguing about
+   * a deadline that no longer has anything to do with anybody.
+   */
+  const late = !delivered && j.tdd && (j.tdd as string) < on ? daysBetween(j.tdd as string, on) : 0;
 
   return (
-    <div style={{ background: "#E9E7E0", minHeight: "100vh", padding: "16px 0" }}>
-      <style dangerouslySetInnerHTML={{ __html: `${css}
-        .pg { margin: 0 auto; background: #fff; box-shadow: 0 6px 24px rgba(22,35,47,.18); }
-        @media (max-width: 230mm) { .pg { transform-origin: top left; } }
-        .live { max-width: 210mm; margin: 0 auto 10px; font: 13px/1.5 system-ui, sans-serif; color: #46545F; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
-        .acts { max-width: 210mm; margin: 14px auto 40px; font: 13px/1.4 system-ui, sans-serif; }
-        .actshd { font-weight: 700; color: #16232F; margin-bottom: 8px; }
-        .actgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-        .act { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #DCD8CC;
-               border-radius: 8px; padding: 12px 10px; color: #16232F; text-decoration: none; font-weight: 600; }
-        .act b { font-size: 16px; color: #E4610F; width: 20px; text-align: center; }
-        .act.off { color: #B8B5AC; background: #F4F2EC; border-style: dashed; }
-        .act.off b { color: #C9C6BD; }
-        .act i { margin-left: auto; font-style: normal; font-size: 10px; letter-spacing: .04em; }
-        .actnote { color: #8B8F87; font-size: 12px; margin-top: 10px; line-height: 1.5; }
-        /* Scanned on a phone at the machine — the sheet scales to fit it. */
-        @media (max-width: 800px) {
-          .pg { width: 100%; height: auto; min-height: 0; }
-          .jno { font-size: 88pt; }
-          .tag { font-size: 14pt; }
-        }
-      ` }} />
-      <div className="live">
-        <b style={{ color: "#0D7A3F" }}>● Live</b>
-        <span>Kitting <b>{Math.round(Number(j.kit) || 0)}%</b> · Production <b>{Math.round(Number(j.pct) || 0)}%</b> as Genie has it now.</span>
-        <span style={{ flex: 1 }} />
-        <a href={`/?job=${encodeURIComponent(String(j.id))}`} style={{ color: "#E4610F", fontWeight: 700 }}>Open the full job plan →</a>
-      </div>
-      <div dangerouslySetInnerHTML={{ __html: html }} />
-
-      {/**
-        * WHAT YOU CAN DO, STANDING AT THE MACHINE (Dr Raghu, 28 Sep 2026:
-        * "once the QR page opens, if it's in production, then show buttons
-        * for QC ToDo, Labour, Details of Job, Commercials, Kitting %,
-        * Production %, Photo, Status, ToDo, Milestones, TDS, GAD, QAP, QC
-        * Records etc").
-        *
-        * A TILE THAT IS NOT BUILT SAYS SO. Half of this list has no home in
-        * Genie yet — there is no QC table at all, and the document shelf is
-        * empty. Drawing them as live buttons that quietly go nowhere would
-        * teach the floor that this page does not work, which is the one
-        * thing a board on a machine cannot afford.
-        */}
-      <div className="acts">
-        <div className="actshd">
-          {inProduction ? "This job is in production" : "Not started on the floor yet"}
+    <div style={{ background: "#F4F2EC", minHeight: "100vh", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", color: "#16232F" }}>
+      {/* ---- the frozen head: which job, and when it is due ---- */}
+      <header style={{ position: "sticky", top: 0, zIndex: 5, background: "#16232F", color: "#fff", padding: "10px 14px", boxShadow: "0 2px 10px rgba(22,35,47,.25)" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <b style={{ fontSize: 20, letterSpacing: "-.01em" }}>{no}</b>
+          <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.25, flex: 1, minWidth: 0 }}>{String(j.tag || "")}</span>
         </div>
-        <div className="actgrid">
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 3, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: "#8FA1B3" }}>{String(j.fam || "")}</span>
+          <span style={{ flex: 1 }} />
+          {delivered ? (
+            <span style={{ fontSize: 11.5, color: "#7BC67E", fontWeight: 700 }}>
+              ACTUAL DELIVERY {dmy(j.delivered_on as string)}
+            </span>
+          ) : (
+            <>
+              <span style={{ fontSize: 11.5, color: "#8FA1B3" }}>
+                OTD <b style={{ color: "#fff" }}>{dmy(j.otd as string)}</b>
+              </span>
+              <span style={{ fontSize: 11.5, color: late ? "#FF9A8A" : "#8FA1B3" }}>
+                TDD <b style={{ color: late ? "#FF9A8A" : "#fff" }}>{dmy(j.tdd as string)}</b>
+                {late ? ` · ${late}d late` : ""}
+              </span>
+            </>
+          )}
+        </div>
+      </header>
+
+      <div style={{ padding: 14, maxWidth: 680, margin: "0 auto" }}>
+        {delivered && (
+          <div style={{ background: "#E6F4EA", border: "1px solid #A9D6B8", borderRadius: 10, padding: 12, marginBottom: 12, color: "#0D5A2E" }}>
+            <b>Delivered {dmy(j.delivered_on as string)}.</b> The target date no longer applies.
+          </div>
+        )}
+
+        {!!j.escalation && (
+          <div style={{ background: "#FBEAE8", border: "1px solid #F0C6C0", borderRadius: 10, padding: 12, marginBottom: 12, color: "#8A2B20", lineHeight: 1.45 }}>
+            <b style={{ letterSpacing: .4, fontSize: 11 }}>ESCALATION</b>
+            <div style={{ fontSize: 13.5, marginTop: 2 }}>{String(j.escalation)}</div>
+          </div>
+        )}
+
+        <Bar label="KITTING" value={kit} colour="#B45309" />
+        <Bar label="PRODUCTION" value={pct} colour="#0D7A3F" />
+
+        {!!j.stat && <Field label="STATUS" value={String(j.stat)} />}
+        {!!j.note && <Field label="CURRENT UPDATE" value={String(j.note)} />}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, margin: "12px 0" }}>
+          <Owner label="PROJECT" v={init(j.own)} />
+          <Owner label="KITTING" v={init(j.kitting_owner)} />
+          <Owner label="PRODUCTION" v={init(j.production_owner)} />
+          <Owner label="DESIGN" v={init(j.design_owner)} />
+        </div>
+
+        <div style={{ fontWeight: 700, margin: "18px 0 8px" }}>
+          {pct > 0 || kit > 0 ? "This job is in production" : "Not started on the floor yet"}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 8 }}>
           <Act href={`/?job=${encodeURIComponent(full)}`} icon="📋" label="Details of the job" />
           <Act href={`/?job=${encodeURIComponent(full)}`} icon="◆" label="Milestones" />
-          <Act href={`/?job=${encodeURIComponent(full)}`} icon="%" label={`Kitting ${Math.round(Number(j.kit) || 0)}%`} />
-          <Act href={`/?job=${encodeURIComponent(full)}`} icon="%" label={`Production ${Math.round(Number(j.pct) || 0)}%`} />
+          <Act href={`/?job=${encodeURIComponent(full)}`} icon="%" label={`Kitting ${kit}%`} />
+          <Act href={`/?job=${encodeURIComponent(full)}`} icon="%" label={`Production ${pct}%`} />
           <Act href={`/?job=${encodeURIComponent(full)}`} icon="✎" label="Status" />
           <Act href={`/?job=${encodeURIComponent(full)}`} icon="☑" label={`To-do${tasks.count ? ` · ${tasks.count}` : ""}`} />
           <Act href="/?tab=floor" icon="📷" label={`Photos${photos.count ? ` · ${photos.count}` : " · none yet"}`} />
@@ -147,29 +146,92 @@ export default async function JobBoardPage({ params }: { params: { no: string } 
           <Act label="GAD" soon />
           <Act label="QAP" soon />
         </div>
-        <div className="actnote">
-          Greyed tiles have nowhere to go yet — there is no QC record in Genie and the document shelf is empty.
+        <p style={{ color: "#8B8F87", fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>
+          Greyed tiles have nowhere to go yet — Genie holds no QC record and the document shelf is empty.
           They are shown so you can say where they should live, not so the page can pretend.
-        </div>
+        </p>
+        <p style={{ color: "#B8B5AC", fontSize: 11, marginTop: 18 }}>
+          Nandan Genie · read {dmy(on)} · this page is live; the sheet on the machine is not.
+        </p>
       </div>
     </div>
   );
 }
 
-function Act({ href, icon, label, soon }: { href?: string; icon?: string; label: string; soon?: boolean }) {
-  if (soon || !href) {
-    return <span className="act off"><b>{icon || "·"}</b>{label}<i>not built yet</i></span>;
-  }
-  return <a className="act" href={href}><b>{icon}</b>{label}</a>;
+const init = (v: unknown) => {
+  const s = String(v || "").trim();
+  if (!s) return null;
+  if (s.includes("@")) return s.split("@")[0].slice(0, 4).toUpperCase();
+  return s.length <= 4 ? s.toUpperCase() : s.split(/\s+/).map((w) => w[0]).join("").slice(0, 4).toUpperCase();
+};
+
+/** The per-cent bar, with the ten marks the paper board has. */
+function Bar({ label, value, colour }: { label: string; value: number; colour: string }) {
+  return (
+    <div style={{ background: "#fff", border: "1px solid #DCD8CC", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "baseline" }}>
+        <b style={{ fontSize: 11, letterSpacing: .6, color: "#8B8F87" }}>{label}</b>
+        <span style={{ flex: 1 }} />
+        <b style={{ fontSize: 20, color: colour }}>{value}%</b>
+      </div>
+      <div style={{ display: "flex", gap: 3, marginTop: 6 }}>
+        {PCT.map((p) => (
+          <div key={p} style={{
+            flex: 1, height: 14, borderRadius: 3,
+            background: value >= p ? colour : "#F0EEE8",
+            border: `1px solid ${value >= p ? colour : "#DCD8CC"}`,
+          }} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
-function Missing({ what }: { what: string }) {
+function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ padding: 40, fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ fontSize: 20 }}>{what}</h1>
-      <p style={{ color: "#6B7280" }}>
-        The number on the board is the short one — 2162, not the long id.{" "}
-        <a href="/" style={{ color: "#E4610F", fontWeight: 700 }}>Go to Genie</a>.
+    <div style={{ background: "#fff", border: "1px solid #DCD8CC", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+      <b style={{ fontSize: 11, letterSpacing: .6, color: "#8B8F87" }}>{label}</b>
+      <div style={{ fontSize: 13.5, lineHeight: 1.45, marginTop: 2 }}>{value}</div>
+    </div>
+  );
+}
+
+function Owner({ label, v }: { label: string; v: string | null }) {
+  return (
+    <div style={{ background: "#fff", border: "1px solid #DCD8CC", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
+      <div style={{ fontSize: 8.5, letterSpacing: .5, color: "#8B8F87" }}>{label}</div>
+      <b style={{ fontSize: 14 }}>{v || "—"}</b>
+    </div>
+  );
+}
+
+function Act({ href, icon, label, soon }: { href?: string; icon?: string; label: string; soon?: boolean }) {
+  const base: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 8, borderRadius: 8,
+    padding: "13px 10px", fontWeight: 600, fontSize: 13, textDecoration: "none",
+  };
+  if (soon || !href) {
+    return (
+      <span style={{ ...base, background: "#EFEDE7", border: "1px dashed #D5D2C9", color: "#B0ADA4" }}>
+        <b style={{ width: 20, textAlign: "center", color: "#C9C6BD" }}>{icon || "·"}</b>
+        {label}
+        <i style={{ marginLeft: "auto", fontStyle: "normal", fontSize: 10 }}>not built yet</i>
+      </span>
+    );
+  }
+  return (
+    <a href={href} style={{ ...base, background: "#fff", border: "1px solid #DCD8CC", color: "#16232F" }}>
+      <b style={{ width: 20, textAlign: "center", color: "#E4610F", fontSize: 15 }}>{icon}</b>{label}
+    </a>
+  );
+}
+
+function Plain({ title, sub, link, linkText }: { title: string; sub: string; link: string; linkText: string }) {
+  return (
+    <div style={{ padding: 28, fontFamily: "system-ui, sans-serif", maxWidth: 520 }}>
+      <h1 style={{ fontSize: 19 }}>{title}</h1>
+      <p style={{ color: "#6B7280", lineHeight: 1.5 }}>
+        {sub} <a href={link} style={{ color: "#E4610F", fontWeight: 700 }}>{linkText}</a>.
       </p>
     </div>
   );
