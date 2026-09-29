@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.3.0",
+    date: "2026-09-29",
+    module: "A date is a delivery, whatever the stage says",
+    items: [
+      "<b>Any job carrying an Actual Delivery Date is now banked as delivered</b> \u2014 including the ones whose stage still reads <i>Installation Stage</i> or <i>Cancelled</i>. Dr Raghu, shown those rows: \u201cthis is right. Add these status also.\u201d",
+      "<b>The rule is the date, not a list of stages.</b> Enumerating statuses means coming back here every time somebody adds one \u2014 and the stage is the part that has proved unreliable, while an actual delivery date is somebody recording that the machine went out. <b>A cancelled job carrying one was delivered and then cancelled; the delivery still happened.</b>",
+      "<b>A cancelled job with no date is still not a delivery</b>, which is exactly why this asks for the date rather than for the stage.",
+      "<b>And the run says how many it added this way</b>, separately from the six it already caught, so the two findings do not blur into one number.",
+    ],
+  },
+  {
     v: "5.8.2.7",
     date: "2026-09-29",
     module: "The ERP answered, and the answer changed the question",

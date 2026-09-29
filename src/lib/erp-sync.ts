@@ -603,6 +603,29 @@ export async function erpSync(
   let extra = 0;
   for (const j of erpDeliveredB) { if (!byName.has(S(j.name))) { byName.set(S(j.name), j); extra++; } }
   if (extra) notes.push(`${extra} job(s) the ERP calls "D: Delivered" while their stage still reads something else — banked as deliveries.`);
+
+  /**
+   * A DATE IS A DELIVERY, WHATEVER THE STAGE SAYS.
+   *
+   * Dr Raghu, 29 Sep 2026, shown the jobs whose stage read "Installation
+   * Stage" or "Cancelled" beside a real Actual Delivery Date: "this is
+   * right. Add these status also."
+   *
+   * SO THE RULE IS THE DATE, NOT A LIST OF STAGES. Enumerating statuses
+   * means coming back here every time somebody adds one — and the stage is
+   * the thing that has proved unreliable, while an actual_delivery_date is
+   * somebody recording that the machine went out. A cancelled job carrying
+   * one was delivered and then cancelled; the delivery still happened.
+   *
+   * A cancelled job with NO date is still not a delivery, which is why this
+   * asks for the date rather than for the stage.
+   */
+  const erpDeliveredC = await erpAll(cfg, "Jobmaster", DELIVERED_FIELDS, [
+    ["actual_delivery_date", "is", "set"],
+  ]);
+  let dated = 0;
+  for (const j of erpDeliveredC) { if (!byName.has(S(j.name))) { byName.set(S(j.name), j); dated++; } }
+  if (dated) notes.push(`${dated} more job(s) carry an actual delivery date although their stage says otherwise — banked, because a date is a delivery.`);
   const erpDelivered = [...byName.values()];
   const delRows = erpDelivered.map((j) => ({
     id: S(j.name),
