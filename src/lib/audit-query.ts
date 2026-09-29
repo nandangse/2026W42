@@ -62,22 +62,39 @@ export function readDate(raw: string): string | null {
 /**
  * Rupees, only where the words say plainly what they mean.
  *
- * "80000" is eighty thousand. "16.31 lakhs" is 1,631,000. "71 Lakhs" is
- * 7,100,000. Anything else — a range, a sentence, a question mark — keeps its
- * text and contributes nothing to a total, because a total built partly on
- * guesses is a total nobody can defend.
+ * "Cr" IN THIS COLUMN MEANS CREDIT, NOT CRORE — and that is not a guess, it
+ * is counted: of 1,302 amounts in the sheet, 58 end in "Dr" and 25 in "Cr",
+ * which is accountants writing which side of the ledger a figure sits on.
+ * Exactly ONE cell means ten million, and it says so in words: "16.17 crore".
+ *
+ * Reading those 25 as crores multiplied rupee figures by ten million and
+ * produced a total of three hundred million crore — which is the useful kind
+ * of wrong, because it is too absurd to survive being looked at. A misread
+ * that merely doubled the figure would have gone out.
+ *
+ * So: a trailing Dr or Cr is a SIDE and the number is plain rupees; only
+ * "lakh", "lac" and "crore" written as words scale it. The marker stays
+ * visible in the text beside the figure, because which side it sits on is
+ * half of what the row is saying.
+ *
+ * Anything else — a range ("37730+62000"), a paragraph, a question — keeps
+ * its text and contributes nothing to a total. A total built partly on
+ * guesses is a total nobody can defend in front of an auditor.
  */
 export function readAmount(raw: string): number | null {
-  const s = String(raw || "").trim().replace(/,/g, "");
+  const s = String(raw || "").trim().replace(/[,\u20b9]/g, "").replace(/^rs\.?\s*/i, "").replace(/\/-\s*$/, "");
   if (!s) return null;
-  const m = s.match(/^(?:rs\.?\s*)?([\d.]+)\s*(lakhs?|lacs?|cr|crores?|k)?\.?$/i);
+  /* The side marker first, so it is never mistaken for a scale. */
+  const side = s.match(/^([\d.]+)\s*(?:dr|cr)\.?$/i);
+  if (side) { const n = Number(side[1]); return isFinite(n) ? n : null; }
+  const m = s.match(/^([\d.]+)\s*(lakhs?|lacs?|crores?|k)?\.?$/i);
   if (!m) return null;
   const n = Number(m[1]);
   if (!isFinite(n)) return null;
   const unit = (m[2] || "").toLowerCase();
   if (!unit) return n;
   if (unit.startsWith("lakh") || unit.startsWith("lac")) return n * 1e5;
-  if (unit.startsWith("cr")) return n * 1e7;
+  if (unit.startsWith("crore")) return n * 1e7;
   if (unit === "k") return n * 1e3;
   return n;
 }

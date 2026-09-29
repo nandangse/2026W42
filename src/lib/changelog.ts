@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.0.1",
+    date: "2026-09-29",
+    module: "\u201cCr\u201d in the audit sheet means Credit, not Crore",
+    items: [
+      "<b>The amount reader was multiplying rupees by ten million.</b> 25 cells in that column end in \u201cCr\u201d and 58 in \u201cDr\u201d \u2014 accountants writing which side of the ledger a figure sits on. I read them as crores. Exactly <b>one</b> cell in 1,302 means ten million, and it says so in words: \u201c16.17 crore\u201d.",
+      "<b>It produced a total of three hundred million crore</b>, which is the useful kind of wrong \u2014 too absurd to survive being looked at. A misread that merely doubled the figure would have gone out unnoticed. This is why the import was dry-run against the real file before a single row was written.",
+      "<b>And it was reading almost nothing.</b> The \u20b9 symbol, commas and the <code>/-</code> ending all defeated it, so 1,146 perfectly plain amounts \u2014 \u20b912,500, \u20b91,59,200 \u2014 were being kept as \u201cwords\u201d. It now reads <b>1,297 of 1,302</b>, and the five it leaves alone are genuinely paragraphs holding several figures, which no total should swallow.",
+      "<b>The five years of queries come to \u20b9117.76 Cr</b> of named amounts.",
+    ],
+  },
+  {
     v: "5.8.0.0",
     date: "2026-09-29",
     module: "Audit Queries \u2014 the Accounts Management Review, inside Genie",
