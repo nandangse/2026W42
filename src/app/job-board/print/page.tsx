@@ -28,7 +28,7 @@ export default async function JobBoardPrint({ searchParams }: { searchParams: { 
 
   const { data } = await adminClient()
     .from("jobs")
-    .select("id, tag, fam, tdd, otd, escalation, own, production_owner, kitting_owner, design_owner")
+    .select("id, tag, fam, tdd, otd, escalation, own, production_owner, kitting_owner, design_owner, is_vehicle, chassis_no, engine_no")
     .in("id", ids);
 
   const init = (v: unknown) => {
@@ -51,6 +51,11 @@ export default async function JobBoardPrint({ searchParams }: { searchParams: { 
     production: init(j!.production_owner),
     design: init(j!.design_owner),
     escalation: (j!.escalation as string) || null,
+    /* Ticked, or answered by the fact that somebody has already recorded a
+       number — recording one is itself saying it is a vehicle. */
+    isVehicle: !!j!.is_vehicle || !!j!.chassis_no || !!j!.engine_no,
+    chassisNo: (j!.chassis_no as string) || null,
+    engineNo: (j!.engine_no as string) || null,
   }));
 
   const html = await jobBoardHtml(jobs, today(), user.email.split("@")[0], APP_VERSION);

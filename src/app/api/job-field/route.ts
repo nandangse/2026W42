@@ -44,6 +44,12 @@ const FIELDS: Record<string, { label: string; kind: "date" | "number" | "text"; 
    * field somebody else is already using.
    */
   mandays:          { label: "Approx Mandays",   kind: "text", genieOnly: true },
+  /* The vehicle a job is built on. Genie's own — the ERP has a chassis
+     INSPECTION CHECKLIST and no field for the numbers themselves, and
+     writing them into something else's column is how two systems begin to
+     disagree (0173). */
+  chassis_no:       { label: "Chassis No",       kind: "text", genieOnly: true },
+  engine_no:        { label: "Engine No",        kind: "text", genieOnly: true },
   /**
    * JOB COMMERCIALS (Dr Raghu, 2 Sep 2026) — the cash a job throws off, and
    * when. Genie's own: the ERP carries a costing model that means something

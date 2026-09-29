@@ -178,6 +178,7 @@ const toWip = (j: Job): WipJob => ({
   kit: Number(j.kit) || 0, pct: Number(j.pct) || 0, note: j.note || "",
   escalation: j.escalation ?? null, amtNeeded: j.amtNeeded ?? null,
   payOnDelivery: j.payOnDelivery ?? null, mandays: j.mandays ?? null,
+  chassisNo: j.chassisNo ?? null, engineNo: j.engineNo ?? null,
   ownerInitials: j.ownerInitials, ownerName: j.ownerName,
 });
 

@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.1.0",
+    date: "2026-09-29",
+    module: "Chassis and engine numbers on the display board",
+    items: [
+      "<b>A job built on a vehicle now carries its chassis and engine number</b> on the A5 board, and both are editable in the job lightbox like every other field there.",
+      "<b>They are Genie\u2019s own fields and are not pushed to the ERP.</b> The ERP has a <i>Chassis inspection checklist</i> document and no column for the numbers themselves \u2014 writing them into a field somebody is already using for something else is how two systems begin to disagree.",
+      "<b>Filling either number is what puts the row on the board.</b> Whether a job is vehicle-mounted cannot be read off the product family: \u201cMHE - Truck Mounted Crane\u201d plainly is one and \u201cMHE - Single Scissor Lift\u201d plainly is not, but \u201cAGSE - Hi Lift\u201d is a catering truck and reads like neither. A guess would print an empty chassis box on a hand pallet truck and leave it off a bowser \u2014 so recording a number is itself the answer, and nobody has to tick a box as well.",
+      "<b>Empty boxes where Genie does not hold them yet</b>, sized for a marker, like every other box on that sheet. A chassis number is read off the plate on the machine \u2014 which is exactly where the board is hanging.",
+      "<b>Needs migration 0173.</b>",
+    ],
+  },
+  {
     v: "5.8.0.1",
     date: "2026-09-29",
     module: "\u201cCr\u201d in the audit sheet means Credit, not Crore",

@@ -39,6 +39,10 @@ export interface BoardJob {
   production: string | null;
   design: string | null;
   escalation: string | null;
+  /** Built on a vehicle — the row only prints when this is true. */
+  isVehicle?: boolean;
+  chassisNo?: string | null;
+  engineNo?: string | null;
   /**
    * Where the QR points. Left alone it is built from the job number, so the
    * paper and the page cannot drift apart — a board carrying a link to a
@@ -133,6 +137,10 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
       <div class="gl">DELIVERY</div><div class="gb">${boxes(DELIVERY, true)}</div>
     </div>
 
+    ${j.isVehicle ? `<div class="veh">
+      <div class="vb"><span>CHASSIS NO</span><i>${esc(j.chassisNo || "")}</i></div>
+      <div class="vb"><span>ENGINE NO</span><i>${esc(j.engineNo || "")}</i></div>
+    </div>` : ""}
     ${j.escalation ? `<div class="esc">&#9888; ${esc(j.escalation.slice(0, 150))}</div>` : ""}
     <div class="notes"><span>NOTES</span><i></i></div>
   </div>
@@ -192,6 +200,13 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
   .bx span { font-size:7pt; color:#C9C6BD; }
   .bx.w span { font-size:5.5pt; letter-spacing:.02em; text-align:center; line-height:1.1; }
 
+  /* THE VEHICLE ROW. Written in by hand like every other box on this sheet
+     when Genie does not hold the number yet -- a chassis number is read off
+     the plate on the machine, which is exactly where this board is hanging. */
+  .veh { display:grid; grid-template-columns:1fr 1fr; gap:2mm; margin-top:2mm; }
+  .vb { border:.3mm solid #16232F; border-radius:.8mm; padding:1mm 2mm; min-height:8mm; }
+  .vb span { display:block; font-size:6pt; letter-spacing:.1em; color:#8B8F87; }
+  .vb i { font-style:normal; font-size:11pt; font-weight:bold; letter-spacing:.02em; }
   .esc { margin-top:2mm; font-size:8pt; color:#B3392E; font-weight:bold; line-height:1.25; }
   .notes { margin-top:auto; display:flex; align-items:flex-end; gap:2mm; }
   .notes span { font-size:6.5pt; letter-spacing:.1em; color:#8B8F87; }

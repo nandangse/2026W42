@@ -46,6 +46,8 @@ export interface WipJob {
   amtNeeded: number | null;
   payOnDelivery: number | null;
   mandays?: string | null;
+  chassisNo?: string | null;
+  engineNo?: string | null;
   ownerInitials: string | null;
   ownerName: string | null;
 }
@@ -687,6 +689,19 @@ export function JobLightbox({
               options={MANDAY_BANDS} color={C.navy} onSave={(v) => save("mandays", v)} />
           </div>
 
+          {/* THE VEHICLE IT IS BUILT ON (Dr Raghu, 29 Sep 2026). Filling
+              either number is what puts the row on the printed board — so
+              recording a chassis number is itself saying this is a vehicle,
+              and nobody has to tick a box as well. */}
+          <div className="flex gap-2 flex-wrap mb-3">
+            <EditBit label="Chassis No" value={job.chassisNo || ""} kind="text"
+              canEdit={canEdit} color={C.body} display={job.chassisNo || "—"}
+              onSave={(v) => save("chassis_no", v)} />
+            <EditBit label="Engine No" value={job.engineNo || ""} kind="text"
+              canEdit={canEdit} color={C.body} display={job.engineNo || "—"}
+              onSave={(v) => save("engine_no", v)} />
+          </div>
+
           <EditText label="Current Project Escalation" value={job.escalation || ""} canEdit={canEdit}
             tone={C.red} onSave={(v) => save("escalation", v)} />
           <EditText label="Current Update" value={job.note || ""} canEdit={canEdit}
@@ -733,7 +748,7 @@ function EditBit({
   label, value, display, suffix, kind, canEdit, color, onSave,
 }: {
   label: string; value: string; display?: string; suffix?: string;
-  kind: "number" | "date"; canEdit: boolean; color: string; onSave: (v: string) => Promise<void>;
+  kind: "number" | "date" | "text"; canEdit: boolean; color: string; onSave: (v: string) => Promise<void>;
 }) {
   const [on, setOn] = useState(false);
   const [v, setV] = useState(value);
@@ -757,7 +772,7 @@ function EditBit({
       {on ? (
         <div className="flex items-center gap-1">
           <input
-            autoFocus type={kind === "date" ? "date" : "number"} value={v}
+            autoFocus type={kind === "date" ? "date" : kind === "text" ? "text" : "number"} value={v}
             onChange={(e) => setV(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") setOn(false); }}
             className="text-sm border rounded px-1 py-0.5 tnum"

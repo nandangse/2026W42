@@ -55,6 +55,9 @@ export interface BoardJob {
   payOnDelivery: number | null;
   /** Genie's own band — B/O, 0-50 … 700+. See 0115_job_mandays.sql. */
   mandays: string | null;
+  /** The vehicle it is built on — Genie's own, see 0173. */
+  chassisNo: string | null;
+  engineNo: string | null;
   /** The cash a job throws off, and when — see 0116_job_commercials.sql. */
   advance: number | null;
   invested: number | null;
@@ -121,6 +124,8 @@ function mapJob(r: any): BoardJob {
     amtNeeded: r.amt_needed == null ? null : Number(r.amt_needed),
     payOnDelivery: r.pay_on_delivery == null ? null : Number(r.pay_on_delivery),
     mandays: (r.mandays as string | null) ?? null,
+    chassisNo: (r.chassis_no as string | null) ?? null,
+    engineNo: (r.engine_no as string | null) ?? null,
     // NEVER Number(null) here: 0 would turn "nobody has recorded an advance"
     // into "no advance was taken", and the cash forecast would promise money
     // that is already in the bank -- or was never coming.
