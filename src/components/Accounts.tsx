@@ -21,6 +21,7 @@ import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerB
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
 import ComplianceCalendar from "@/components/kuber/Compliance";
+import AuditQueries from "@/components/kuber/AuditQueries";
 import { LOGO } from "@/lib/logo";
 
 const NAV: { header?: string; items: { key: string; label: string; icon: string }[] }[] = [
@@ -79,7 +80,14 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
   },
   {
     header: "CORRESPONDENCE",
-    items: [{ key: "tasking", label: "Tasking", icon: "☑" }],
+    items: [
+      { key: "tasking", label: "Tasking", icon: "☑" },
+      /* Dr Raghu, 29 Sep 2026: "make a section called Audit Queries. We will
+         get the Auditors to put it here itself from now on." Under
+         Correspondence beside Tasking, because that is what it is — somebody
+         outside asking the accounts a question and waiting for an answer. */
+      { key: "audit", label: "Audit Queries", icon: "⚑" },
+    ],
   },
   {
     header: "BOOKS",
@@ -216,6 +224,7 @@ export default function Accounts({
           {openKey === "fundflow" && <FundFlowScreen />}
           {openKey === "ratios" && <RatioScreen />}
           {openKey === "compliance" && <ComplianceCalendar />}
+          {openKey === "audit" && <AuditQueries isOwner={email.toLowerCase() === "raghu@nandan.co.in"} />}
           {openKey === "cfonote" && <CfoNoteScreen go={go} />}
           {openKey === "salesreg" && <VoucherRegister kind="sales" key="s" />}
           {openKey === "purchreg" && <VoucherRegister kind="purchase" key="p" />}

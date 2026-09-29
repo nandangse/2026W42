@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.0.0",
+    date: "2026-09-29",
+    module: "Audit Queries \u2014 the Accounts Management Review, inside Genie",
+    items: [
+      "<b>A new section under Correspondence</b>, holding the query sheet the auditors have kept by hand since April 2021 \u2014 <b>1,905 rows</b>: who asked, who it went to, against which ledger, what was asked, what it was worth, where it stands, and what was said when it closed. Dr Raghu: \u201cWe will get the Auditors to put it here itself from now on \u2014 I want ALL the details in this so that the Accounts management review file with manual work is redundant.\u201d",
+      "<b>So it had to be better than the sheet, not a copy of it.</b> The only thing anybody actually asks that file is <i>what is still open, whose is it, and how old</i> \u2014 so that is the first thing on the screen, as four counted numbers you can click to filter by. The sheet carries those numbers <b>typed at the top</b>, which somebody has to remember to update and which no longer agrees with the rows beneath it. Here they are counted from the rows every time, so they cannot drift.",
+      "<b>Nothing is guessed.</b> That date column holds \u201c20/04/2021\u201d beside \u201c8\u201d and \u201cImmediately on priority\u201d; the amount column holds \u201c16.31 lakhs\u201d beside \u201c80000\u201d. Each cell is kept <b>exactly as written</b> and turned into a date or a rupee figure only where it plainly is one \u2014 and the total says how many amounts are in words and therefore not in it. Parsing \u201c8\u201d into the eighth of some month would be inventing a fact about an audit query.",
+      "<b>Import is keyed on the sheet\u2019s own row number</b>, so running it twice corrects the rows rather than doubling them. An audit trail that can be accidentally duplicated is an audit trail nobody can count.",
+      "<b>vidya, Vidya and VIDYA are one person in the filter</b> and three spellings on the row \u2014 the filter groups them; the record still shows what was actually written.",
+      "<b>Needs migration 0172.</b> Until it is run the section says so plainly rather than half-working.",
+    ],
+  },
+  {
     v: "5.7.1.3",
     date: "2026-09-29",
     module: "The three clocks now say the count and the rate",
