@@ -82,16 +82,45 @@ export async function erpConfig(crm: SupabaseClient): Promise<ErpCfg | { error: 
 }
 
 /** Every row of a doctype, paged past Frappe's 1000-row habit. */
+/**
+ * Fields whose names are inferred and may simply not exist on this ERP.
+ * Recorded here when the ERP rejects them, so the sync can SAY so instead of
+ * quietly returning rows with three empty columns for ever.
+ */
+export const droppedFields: string[] = [];
+
 async function erpAll(
   cfg: ErpCfg, doctype: string, fields: string[], filters?: unknown[],
 ): Promise<Record<string, unknown>[]> {
   const out: Record<string, unknown>[] = [];
+  let ask = fields;
   for (let start = 0; start < 40000; start += 500) {
     const u = `${cfg.base}/api/resource/${encodeURIComponent(doctype)}`
-      + `?fields=${encodeURIComponent(JSON.stringify(fields))}`
+      + `?fields=${encodeURIComponent(JSON.stringify(ask))}`
       + (filters ? `&filters=${encodeURIComponent(JSON.stringify(filters))}` : "")
       + `&limit_start=${start}&limit_page_length=500`;
-    const r = await fetch(u, { headers: cfg.H });
+    let r = await fetch(u, { headers: cfg.H });
+    /**
+     * A GUESSED FIELDNAME MUST FAIL OUT LOUD, NOT TAKE THE SYNC WITH IT.
+     *
+     * The vehicle fields' names are inferred from ERPNext's custom_ habit.
+     * If this ERP spells them differently, Frappe refuses the whole request —
+     * which would stop every project syncing over three columns. So they are
+     * dropped once, the rest of the sync proceeds, and the names that were
+     * dropped are reported rather than leaving three columns mysteriously
+     * empty for ever.
+     */
+    if (!r.ok && ask.some((f) => VEHICLE_FIELDS.includes(f))) {
+      const why = await r.text().catch(() => "");
+      ask = ask.filter((f) => !VEHICLE_FIELDS.includes(f));
+      for (const f of VEHICLE_FIELDS) if (!droppedFields.includes(f)) droppedFields.push(f);
+      swallow("erp-sync/vehicle-fields", new Error(`${doctype}: ${why.slice(0, 200)}`));
+      const again = `${cfg.base}/api/resource/${encodeURIComponent(doctype)}`
+        + `?fields=${encodeURIComponent(JSON.stringify(ask))}`
+        + (filters ? `&filters=${encodeURIComponent(JSON.stringify(filters))}` : "")
+        + `&limit_start=${start}&limit_page_length=500`;
+      r = await fetch(again, { headers: cfg.H });
+    }
     if (!r.ok) throw new Error(`The ERP answered ${r.status} on ${doctype} page ${start}.`);
     const page = ((await r.json()) as { data?: Record<string, unknown>[] }).data ?? [];
     out.push(...page);
@@ -134,6 +163,18 @@ const N = (v: unknown) => {
   const n = Number(S(v).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
 };
+
+/**
+ * The three fields the ERP's Project carries about the vehicle.
+ *
+ * Kept in their own list because they are the only names here that are
+ * INFERRED rather than known: ERPNext prefixes a field added through
+ * Customise Form with custom_, which is what every other custom field in
+ * this ERP does. An inferred name must be able to fail out loud, so these
+ * are optional — if the ERP does not know them the request is retried
+ * without them and the sync reports which were dropped.
+ */
+export const VEHICLE_FIELDS = ["custom_vehicle_model", "custom_engine_no", "custom_chassis_no"];
 
 const PROJECT_FIELDS = [
   "name", "custom_project_director", "customer_committed_delivery_",
@@ -251,6 +292,11 @@ const JOB_FIELDS = [
   // Dr Raghu, 2 Sep 2026: the GST rate is already on Jobmaster, so nobody
   // types it 112 times.
   "custom_gst_rate",
+  /* THE VEHICLE IT IS BUILT ON (Dr Raghu, 29 Sep 2026: "its in ERP ... not
+     project this is in jobmaster"). Optional, because these three names are
+     inferred from ERPNext's custom_ habit rather than known — see
+     VEHICLE_FIELDS. */
+  ...VEHICLE_FIELDS,
   // when the ERP last touched the row -- "latest entry wins" needs it
   "modified",
 ];
@@ -461,6 +507,12 @@ export async function erpSync(
     stat: S(j.job_status),
     own: S(j.planning_owner),
     gst: j.custom_gst_rate == null || j.custom_gst_rate === "" ? null : N(j.custom_gst_rate),
+    /* The vehicle, straight off the Jobmaster row. keepFilled() below is what
+       protects a number somebody typed here from a blank arriving from the
+       ERP — an empty field is not later information, it is none. */
+    vehicle_model: S(j.custom_vehicle_model) || null,
+    engine_no: S(j.custom_engine_no) || null,
+    chassis_no: S(j.custom_chassis_no) || null,
     _erp_modified: S(j.modified),
   })).filter((j) => j.id);
 
@@ -643,6 +695,13 @@ export async function erpSync(
     }
     return out as T;
   };
+
+  if (droppedFields.length) {
+    /* Said, not swallowed: three columns that stay empty for ever because a
+       fieldname was guessed wrongly is exactly the silent failure this
+       codebase keeps having to be cured of. */
+    notes.push(`the ERP has no field named ${droppedFields.join(", ")} — vehicle details not synced`);
+  }
 
   let projWritten = 0;
   const strip = <T extends Record<string, unknown>>(r: T): T => { const o = { ...r } as Record<string, unknown>; delete o._erp_modified; return o as T; };

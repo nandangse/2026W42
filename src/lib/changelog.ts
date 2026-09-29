@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.2.0",
+    date: "2026-09-29",
+    module: "The vehicle syncs from the Jobmaster",
+    items: [
+      "<b>Vehicle Model, Engine No and Chassis No now come down from the ERP</b> \u2014 off the Jobmaster row, where they are actually kept, so nobody types them. They print on the A5 display board and are editable in the job lightbox for the jobs the ERP has not been filled in for yet.",
+      "<b>A blank from the ERP never overwrites something a person typed.</b> The rule is that the later entry wins, but an empty field is not later information \u2014 it is none, and a planner who wrote a chassis number off the plate must not lose it to an ERP nobody has filled in.",
+      "<b>And the three fieldnames are a guess that fails out loud.</b> They are inferred from ERPNext\u2019s habit of prefixing a customised field with <code>custom_</code>, which is what every other custom field in this ERP does \u2014 but if this one spells them differently, Frappe refuses the <b>whole request</b>, which would stop every job syncing over three columns. So they are dropped once, the rest of the sync carries on, and the run <b>says which names it could not find</b>. Three columns quietly empty for ever is exactly the failure this codebase keeps having to be cured of.",
+      "<b>Audit Queries is loaded</b> \u2014 all 1,905 rows. 170 pending, not the 162 the sheet\u2019s typed header claims.",
+    ],
+  },
+  {
     v: "5.8.1.0",
     date: "2026-09-29",
     module: "Chassis and engine numbers on the display board",

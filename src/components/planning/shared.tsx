@@ -177,6 +177,7 @@ export interface Job {
   /** The vehicle it is built on, where it is one — Genie's own (0173). */
   chassisNo?: string | null;
   engineNo?: string | null;
+  vehicleModel?: string | null;
   /** The day it actually went. The board has carried it since 0100; this
    *  type simply never declared it. */
   delivered_on?: string | null;
