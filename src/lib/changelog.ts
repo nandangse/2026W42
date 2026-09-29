@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.2.5",
+    date: "2026-09-29",
+    module: "The hourly sync was calling a door it had locked against itself",
+    items: [
+      "<b>Every hourly pass today failed on the push step with 401 \u201cProtected deployment\u201d</b> \u2014 and because a failed push cancels the pull, the board stopped taking anything from the ERP after 10:05. Found in the heartbeat, not by guessing.",
+      "<b>The cause was ours, not a Vercel setting.</b> When the platform invokes a cron, <code>req.url</code> is the <b>deployment\u2019s own URL</b> \u2014 the <code>genie-abc123.vercel.app</code> one \u2014 and deployment URLs sit behind Vercel Authentication even on a project whose production domain is wide open. So the route called itself at an address it had locked, once an hour, for hours, while <b>genie.nandan.co.in answered anybody</b> who asked.",
+      "<b>The push now goes to the production domain by name.</b> The hop is to the address the world uses, which is the address that is actually open.",
+      "<b>The heartbeat is what found it</b> \u2014 it had been recording the exact 401 and its content type since 16 September, precisely so that a failure like this would name itself instead of being chased.",
+    ],
+  },
+  {
     v: "5.8.2.4",
     date: "2026-09-29",
     module: "The pull button says what happened",

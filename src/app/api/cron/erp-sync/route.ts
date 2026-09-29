@@ -93,7 +93,24 @@ export async function GET(req: Request) {
     let push: Record<string, unknown> = {};
     let pushFailed: { status: number; said: string } | null = null;
     if (!secret) return NextResponse.json({ ok: false, note: "CRON_SECRET is not set, so the cron cannot push." });
-    const pr = await fetch(new URL("/api/erp-update", req.url), {
+    /**
+     * THE PUSH GOES TO THE PRODUCTION DOMAIN, NOT TO req.url.
+     *
+     * 29 Sep 2026, found in the heartbeat: every hourly pass since the
+     * morning failed with 401 "Protected deployment" on the push step — and
+     * therefore skipped the pull, so the board stopped moving.
+     *
+     * The cause was here, not in Vercel's settings. When the platform invokes
+     * a cron, req.url is the DEPLOYMENT's own URL — the one that looks like
+     * genie-abc123.vercel.app — and deployment URLs sit behind Vercel
+     * Authentication even on a project whose production domain is open. So
+     * the route was calling a door it had locked against itself, once an
+     * hour, for hours, while genie.nandan.co.in answered anybody.
+     *
+     * Named explicitly, so the hop is to the address the world uses.
+     */
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://genie.nandan.co.in";
+    const pr = await fetch(new URL("/api/erp-update", origin), {
       method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
       body: JSON.stringify({ action: "push" }),
     });
