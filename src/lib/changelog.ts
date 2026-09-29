@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.2.7",
+    date: "2026-09-29",
+    module: "The ERP answered, and the answer changed the question",
+    items: [
+      "<b>The Jobmaster has no chassis or engine number at all.</b> What it does have is <code>custom_is_vehicle_based</code>, <code>custom_chassis_ordered</code>, <code>custom_chassis_recieved</code> and <code>installation_engineer</code> \u2014 read off a whole document, not guessed.",
+      "<b>So the numbers are on the Project after all.</b> The ERP screen showing Engine No and Chassis No also showed <i>Project Type</i>, which is a standard Project field. Rather than argue about which doctype it is, the diagnostic now asks <b>both</b> and reports what each carries.",
+      "<b>And one guess turns out to have been unnecessary.</b> I decided yesterday that whether a job is vehicle-mounted could not be read off anything and had to be inferred from a chassis number being filled in. The ERP has been holding <code>custom_is_vehicle_based</code> the whole time. It is now read straight \u2014 the right answer was in the data, not in the reasoning.",
+    ],
+  },
+  {
     v: "5.8.2.6",
     date: "2026-09-29",
     module: "The sync now finds the field name for us",

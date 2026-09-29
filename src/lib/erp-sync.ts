@@ -176,6 +176,14 @@ const N = (v: unknown) => {
  */
 export const VEHICLE_FIELDS = ["custom_vehicle_model", "custom_engine_no", "custom_chassis_no"];
 
+/**
+ * CONFIRMED to exist on the Jobmaster — read off a whole document, not
+ * guessed. It is the answer to a question I had decided could not be
+ * answered: whether a job is built on a vehicle. The ERP has been holding
+ * that all along.
+ */
+export const VEHICLE_FLAG = "custom_is_vehicle_based";
+
 const PROJECT_FIELDS = [
   "name", "custom_project_director", "customer_committed_delivery_",
   "expected_end_date", "project_stage", "sales_order", "jobnumberslist", "status", "modified",
@@ -297,6 +305,7 @@ const JOB_FIELDS = [
      inferred from ERPNext's custom_ habit rather than known — see
      VEHICLE_FIELDS. */
   ...VEHICLE_FIELDS,
+  VEHICLE_FLAG,
   // when the ERP last touched the row -- "latest entry wins" needs it
   "modified",
 ];
@@ -510,6 +519,7 @@ export async function erpSync(
     /* The vehicle, straight off the Jobmaster row. keepFilled() below is what
        protects a number somebody typed here from a blank arriving from the
        ERP — an empty field is not later information, it is none. */
+    is_vehicle: j[VEHICLE_FLAG] == null ? null : !!Number(j[VEHICLE_FLAG]),
     vehicle_model: S(j.custom_vehicle_model) || null,
     engine_no: S(j.custom_engine_no) || null,
     chassis_no: S(j.custom_chassis_no) || null,
@@ -707,18 +717,25 @@ export async function erpSync(
      * offered. A diagnostic that names the fix is worth ten that name the
      * fault.
      */
+    /* BOTH DOCTYPES, because the first answer raised a better question. The
+       Jobmaster turned out to carry custom_is_vehicle_based and the chassis
+       ORDERED/RECEIVED dates but no numbers — and the ERP screen showing
+       Engine No and Chassis No also showed Project Type, which is a Project
+       field. So ask the Project too rather than argue about which it is. */
     let found = "";
-    try {
-      const one = jobRows[0]?.id;
-      if (one) {
-        const r = await fetch(`${cfg.base}/api/resource/Jobmaster/${encodeURIComponent(one)}`, { headers: cfg.H });
-        if (r.ok) {
-          const doc = ((await r.json()) as { data?: Record<string, unknown> }).data || {};
-          const hits = Object.keys(doc).filter((k) => /chass|engine|vehic/i.test(k));
-          found = hits.length ? ` — the Jobmaster does have: ${hits.join(", ")}` : " — and nothing on it looks like chassis, engine or vehicle either";
-        }
-      }
-    } catch { /* the note stands on its own without this */ }
+    const look = async (doctype: string, id: string | undefined) => {
+      if (!id) return "";
+      try {
+        const r = await fetch(`${cfg.base}/api/resource/${doctype}/${encodeURIComponent(id)}`, { headers: cfg.H });
+        if (!r.ok) return "";
+        const doc = ((await r.json()) as { data?: Record<string, unknown> }).data || {};
+        const hits = Object.keys(doc).filter((k) => /chass|engine|vehic/i.test(k));
+        return hits.length ? ` — ${doctype} has: ${hits.join(", ")}` : "";
+      } catch { return ""; }
+    };
+    found = (await look("Jobmaster", jobRows[0]?.id))
+      + (await look("Project", jobRows.find((j) => j.proj)?.proj));
+    if (!found) found = " — and nothing on either looks like chassis, engine or vehicle";
     notes.push(`the ERP has no field named ${droppedFields.join(", ")} — vehicle details not synced${found}`);
   }
 
