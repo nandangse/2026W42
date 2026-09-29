@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.2.1",
+    date: "2026-09-29",
+    module: "A button that pulls from the ERP now",
+    items: [
+      "<b>Synchronize to ERP could push corrections up and could say what the hourly pull <i>would</i> bring down \u2014 and had no way to bring it down.</b> The only pull was the one at five past the hour, so checking whether a change works meant waiting for a clock.",
+      "<b>\u21e3 Pull from the ERP now</b> runs <b>the same route the cron runs</b>, in the same order: push what is waiting, then bring down what is ticked. Not a second code path that might behave differently from the hourly one \u2014 that is the only way a \u201crun it now\u201d button stays trustworthy.",
+      "<b>And it shows every note the pass returns</b>, including the one saying a field name could not be found in the ERP \u2014 which is the whole reason somebody presses it today.",
+    ],
+  },
+  {
     v: "5.8.2.0",
     date: "2026-09-29",
     module: "The vehicle syncs from the Jobmaster",

@@ -103,6 +103,28 @@ function HourlyFromErp() {
   const [note, setNote] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
+  const [pullMsg, setPullMsg] = useState("");
+  /** The hourly pass, run by hand. Same route, same order, same rules. */
+  const pullNow = async () => {
+    if (!window.confirm("Run the ERP pass now?\n\nIt pushes what is waiting, then brings down everything ticked above. It can take a minute or two.")) return;
+    setBusy("pull"); setPullMsg("Running — push first, then the pull…");
+    try {
+      const r = await api.get("/api/cron/erp-sync") as { ok?: boolean; note?: string; notes?: string[]; jobs?: number; projects?: number; delivered?: number };
+      const bits = [
+        r.jobs != null ? `${r.jobs} job(s)` : "",
+        r.projects != null ? `${r.projects} project(s)` : "",
+        r.delivered != null ? `${r.delivered} delivered` : "",
+      ].filter(Boolean).join(" · ");
+      /* Every note the pass returns is shown — including the one that says a
+         field name could not be found, which is the whole reason somebody
+         presses this button today. */
+      const notes = [r.note, ...(r.notes || [])].filter(Boolean).join(" · ");
+      setPullMsg(`${r.ok === false ? "!" : ""}Done. ${bits}${notes ? ` — ${notes}` : ""}`);
+      load();
+    } catch (e) { setPullMsg("!" + (e instanceof Error ? e.message : String(e))); }
+    setBusy("");
+  };
+
 
   const load = useCallback(() => api.get("/api/erp-hourly")
     .then((r) => { const j = r as { docs?: HourlyDoc[]; winner?: string; note?: string };
@@ -171,6 +193,34 @@ function HourlyFromErp() {
         <span className="text-xs" style={{ color: "var(--muted)" }}>
           Later-wins is why a pull can never trample a change made here after the ERP&rsquo;s own.
         </span>
+      </div>
+
+      {/**
+        * PULL IT NOW (Dr Raghu, 29 Sep 2026: "i want to do it now").
+        *
+        * This screen could push corrections up and could say what the hourly
+        * pull WOULD bring down — and had no way to bring it down. Waiting
+        * until :05 to see whether a field maps is a slow way to find out it
+        * does not.
+        *
+        * It runs the same route the cron runs, in the same order: push
+        * first, then pull. It is not a second code path that might behave
+        * differently from the nightly one — that is the only way a "run it
+        * now" button stays trustworthy.
+        */}
+      <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ borderTop: "1px solid var(--line)" }}>
+        <button onClick={pullNow} disabled={busy === "pull"} className="text-xs font-bold rounded px-3 py-1.5 text-white"
+          style={{ background: busy === "pull" ? "var(--muted)" : "var(--accent)" }}>
+          {busy === "pull" ? "Running…" : "⇣ Pull from the ERP now"}
+        </button>
+        <span className="text-xs" style={{ color: "var(--muted)" }}>
+          The same pass the hour runs — pushes what is waiting, then brings down what is ticked.
+        </span>
+        {pullMsg && (
+          <div className="text-xs w-full" style={{ color: pullMsg.startsWith("!") ? "var(--red)" : "var(--ink)", lineHeight: 1.5, marginTop: 2 }}>
+            {pullMsg.replace(/^!/, "")}
+          </div>
+        )}
       </div>
     </div>
   );
