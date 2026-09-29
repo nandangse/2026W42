@@ -109,17 +109,29 @@ function HourlyFromErp() {
     if (!window.confirm("Run the ERP pass now?\n\nIt pushes what is waiting, then brings down everything ticked above. It can take a minute or two.")) return;
     setBusy("pull"); setPullMsg("Running — push first, then the pull…");
     try {
-      const r = await api.get("/api/cron/erp-sync") as { ok?: boolean; note?: string; notes?: string[]; jobs?: number; projects?: number; delivered?: number };
+      const r = await api.get("/api/cron/erp-sync") as {
+        ok?: boolean; note?: string; notes?: string[];
+        push?: { pushed?: number; rejected?: number; notInErp?: number };
+        pull?: { jobs?: number; projects?: number; delivered?: number; seconds?: number };
+        pushFailed?: unknown;
+      };
+      /* READ WHERE THE ANSWER ACTUALLY IS. The counts come back nested under
+         push and pull; reading them off the top level produced a bare
+         "Done." that said nothing at all — which is how a button that half
+         works looks exactly like one that works. */
       const bits = [
-        r.jobs != null ? `${r.jobs} job(s)` : "",
-        r.projects != null ? `${r.projects} project(s)` : "",
-        r.delivered != null ? `${r.delivered} delivered` : "",
+        r.pull?.jobs != null ? `${r.pull.jobs} job(s)` : "",
+        r.pull?.projects != null ? `${r.pull.projects} project(s)` : "",
+        r.pull?.delivered != null ? `${r.pull.delivered} delivered` : "",
+        r.push?.pushed != null ? `pushed ${r.push.pushed}` : "",
+        r.push?.rejected ? `rejected ${r.push.rejected}` : "",
+        r.pull?.seconds != null ? `in ${r.pull.seconds}s` : "",
       ].filter(Boolean).join(" · ");
       /* Every note the pass returns is shown — including the one that says a
          field name could not be found, which is the whole reason somebody
          presses this button today. */
       const notes = [r.note, ...(r.notes || [])].filter(Boolean).join(" · ");
-      setPullMsg(`${r.ok === false ? "!" : ""}Done. ${bits}${notes ? ` — ${notes}` : ""}`);
+      setPullMsg(`${r.ok === false || r.pushFailed ? "!" : ""}${bits || "The pass ran and reported no counts."}${notes ? ` — ${notes}` : ""}`);
       load();
     } catch (e) { setPullMsg("!" + (e instanceof Error ? e.message : String(e))); }
     setBusy("");

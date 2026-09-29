@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.2.4",
+    date: "2026-09-29",
+    module: "The pull button says what happened",
+    items: [
+      "<b>It answered \u201cDone.\u201d and nothing else</b> \u2014 which is how a pass that half worked looked exactly like one that worked. The counts come back nested under <code>push</code> and <code>pull</code>, and I was reading them off the top level, so every number was undefined and quietly dropped.",
+      "<b>Worse, the route was throwing the notes away.</b> The sync has always collected them \u2014 fields it could not find in the ERP, delivery dates it kept because the ERP holds none, rows it could not write \u2014 and none of it reached the screen. That is the whole reason to press the button today.",
+      "<b>Now it reads:</b> <i>105 job(s) \u00b7 68 project(s) \u00b7 pushed 0 \u00b7 in 4.1s</i> \u2014 and underneath, anything the pass wants to say.",
+    ],
+  },
+  {
     v: "5.8.2.3",
     date: "2026-09-29",
     module: "Pankaj and Mukesh can run the ERP pass",

@@ -158,7 +158,13 @@ export async function GET(req: Request) {
         changes: out.changes, notes: [...(out.notes || []), `winner on a difference: ${fallback}`], seconds: out.seconds,
       }).then(() => null, () => null);
       await beat("erp-sync", pushFailed ? "failed" : "done", { fallback, want, pushFailed, pushed: push.pushed, rejected: push.rejected, jobs_changed: out.jobs.changed, proj_changed: out.projects.changed, seconds: out.seconds });
-      return NextResponse.json({ ok: !pushFailed, fallback, pushFailed, push: { pushed: push.pushed, rejected: push.rejected, notInErp: push.notInErp }, pull: { jobs: out.jobs, projects: out.projects, delivered: out.delivered, seconds: out.seconds }, note: pushFailed ? "The push failed; the pull ran anyway because the later edit wins." : undefined });
+      return NextResponse.json({ ok: !pushFailed, fallback, pushFailed, push: { pushed: push.pushed, rejected: push.rejected, notInErp: push.notInErp }, pull: { jobs: out.jobs, projects: out.projects, delivered: out.delivered, seconds: out.seconds },
+        /* WHAT THE PASS ACTUALLY SAID. The sync has always collected notes —
+           fields it could not find, delivery dates it kept, rows it could not
+           write — and the route threw them away, so a run that half-worked
+           looked identical to one that worked. */
+        notes: out.notes || [],
+        note: pushFailed ? "The push failed; the pull ran anyway because the later edit wins." : undefined });
     } catch (e) {
       await genie.from("erp_sync_log").insert({ by: "cron", dry: false, ok: false, error: `pull: ${String(e instanceof Error ? e.message : e).slice(0, 400)}` }).then(() => null, () => null);
       await beat("erp-sync", "failed", { step: "pull", error: String(e instanceof Error ? e.message : e).slice(0, 300) });
