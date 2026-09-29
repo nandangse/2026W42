@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.7.1.3",
+    date: "2026-09-29",
+    module: "The three clocks now say the count and the rate",
+    items: [
+      "<b>Each period carries the number of jobs delivered in it</b>, above the value and the throughput. A figure in crores says how much went out; the count says how many times somebody had to get a machine through the door to earn it.",
+      "<b>It says <i>days</i> now</b> \u2014 \u201c182 days done \u00b7 183 left\u201d. \u201c182 done\u201d beside a delivered figure could be read as jobs, and on a picture that gets forwarded there is nobody to ask.",
+      "<b>And a run rate under each: jobs, value and throughput, per month.</b> Per month because it is the unit the year report already speaks in \u2014 a rate stated per day in crores is a number nobody can hold in their head. The month\u2019s own box shows a monthly rate computed from a part-month, which is the point: it says what <b>this</b> month is running at, not what it has reached so far.",
+    ],
+  },
+  {
     v: "5.7.1.2",
     date: "2026-09-29",
     module: "The job page is built for the phone that scanned it",

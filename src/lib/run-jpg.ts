@@ -122,56 +122,83 @@ export function runJpg(
   x.fillStyle = C.paper; x.fillRect(0, 0, W, H);
 
   // ---- the header band -----------------------------------------------
-  x.fillStyle = C.navy; x.fillRect(0, 0, W, 256);
+  x.fillStyle = C.navy; x.fillRect(0, 0, W, 300);
   const t = d0(today);
   x.fillStyle = "#8FA1B3"; x.font = F(19, "700");
   x.fillText("NANDAN GSE · DELIVERY RUN", PAD, 46);
   x.fillStyle = "#fff"; x.font = F(40, "700");
   x.fillText(`${LONG_DAY[t.getDay()]}, ${t.getDate()} ${LONG_MON[t.getMonth()]} ${t.getFullYear()}`, PAD, 92);
 
-  // the three clocks — days gone, days left, and what was delivered in them
+  /**
+   * THE THREE CLOCKS — how much of the period is gone, what went out in it,
+   * and the rate that produced it.
+   *
+   * Dr Raghu, 29 Sep 2026: "show number of jobs also for each box. Also
+   * mention 182 days done 183 left for each box. Below each period stats
+   * also show the Run rate for each period of nos, value, T."
+   *
+   * THE RATE IS PER MONTH, for all three. It is the unit he already reads
+   * the year report in — "₹10.02 Cr per month" — and a rate stated per day
+   * in crores is a number nobody can hold in their head. The month's own box
+   * is a rate per month computed from part of a month, which is the point:
+   * it says what THIS month is running at, not what it has reached.
+   */
   const cl = clocks(today);
   const cw = (W - PAD * 2 - 24) / 3;
   cl.forEach((c, i) => {
-    const cx = PAD + i * (cw + 12), cy = 112;
+    const cx = PAD + i * (cw + 12), cy = 108;
     const left = c.total - c.done;
-    x.fillStyle = "rgba(255,255,255,.08)"; roundRect(x, cx, cy, cw, 124, 8); x.fill();
+    x.fillStyle = "rgba(255,255,255,.08)"; roundRect(x, cx, cy, cw, 176, 8); x.fill();
     x.fillStyle = "#8FA1B3"; x.font = F(15, "700");
-    x.fillText(c.label.toUpperCase(), cx + 14, cy + 24);
-    x.fillStyle = "#fff"; x.font = F(26, "700");
-    x.fillText(`${c.done}`, cx + 14, cy + 54);
-    /* MEASURED IN THE BIG FONT, BEFORE SWITCHING. It was measured after the
-       switch to 15px, so "done · 184 left" began inside the number and
-       printed over it. */
+    x.fillText(c.label.toUpperCase(), cx + 14, cy + 22);
+
+    /* Measured in the font it is drawn in, before switching. */
+    x.fillStyle = "#fff"; x.font = F(24, "700");
+    x.fillText(`${c.done}`, cx + 14, cy + 50);
     const dw = x.measureText(`${c.done}`).width;
-    x.fillStyle = "#8FA1B3"; x.font = F(15);
-    x.fillText(`done  ·  ${left} left`, cx + 22 + dw, cy + 54);
-    // the bar
-    x.fillStyle = "rgba(255,255,255,.16)"; roundRect(x, cx + 14, cy + 64, cw - 28, 7, 4); x.fill();
-    x.fillStyle = "#F0A02A"; roundRect(x, cx + 14, cy + 64, (cw - 28) * (c.done / c.total), 7, 4); x.fill();
-    /* WHAT WENT OUT IN THAT PERIOD (Dr Raghu, 28 Sep 2026: "Also show the
-       values and Throughput in it"). Days on their own say how much of the
-       period is spent; these say what was got for it — which is the only
-       reason the days matter. */
+    x.fillStyle = "#8FA1B3"; x.font = F(14);
+    x.fillText(`days done  ·  ${left} left`, cx + 20 + dw, cy + 50);
+
+    x.fillStyle = "rgba(255,255,255,.16)"; roundRect(x, cx + 14, cy + 60, cw - 28, 7, 4); x.fill();
+    x.fillStyle = "#F0A02A"; roundRect(x, cx + 14, cy + 60, (cw - 28) * (c.done / c.total), 7, 4); x.fill();
+
     const inPeriod = delivered.filter((d) => d.on >= c.from && d.on <= today);
+    const n = inPeriod.length;
     const v = inPeriod.reduce((a, d) => a + d.val, 0);
     const tp = inPeriod.reduce((a, d) => a + d.tp, 0);
-    x.fillStyle = "#F0A02A"; x.font = F(17, "700");
-    x.fillText(`₹${(v / 1e7).toFixed(2)} Cr`, cx + 14, cy + 112);
-    const vw = x.measureText(`₹${(v / 1e7).toFixed(2)} Cr`).width;
-    x.fillStyle = "#7BC67E"; x.font = F(17, "700");
-    x.fillText(`₹${(tp / 1e7).toFixed(2)} Cr`, cx + 14 + vw + 14, cy + 112);
-    /* UNDER the bar, not on it. At 79 it was printing across the bar it
-       was meant to caption. */
+
     x.fillStyle = "#6E8298"; x.font = F(11);
-    x.fillText("DELIVERED  ·  THROUGHPUT", cx + 14, cy + 90);
+    x.fillText("DELIVERED", cx + 14, cy + 86);
+    x.fillStyle = "#fff"; x.font = F(19, "700");
+    x.fillText(`${n}`, cx + 14, cy + 108);
+    const nw3 = x.measureText(`${n}`).width;
+    x.fillStyle = "#8FA1B3"; x.font = F(13);
+    x.fillText(n === 1 ? "job" : "jobs", cx + 20 + nw3, cy + 108);
+
+    x.fillStyle = "#F0A02A"; x.font = F(16, "700");
+    const vs = `₹${(v / 1e7).toFixed(2)} Cr`;
+    x.fillText(vs, cx + 14, cy + 130);
+    const vw = x.measureText(vs).width;
+    x.fillStyle = "#7BC67E"; x.font = F(16, "700");
+    x.fillText(`₹${(tp / 1e7).toFixed(2)} Cr`, cx + 14 + vw + 12, cy + 130);
+
+    /* The rate that produced it, in the unit the year report already uses. */
+    const perMonth = c.done > 0 ? 30.44 / c.done : 0;
+    x.fillStyle = "rgba(255,255,255,.10)"; roundRect(x, cx + 10, cy + 140, cw - 20, 28, 5); x.fill();
+    x.fillStyle = "#6E8298"; x.font = F(10);
+    x.fillText("RUN RATE / MONTH", cx + 16, cy + 152);
+    x.fillStyle = "#C8D2DC"; x.font = F(12.5, "700");
+    x.fillText(
+      `${(n * perMonth).toFixed(1)} jobs  ·  ₹${((v / 1e7) * perMonth).toFixed(2)} Cr  ·  ₹${((tp / 1e7) * perMonth).toFixed(2)} Cr`,
+      cx + 16, cy + 165,
+    );
   });
 
   // ---- what the board is worth ----------------------------------------
   /* Dr Raghu, 28 Sep 2026: "Total Jobs: <> | Value | Throughput. Next 20
      Jobs <> | Value | Throughput." The two together say the size of the book
      and the size of the next bite of it — a count on its own says neither. */
-  let y = 276;
+  let y = 322;
   const money = (r: number) => `₹${(r / 1e7).toFixed(2)} Cr`;
   const sumLine = (label: string, n: number, val: number, tp: number, tone: string) => {
     x.fillStyle = C.band; roundRect(x, PAD, y, W - PAD * 2, 42, 6); x.fill();
