@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.2.2",
+    date: "2026-09-29",
+    module: "The stale clock comes off the top bar",
+    items: [
+      "<b>\u201c31 Aug, 12:11 pm\u201d is gone.</b> It said when the Jobmaster <i>export</i> was last loaded into Genie \u2014 a fact that stopped moving the day the hourly ERP sync replaced the upload, so it had sat on the same August date for a month beside a board that refreshes at five past every hour.",
+      "<b>A stale clock on a live page is worse than no clock:</b> it answers \u201chow old is this?\u201d with the wrong number, confidently.",
+    ],
+  },
+  {
     v: "5.8.2.1",
     date: "2026-09-29",
     module: "A button that pulls from the ERP now",

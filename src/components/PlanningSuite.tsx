@@ -567,9 +567,13 @@ export default function PlanningSuite({
               {role === "viewer" && (
                 <span className="genie-tagline text-xs rounded px-2 font-bold" style={{ height: 32, lineHeight: "30px", background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }} title="Your account is read-only">👁 Read-only</span>
               )}
-              <span className="genie-tagline text-xs rounded px-2 font-bold" style={{ height: 32, lineHeight: "30px", background: "#0D161F", color: "#8FA1B3", border: "1px solid #22303C" }} title="When the Jobmaster export was last loaded into Genie">
-                🕒 {stamp(board.lastUpdated)}
-              </span>
+              {/* THE FILE CLOCK IS GONE (Dr Raghu, 29 Sep 2026: "remove this
+                  date"). It said when the Jobmaster EXPORT was last loaded —
+                  a fact that stopped moving the day the hourly ERP sync took
+                  over from the upload, so it had sat on "31 Aug" for a month
+                  beside a board refreshed at five past every hour. A stale
+                  clock on a live page is worse than no clock: it answers the
+                  question "how old is this?" with the wrong number. */}
               <button onClick={() => setQuoteTrigger((n) => n + 1)} className="text-xs rounded px-2 font-bold" style={{ height: 32, background: "#0D161F", color: "var(--amber)", border: "1px solid #22303C" }} title="Show today's quote">☀</button>
               {mayValue && (
                 <select value={showVal ? "with" : "without"} onChange={(e) => setShowVal(e.target.value === "with")} className="text-xs rounded px-1 font-semibold" style={{ height: 32, background: "#0D161F", color: "var(--amber)", border: "1px solid #22303C" }}>
