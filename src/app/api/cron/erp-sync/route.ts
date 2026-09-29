@@ -5,6 +5,7 @@ import { crmDb, crmConfigured } from "@/crm/db";
 import { erpConfig, erpSync, type Winner } from "@/lib/erp-sync";
 import { beat } from "@/lib/cron-beat";
 import { isOn } from "@/lib/erp-hourly";
+import { mayTouchErp, ERP_HANDS_REFUSAL } from "@/lib/erp-hands";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -46,8 +47,21 @@ export async function GET(req: Request) {
     if (!fromCron && req.headers.get("user-agent")?.includes("vercel-cron"))
       await beat("erp-sync", "failed", { error: secret ? "cron call did not carry the CRON_SECRET" : "CRON_SECRET is not set on Vercel" });
     if (!fromCron) {
+      /**
+       * THE HOURLY CRON, OR THE HANDS THAT MIND THE ERP.
+       *
+       * Dr Raghu, 29 Sep 2026: "also let pankaj or mukesh make the cron."
+       * They already see the Synchronize screen; it was the route behind the
+       * button that was still owner-only, so the button existed for them and
+       * refused them — the worst of both.
+       *
+       * The same list as Saamaan's pull and the hourly ticks: one list, in
+       * lib/erp-hands, because a permission written in three places will
+       * eventually disagree with itself.
+       */
       const u = await currentUser();
-      if (!u || u.disabled || !u.isOwner) throw new HttpError(401, "The hourly cron, or Raghu.");
+      if (!u || u.disabled || (!u.isOwner && !mayTouchErp(u.email)))
+        throw new HttpError(401, `The hourly cron, or ${ERP_HANDS_REFUSAL.replace(/^The ERP door is /, "")}`);
     }
     await beat("erp-sync", "fired", { fromCron });
     if (!crmConfigured()) return NextResponse.json({ ok: false, note: "CRM (and the ERP keys) not configured." });

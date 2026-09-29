@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.2.3",
+    date: "2026-09-29",
+    module: "Pankaj and Mukesh can run the ERP pass",
+    items: [
+      "<b>The button existed for them and refused them</b> \u2014 the Synchronize screen has been theirs since 16 September, but the route behind <b>Pull from the ERP now</b> was still owner-only. A control somebody can see and cannot use is worse than one they cannot see.",
+      "<b>And it is now the same list in all three places.</b> Saamaan\u2019s pull, the hourly ticks and this pass all read <code>lib/erp-hands</code>. The screen kept its own copy of the three names beside the two that already existed \u2014 a permission written in three places will eventually disagree with itself, which is exactly what happened yesterday with Saamaan.",
+    ],
+  },
+  {
     v: "5.8.2.2",
     date: "2026-09-29",
     module: "The stale clock comes off the top bar",

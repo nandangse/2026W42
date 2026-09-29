@@ -41,6 +41,7 @@ const Escalations = dynamic(() => import("./planning/Material").then((m) => m.Es
 const LoadBoard = dynamic(() => import("./planning/LoadBoard").then((m) => m.LoadBoard), { loading: () => <TabLoading /> });
 const JobPlan = dynamic(() => import("./planning/JobPlan").then((m) => m.JobPlan), { loading: () => <TabLoading /> });
 import { UpdateToErp } from "./planning/Admin";
+import { ERP_HANDS } from "@/lib/erp-hands";
 const Admin = dynamic(() => import("./planning/Admin").then((m) => m.Admin), { loading: () => <TabLoading /> });
 const ConsultRaghu = dynamic(() => import("./planning/Consult").then((m) => m.ConsultRaghu), { loading: () => <TabLoading /> });
 const Principles = dynamic(() => import("./planning/Consult").then((m) => m.Principles), { loading: () => <TabLoading /> });
@@ -88,7 +89,9 @@ export default function PlanningSuite({
      admin. Dr Raghu, 8 Sep 2026: "which only pankaj and me can see"; then
      16 Sep 2026: "make this available to pankaj, mukesh and me". Named
      rather than roled, because it is three people and not a tier. */
-  const SYNC_HANDS = new Set([RAGHU_EMAIL_LC, UPLOADER_EMAIL, "pankajs@nandan.co.in", "mukesh@nandan.co.in"]);
+  /* The same three hands as the route behind the button and as Saamaan's
+     pull — lib/erp-hands, plus the uploader who brings the morning files. */
+  const SYNC_HANDS = new Set([...ERP_HANDS, UPLOADER_EMAIL]);
   const canSync = SYNC_HANDS.has(email.toLowerCase());
   const me = useMemo(
     () => ({ email, initials, displayName, erpOwner, role }),
