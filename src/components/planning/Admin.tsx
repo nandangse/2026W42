@@ -112,17 +112,26 @@ function HourlyFromErp() {
       const r = await api.get("/api/cron/erp-sync") as {
         ok?: boolean; note?: string; notes?: string[];
         push?: { pushed?: number; rejected?: number; notInErp?: number };
-        pull?: { jobs?: number; projects?: number; delivered?: number; seconds?: number };
+        pull?: {
+          jobs?: { read?: number; changed?: number }; projects?: { read?: number; changed?: number };
+          delivered?: { read?: number; changed?: number }; seconds?: number;
+        };
         pushFailed?: unknown;
       };
       /* READ WHERE THE ANSWER ACTUALLY IS. The counts come back nested under
          push and pull; reading them off the top level produced a bare
          "Done." that said nothing at all — which is how a button that half
          works looks exactly like one that works. */
+      /* Each count is an object — read, written, changed — not a number.
+         Printing it whole gave "[object Object] job(s)", which is the same
+         silence as "Done." wearing a different coat. What a reader wants is
+         how many were LOOKED at and how many actually MOVED. */
+      const say = (o: { read?: number; changed?: number } | undefined, what: string) =>
+        o?.read == null ? "" : `${o.read} ${what}${o.changed ? ` (${o.changed} changed)` : ""}`;
       const bits = [
-        r.pull?.jobs != null ? `${r.pull.jobs} job(s)` : "",
-        r.pull?.projects != null ? `${r.pull.projects} project(s)` : "",
-        r.pull?.delivered != null ? `${r.pull.delivered} delivered` : "",
+        say(r.pull?.jobs, "job(s)"),
+        say(r.pull?.projects, "project(s)"),
+        say(r.pull?.delivered, "delivered"),
         r.push?.pushed != null ? `pushed ${r.push.pushed}` : "",
         r.push?.rejected ? `rejected ${r.push.rejected}` : "",
         r.pull?.seconds != null ? `in ${r.pull.seconds}s` : "",

@@ -697,10 +697,29 @@ export async function erpSync(
   };
 
   if (droppedFields.length) {
-    /* Said, not swallowed: three columns that stay empty for ever because a
-       fieldname was guessed wrongly is exactly the silent failure this
-       codebase keeps having to be cured of. */
-    notes.push(`the ERP has no field named ${droppedFields.join(", ")} — vehicle details not synced`);
+    /**
+     * SAID, AND THEN ANSWERED.
+     *
+     * Saying "no field named custom_chassis_no" is honest but leaves somebody
+     * to go hunting through Customise Form. The ERP already knows the answer:
+     * fetching ONE Jobmaster whole returns every field it has, so the names
+     * that look like the ones we wanted can simply be read off it and
+     * offered. A diagnostic that names the fix is worth ten that name the
+     * fault.
+     */
+    let found = "";
+    try {
+      const one = jobRows[0]?.id;
+      if (one) {
+        const r = await fetch(`${cfg.base}/api/resource/Jobmaster/${encodeURIComponent(one)}`, { headers: cfg.H });
+        if (r.ok) {
+          const doc = ((await r.json()) as { data?: Record<string, unknown> }).data || {};
+          const hits = Object.keys(doc).filter((k) => /chass|engine|vehic/i.test(k));
+          found = hits.length ? ` — the Jobmaster does have: ${hits.join(", ")}` : " — and nothing on it looks like chassis, engine or vehicle either";
+        }
+      }
+    } catch { /* the note stands on its own without this */ }
+    notes.push(`the ERP has no field named ${droppedFields.join(", ")} — vehicle details not synced${found}`);
   }
 
   let projWritten = 0;

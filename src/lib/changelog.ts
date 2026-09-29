@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.8.2.6",
+    date: "2026-09-29",
+    module: "The sync now finds the field name for us",
+    items: [
+      "<b>The pull ran and said what it found</b> \u2014 including that the ERP has no field called <code>custom_vehicle_model</code>, <code>custom_engine_no</code> or <code>custom_chassis_no</code>. The guess was wrong, which is exactly what it was built to be able to say.",
+      "<b>But saying so left somebody to go hunting through Customise Form.</b> The ERP already knows the answer: fetching one Jobmaster <i>whole</i> returns every field it has, so the sync now reads the real names off it and offers them \u2014 <i>\u201cthe Jobmaster does have: \u2026\u201d</i>. A diagnostic that names the fix is worth ten that name the fault.",
+      "<b>And the counts are numbers again.</b> Each one comes back as an object \u2014 read, written, changed \u2014 and printing it whole gave \u201c[object Object] job(s)\u201d, which is the same silence as \u201cDone.\u201d in a different coat. It now reads <i>105 job(s) (3 changed)</i>.",
+      "<b>The hourly cron also carried two real findings tonight:</b> 6 jobs the ERP calls <i>D: Delivered</i> whose stage still says otherwise, and <b>1,491 delivered jobs with no actual delivery date in the ERP</b> \u2014 banked, but undated.",
+    ],
+  },
+  {
     v: "5.8.2.5",
     date: "2026-09-29",
     module: "The hourly sync was calling a door it had locked against itself",
