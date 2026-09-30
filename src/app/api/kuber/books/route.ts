@@ -395,6 +395,109 @@ export async function GET(req: Request) {
         const f = FINE.find(([, lo, hi]) => d >= lo && d <= hi);
         buckets[f ? f[0] : "d360p"] += b.amount;
       }
+      /**
+       * THE BANDS AS A TABLE (Dr Raghu, 30 Sep 2026: "show the aging as a
+       * proper table, single table with 0-30, 31 to 60 etc, below that
+       * amounts, below that % of o/s").
+       *
+       * Nine chips wrapping over two lines is a shape the eye reads one at a
+       * time; a row of eight with the share underneath is a shape it reads
+       * across. The fine buckets are kept for the drilldowns that already use
+       * them — this is a second view of the same bills, not a replacement.
+       */
+      const BANDS: [string, number, number][] = [
+        ["0–30", 0, 30], ["31–60", 31, 60], ["61–90", 61, 90], ["91–120", 91, 120],
+        ["121–180", 121, 180], ["181–240", 181, 240], ["241–360", 241, 360], ["360+", 361, 1e9],
+      ];
+      const bands = BANDS.map(([label, lo, hi]) => {
+        const amount = posB.reduce((a, b) => {
+          if (!b.bill_date) return a;
+          const d = daysBetween(b.bill_date, today);
+          return d >= lo && d <= hi ? a + b.amount : a;
+        }, 0);
+        return { label, amount, pct: gross ? (amount / gross) * 100 : 0 };
+      });
+
+      /**
+       * TWELVE MONTHS OF HIM (his instruction): what he invoiced, what we
+       * paid, and the balance he was left carrying at each month end.
+       *
+       * THE BALANCE IS A RUNNING CLOSING, not a month's movement — "so that
+       * one of Sept 2025 will show closing balance". It is built forward from
+       * the ledger's own opening, so the last row ties to the outstanding on
+       * the card above.
+       *
+       * Months before the books begin are returned with nulls rather than
+       * zeros. A zero would say he invoiced nothing; null says Genie does not
+       * know, which until the 2025-26 Tally file is loaded is the truth.
+       */
+      const months: { key: string; label: string; purchases: number | null; payments: number | null;
+                      balance: number | null; invoices: number | null; pos: number | null }[] = [];
+      try {
+        const { data: led } = await admin.from("kuber_ledger").select("opening").eq("name", party).maybeSingle();
+        const opening = Number(led?.opening) || 0;
+        const { data: vs } = await admin.from("kuber_voucher").select("id, date, vtype").eq("party", party).limit(5000);
+        const vlist = (vs || []) as { id: string; date: string; vtype: string }[];
+        const vById = new Map(vlist.map((v) => [String(v.id), v]));
+        const mv: Record<string, { p: number; y: number; inv: number }> = {};
+        let firstBook = "9999-99";
+        for (const v of vlist) if (v.date && String(v.date).slice(0, 7) < firstBook) firstBook = String(v.date).slice(0, 7);
+        /* The party's own ledger lines: a credit raises what we owe him, a
+           debit reduces it. Tally's signs, unchanged. */
+        for (let from = 0; ; from += 1000) {
+          const { data: ls } = await admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").eq("ledger", party).range(from, from + 999);
+          const rows = (ls || []) as { voucher_id: string; amount: number }[];
+          for (const l of rows) {
+            const v = vById.get(String(l.voucher_id));
+            if (!v || !v.date) continue;
+            const k = String(v.date).slice(0, 7);
+            const m = (mv[k] ||= { p: 0, y: 0, inv: 0 });
+            const a = Number(l.amount) || 0;
+            if (a > 0) m.p += a; else m.y += -a;
+          }
+          if (rows.length < 1000) break;
+        }
+        for (const v of vlist) {
+          if (!v.date) continue;
+          if (!/purchase|excise/i.test(String(v.vtype))) continue;
+          (mv[String(v.date).slice(0, 7)] ||= { p: 0, y: 0, inv: 0 }).inv += 1;
+        }
+        /* His purchase orders, from the ERP's own register. */
+        const poByMonth: Record<string, number> = {};
+        try {
+          const { data: po } = await admin.from("material_po")
+            .select("supplier_name, supplier, transaction_date").limit(5000);
+          for (const r of (po || []) as Record<string, unknown>[]) {
+            const who = String(r.supplier_name || r.supplier || "");
+            if (who.trim().toLowerCase() !== party.trim().toLowerCase()) continue;
+            const d = String(r.transaction_date || "").slice(0, 7);
+            if (d) poByMonth[d] = (poByMonth[d] || 0) + 1;
+          }
+        } catch (e) { swallow("kuber/supplier-po", e); }
+
+        const t0 = new Date(`${today}T00:00:00`);
+        const keys: string[] = [];
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(t0.getFullYear(), t0.getMonth() - i, 1);
+          keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        }
+        let run = opening;
+        for (const k of keys) {
+          const known = k >= firstBook;
+          const m = mv[k];
+          if (known) run += (m?.p || 0) - (m?.y || 0);
+          months.push({
+            key: k,
+            label: new Date(`${k}-01T00:00:00`).toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
+            purchases: known ? (m?.p || 0) : null,
+            payments: known ? (m?.y || 0) : null,
+            balance: known ? run : null,
+            invoices: known ? (m?.inv || 0) : null,
+            pos: poByMonth[k] ?? (known ? 0 : null),
+          });
+        }
+      } catch (e) { swallow("kuber/supplier-months", e); }
+
       // credit period as the bills themselves wear it (due − bill date)
       const periods = posB.filter((b) => b.bill_date && b.due_date).map((b) => daysBetween(b.bill_date as string, b.due_date as string));
       const creditDays = periods.length ? Math.round(periods.reduce((a, b) => a + b, 0) / periods.length) : null;
@@ -478,7 +581,7 @@ export async function GET(req: Request) {
         party, today, net, gross, unadjusted, overdue,
         overdue_pct: gross > 0 ? Math.round((overdue / gross) * 100) : 0,
         weighted_delay: overdue > 0 ? Math.round(wsum / overdue) : 0,
-        oldest_due: oldest, credit_days: creditDays, buckets, paid, invoiced, vouchers,
+        oldest_due: oldest, credit_days: creditDays, buckets, bands, months, paid, invoiced, vouchers,
         payments: payments.slice(0, 200), invoices: invoices.slice(0, 200), plans, items: items.slice(0, 100),
         bills: bills.sort((a, b2) => String(a.due_date || "9999").localeCompare(String(b2.due_date || "9999"))),
       });

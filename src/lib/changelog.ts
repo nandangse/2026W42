@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.6.2",
+    date: "2026-09-30",
+    module: "The supplier card reads across, and remembers twelve months",
+    items: [
+      "<b>The ageing is one table now</b> \u2014 0\u201330, 31\u201360, 61\u201390, 91\u2013120, 121\u2013180, 181\u2013240, 241\u2013360, 360+ across the top, the amounts under them and <b>each band\u2019s share of the outstanding</b> under that. Nine chips wrapping over two lines is a shape the eye reads one at a time; a row with the share beneath is a shape it reads across.",
+      "<b>And twelve months of him underneath:</b> what he invoiced, what we paid, and the <b>balance he was left carrying at each month end</b> \u2014 a running closing built forward from the ledger\u2019s own opening, so the last row ties to the outstanding on the card above. The count of <b>purchase orders</b> comes from the ERP\u2019s own register and the count of <b>invoices</b> from the vouchers.",
+      "<b>A dash is not a zero.</b> Months before 1 April 2026 come back empty rather than as zeros, because a zero would say he invoiced nothing and the truth is that Genie does not know \u2014 the books begin there. They fill in the day the 2025-26 Tally export is loaded, which migration 0178 has now made safe.",
+    ],
+  },
+  {
     v: "5.9.6.1",
     date: "2026-09-30",
     module: "\u201cIndirect Expenses\u201d contains \u201cdirect expense\u201d",

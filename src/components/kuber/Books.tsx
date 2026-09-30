@@ -514,6 +514,11 @@ interface Dossier {
   net: number; gross: number; unadjusted: number; overdue: number; overdue_pct: number;
   weighted_delay: number; oldest_due: string | null; credit_days: number | null;
   buckets: Record<string, number>;
+  /** the coarse bands as a table: amount and share of outstanding */
+  bands?: { label: string; amount: number; pct: number }[];
+  /** twelve months of him — nulls before the books begin */
+  months?: { key: string; label: string; purchases: number | null; payments: number | null;
+             balance: number | null; invoices: number | null; pos: number | null }[];
   paid: { d7: number; d30: number; d45: number; d90: number };
   invoiced: { d7: number; d30: number; d45: number; d90: number };
   vouchers: number; today: string;
@@ -601,20 +606,81 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
                     <Fact k="PAID — 7/30/45/90 DAYS" v={`${fmtMoney(d.paid.d7)} · ${fmtMoney(d.paid.d30)} · ${fmtMoney(d.paid.d45)} · ${fmtMoney(d.paid.d90)}`} c={GREEN} />
                     <Fact k="INVOICED — 7/30/45/90 DAYS" v={`${fmtMoney(d.invoiced.d7)} · ${fmtMoney(d.invoiced.d30)} · ${fmtMoney(d.invoiced.d45)} · ${fmtMoney(d.invoiced.d90)}`} />
                   </div>
+                  {/* ONE TABLE, READ ACROSS (Dr Raghu, 30 Sep 2026: "show the
+                      aging as a proper table ... below that amounts, below
+                      that % of o/s"). Nine chips wrapping over two lines is a
+                      shape the eye reads one at a time. */}
                   <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>AGEING OF OUTSTANDING — DAYS SINCE BILL</div>
-                  <div className="flex gap-2 flex-wrap mb-3">
-                    {FINE_LABELS.map(([k, l]) => (
-                      <span key={k} className="rounded border px-2 py-1 text-xs font-semibold"
-                        style={{ borderColor: BORDER, color: ["d91_120", "d121_180"].includes(k) ? "var(--warn)" : ["d181_240", "d241_360", "d360p"].includes(k) ? RED : INK }}>
-                        {l}: <b className="tnum">{d.buckets[k] ? fmtMoney(d.buckets[k]) : "·"}</b>
-                      </span>
-                    ))}
-                    {d.buckets.undated > 0 && (
-                      <span className="rounded border px-2 py-1 text-xs font-semibold" style={{ borderColor: BORDER, color: MUTED }}>
-                        undated: <b className="tnum">{fmtMoney(d.buckets.undated)}</b>
-                      </span>
-                    )}
+                  <div className="overflow-auto mb-3 rounded border" style={{ borderColor: BORDER }}>
+                    <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+                      <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+                        {(d.bands ?? []).map((b) => <th key={b.label} className="px-2 py-1.5 text-right">{b.label}</th>)}
+                        {d.buckets.undated > 0 && <th className="px-2 py-1.5 text-right">undated</th>}
+                        <th className="px-2 py-1.5 text-right" style={{ borderLeft: "1px solid rgba(255,255,255,.25)" }}>Total</th>
+                      </tr></thead>
+                      <tbody>
+                        <tr className="font-bold">
+                          {(d.bands ?? []).map((b) => (
+                            <td key={b.label} className="px-2 py-1.5 text-right tnum"
+                              style={{ color: b.amount === 0 ? MUTED : /^(181|241|360)/.test(b.label) ? RED : /^(91|121)/.test(b.label) ? "var(--warn)" : INK }}>
+                              {b.amount ? fmtMoney(b.amount) : "·"}
+                            </td>
+                          ))}
+                          {d.buckets.undated > 0 && <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{fmtMoney(d.buckets.undated)}</td>}
+                          <td className="px-2 py-1.5 text-right tnum" style={{ borderLeft: `1px solid ${BORDER}` }}>{fmtMoney(d.gross)}</td>
+                        </tr>
+                        <tr style={{ background: "#FAF9F5" }}>
+                          {(d.bands ?? []).map((b) => (
+                            <td key={b.label} className="px-2 py-1 text-right tnum" style={{ color: MUTED }}>
+                              {b.amount ? `${b.pct.toFixed(1)}%` : "·"}
+                            </td>
+                          ))}
+                          {d.buckets.undated > 0 && <td className="px-2 py-1 text-right tnum" style={{ color: MUTED }}>—</td>}
+                          <td className="px-2 py-1 text-right tnum" style={{ color: MUTED, borderLeft: `1px solid ${BORDER}` }}>100%</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
+
+                  {/* TWELVE MONTHS OF HIM — what he invoiced, what we paid, and
+                      the balance he was left carrying at each month end. */}
+                  {!!d.months?.length && (
+                    <>
+                      <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>
+                        MONTH BY MONTH — THE LAST 12
+                      </div>
+                      <div className="overflow-auto mb-1 rounded border" style={{ borderColor: BORDER }}>
+                        <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+                          <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+                            <th className="px-2 py-1.5 text-left">Month</th>
+                            <th className="px-2 py-1.5 text-right">Purchases</th>
+                            <th className="px-2 py-1.5 text-right">Payments</th>
+                            <th className="px-2 py-1.5 text-right">Closing balance</th>
+                            <th className="px-2 py-1.5 text-right">POs</th>
+                            <th className="px-2 py-1.5 text-right">Invoices</th>
+                          </tr></thead>
+                          <tbody>
+                            {d.months.map((m) => (
+                              <tr key={m.key} className="border-t" style={{ borderColor: "var(--line-soft)", background: m.purchases == null ? "#FAF9F5" : "#fff" }}>
+                                <td className="px-2 py-1 font-semibold">{m.label}</td>
+                                <td className="px-2 py-1 text-right tnum">{m.purchases == null ? <span style={{ color: MUTED }}>—</span> : m.purchases ? fmtMoney(m.purchases) : "·"}</td>
+                                <td className="px-2 py-1 text-right tnum" style={{ color: m.payments ? GREEN : MUTED }}>{m.payments == null ? "—" : m.payments ? fmtMoney(m.payments) : "·"}</td>
+                                <td className="px-2 py-1 text-right tnum font-bold">{m.balance == null ? <span style={{ color: MUTED, fontWeight: 400 }}>—</span> : fmtMoney(m.balance)}</td>
+                                <td className="px-2 py-1 text-right tnum" style={{ color: MUTED }}>{m.pos == null ? "—" : m.pos || "·"}</td>
+                                <td className="px-2 py-1 text-right tnum" style={{ color: MUTED }}>{m.invoices == null ? "—" : m.invoices || "·"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {d.months.some((m) => m.purchases == null) && (
+                        <div className="text-xs mb-3" style={{ color: "var(--warn)", lineHeight: 1.5 }}>
+                          A dash is <b>not a zero</b> — the books begin at 1 April 2026, so Genie does not know those months.
+                          Load the 2025-26 Tally export and they fill in.
+                        </div>
+                      )}
+                    </>
+                  )}
                   {d.plans.length > 0 && (
                     <div className="rounded p-2 text-xs font-semibold" style={{ background: "#E9F5EC", color: "var(--green)" }}>
                       Planned in the cash flow: {d.plans.map((pl) => `${fmtD(pl.plan_date)} — ${fmtMoney(pl.amount)} (${pl.status})`).join(" · ")}
