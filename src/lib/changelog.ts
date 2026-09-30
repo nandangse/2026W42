@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.6.6",
+    date: "2026-09-30",
+    module: "Two years, one position",
+    items: [
+      "<b>Loading 2025-26 doubled the receivables again</b> \u2014 Vama \u20b90.85 Cr became \u20b91.70 Cr, Gemini \u20b90.64 became \u20b91.28, exactly twice. <b>Dr Raghu caught it within minutes of the load.</b>",
+      "<b>The cause was mine, and it was foreseeable.</b> The masters\u2019 bill-wise list is the outstanding <i>as at its export</i> \u2014 established this morning while fixing the first doubling. Load two years and there are two such lists, each complete in itself, and every bill still open at the year end appears in both. Recommending the second load without handling that was the error.",
+      "<b>The position is now taken from the latest year\u2019s list alone.</b> Older lists stay in the table \u2014 they are what each year\u2019s own statement was struck against \u2014 but they are snapshots, superseded the moment a newer one arrives. Verified party by party against Tally before shipping: Airbus \u20b92.95 Cr, Transweigh \u20b92.70 Cr, 8 Base \u20b91.20 Cr, Vama \u20b90.85 Cr, Three D \u20b91.67 Cr, Swarajya \u20b90.96 Cr.",
+      "<b>Press Recompute open bills on Upload</b> and the books correct themselves; no re-upload is needed.",
+    ],
+  },
+  {
     v: "5.9.6.5",
     date: "2026-09-30",
     module: "Filing is not loading, and the register now says so",

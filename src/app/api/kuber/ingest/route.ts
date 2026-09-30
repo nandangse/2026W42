@@ -178,7 +178,31 @@ export async function POST(req: Request) {
         }
         return out;
       };
-      for (const b of await page("kuber_opening_bill", "ledger, bill, bill_date, amount, credit_days")) {
+      /**
+       * ONE MASTERS LIST — THE NEWEST — AND ONLY THAT ONE.
+       *
+       * Dr Raghu, 30 Sep 2026, the moment last year was loaded: "still
+       * doubled". Correct, and it was a second instance of the same mistake
+       * rather than a return of the first.
+       *
+       * The masters' bill-wise list is the outstanding AS AT ITS EXPORT. Load
+       * two years and there are two such lists, each complete in itself, and a
+       * bill still open in both appears in both. Summing them doubles every
+       * bill that survived the year end — Vama 0.85 became 1.70, Gemini 0.64
+       * became 1.28, exactly twice.
+       *
+       * So the position is taken from the LATEST year's list alone. Older
+       * lists are historical snapshots: true on the day they were exported,
+       * superseded the moment a newer one arrives. They stay in the table
+       * because they are what a year's own statement was struck against.
+       */
+      const obAll = await page("kuber_opening_bill", "ledger, bill, bill_date, amount, credit_days, fy");
+      const latestFy = obAll.reduce((a, r) => {
+        const f = String(r.fy || "");
+        return f > a ? f : a;
+      }, "");
+      const obUse = latestFy ? obAll.filter((r) => String(r.fy || "") === latestFy) : obAll;
+      for (const b of obUse) {
         const k = String(b.ledger) + "||" + String(b.bill);
         const r = bills.get(k) || { ledger: String(b.ledger), bill: String(b.bill), outstanding: 0, bill_date: null, credit_days: null };
         r.outstanding += Number(b.amount) || 0;
