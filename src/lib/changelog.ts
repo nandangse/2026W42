@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.8.5",
+    date: "2026-09-30",
+    module: "Audit queries: the ledger offers itself, and Details takes a screenshot",
+    items: [
+      "TYPE A LEDGER AND THE BOOKS OFFER THE NAME. The Ledger-or-vendor field now completes from Tally's own ledger list as you type \u2014 and stays free text, so \"Purchase\" or \"GST Liabilities\" can still be written when no single ledger is meant. A list that offers is useful; one that insists is a form.",
+      "REMARKS ON CLOSURE IS NOW DETAILS, AND IT IS RICH TEXT. Paste a screenshot straight into it and it files itself to the shared drive under Audit queries; the query keeps only Genie's own address for the picture, so a row never carries a megabyte of image and the folder is never handed out. Bold, lists and links survive; anything that could run is stripped before it is kept.",
+    ],
+  },
+  {
     v: "5.9.8.4",
     date: "2026-09-30",
     module: "Bills Receivable becomes the collection desk",

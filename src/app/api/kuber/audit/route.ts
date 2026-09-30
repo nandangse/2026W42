@@ -12,6 +12,24 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const NOT_INSTALLED = /audit_query|schema cache|does not exist/i;
+/**
+ * What a rich-text field is allowed to keep: paragraphs, emphasis, lists,
+ * links and pictures by Genie's own address. Anything that could run is
+ * stripped, and so is any picture that is not ours — a pasted screenshot
+ * arrives through /api/kuber/audit-image and comes back as /api/file/…, so
+ * an <img> pointing anywhere else did not come from that path.
+ */
+const cleanHtml = (v: string | null): string | null => {
+  if (!v) return v;
+  let h = v
+    .replace(/<\s*(script|style|iframe|object|embed|form|input|textarea)[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+    .replace(/<\s*(script|style|iframe|object|embed|form|input|textarea)[^>]*>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src)\s*=\s*("|')?\s*javascript:[^"'>\s]*("|')?/gi, "")
+    .replace(/<img\b(?![^>]*src\s*=\s*["']?\/api\/file\/)[^>]*>/gi, "");
+  return h.slice(0, 40000);
+};
+
 const S = (v: unknown, max = 4000) => {
   const s = String(v ?? "").trim();
   return s ? s.slice(0, max) : null;
@@ -103,7 +121,9 @@ export async function POST(req: Request) {
         amount_text: S(body.amount_text, 80),
         amount: readAmount(String(body.amount_text || "")),
         status: tidyStatus(String(body.status || "Pending")),
-        remarks: S(body.remarks, 8000),
+        /* Details is rich text now (30 Sep 2026) — a little HTML, never a
+           script, never an inline handler, never an image inlined as base64 */
+        remarks: cleanHtml(S(body.remarks, 40000)),
         verified_text: S(body.verified_text, 60),
         verified_on: readDate(String(body.verified_text || "")),
         updated_by: u.email,

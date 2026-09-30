@@ -40,6 +40,8 @@ export const FOLDERS = {
      folder somebody can open without Genie. */
   sales_bill: "Bills \u2014 Sales",
   purchase_bill: "Bills \u2014 Purchase",
+  /* screenshots pasted into an audit query's Details (30 Sep 2026) */
+  audit: "Audit queries",
 } as const;
 export type FileKind = keyof typeof FOLDERS;
 

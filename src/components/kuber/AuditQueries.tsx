@@ -23,7 +23,7 @@
  * kept exactly as written and only turned into a date or a rupee figure where
  * it plainly is one. Where it is not, the screen shows the words.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import {
   AUDIT_STATUS, STATUS_TONE, properName, overdue, readAmount,
@@ -185,7 +185,7 @@ export default function AuditQueries({ isOwner }: { isOwner: boolean }) {
                     <td style={{ padding: "5px 8px", maxWidth: 190 }}>{r.related_to}</td>
                     <td onClick={() => setEdit(r)} title="Click to edit" style={{ padding: "5px 8px", maxWidth: 420, lineHeight: 1.4, cursor: "text" }}>
                       {String(r.instruction || "").slice(0, 220)}{String(r.instruction || "").length > 220 ? "…" : ""}
-                      {r.remarks && <div style={{ color: C.green, fontSize: 11, marginTop: 2 }}>↳ {String(r.remarks).slice(0, 140)}</div>}
+                      {r.remarks && <div style={{ color: C.green, fontSize: 11, marginTop: 2 }}>↳ {plainText(String(r.remarks)).slice(0, 140)}{/<img/i.test(String(r.remarks)) ? " 🖼" : ""}</div>}
                       {/* GENIE'S READING, IN ONE LINE (Dr Raghu, 30 Sep 2026:
                           "show summary in this"). A sparkle saying a reading
                           exists is not the same as being able to see what it
@@ -315,7 +315,14 @@ function QueryBox({ row, busy, onClose, onSave }: {
               <datalist id="audit-closers">{AUDIT_CLOSERS.map((n) => <option key={n} value={n} />)}</datalist>
             </L>
           </div>
-          <L label="Ledger or vendor"><input value={f.related_to || ""} onChange={(e) => set("related_to", e.target.value)} style={box} /></L>
+          {/* TYPE, AND THE LEDGER OFFERS ITSELF (Dr Raghu, 30 Sep 2026:
+              "should be able to type this and follow show ledger. however
+              even can write another one also"). The names come from the
+              books as you type; a datalist offers, it does not insist, so
+              "Purchase" or "GST Liabilities" stay possible. */}
+          <L label="Ledger or vendor" hint="start typing — the books' own ledger names appear; anything else can still be written">
+            <LedgerInput value={f.related_to || ""} onChange={(v) => set("related_to", v)} />
+          </L>
           <L label="The query"><textarea value={f.instruction || ""} onChange={(e) => set("instruction", e.target.value)} rows={5} style={{ ...box, resize: "vertical", lineHeight: 1.55 }} /></L>
           <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
             <L label="Target" hint="a date, or words"><input value={f.target_text || ""} onChange={(e) => set("target_text", e.target.value)} style={box} /></L>
@@ -328,7 +335,13 @@ function QueryBox({ row, busy, onClose, onSave }: {
               </select>
             </L>
           </div>
-          <L label="Remarks on closure"><textarea value={f.remarks || ""} onChange={(e) => set("remarks", e.target.value)} rows={3} style={{ ...box, resize: "vertical", lineHeight: 1.55 }} /></L>
+          {/* DETAILS, WITH PICTURES (his ask, same day: "change to Details
+              and make it rich text to put screenshots"). Paste a screenshot
+              and it files itself to the drive; the query keeps only Genie's
+              address for it. */}
+          <L label="Details" hint="paste a screenshot straight in — it goes to the drive and appears here">
+            <RichBox value={f.remarks || ""} onChange={(v) => set("remarks", v)} />
+          </L>
           <L label="Verified on" hint="left empty until somebody has actually checked it">
             <input value={f.verified_text || ""} onChange={(e) => set("verified_text", e.target.value)} style={{ ...box, maxWidth: 200 }} />
           </L>
@@ -584,5 +597,89 @@ export function QuickAudit({ who }: { who: string }) {
           busy={busy} onClose={() => setOpen(false)} onSave={save} />
       )}
     </>
+  );
+}
+
+
+/** the words of a rich-text field, for a one-line preview */
+function plainText(html: string): string {
+  return html.replace(/<img[^>]*>/gi, " ").replace(/<br\s*\/?>|<\/p>|<\/div>|<\/li>/gi, " ").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * A ledger name, offered as you type and never insisted upon.
+ * The names come from the books; the field stays free text.
+ */
+function LedgerInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [names, setNames] = useState<string[]>([]);
+  useEffect(() => {
+    const q = value.trim();
+    if (q.length < 2) { setNames([]); return; }
+    const t = window.setTimeout(() => {
+      fetch(`/api/kuber/books?view=ledgers&q=${encodeURIComponent(q)}`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((j: { rows?: { name: string }[] }) => setNames((j.rows || []).map((x) => x.name).slice(0, 40)))
+        .catch(() => setNames([]));
+    }, 220);
+    return () => window.clearTimeout(t);
+  }, [value]);
+  return (
+    <>
+      <input list="aq-ledgers" value={value} onChange={(e) => onChange(e.target.value)} style={box} autoComplete="off" />
+      <datalist id="aq-ledgers">{names.map((n) => <option key={n} value={n} />)}</datalist>
+    </>
+  );
+}
+
+/**
+ * RICH TEXT THAT TAKES A PASTED SCREENSHOT.
+ *
+ * A contentEditable box. Typing is typing; pasting an image uploads it to
+ * the drive through /api/kuber/audit-image and drops an <img> at the caret
+ * pointing at Genie's own address for it. What is saved is the box's HTML,
+ * which the server strips down to paragraphs, emphasis, lists and our own
+ * pictures before it is kept.
+ */
+function RichBox({ value, onChange }: { value: string; onChange: (html: string) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  /* seed once; afterwards the box owns its own DOM and reports upward */
+  useEffect(() => { if (ref.current && ref.current.innerHTML !== value && document.activeElement !== ref.current) ref.current.innerHTML = value; }, [value]);
+
+  const onPaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const item = [...(e.clipboardData?.items || [])].find((x) => x.type.startsWith("image/"));
+    if (!item) return;                       /* text pastes as text */
+    e.preventDefault();
+    const file = item.getAsFile();
+    if (!file) return;
+    setBusy(true); setErr("");
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const r = await fetch("/api/kuber/audit-image", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok || !j.url) throw new Error(j.error || "could not upload the image");
+      const img = document.createElement("img");
+      img.src = j.url; img.style.maxWidth = "100%"; img.style.display = "block"; img.style.margin = "6px 0";
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount && ref.current?.contains(sel.anchorNode)) {
+        const range = sel.getRangeAt(0); range.deleteContents(); range.insertNode(img);
+        range.setStartAfter(img); range.collapse(true); sel.removeAllRanges(); sel.addRange(range);
+      } else ref.current?.appendChild(img);
+      onChange(ref.current?.innerHTML || "");
+    } catch (x) { setErr(x instanceof Error ? x.message : String(x)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div>
+      <div ref={ref} contentEditable suppressContentEditableWarning
+        onInput={() => onChange(ref.current?.innerHTML || "")}
+        onPaste={(e) => void onPaste(e)}
+        style={{ ...box, minHeight: 88, lineHeight: 1.55, overflowY: "auto", maxHeight: 360, whiteSpace: "pre-wrap" }} />
+      <div style={{ fontSize: 11, color: busy ? C.accent : err ? C.red : C.faint, marginTop: 3 }}>
+        {busy ? "filing the screenshot to the drive…" : err || "bold with ⌘B, lists with ⌘⇧8 — a pasted screenshot goes straight in"}
+      </div>
+    </div>
   );
 }
