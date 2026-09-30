@@ -2349,6 +2349,19 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<VregRow | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  /* FREEZE THE LEADING COLUMNS (Dr Raghu, 1 Oct 2026: "make me a provision
+     to freeze the column"). Thirteen columns wide, the party scrolls out of
+     sight just when the amount comes into it. The first N columns pin to the
+     left like Excel's Freeze Panes; the choice is remembered on this browser. */
+  const [frozen, setFrozen] = useState<number>(() => { try { return Number(localStorage.getItem("kuber.vreg.freeze") ?? 3); } catch { return 3; } });
+  const setFreeze = (n: number) => { setFrozen(n); try { localStorage.setItem("kuber.vreg.freeze", String(n)); } catch { /* fine */ } };
+  const FZ_W = [36, 100, 150, 210];                    // tick · date · no · party
+  const fz = (i: number, head = false): React.CSSProperties => {
+    if (i >= frozen) return {};
+    const left = FZ_W.slice(0, i).reduce((a, w) => a + w, 0);
+    return { position: "sticky", left, zIndex: head ? 6 : 2, minWidth: FZ_W[i], maxWidth: FZ_W[i], width: FZ_W[i],
+             background: head ? "var(--ink)" : "inherit", boxShadow: i === frozen - 1 ? "2px 0 0 var(--line)" : undefined };
+  };
 
   const sales = kind === "sales";
   if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
@@ -2390,15 +2403,17 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
     } finally { setBulkBusy(false); }
   };
 
-  const Hd = ({ k, children, right }: { k: typeof sortK; children: React.ReactNode; right?: boolean }) => (
+  const Hd = ({ k, children, right, extra }: { k: typeof sortK; children: React.ReactNode; right?: boolean; extra?: React.CSSProperties }) => (
     <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`}
       onClick={() => { if (sortK === k) setDir((d2) => (d2 === 1 ? -1 : 1)); else { setSortK(k); setDir(k === "party" || k === "vno" ? 1 : -1); } }}
-      style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}>
+      style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer", ...extra }}>
       {children}{sortK === k ? (dir === 1 ? " ▲" : " ▼") : ""}
     </th>
   );
   const box = { borderColor: BORDER } as React.CSSProperties;
   const cols = sales ? 13 : 8;
+  /* purchase has no tick column, so its frozen columns start one earlier */
+  const off = sales ? 0 : 1;
 
   return (
     <div style={{ maxWidth: sales ? 1240 : 1060 }}>
@@ -2449,6 +2464,16 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
             </>}
             <input value={minAmt} onChange={(e) => setMinAmt(e.target.value)} placeholder="min ₹"
               className="border rounded px-2 py-1.5 text-xs tnum" style={{ ...box, width: 92 }} />
+            <label className="text-xs ml-auto flex items-center gap-1" style={{ color: MUTED }} title="Pin the leading columns while the rest scrolls">
+              &#10052; freeze
+              <select value={frozen} onChange={(e) => setFreeze(Number(e.target.value))} className="border rounded px-1.5 py-1 text-xs" style={box}>
+                <option value={0}>nothing</option>
+                {sales && <option value={1}>tick</option>}
+                <option value={2}>up to Date</option>
+                <option value={3}>up to No</option>
+                <option value={4}>up to Party</option>
+              </select>
+            </label>
           </div>
 
           {/* THE BULK BAR — "select multiple or select all, then edit where
@@ -2487,11 +2512,11 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
               <thead>
                 <tr style={{ background: "var(--ink)", color: "#fff" }}>
                   {sales && (
-                    <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)", width: 30 }}>
+                    <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)", width: 30, ...fz(0, true) }}>
                       <input type="checkbox" checked={allOn} onChange={toggleAll} title="Select everything shown" />
                     </th>
                   )}
-                  <Hd k="date">Date</Hd><Hd k="vno">No</Hd><Hd k="party">Party</Hd>
+                  <Hd k="date" extra={fz(1 - off, true)}>Date</Hd><Hd k="vno" extra={fz(2 - off, true)}>No</Hd><Hd k="party" extra={fz(3 - off, true)}>Party</Hd>
                   {sales ? <>
                     <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Family</th>
                     <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Salesman</th>
@@ -2533,10 +2558,10 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
                   const chip = r.status ? STATUS_CHIP[r.status] : null;
                   return (
                     <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: sel.has(r.vno) ? "#EEF1FA" : i % 2 ? "#FAF9F5" : "#fff" }}>
-                      {sales && <td className="px-2 py-1"><input type="checkbox" checked={sel.has(r.vno)} onChange={() => toggle(r.vno)} /></td>}
-                      <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.date)}</td>
-                      <td className="px-2 py-1 whitespace-nowrap">{r.vno}</td>
-                      <td className="px-2 py-1 font-semibold" style={{ maxWidth: 190, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.party}>{r.party || "—"}</td>
+                      {sales && <td className="px-2 py-1" style={fz(0)}><input type="checkbox" checked={sel.has(r.vno)} onChange={() => toggle(r.vno)} /></td>}
+                      <td className="px-2 py-1 tnum whitespace-nowrap" style={fz(1 - off)}>{fmtD(r.date)}</td>
+                      <td className="px-2 py-1 whitespace-nowrap" style={{ overflow: "hidden", textOverflow: "ellipsis", ...fz(2 - off) }}>{r.vno}</td>
+                      <td className="px-2 py-1 font-semibold" style={{ maxWidth: 190, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...fz(3 - off) }} title={r.party}>{r.party || "—"}</td>
                       {sales ? <>
                         <td className="px-2 py-1" style={{ color: r.fam ? INK : MUTED, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.fam || ""}>{r.fam || "—"}</td>
                         <td className="px-2 py-1" style={{ color: r.salesman ? INK : MUTED, whiteSpace: "nowrap" }}>{r.salesman || "—"}</td>

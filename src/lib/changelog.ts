@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.10.0",
+    date: "2026-10-01",
+    module: "Freeze the columns",
+    items: [
+      "FREEZE PANES ON THE SALES AND PURCHASE REGISTERS (Dr Raghu, 1 Oct 2026: \"make me a provision to freeze the column\"). Thirteen columns wide, the party scrolled out of sight just as the amount scrolled into it. A \u2744 freeze control pins the leading columns \u2014 nothing, the tick, up to Date, up to No, or up to Party \u2014 and they stay put while the rest scrolls, with a hairline where the frozen part ends. The choice is remembered on the browser.",
+    ],
+  },
+  {
     v: "5.9.9.5",
     date: "2026-09-30",
     module: "The collection call, and the mail half-written",
