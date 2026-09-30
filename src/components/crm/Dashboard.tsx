@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { swallow } from "@/lib/swallow";
 import { NAVY, NAVY_SOFT, INK, MUTED, BORDER, ORANGE, GREEN } from "./palette";
+import Funnel from "./Funnel";
 import { DateRangeBar, DEFAULT_RANGE, type DateRange } from "./DateRange";
 import ProspectQueue from "./ProspectQueue";
 
@@ -76,6 +77,13 @@ export default function Dashboard({ onOpen }: { onOpen: (target: string, id: str
 
   return (
     <div>
+      {/* THE FUNNEL, FIRST (Dr Raghu, 30 Sep 2026). It is the question the
+          rest of this page is evidence for: how many came in, how many got
+          as far as somebody speaking to them, how many became an
+          opportunity. Its own window and its own person picker, because a
+          funnel scoped to something else is not this funnel. */}
+      <div className="mb-3"><Funnel /></div>
+
       <div className="flex items-center gap-3 flex-wrap mb-2">
         <DateRangeBar value={range} onChange={setRange} />
         {data?.allowedTeam && (

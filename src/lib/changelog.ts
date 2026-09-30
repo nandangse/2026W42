@@ -89,6 +89,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.0.0",
+    date: "2026-09-30",
+    module: "The CRM funnel \u2014 five stages, one person, thirty days",
+    items: [
+      "<b>List Building \u2192 Account Qualified \u2192 Contact Verified \u2192 Nurturing \u2192 Opportunity Identified</b>, on the CRM home. Last 30 days by default, with 90 days, the year, or any two dates; and for a head or an admin, a picker for <b>Myself \u00b7 the whole team \u00b7 one named person</b>.",
+      "<b>It counts what ENTERED each stage in the window, not what exists.</b> Across the whole CRM those five stages come to <b>255,215 / 62,056 / 15,509 / 74,303 / 53,771</b> \u2014 nurturing wider than verified, opportunities three times the contacts. Drawn as a funnel it widens at the bottom, because that is twenty years of imported ERP history and not a pipeline. Scoped to a person and a month it narrows, and every number is one somebody can be asked about.",
+      "<b>Every stage opens into the actual names</b>, each carrying whose it is and when \u2014 because the first question anybody asks a funnel is \u201cwhich ones?\u201d, and five numbers nobody can open are five numbers nobody believes.",
+      "<b>And when a stage IS wider than the one above it, it says so</b> in amber rather than quietly clamping the bar. A funnel that cannot widen is a picture that cannot be wrong, and a picture that cannot be wrong is not evidence.",
+      "<b>The Verify tick now exists on a contact</b>, recording <b>who and when</b> rather than a bare true \u2014 15,509 contacts had no record anywhere of whether a human had ever confirmed the address was real. Un-ticking clears the name too: a verification whose evidence is withdrawn must not keep somebody\u2019s name on it.",
+      "<b>Account Qualified means a company assigned to a salesperson.</b> Stated because it was my choice: a company has no other signal that is not true of all 62,056, and being given to somebody is a real act by a real person.",
+      "<b>Needs CRM migration 0080.</b> The other four stages work without it.",
+    ],
+  },
+  {
     v: "5.8.3.0",
     date: "2026-09-29",
     module: "A date is a delivery, whatever the stage says",
