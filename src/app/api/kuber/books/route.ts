@@ -1294,7 +1294,42 @@ export async function GET(req: Request) {
       }
       const inn = treeOf(inflows), out = treeOf(outflows);
       const tin = inn.reduce((s2, r) => s2 + r.total, 0), tout = out.reduce((s2, r) => s2 + r.total, 0);
-      return NextResponse.json({ from, to, inflows: inn, outflows: out, totalIn: tin, totalOut: tout, net: tin - tout, bankMove: -bankMove, contra });
+      /**
+       * THE SAME MONEY, IN THE HEADS A MANAGING DIRECTOR READS BY (Dr Raghu,
+       * 30 Sep 2026: "show these as % of the inflow — Received from customers,
+       * Received from bank, Other income; for spending Suppliers, Salaries,
+       * Bank EMI, Utilities, Other OE, Other costs — show also a pie chart").
+       *
+       * Tally's roots ("06.Current Assets", "03.Current Liabilities") are
+       * where the money sat, not where it came from. Each entry is placed by
+       * the ledger's chain and, for expenses, by the same ladder the P&L
+       * uses; the last head of each side is a catch so the shares add to 100.
+       */
+      const headIn = (e: { ledger: string; group: string; root: string }) => {
+        if (w.chainHas(e.group, /^sundry debtors$/)) return "Received from customers";
+        if (w.chainHas(e.group, /loans? \(liability\)|^secured loans?|^unsecured loans?|^bank od/)) return "Received from bank";
+        return "Other income";
+      };
+      const headOut = (e: { ledger: string; group: string; root: string }) => {
+        const hay = (e.ledger + " " + e.group).toLowerCase();
+        if (w.chainHas(e.group, /^sundry creditors$/)) return "Suppliers";
+        if (/salar|wages|employee dues|bonus|gratuity|provident|esic|directors? remun/.test(hay)) return "Salaries";
+        if (w.chainHas(e.group, /loans? \(liability\)|^secured loans?|^unsecured loans?/) || /interest|emi\b/.test(hay)) return "Bank EMI";
+        if (/electric|water|telephone|mobile|internet|fuel|power|utilit/.test(hay)) return "Utilities";
+        const rootN = stripNo(e.root);
+        const { bucket } = classifyLedger({ ledger: e.ledger, group: e.group, root: e.root, rootN });
+        if (bucket === "indirect" || bucket === "finance") return "Other OE";
+        return "Other costs";
+      };
+      const IN_ORDER = ["Received from customers", "Received from bank", "Other income"];
+      const OUT_ORDER = ["Suppliers", "Salaries", "Bank EMI", "Utilities", "Other OE", "Other costs"];
+      const fold = (list: typeof inflows, f: (e: typeof inflows[number]) => string, order: string[], total: number) => {
+        const m = new Map<string, number>();
+        for (const e of list) m.set(f(e), (m.get(f(e)) || 0) + e.amount);
+        return order.map((h) => ({ head: h, amount: m.get(h) || 0, pct: total ? ((m.get(h) || 0) / total) * 100 : 0 }));
+      };
+      return NextResponse.json({ from, to, inflows: inn, outflows: out, totalIn: tin, totalOut: tout, net: tin - tout, bankMove: -bankMove, contra,
+        headsIn: fold(inflows, headIn, IN_ORDER, tin), headsOut: fold(outflows, headOut, OUT_ORDER, tout) });
     }
 
     // ---- Fund Flow (same ask): where the money CAME FROM and WENT between

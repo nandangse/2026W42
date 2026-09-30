@@ -47,7 +47,28 @@ export type FileKind = keyof typeof FOLDERS;
 
 /** The Drive folder pictures go into — its own, or the one Genie already uses. */
 export function filesRoot(): string | null {
-  return (process.env.DRIVE_FILES_FOLDER_ID || process.env.DRIVE_UPLOAD_FOLDER_ID || "").trim() || null;
+  return driveId(process.env.DRIVE_FILES_FOLDER_ID) || driveId(process.env.DRIVE_UPLOAD_FOLDER_ID) || null;
+}
+
+/**
+ * THE ID, WHATEVER FORM IT WAS PASTED IN.
+ *
+ * 30 Sep 2026, first audit screenshot of the night: "Could not create the
+ * folder 'Audit queries': File not found: 1WMeh…CRq?usp=drive_link". The
+ * folder id had been pasted into the environment straight from the browser's
+ * share button, with the link's tail still on it, and Drive was being asked
+ * for a folder whose name ended in a question mark. Every Drive upload of the
+ * day had quietly fallen back to the bucket or failed.
+ *
+ * A setting a person pastes should take what a person pastes: the bare id,
+ * the id with a query string, or the whole folder URL.
+ */
+export function driveId(raw: string | undefined | null): string | null {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  const m = s.match(/\/folders\/([A-Za-z0-9_-]{10,})/) || s.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  const id = (m ? m[1] : s.split(/[?#]/)[0]).trim();
+  return /^[A-Za-z0-9_-]{10,}$/.test(id) ? id : null;
 }
 
 export function driveReady(): boolean {

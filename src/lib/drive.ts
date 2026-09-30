@@ -45,7 +45,10 @@ export function driveConfig(): DriveConfig | null {
   // Vercel stores newlines as the two characters \n; a PEM with literal
   // backslash-n in it fails to sign with an error that names neither.
   const key = process.env.GOOGLE_SA_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
-  const folderId = process.env.DRIVE_UPLOAD_FOLDER_ID?.trim();
+  /* a pasted share link is a valid way to set this — see driveId() */
+  const raw = String(process.env.DRIVE_UPLOAD_FOLDER_ID || "").trim();
+  const m = raw.match(/\/folders\/([A-Za-z0-9_-]{10,})/) || raw.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  const folderId = (m ? m[1] : raw.split(/[?#]/)[0]).trim() || undefined;
   if (!email || !key || !folderId) return null;
   return { email, key, folderId };
 }

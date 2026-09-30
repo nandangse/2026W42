@@ -490,7 +490,7 @@ export function ReportCardScreen() {
             <tr style={{ background: "var(--ink)", color: "#fff" }}>
               {([["grade", "Grade"], ["party", "Supplier"], ["outstanding", "Outstanding"], ["overdue", "Overdue"], ["pct", "Overdue %"], ["delay", "Weighted delay"], ["oldest", "Oldest due"], ["nbills", "Open bills"], ["vouchers", "Vouchers FY"]] as const).map(([k, h], i) => (
                 <th key={k} className={`px-2 py-2 ${i <= 1 ? "text-left" : "text-right"} whitespace-nowrap`}
-                  style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}
+                  style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer", zIndex: 4 }}
                   onClick={() => clickSort(k)}
                   title="Click to sort — again to flip, a third time to clear">
                   {h}{sortKey === k ? (dir === -1 ? " ▼" : " ▲") : ""}
@@ -1979,7 +1979,7 @@ export function ExpensesScreen({ mode }: { mode: "all" | "tvc" | "oe" }) {
 // (Dr Raghu, 28 Aug 2026: "build the Cash Flow and Fund Flow from the XML,
 // make it drill downable.")
 
-interface CashActual { empty?: boolean; from: string; to: string; inflows: TreeSec[]; outflows: TreeSec[]; totalIn: number; totalOut: number; net: number; bankMove: number; contra: number }
+interface CashActual { empty?: boolean; from: string; to: string; inflows: TreeSec[]; outflows: TreeSec[]; totalIn: number; totalOut: number; net: number; bankMove: number; contra: number ; headsIn?: { head: string; amount: number; pct: number }[]; headsOut?: { head: string; amount: number; pct: number }[] }
 export function ActualCashFlowScreen() {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
@@ -2006,13 +2006,22 @@ export function ActualCashFlowScreen() {
             <Card label="NET MOVEMENT" value={fmtMoney(data.net)} color={data.net >= 0 ? GREEN : RED} sub={`bank & cash actually moved ${fmtMoney(data.bankMove)}`} />
             {data.contra > 0 && <Card label="CONTRA (BANK ↔ BANK)" value={fmtMoney(data.contra)} sub="internal transfers — not a flow" />}
           </div>
+          {/* THE HEADS HE READS BY, WITH THEIR SHARE AND A PIE (30 Sep 2026).
+              The Tally-root drill stays below for the audit trail; this is the
+              reading. */}
+          {data.headsIn && data.headsOut && (
+            <div className="flex gap-3 flex-wrap mb-3">
+              <HeadPie title="RECEIVED" tone={GREEN} rows={data.headsIn} total={data.totalIn} fmtMoney={fmtMoney} />
+              <HeadPie title="SPENT" tone={RED} rows={data.headsOut} total={data.totalOut} fmtMoney={fmtMoney} />
+            </div>
+          )}
           <div className="flex gap-3 flex-wrap">
             <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
-              <div className="px-3 py-2 text-xs font-bold" style={{ color: GREEN, letterSpacing: 0.8 }}>INFLOWS — MONEY CAME FROM</div>
+              <div className="px-3 py-2 text-xs font-bold" style={{ color: GREEN, letterSpacing: 0.8 }}>INFLOWS — BY TALLY HEAD, FOR THE DRILL</div>
               <DrillTree secs={data.inflows} fmtMoney={fmtMoney} onLedger={setDrill} />
             </div>
             <div className="bg-white rounded-lg border" style={{ borderColor: BORDER, flex: 1, minWidth: 340 }}>
-              <div className="px-3 py-2 text-xs font-bold" style={{ color: RED, letterSpacing: 0.8 }}>OUTFLOWS — MONEY WENT TO</div>
+              <div className="px-3 py-2 text-xs font-bold" style={{ color: RED, letterSpacing: 0.8 }}>OUTFLOWS — BY TALLY HEAD, FOR THE DRILL</div>
               <DrillTree secs={data.outflows} fmtMoney={fmtMoney} onLedger={setDrill} />
             </div>
           </div>
@@ -3532,6 +3541,51 @@ function CfoMonthly() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+
+/**
+ * A table of heads with their share of the side, and a pie of the same —
+ * drawn by hand in SVG so the page carries no chart library. The colours
+ * run from the tone (customers, suppliers) to grey (other), so the biggest
+ * slice is the darkest and the eye lands on it first.
+ */
+function HeadPie({ title, tone, rows, total, fmtMoney }: { title: string; tone: string; rows: { head: string; amount: number; pct: number }[]; total: number; fmtMoney: (n: number) => string }) {
+  const PAL = tone === GREEN ? ["#0D7A3F", "#1B6B93", "#8FA1B3"] : ["#B3392E", "#D97706", "#7C3AED", "#0E7490", "#6B7783", "#B8B5AC"];
+  const R = 54, C = 60;
+  let acc = 0;
+  const slices = rows.filter((r) => r.amount > 0).map((r, i) => {
+    const a0 = (acc / (total || 1)) * Math.PI * 2, a1 = ((acc + r.amount) / (total || 1)) * Math.PI * 2;
+    acc += r.amount;
+    const big = a1 - a0 > Math.PI ? 1 : 0;
+    const p = (a: number) => `${(C + R * Math.sin(a)).toFixed(2)},${(C - R * Math.cos(a)).toFixed(2)}`;
+    return { d: `M${C},${C} L${p(a0)} A${R},${R} 0 ${big} 1 ${p(a1)} Z`, fill: PAL[rows.indexOf(r) % PAL.length], head: r.head };
+  });
+  return (
+    <div className="bg-white rounded-lg border p-3 flex gap-3 items-start" style={{ borderColor: BORDER, flex: 1, minWidth: 380 }}>
+      <svg viewBox="0 0 120 120" width={120} height={120} role="img" aria-label={`${title} by head`}>
+        {slices.length === 1 ? <circle cx={C} cy={C} r={R} fill={slices[0].fill} /> : slices.map((s2) => <path key={s2.head} d={s2.d} fill={s2.fill}><title>{s2.head}</title></path>)}
+        <circle cx={C} cy={C} r={26} fill="#fff" />
+        <text x={C} y={C + 4} textAnchor="middle" fontSize={9} fontWeight={800} fill={tone}>{title}</text>
+      </svg>
+      <table className="text-xs" style={{ flex: 1, borderCollapse: "collapse" }}>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.head} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
+              <td className="py-1 pr-2"><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: PAL[i % PAL.length], marginRight: 6, verticalAlign: "middle" }} />{r.head}</td>
+              <td className="py-1 text-right tnum font-bold" style={{ whiteSpace: "nowrap" }}>{r.amount ? fmtMoney(r.amount) : <span style={{ color: "#D5D2C8" }}>·</span>}</td>
+              <td className="py-1 pl-2 text-right tnum" style={{ color: MUTED, width: 52 }}>{r.amount ? fmtPct(r.pct) : ""}</td>
+            </tr>
+          ))}
+          <tr className="border-t" style={{ borderColor: "var(--ink)" }}>
+            <td className="py-1 font-bold">{title === "RECEIVED" ? "Total received" : "Total spent"}</td>
+            <td className="py-1 text-right tnum font-bold">{fmtMoney(total)}</td>
+            <td className="py-1 pl-2 text-right tnum" style={{ color: MUTED }}>100%</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }

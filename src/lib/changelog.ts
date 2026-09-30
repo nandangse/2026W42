@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.9.2",
+    date: "2026-09-30",
+    module: "Where the money came from, in his heads \u2014 and a Drive bug found by a screenshot",
+    items: [
+      "ACTUAL CASH FLOW READS BY HIS HEADS NOW: Received from customers, Received from bank, Other income; Suppliers, Salaries, Bank EMI, Utilities, Other OE, Other costs \u2014 each with its share of the side and a pie beside it. Tally's roots said where the money SAT (\"06.Current Assets\"), not where it came from. The Tally-root drill stays below for the audit trail.",
+      "EVERY DRIVE UPLOAD OF THE DAY HAD BEEN QUIETLY REFUSED. The folder id had been pasted into the environment straight from the share button, link tail and all \u2014 \"\u2026CRq?usp=drive_link\" \u2014 and Drive was being asked for a folder whose name ended in a question mark. Bill scans fell back to the bucket; audit screenshots failed outright, which is how it was seen. A setting a person pastes now takes what a person pastes: the bare id, the id with its tail, or the whole URL.",
+      "The Supplier Report Card's header stays above the rows that scroll under it.",
+      "The software description catches up with the day: every Kuber screen, table and route added on 30 September is listed.",
+    ],
+  },
+  {
     v: "5.9.9.1",
     date: "2026-09-30",
     module: "The CFO Monthly Report",
