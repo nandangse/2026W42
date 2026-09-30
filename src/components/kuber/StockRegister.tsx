@@ -23,7 +23,11 @@ import { useCallback, useEffect, useState } from "react";
 const INK = "var(--ink)", MUTED = "var(--muted)", BORDER = "var(--line)";
 const CR = 1e7;
 
-interface Row { as_on: string; amount: number | null; note: string | null; by: string | null; at: string | null; opening: boolean }
+interface Row {
+  as_on: string; amount: number | null; note: string | null; by: string | null; at: string | null; opening: boolean;
+  /** the month this row closes, what was bought in it, and what it consumed */
+  month: string | null; purchases: number | null; cogs: number | null;
+}
 
 const dmy = (s: string) => s.split("-").reverse().join("-");
 const monthName = (s: string) =>
@@ -108,7 +112,9 @@ export default function StockRegister() {
             <th className="px-3 py-2 text-left">As at</th>
             <th className="px-2 py-2 text-right" style={{ width: 170 }}>Stock value ₹</th>
             <th className="px-2 py-2 text-right" style={{ width: 110 }}>₹ Cr</th>
-            <th className="px-2 py-2 text-right" style={{ width: 120 }}>Movement</th>
+            <th className="px-2 py-2 text-right" style={{ width: 110 }}>Movement</th>
+            <th className="px-2 py-2 text-right" style={{ width: 130 }}>Purchases ₹ Cr</th>
+            <th className="px-2 py-2 text-right" style={{ width: 130 }}>COGS ₹ Cr</th>
             <th className="px-3 py-2 text-left">How it was arrived at</th>
           </tr></thead>
           <tbody>
@@ -147,6 +153,20 @@ export default function StockRegister() {
                   <td className="px-2 py-1.5 text-right tnum" style={{ color: m == null ? MUTED : m >= 0 ? "var(--green)" : "var(--red)" }}>
                     {m == null ? "—" : `${m >= 0 ? "+" : "−"}${(Math.abs(m) / CR).toFixed(2)}`}
                   </td>
+                  {/* WHAT WAS BOUGHT, AND WHAT THE MONTH THEREFORE CONSUMED
+                      (his instruction). The purchases come from the books and
+                      need nobody; the COGS only appears once both ends of the
+                      month are valued, because a cost of sales struck against
+                      a missing stock figure is a guess with a decimal point. */}
+                  <td className="px-2 py-1.5 text-right tnum" style={{ color: r.purchases == null ? MUTED : "var(--dim)" }}
+                    title={r.month ? "Bought in this month, from the Tally vouchers" : "The opening row closes no month"}>
+                    {r.purchases == null ? "—" : (r.purchases / CR).toFixed(2)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tnum font-bold"
+                    style={{ color: r.cogs == null ? MUTED : r.cogs < 0 ? "var(--red)" : INK }}
+                    title="Opening stock + purchases − closing stock">
+                    {r.cogs == null ? "—" : (r.cogs / CR).toFixed(2)}
+                  </td>
                   <td className="px-3 py-1.5">
                     <input
                       value={noteDraft[key] ?? r.note ?? ""}
@@ -166,7 +186,12 @@ export default function StockRegister() {
       {!!msg && (
         <div className="text-xs font-bold mt-2" style={{ color: msg.includes("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>
       )}
-      <div className="text-xs mt-3" style={{ color: MUTED, lineHeight: 1.6, maxWidth: 680 }}>
+      <div className="text-xs mt-3" style={{ color: MUTED, lineHeight: 1.6, maxWidth: 760 }}>
+        <b>COGS is the previous month&rsquo;s stock, plus what was bought, less this month&rsquo;s stock</b> — what the month
+        actually consumed. It appears only where both ends are valued: a cost of sales struck against a missing stock
+        figure is a guess with a decimal point. Purchases are read from the Tally vouchers and need nobody.
+      </div>
+      <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6, maxWidth: 760 }}>
         A month left blank falls back to the last month that has a figure, and the P&amp;L says which date it used —
         a gross profit struck against a stock value four months stale is a fiction nobody can see unless the statement
         admits it. Clear a value by emptying the box.

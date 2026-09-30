@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.5.3",
+    date: "2026-09-30",
+    module: "The stock register finishes the sum",
+    items: [
+      "<b>Each month now shows what was bought in it and the cost of sales it produced.</b> <i>\u201cShow purchase of the month and then it will also give the COGS.\u201d</i> Opening stock, plus what was bought, less what is still on the floor \u2014 what the month actually consumed.",
+      "<b>Which is why the figure belongs here and not only on the P&amp;L.</b> A stock value typed with no consequence in front of it is a number somebody enters to clear a warning; a stock value sitting beside the cost of sales it produces is a number somebody checks.",
+      "<b>The purchases need nobody</b> \u2014 they are read from the Tally vouchers, proformas excluded. <b>The COGS appears only where both ends of the month are valued</b>, because a cost of sales struck against a missing stock figure is a guess with a decimal point.",
+    ],
+  },
+  {
     v: "5.9.5.2",
     date: "2026-09-30",
     module: "The bill date, in a column of its own",

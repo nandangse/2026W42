@@ -45,6 +45,56 @@ function stockDates(fyStart: string, upto: string): string[] {
 
 const REQUIRE_0179 = "Run migration 0179 first — the stock register has nowhere to live yet.";
 
+const S = (v: unknown) => (v == null ? "" : String(v).trim());
+const stripNo = (r: string) => r.replace(/^\s*\d+\s*[.)-]*\s*/, "");
+const isProforma = (vtype: unknown, vno: unknown) =>
+  S(vtype) === "Proforma Invoice" || /^PI[-/]/i.test(S(vno));
+
+/**
+ * WHAT WAS BOUGHT IN EACH MONTH — so the register can finish the sum.
+ *
+ * Dr Raghu, 30 Sep 2026: "in this show purchase of the month and then it will
+ * also give the COGS."
+ *
+ * He is right that it belongs here rather than only on the P&L. A stock value
+ * typed with no consequence in front of it is a number somebody enters to
+ * clear a warning; a stock value sitting beside the cost of sales it produces
+ * is a number somebody checks. Opening plus what was bought, less what is
+ * still on the floor, is what the month actually consumed.
+ */
+async function purchasesByMonth(admin: ReturnType<typeof adminClient>): Promise<Record<string, number>> {
+  const page = async <T>(run: (a: number, b: number) => PromiseLike<{ data: T[] | null; error: unknown }>) => {
+    const out: T[] = [];
+    for (let a = 0; ; a += 1000) {
+      const { data, error } = await run(a, a + 999);
+      if (error) return out;
+      out.push(...((data || []) as T[]));
+      if (!data || data.length < 1000) break;
+    }
+    return out;
+  };
+  const [groups, ledgers, vouchers, lines] = await Promise.all([
+    page<{ name: string; parent: string }>((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
+    page<{ name: string; parent: string }>((a, b) => admin.from("kuber_ledger").select("name, parent").order("name").range(a, b)),
+    page<{ id: string; date: string; vtype: string; vno: string }>((a, b) => admin.from("kuber_voucher").select("id, date, vtype, vno").order("id").range(a, b)),
+    page<{ voucher_id: string; ledger: string; amount: number }>((a, b) => admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").order("id").range(a, b)),
+  ]);
+  const gp = new Map(groups.map((g) => [g.name, g.parent]));
+  const rootOf = (n0: string) => { let n = n0, s = 0; while (gp.get(n) && s++ < 30) n = gp.get(n)!; return n; };
+  const isPurchase = new Map(ledgers.map((l) => [l.name, stripNo(rootOf(l.parent)) === "Purchase Accounts"]));
+  const V = new Map(vouchers.map((v) => [String(v.id), v]));
+  const out: Record<string, number> = {};
+  for (const l of lines) {
+    if (!isPurchase.get(l.ledger)) continue;
+    const v = V.get(String(l.voucher_id));
+    if (!v || !v.date || isProforma(v.vtype, v.vno)) continue;
+    const k = S(v.date).slice(0, 7);
+    /* Tally signs: a purchase is a debit and arrives negative. */
+    out[k] = (out[k] || 0) - (Number(l.amount) || 0);
+  }
+  return out;
+}
+
 /** GET — every entry, oldest first, with the month ends that have none. */
 export async function GET(req: Request) {
   try {
@@ -59,25 +109,37 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: true, installed: false, rows: [], dates: stockDates(fyStart, upto) });
       throw new Error(error.message);
     }
+    const bought = await purchasesByMonth(adminClient()).catch(() => ({} as Record<string, number>));
     const have = new Map((data || []).map((r) => [String(r.as_on), r]));
     /* Every month end the year has reached, whether or not it has a figure —
        an empty row is the ask, and a missing row is invisible. */
-    const rows = stockDates(fyStart, upto).map((d) => {
+    const dates = stockDates(fyStart, upto);
+    const rows = dates.map((d, i) => {
       const r = have.get(d);
+      const amount = r ? Number(r.amount) : null;
+      /* The month this row closes — the opening row closes no month. */
+      const month = i === 0 ? null : d.slice(0, 7);
+      const purchases = month ? (bought[month] ?? 0) : null;
+      /* COGS = what was here + what was bought − what is still here. Only
+         struck where BOTH ends are valued: a cost of sales computed against a
+         missing stock figure is a guess with a decimal point. */
+      const prevAmt = i > 0 ? (have.get(dates[i - 1]) ? Number(have.get(dates[i - 1])!.amount) : null) : null;
+      const cogs = amount != null && prevAmt != null && purchases != null
+        ? prevAmt + purchases - amount : null;
       return {
-        as_on: d,
-        amount: r ? Number(r.amount) : null,
+        as_on: d, amount,
         note: r?.note ?? null,
         by: r?.by ?? null,
         at: r?.at ?? null,
         opening: d < fyStart,          // the 31 March closing, which opens the year
+        month, purchases, cogs,
       };
     });
     /* Anything entered outside the expected dates is still shown — somebody
        valuing stock at a quarter end should not find it swallowed. */
     const extra = (data || [])
       .filter((r) => !rows.some((x) => x.as_on === String(r.as_on)))
-      .map((r) => ({ as_on: String(r.as_on), amount: Number(r.amount), note: r.note ?? null, by: r.by ?? null, at: r.at ?? null, opening: false }));
+      .map((r) => ({ as_on: String(r.as_on), amount: Number(r.amount), note: r.note ?? null, by: r.by ?? null, at: r.at ?? null, opening: false, month: null, purchases: null, cogs: null }));
     return NextResponse.json({
       ok: true, installed: true,
       rows: [...rows, ...extra].sort((a, b) => a.as_on.localeCompare(b.as_on)),
