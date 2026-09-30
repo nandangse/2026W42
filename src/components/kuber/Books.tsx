@@ -216,10 +216,10 @@ function DayRatios({ receivableNet, payableNet }: { receivableNet: number; payab
 }
 
 // ---------------- Ageing ----------------
-interface AgeingParty { party: string; group: string | null; total: number; gross: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number; original: number; received: number }[] }
+interface AgeingParty { party: string; group: string | null; total: number; gross: number; unadjusted: number; applied: number; credit: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number; original: number; received: number }[] }
 
 export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
-  const [data] = useBooks<{ rows: AgeingParty[]; total: number; gross: number; overdue: number; unadjusted: number; count: number; today: string }>("ageing", `&kind=${kind}`);
+  const [data] = useBooks<{ rows: AgeingParty[]; total: number; gross: number; overdue: number; unadjusted: number; applied: number; credit: number; bothSides: number; count: number; today: string }>("ageing", `&kind=${kind}`);
   const { fmt: fmtMoney } = useMoneyFmt();
   const [open, setOpen] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -271,6 +271,19 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
         <Card label={words.adv.toUpperCase()} value={fmtMoney(-data.unadjusted)} sub={rec ? "a liability — work owed against money held" : "money out, goods awaited"} color="#1B6B93" />
         <Card label={words.net.toUpperCase()} value={fmtMoney(data.total)} sub="bills less advances" color={INK} />
       </div>
+      {/* THE AGEING IS NET NOW, AND SAYS SO (Dr Raghu, 30 Sep 2026: "if a
+          customer has an outstanding and an advance same name it is wrong —
+          it has to internally deduct"). */}
+      {data.bothSides > 0 && (
+        <div className="text-xs rounded px-2.5 py-2 mb-3" style={{ background: "#F1F6FA", color: "#1B4B66", lineHeight: 1.55 }}>
+          <b>The ageing below is net.</b> {data.bothSides} {rec ? "customers carry" : "suppliers carry"} both a bill and an
+          advance in the same name, and each one&rsquo;s advance has been applied against <b>its own bills, oldest first</b> —
+          so the buckets add to <b>{fmtMoney(data.applied)}</b>, what is really {rec ? "collectable" : "payable"}, not to the
+          gross. An advance is never applied to another party&rsquo;s bill.
+          {data.credit > 0.5 && <> <b>{fmtMoney(data.credit)}</b> of advance is left over after every bill in those names is
+          covered &mdash; {rec ? "money held against work not yet invoiced" : "our cash sitting with suppliers ahead of any bill"}.</>}
+        </div>
+      )}
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "70vh" }}>
         <table className="w-full text-xs genie-table" style={{ minWidth: 1100, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
@@ -1016,7 +1029,10 @@ function FinSection({ s, flip, fmtMoney }: { s: FinSec; flip: boolean; fmtMoney:
 
 interface MisLine { key: string; label: string; amount: number; pct: number | null; avg: number; tree?: TreeSec[] }
 interface MisRatio { key: string; label: string; value: number | null; unit: string; formula: string; target: string }
-interface MisData { empty?: boolean; from: string; to: string; months: number; stocksTyped: boolean; lines: MisLine[]; ratios: MisRatio[] }
+interface MisData { empty?: boolean; from: string; to: string; months: number; stocksTyped: boolean;
+  /** where the two stock figures came from, and whether the closing one is older than the period (0179) */
+  stock?: { from: "register" | "typed" | "none"; openingAt: string | null; closingAt: string | null; stale: boolean };
+  lines: MisLine[]; ratios: MisRatio[] }
 
 const lastMonthEndIso = () => {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
@@ -1038,19 +1054,14 @@ export function PnLScreen() {
   const [data, reload] = useBooks<MisData>("mis", `&from=${from}&to=${to}`);
   const { fmt: fmtMoney } = useMoneyFmt();
   const [drill, setDrill] = useState<string | null>(null);
-  const [openLine, setOpenLine] = useState<string | null>(null);
-  const [stockDraft, setStockDraft] = useState<Record<string, string>>({});
+  /* EXPAND ALL / COLLAPSE ALL (Dr Raghu, 30 Sep 2026). One head at a time
+     meant closing the one you were comparing against to open the next. */
+  const [openLines, setOpenLines] = useState<Record<string, boolean>>({});
+  const toggle = (k: string) => setOpenLines((o) => ({ ...o, [k]: !o[k] }));
   if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
 
   const BOLD = new Set(["revenue", "tvc", "throughput", "gross_profit", "ebitda", "net_operating", "npbt", "npat"]);
   const TINT: Record<string, string> = { throughput: "#EEF1FA", gross_profit: "#FBF3E4", ebitda: "#E7F5EC", npat: "#E7F5EC" };
-  const saveStock = async (key: string, v: string) => {
-    await fetch("/api/kuber/books", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "set_mis_input", key, value: Number(v.replace(/,/g, "")) || 0 }),
-    });
-    reload();
-  };
 
   return (
     <div style={{ maxWidth: 940 }}>
@@ -1064,6 +1075,30 @@ export function PnLScreen() {
         </div>
         <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
       </div>
+      {!!data && (
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <button onClick={() => setOpenLines(Object.fromEntries(data.lines.filter((l) => l.tree?.length).map((l) => [l.key, true])))}
+            className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: INK }}>
+            ⊞ Expand all
+          </button>
+          <button onClick={() => setOpenLines({})}
+            className="text-xs font-bold rounded px-2.5 py-1" style={{ background: "#fff", border: `1px solid ${BORDER}`, color: INK }}>
+            ⊟ Collapse all
+          </button>
+          {/* WHERE THE STOCK CAME FROM. A gross profit struck against a stock
+              value four months stale is a fiction nobody can see unless the
+              statement says so. */}
+          {data.stock?.from === "register" ? (
+            <span className="text-xs" style={{ color: data.stock.stale ? "#B45309" : MUTED }}>
+              Stock read from the register{data.stock.stale ? ` — the latest valuation is ${fmtD(data.stock.closingAt || "")}, before this period ends` : ""}.
+            </span>
+          ) : (
+            <span className="text-xs" style={{ color: "#B45309" }}>
+              No stock valued yet — open the <b>Stock register</b> and enter the month ends.
+            </span>
+          )}
+        </div>
+      )}
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
         <>
           <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER }}>
@@ -1080,27 +1115,23 @@ export function PnLScreen() {
                   const openable = !!l.tree?.length;
                   return (
                     <FragRow key={l.key}>
-                      <tr className="border-t" role="button" tabIndex={0} onClick={() => openable && setOpenLine(openLine === l.key ? null : l.key)}
+                      <tr className="border-t" role="button" tabIndex={0} onClick={() => openable && toggle(l.key)}
                         style={{ borderColor: "var(--line-soft)", background: TINT[l.key] || "#fff", cursor: openable ? "pointer" : "default" }}>
                         <td className="px-3 py-1.5" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: INK }}>
-                          {openable && <span style={{ display: "inline-block", width: 14 }}>{openLine === l.key ? "▾" : "▸"}</span>}
+                          {openable && <span style={{ display: "inline-block", width: 14 }}>{openLines[l.key] ? "▾" : "▸"}</span>}
                           {l.label}
-                          {stock && !data.stocksTyped && <span style={{ color: "#B45309", fontWeight: 400 }}> — type it; the XML carries no stock</span>}
+                          {stock && !data.stocksTyped && <span style={{ color: "#B45309", fontWeight: 400 }}> — nothing valued yet</span>}
                         </td>
                         <td className="px-2 py-1.5 text-right tnum" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: /profit|throughput|ebitda|npat/.test(l.key) && l.amount < 0 ? RED : INK }}>
-                          {stock ? (
-                            <input
-                              value={stockDraft[l.key] ?? String(l.amount || "")}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => setStockDraft((d) => ({ ...d, [l.key]: e.target.value.replace(/[^0-9.]/g, "") }))}
-                              onBlur={(e) => { if (Number(e.target.value) !== l.amount) void saveStock(l.key, e.target.value); }}
-                              className="border rounded px-1.5 py-0.5 text-right tnum" style={{ borderColor: data.stocksTyped ? BORDER : "var(--accent)", width: 120 }} />
-                          ) : fmtMoney(l.amount)}
+                          {/* NO ENTRIES INSIDE IN LINE (his instruction, 30 Sep
+                              2026). A statement is an output; the stock values
+                              are typed in the register and read here. */}
+                          {fmtMoney(l.amount)}
                         </td>
                         <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{l.pct == null ? "—" : `${l.pct.toFixed(2)}%`}</td>
                         <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{stock ? "—" : fmtMoney(l.avg)}</td>
                       </tr>
-                      {openLine === l.key && l.tree && (
+                      {openLines[l.key] && l.tree && (
                         <tr><td colSpan={4} style={{ background: "#FAF9F5", padding: "0 0 0 20px" }}>
                           <DrillTree secs={l.tree} abs fmtMoney={fmtMoney} onLedger={setDrill} />
                         </td></tr>

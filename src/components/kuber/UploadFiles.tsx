@@ -31,6 +31,24 @@ type Stage = { name: string; state: "wait" | "run" | "done" | "skip" | "fail"; p
 
 export default function UploadFiles({ email }: { email?: string }) {
   const [forDate, setForDate] = useState(TODAY_IST);
+  /**
+   * WHICH YEAR THIS LOAD BELONGS TO (0178).
+   *
+   * Derived from the date the export is OF, because that is the one fact the
+   * person already had to get right, and shown so it can be corrected: an
+   * export taken in April of last year's closed books is dated April and
+   * belongs to the year before. Getting it wrong no longer destroys anything
+   * — it loads into the wrong year's slot, and re-loading the right one puts
+   * it back — but it is worth a glance.
+   */
+  const fyOf = (iso: string) => {
+    const d = new Date(`${iso}T00:00:00`);
+    const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    return `${y}-${String(y + 1).slice(2)}`;
+  };
+  const [fy, setFy] = useState(() => fyOf(TODAY_IST));
+  const [fyTouched, setFyTouched] = useState(false);
+  const setDate = (iso: string) => { setForDate(iso); if (!fyTouched) setFy(fyOf(iso)); };
   const [rows, setRows] = useState<KuberUpload[] | null>(null);
   const [reviewLink, setReviewLink] = useState<string | null>(null);
   const [reviewWho, setReviewWho] = useState<string>("");
@@ -118,13 +136,13 @@ export default function UploadFiles({ email }: { email?: string }) {
       setStage(2, { state: "run" });
       const begin = await fetch("/api/kuber/ingest", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "begin", kind }),
+        body: JSON.stringify({ action: "begin", kind, fy }),
       });
       if (!begin.ok) throw new Error((await begin.json()).error || "Kuber refused the load");
       const sink = async (table: string, batch: Row[]) => {
         const r = await fetch("/api/kuber/ingest", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action: "batch", table, rows: batch }),
+          body: JSON.stringify({ action: "batch", table, rows: batch, fy }),
         });
         if (!r.ok) throw new Error((await r.json()).error || `a ${table} batch was refused`);
       };
@@ -134,7 +152,7 @@ export default function UploadFiles({ email }: { email?: string }) {
         : await parseTransactionsInBrowser(file, sink, onPct);
       const done = await fetch("/api/kuber/ingest", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "done", kind, for_date: forDate, name: file.name, bytes: file.size, drive: onDrive, counts }),
+        body: JSON.stringify({ action: "done", kind, fy, for_date: forDate, name: file.name, bytes: file.size, drive: onDrive, counts }),
       });
       if (!done.ok) throw new Error((await done.json()).error || "the final step was refused");
       const j = await done.json();
@@ -176,11 +194,26 @@ export default function UploadFiles({ email }: { email?: string }) {
           and is then read into Kuber's books right here — the 400&nbsp;MB never touches the app's servers, only the rows do.
           One file at a time.
         </div>
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="text-xs font-bold" style={{ color: MUTED }}>DATE</span>
-          <input type="date" value={forDate} onChange={(e) => setForDate(e.target.value)} disabled={!!running}
+          <input type="date" value={forDate} onChange={(e) => setDate(e.target.value)} disabled={!!running}
             className="border rounded px-2 py-1 text-sm" style={{ borderColor: BORDER }}
             title="The date the export is OF — not necessarily today" />
+          {/* WHICH YEAR IT REPLACES. Loading clears this year and refills it;
+              every other year is left alone (0178). */}
+          <span className="text-xs font-bold ml-2" style={{ color: MUTED }}>FINANCIAL YEAR</span>
+          <select value={fy} disabled={!!running}
+            onChange={(e) => { setFy(e.target.value); setFyTouched(true); }}
+            className="border rounded px-2 py-1 text-sm font-bold" style={{ borderColor: BORDER, color: INK }}
+            title="The year this load belongs to — loading replaces THIS year only">
+            {Array.from({ length: 8 }, (_, i) => { const y = 2026 - i; return `${y}-${String(y + 1).slice(2)}`; })
+              .map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </div>
+        <div className="text-xs rounded px-2 py-1.5 mb-3" style={{ background: "#FFF8E8", color: "#7A5B00", lineHeight: 1.5 }}>
+          Loading replaces <b>{fy}</b> and nothing else. Any other year already in the books stays where it is —
+          and the open bills are rebuilt across all of them, so a bill raised in one year and settled in the next
+          nets off properly.
         </div>
         <div className="flex gap-3 flex-wrap mb-2">
           <Tile kind="masters" label="Tally XML Masters" />

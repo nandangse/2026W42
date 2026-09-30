@@ -214,20 +214,55 @@ export async function GET(req: Request) {
         const received = kind === "receivable" ? h.pos : -h.neg;
         return { ...b, original, received };
       };
-      const parties = new Map<string, { party: string; group: string | null; total: number; gross: number; unadjusted: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: BillOut[] }>();
+      /**
+       * AN ADVANCE COMES OFF THAT PARTY'S OWN BILLS, OLDEST FIRST.
+       *
+       * Dr Raghu, 30 Sep 2026: "this cannot be correct!!! If a customer has
+       * an outstanding and an advance in the same name it is wrong!!! It has
+       * to internally deduct" — and, a minute later, "same with supplier".
+       *
+       * The NET column was already right. The AGEING was not: Transweigh's
+       * buckets added to its gross ₹8.86 Cr while only ₹7.56 Cr was
+       * collectable, because the ₹1.29 Cr advance sat to one side and was
+       * never applied. Every ageing figure on the screen was therefore
+       * overstated for the forty customers and hundred and eight suppliers
+       * who hold both — ₹15.93 Cr and ₹10.36 Cr of advances respectively,
+       * sitting beside bills belonging to the same name.
+       *
+       * OLDEST FIRST, because that is how money is actually applied and how
+       * every ageing in the world is read. The oldest bucket is the one that
+       * should empty first when a party has paid ahead.
+       *
+       * WHAT IS NOT DONE: an advance is never applied to a DIFFERENT party's
+       * bill. That remains his rule from 28 August, and it is why the totals
+       * still carry gross and advance separately as well as the net.
+       */
+      const parties = new Map<string, { party: string; group: string | null; total: number; gross: number; unadjusted: number; applied: number; credit: number; not_due: number; d0_30: number; d31_90: number; d91_180: number; d180p: number; bills: BillOut[] }>();
       for (const b of bills) {
-        const p = parties.get(b.party) || { party: b.party, group: b.party_group, total: 0, gross: 0, unadjusted: 0, not_due: 0, d0_30: 0, d31_90: 0, d91_180: 0, d180p: 0, bills: [] };
+        const p = parties.get(b.party) || { party: b.party, group: b.party_group, total: 0, gross: 0, unadjusted: 0, applied: 0, credit: 0, not_due: 0, d0_30: 0, d31_90: 0, d91_180: 0, d180p: 0, bills: [] };
         p.total += b.amount;
-        if (b.amount > 0) {
-          p.gross += b.amount;
-          (p as unknown as Record<string, number>)[bucketOf(b.due_date, today)] += b.amount;
-        } else p.unadjusted += b.amount;
+        if (b.amount > 0) p.gross += b.amount; else p.unadjusted += b.amount;
         p.bills.push(dress(b));
         parties.set(b.party, p);
       }
+      /* Now age what is LEFT after the party's own advance has been applied. */
+      for (const p of parties.values()) {
+        p.bills.sort((a, b2) => String(a.due_date || "9999").localeCompare(String(b2.due_date || "9999")));
+        let left = Math.abs(p.unadjusted);                 // the advance, to spend
+        for (const b of p.bills) {
+          if (b.amount <= 0) continue;
+          const take = Math.min(left, b.amount);
+          left -= take;
+          const net = b.amount - take;
+          p.applied += net;
+          if (net > 0.5) (p as unknown as Record<string, number>)[bucketOf(b.due_date, today)] += net;
+        }
+        /* An advance bigger than everything billed leaves a real credit —
+           money held against work not yet invoiced. Shown, never buried. */
+        p.credit = left;
+      }
       const rows = [...parties.values()]
         .filter((p) => Math.abs(p.total) > 0.5)
-        .map((p) => ({ ...p, bills: p.bills.sort((a, b2) => String(a.due_date || "9999").localeCompare(String(b2.due_date || "9999"))) }))
         .sort((a, b2) => b2.total - a.total);
       // ONE arithmetic with the report card (Dr Raghu caught the two screens
       // disagreeing, 28 Aug 2026): totals over ALL bills, count = the open
@@ -235,8 +270,16 @@ export async function GET(req: Request) {
       const pos = bills.filter((b) => b.amount > 0);
       const gross = pos.reduce((s2, b) => s2 + b.amount, 0);
       const unadjusted = bills.filter((b) => b.amount < 0).reduce((s2, b) => s2 + b.amount, 0);
-      const overdue = pos.filter((b) => b.due_date && b.due_date < today).reduce((s2, b) => s2 + b.amount, 0);
-      return NextResponse.json({ rows, total: gross + unadjusted, gross, overdue, unadjusted, count: pos.length, today });
+      /* OVERDUE, AFTER THE ADVANCE. The old figure aged the gross bills and
+         so counted money the party had already sent. */
+      const overdue = rows.reduce((s2, p) => s2 + p.d0_30 + p.d31_90 + p.d91_180 + p.d180p, 0);
+      const applied = rows.reduce((s2, p) => s2 + p.applied, 0);
+      const credit = rows.reduce((s2, p) => s2 + p.credit, 0);
+      const bothSides = rows.filter((p) => p.gross > 0 && p.unadjusted < 0).length;
+      return NextResponse.json({
+        rows, total: gross + unadjusted, gross, overdue, unadjusted,
+        applied, credit, bothSides, count: pos.length, today,
+      });
     }
 
     if (view === "reportcard") {
@@ -790,9 +833,43 @@ export async function GET(req: Request) {
       const otherIncome = sum(ents.otherIncome);
       const revenue = sales;
       const purchases = sum(ents.purchases);
-      const openingStock = inputs.get("opening_stock") ?? 0;
-      const closingStock = inputs.get("closing_stock") ?? 0;
-      const stocksTyped = inputs.has("opening_stock") || inputs.has("closing_stock");
+      /**
+       * STOCK COMES FROM THE DATED REGISTER (0179), NOT FROM TWO BOXES.
+       *
+       * Opening is the value at the financial year's first day; closing is
+       * the LATEST entry on or before the period's end. So a statement drawn
+       * to 31 May uses May's stock and one drawn to 30 September uses
+       * September's, with nothing re-typed — which the two undated boxes
+       * could never do.
+       *
+       * IT SAYS WHICH DATES IT USED. Falling back to an earlier month's
+       * value is reasonable; doing it silently is not, because a gross profit
+       * struck against a stock figure four months stale is a fiction nobody
+       * can see. The dates ride back with the statement.
+       */
+      let openingStock = 0, closingStock = 0;
+      let openingAt: string | null = null, closingAt: string | null = null;
+      let stockFrom: "register" | "typed" | "none" = "none";
+      try {
+        const { data: st } = await admin.from("kuber_stock").select("as_on, amount").order("as_on");
+        const rows = (st || []) as { as_on: string; amount: number }[];
+        if (rows.length) {
+          stockFrom = "register";
+          /* the year's first day: the earliest entry on or before `from` */
+          const open = [...rows].filter((r) => String(r.as_on) <= from).pop() ?? rows[0];
+          const close = [...rows].filter((r) => String(r.as_on) <= to).pop();
+          if (open) { openingStock = Number(open.amount) || 0; openingAt = String(open.as_on); }
+          if (close) { closingStock = Number(close.amount) || 0; closingAt = String(close.as_on); }
+        }
+      } catch (e) { swallow("kuber/pnl-stock", e); /* 0179 not run yet */ }
+      /* Until the register has a row, the two old typed values still stand,
+         so nothing breaks on the day the migration runs. */
+      if (stockFrom === "none" && (inputs.has("opening_stock") || inputs.has("closing_stock"))) {
+        openingStock = inputs.get("opening_stock") ?? 0;
+        closingStock = inputs.get("closing_stock") ?? 0;
+        stockFrom = "typed";
+      }
+      const stocksTyped = stockFrom !== "none";
       const tvc = purchases + openingStock - closingStock;
       const throughput = revenue - tvc;
       const manuf = sum(ents.manuf);
@@ -862,12 +939,13 @@ export async function GET(req: Request) {
       });
       return NextResponse.json({
         from, to, months, stocksTyped,
+        stock: { from: stockFrom, openingAt, closingAt, stale: !!(closingAt && closingAt < to) },
         lines: [
           line("sales", "Sales", sales, ents.sales),
           line("revenue", "Revenue", revenue),
           line("purchases", "Purchases during the Period", purchases, ents.purchases),
-          line("opening_stock", "Opening Stock (typed)", openingStock),
-          line("closing_stock", "Closing Stock (typed)", closingStock),
+          line("opening_stock", openingAt ? `Opening Stock — as at ${openingAt.split("-").reverse().join("-")}` : "Opening Stock", openingStock),
+          line("closing_stock", closingAt ? `Closing Stock — as at ${closingAt.split("-").reverse().join("-")}` : "Closing Stock — not valued", closingStock),
           line("tvc", "TVC (COGS)", tvc),
           line("throughput", "THROUGHPUT", throughput),
           line("manuf", "Manufacturing Expenses", manuf, ents.manuf),

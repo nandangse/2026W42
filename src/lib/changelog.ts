@@ -89,6 +89,21 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.4.0",
+    date: "2026-09-30",
+    module: "An advance comes off that party\u2019s own bills, and stock gets a register",
+    items: [
+      "<b>The ageing was overstating what is collectable, and he caught it.</b> \u201cIf a customer has an outstanding and an advance same name it is wrong \u2014 it has to internally deduct.\u201d The <i>Net</i> column was already right; the <b>buckets were not</b>. Transweigh\u2019s aged to its gross \u20b98.86 Cr while only \u20b97.56 Cr was owed, because the \u20b91.29 Cr advance sat to one side and was never applied. <b>Each party\u2019s advance now comes off that party\u2019s own bills, oldest first</b>, before anything is aged \u2014 on receivables and payables both.",
+      "<b>It was not a small correction.</b> <b>40 customers</b> hold both a bill and an advance in the same name, with <b>\u20b915.93 Cr</b> of advance sitting inside them; <b>108 suppliers</b>, with <b>\u20b910.36 Cr</b>. Every ageing figure for those names was too high. An advance is still never applied to a different party\u2019s bill \u2014 that rule of his stands \u2014 which is why gross, advance and net are all still shown.",
+      "<b>Where an advance is bigger than everything billed, the remainder is shown as a credit</b> rather than buried: money held against work not yet invoiced, or our cash sitting with a supplier ahead of any bill.",
+      "<b>A stock register, one row a month.</b> <i>\u201cOpening stock as of 1/4/2026, then April 30, May 31 etc. No entries put inside in line.\u201d</i> Two undated boxes cannot describe six month-ends \u2014 the same closing figure was used whether the statement was drawn to April or to September. <b>The P&amp;L now reads the register</b>: opening from 1 April, closing from the latest valuation on or before the period\u2019s end, and <b>it says which dates it used</b>, because a gross profit struck against a four-month-stale stock value is a fiction nobody can see. <b>Needs migration 0179.</b>",
+      "<b>The typing has left the statement.</b> A figure somebody types is an input; a statement is an output; and a box inside a line of the P&amp;L invites a number being nudged until the statement reads better.",
+      "<b>Expand all and collapse all</b> on the P&amp;L, and heads now open independently \u2014 one at a time meant closing the head you were comparing against to open the next.",
+      "<b>Kuber can tell one financial year from another.</b> The loader opened with a full reset: uploading 2025-26 would have <b>deleted 2026-27</b> rather than sitting beside it, and the first sign would have been a board report missing half a year. Every row now carries its year, the wipe is scoped to it, and the uploader says which year it is about to replace. <b>Needs migration 0178.</b>",
+      "<b>And the arithmetic that makes two years true:</b> the open bills are rebuilt from <b>the openings of the earliest year loaded plus the allocations of every year</b> \u2014 never each year\u2019s own openings, because 2026-27\u2019s opening balance already contains what 2025-26 left unsettled, and counting both would double every old bill.",
+    ],
+  },
+  {
     v: "5.9.3.0",
     date: "2026-09-30",
     module: "The QR page writes back, and the picture reads on a phone",
