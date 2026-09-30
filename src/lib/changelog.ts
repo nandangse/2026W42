@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.6.4",
+    date: "2026-09-30",
+    module: "Newest month first on the supplier ledger",
+    items: [
+      "<b>The twelve months now read with the current one at the top</b>, which is where the eye goes and where the question usually is. The running balance is still built oldest-first \u2014 each month\u2019s closing is the one before it plus the movement \u2014 and only the rows are reversed for reading. Reversing the loop instead would have carried the balance backwards and produced a column that looked right and was not.",
+    ],
+  },
+  {
     v: "5.9.6.3",
     date: "2026-09-30",
     module: "What it costs to run the place, in one line",

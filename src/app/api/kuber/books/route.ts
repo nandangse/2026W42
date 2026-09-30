@@ -496,6 +496,17 @@ export async function GET(req: Request) {
             pos: poByMonth[k] ?? (known ? 0 : null),
           });
         }
+        /**
+         * NEWEST FIRST (Dr Raghu, 30 Sep 2026: "show reverse current month
+         * first").
+         *
+         * The running balance has to be built OLDEST first — each month's
+         * closing is the one before it plus the movement — so the rows are
+         * computed forward and reversed only for the reading. Reversing the
+         * loop instead would have carried the balance backwards and produced
+         * a column that looked right and was not.
+         */
+        months.reverse();
       } catch (e) { swallow("kuber/supplier-months", e); }
 
       // credit period as the bills themselves wear it (due − bill date)
