@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.7.5",
+    date: "2026-09-30",
+    module: "Purchase Orders on the supplier card",
+    items: [
+      "A PURCHASE ORDERS TAB on every supplier: PO number, date, what it was for, due date, completion date and a grade. The completion date is not a field anywhere \u2014 the ERP keeps only a received percentage \u2014 so it is taken from the goods themselves: the last receipt note booked against that order. An order not fully received carries no date and no grade, because grading something that has not arrived would be inventing the verdict.",
+      "THE GRADE IS ABOUT THE PROMISE. A means it landed on or before the due date on the PO, B within a week, C within a month, D beyond. Late orders also say by how many days.",
+      "AND A REAL BUG WITH IT: the POs-per-month column on the supplier card was reading the first five thousand purchase orders of twenty-one thousand, unordered, and filtering afterwards. Any supplier whose orders fell outside that arbitrary slice showed a column of dots and looked like somebody we had never ordered from. Swarajya has fifty-odd and showed none. The filter is in the query now.",
+      "Items Supplied stays sorted by the biggest spend first \u2014 the order is struck on the server and nothing re-sorts it.",
+    ],
+  },
+  {
     v: "5.9.7.4",
     date: "2026-09-30",
     module: "+ Audit, from anywhere in Kuber",

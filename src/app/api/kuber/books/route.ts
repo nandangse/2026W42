@@ -477,6 +477,9 @@ export async function GET(req: Request) {
        */
       const months: { key: string; label: string; purchases: number | null; payments: number | null;
                       balance: number | null; invoices: number | null; pos: number | null }[] = [];
+      /** his purchase orders, one row each (Dr Raghu, 30 Sep 2026) */
+      const poList: { po: string; date: string | null; items: string; lines: number; value: number;
+                      due: string | null; done: string | null; late: number | null; grade: string; status: string }[] = [];
       try {
         const { data: led } = await admin.from("kuber_ledger").select("opening").eq("name", party).order("fy", { ascending: false }).limit(1).maybeSingle();
         const opening = Number(led?.opening) || 0;
@@ -506,18 +509,101 @@ export async function GET(req: Request) {
           if (!/purchase|excise/i.test(String(v.vtype))) continue;
           (mv[String(v.date).slice(0, 7)] ||= { p: 0, y: 0, inv: 0 }).inv += 1;
         }
-        /* His purchase orders, from the ERP's own register. */
+        /**
+         * HIS PURCHASE ORDERS, FROM THE ERP'S OWN REGISTER.
+         *
+         * IT USED TO READ THE FIRST FIVE THOUSAND OF TWENTY-ONE THOUSAND.
+         * `.limit(5000)` with no order and a filter applied afterwards in
+         * JavaScript: any supplier whose POs happened to sit outside that
+         * arbitrary slice showed a column of dots and looked like a supplier
+         * we had never ordered from. Swarajya has fifty-odd and showed none.
+         * The filter belongs in the query.
+         *
+         * Two queries rather than one `.or()`, because a party name with a
+         * comma in it breaks PostgREST's or-syntax and several of them have.
+         */
         const poByMonth: Record<string, number> = {};
+        type PoRow = { name: string; status: string; docstatus: number; transaction_date: string | null; schedule_date: string | null; grand_total: number; per_received: number };
+        let poRows: PoRow[] = [];
         try {
-          const { data: po } = await admin.from("material_po")
-            .select("supplier_name, supplier, transaction_date").limit(5000);
-          for (const r of (po || []) as Record<string, unknown>[]) {
-            const who = String(r.supplier_name || r.supplier || "");
-            if (who.trim().toLowerCase() !== party.trim().toLowerCase()) continue;
+          const sel = "name, status, docstatus, transaction_date, schedule_date, grand_total, per_received";
+          const [a, b] = await Promise.all([
+            admin.from("material_po").select(sel).ilike("supplier", party).limit(1000),
+            admin.from("material_po").select(sel).ilike("supplier_name", party).limit(1000),
+          ]);
+          const seen = new Map<string, PoRow>();
+          for (const r of [...((a.data || []) as PoRow[]), ...((b.data || []) as PoRow[])]) seen.set(String(r.name), r);
+          poRows = [...seen.values()];
+          for (const r of poRows) {
             const d = String(r.transaction_date || "").slice(0, 7);
             if (d) poByMonth[d] = (poByMonth[d] || 0) + 1;
           }
         } catch (e) { swallow("kuber/supplier-po", e); }
+
+        /**
+         * EACH PO, WITH WHAT IT WAS FOR AND WHETHER IT CAME ON TIME.
+         *
+         * Dr Raghu, 30 Sep 2026: "in this also show Purchase Orders — PO No,
+         * Date, Items, Value, Due Date, Completion Date, Grade."
+         *
+         * The completion date is not a field anywhere; the ERP keeps only a
+         * received PERCENTAGE. So it is taken from the goods themselves: the
+         * last receipt note posted against that PO. A PO not fully received
+         * has no completion date and is not graded, because grading an order
+         * that has not arrived would be inventing the verdict.
+         *
+         * THE GRADE IS ABOUT THE PROMISE, not about us. Due date is the
+         * schedule date on the PO; A means it landed on or before it.
+         */
+        try {
+          const names = poRows.map((r) => String(r.name));
+          const itemsOf = new Map<string, { names: string[]; lines: number }>();
+          const doneOf = new Map<string, string>();
+          for (let i = 0; i < names.length; i += 100) {
+            const slice = names.slice(i, i + 100);
+            const [{ data: pit }, { data: git }] = await Promise.all([
+              admin.from("material_po_item").select("po_name, item_name").in("po_name", slice),
+              admin.from("material_grn_item").select("purchase_order, grn_name").in("purchase_order", slice),
+            ]);
+            for (const x of (pit || []) as { po_name: string; item_name: string }[]) {
+              const r = itemsOf.get(String(x.po_name)) || { names: [], lines: 0 };
+              r.lines += 1;
+              const n = String(x.item_name || "").trim();
+              if (n && r.names.length < 3 && !r.names.includes(n)) r.names.push(n);
+              itemsOf.set(String(x.po_name), r);
+            }
+            const grnNames = [...new Set(((git || []) as { grn_name: string }[]).map((x) => String(x.grn_name)))];
+            const dateOfGrn = new Map<string, string>();
+            for (let k = 0; k < grnNames.length; k += 100) {
+              const { data: gr } = await admin.from("material_grn").select("name, posting_date").in("name", grnNames.slice(k, k + 100));
+              for (const g of (gr || []) as { name: string; posting_date: string }[]) if (g.posting_date) dateOfGrn.set(String(g.name), String(g.posting_date));
+            }
+            for (const x of (git || []) as { purchase_order: string; grn_name: string }[]) {
+              const d = dateOfGrn.get(String(x.grn_name));
+              const po = String(x.purchase_order);
+              if (d && (!doneOf.get(po) || d > doneOf.get(po)!)) doneOf.set(po, d);
+            }
+          }
+          for (const r of poRows) {
+            const nm = String(r.name);
+            const it = itemsOf.get(nm);
+            const received = Number(r.per_received) || 0;
+            const cancelled = /cancel/i.test(String(r.status)) || Number(r.docstatus) === 2;
+            const done = received >= 99.5 ? (doneOf.get(nm) || null) : null;
+            const due = r.schedule_date ? String(r.schedule_date) : null;
+            const late = done && due ? daysBetween(due, done) : null;
+            const grade = cancelled ? "cancelled"
+              : late == null ? (received > 0 ? `part ${Math.round(received)}%` : due && due < today ? `overdue ${daysBetween(due, today)}d` : "open")
+              : late <= 0 ? "A" : late <= 7 ? "B" : late <= 30 ? "C" : "D";
+            poList.push({
+              po: nm, date: r.transaction_date ? String(r.transaction_date) : null,
+              items: it ? it.names.join(", ") + (it.lines > it.names.length ? ` +${it.lines - it.names.length} more` : "") : "",
+              lines: it?.lines || 0, value: Number(r.grand_total) || 0,
+              due, done, late, grade, status: String(r.status || ""),
+            });
+          }
+          poList.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+        } catch (e) { swallow("kuber/supplier-po-detail", e); }
 
         const t0 = new Date(`${today}T00:00:00`);
         const keys: string[] = [];
@@ -638,6 +724,7 @@ export async function GET(req: Request) {
         weighted_delay: overdue > 0 ? Math.round(wsum / overdue) : 0,
         oldest_due: oldest, credit_days: creditDays, buckets, bands, months, paid, invoiced, vouchers,
         payments: payments.slice(0, 200), invoices: invoices.slice(0, 200), plans, items: items.slice(0, 100),
+        pos: poList.slice(0, 400),
         bills: bills.sort((a, b2) => String(a.due_date || "9999").localeCompare(String(b2.due_date || "9999"))),
       });
     }

@@ -546,6 +546,9 @@ interface Dossier {
   invoices: { date: string | null; amount: number; bill: string; vtype: string; vno: string }[];
   plans: { plan_date: string; amount: number; status: string; purpose: string; bill_ref: string }[];
   items: { item: string; times: number; total: number; qty: string; last: string | null }[];
+  /** his purchase orders from the ERP, graded on the promise (30 Sep 2026) */
+  pos?: { po: string; date: string | null; items: string; lines: number; value: number;
+          due: string | null; done: string | null; late: number | null; grade: string; status: string }[];
   bills: { bill: string; bill_date: string | null; due_date: string | null; amount: number }[];
 }
 type RecoRow = { id?: string; party: string; fy: string; our_closing: number | null; their_closing: number | null; status: string; upto: string | null; note: string };
@@ -553,7 +556,7 @@ type RecoRow = { id?: string; party: string; fy: string; our_closing: number | n
 function SupplierCard({ party, grade, onClose }: { party: string; grade: string; onClose: () => void }) {
   const { fmt: fmtMoney } = useMoneyFmt();
   const [d, setD] = useState<Dossier | null>(null);
-  const [tab, setTab] = useState<"overview" | "bills" | "invoices" | "payments" | "plan" | "reco" | "items">("overview");
+  const [tab, setTab] = useState<"overview" | "bills" | "invoices" | "payments" | "plan" | "reco" | "pos" | "items">("overview");
   const [reco, setReco] = useState<RecoRow[] | null>(null);
   const [recoMsg, setRecoMsg] = useState("");
 
@@ -592,7 +595,8 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
   );
   const TABS: [typeof tab, string][] = [
     ["overview", "Overview"], ["bills", "Outstanding"], ["invoices", "Invoices"],
-    ["payments", "Payments"], ["plan", "Payment Plan"], ["reco", "Reco Status"], ["items", "Items Supplied"],
+    ["payments", "Payments"], ["plan", "Payment Plan"], ["reco", "Reco Status"],
+    ["pos", "Purchase Orders"], ["items", "Items Supplied"],
   ];
 
   return (
@@ -785,6 +789,42 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
                 </>
               )}
 
+              {/* PURCHASE ORDERS (Dr Raghu, 30 Sep 2026: "in this also show
+                  Purchase Orders — PO No, Date, Items, Value, Due Date,
+                  Completion Date, Grade"). The completion date is not a field
+                  anywhere; it is the last goods receipt posted against the PO.
+                  An order not fully received carries no date and no grade,
+                  because grading something that has not arrived would be
+                  inventing the verdict. */}
+              {tab === "pos" && (
+                <>
+                  <p className="text-xs mb-2" style={{ color: MUTED, lineHeight: 1.6 }}>
+                    From the ERP&apos;s own register. <b>Completion</b> is the last goods receipt booked against the
+                    order; <b>Grade</b> measures it against the due date on the PO — <b>A</b> on or before,
+                    <b> B</b> within a week, <b>C</b> within a month, <b>D</b> beyond. An order still open is not graded.
+                  </p>
+                  <MiniTable head={["PO No", "Date", "Items", "Due", "Completed", "Grade", "Value"]}>
+                    {(!d.pos || !d.pos.length) && (<tr><td colSpan={7} className="px-3 py-4" style={{ color: MUTED }}>No purchase orders in the ERP under this name.</td></tr>)}
+                    {(d.pos || []).map((x, i) => (
+                      <tr key={x.po} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                        <td className="px-2 py-1 font-semibold" style={{ whiteSpace: "nowrap" }}>{x.po}</td>
+                        <td className="px-2 py-1 tnum" style={{ whiteSpace: "nowrap" }}>{fmtD(x.date)}</td>
+                        <td className="px-2 py-1" style={{ color: MUTED, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={x.items}>{x.items || "—"}</td>
+                        <td className="px-2 py-1 tnum" style={{ whiteSpace: "nowrap" }}>{fmtD(x.due)}</td>
+                        <td className="px-2 py-1 tnum" style={{ whiteSpace: "nowrap", color: x.done ? INK : MUTED }}>{x.done ? fmtD(x.done) : "—"}</td>
+                        <td className="px-2 py-1" style={{ whiteSpace: "nowrap" }}>
+                          <b className="rounded px-1.5 py-0.5" style={{ fontSize: 11, ...gradeTone(x.grade) }}>{x.grade}</b>
+                          {x.late != null && x.late > 0 && <span style={{ color: MUTED, fontSize: 11 }}> · {x.late}d late</span>}
+                        </td>
+                        <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(x.value)}</td>
+                      </tr>
+                    ))}
+                  </MiniTable>
+                </>
+              )}
+              {/* ITEMS SUPPLIED — biggest spend first, and it stays that way
+                  (Dr Raghu, 30 Sep 2026: "keep this sorting"). The order is
+                  struck on the server and nothing re-sorts it here. */}
               {tab === "items" && (
                 <MiniTable head={["Item", "Times", "Last supplied", "Last qty", "Total value"]}>
                   {d.items.length === 0 && (<tr><td colSpan={5} className="px-3 py-4" style={{ color: MUTED }}>No item lines on his vouchers in this book — service and expense suppliers show nothing here (run migration 0081 and re-upload Transactions once, if not done).</td></tr>)}
@@ -1485,6 +1525,15 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
   );
 }
 const FragRow = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+/** A on time, B a week, C a month, D beyond — anything else is not a verdict. */
+const gradeTone = (g: string): { background: string; color: string } =>
+  g === "A" ? { background: "#E6F4EA", color: "#0D7A3F" }
+  : g === "B" ? { background: "#FFF8E1", color: "#8A6D1A" }
+  : g === "C" ? { background: "#FFF3E8", color: "#B4540A" }
+  : g === "D" ? { background: "#FBEAE8", color: "#B3392E" }
+  : g.startsWith("overdue") ? { background: "#FBEAE8", color: "#B3392E" }
+  : { background: "#F2F2EE", color: "#6B7783" };
+
 
 /* ------------------------------------------------------------------ *
  *  HOW THE BOOKS ARE READ
