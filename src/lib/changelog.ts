@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.6.5",
+    date: "2026-09-30",
+    module: "Filing is not loading, and the register now says so",
+    items: [
+      "<b>Every year row says whether it is actually in the books.</b> <i>\u201c\u2713 in the books \u00b7 13,302 vouchers\u201d</i>, or <i>\u201cfiled to Drive \u2014 not in the books. Load it from Upload, with the year set to 2025-26.\u201d</i>",
+      "<b>Because the distinction is invisible and it matters.</b> Master2526 and Transactions2526 were filed here on 30 September and Dr Raghu reasonably said \u201ci uploaded it now\u201d \u2014 twice. This register puts a file on Drive and writes a row; it parses nothing, and its four upload buttons look exactly like the ones that do. Saying it on the row is cheaper than explaining it again, and it is the kind of thing nobody should have to be told twice by a person.",
+      "<b>A warning worth repeating here:</b> the Upload screen\u2019s financial-year selector is what stops a load of last year from replacing this one, and it defaults from a date rather than from the file. Set it to 2025-26 <i>before</i> choosing the 2025-26 export.",
+    ],
+  },
+  {
     v: "5.9.6.4",
     date: "2026-09-30",
     module: "Newest month first on the supplier ledger",

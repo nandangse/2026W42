@@ -46,6 +46,8 @@ const when = (s: string) => new Date(s).toLocaleDateString("en-IN", { timeZone: 
 
 export default function YearFiles({ email, googleClientId }: { email?: string; googleClientId: string | null }) {
   const [files, setFiles] = useState<YearFile[] | null>(null);
+  /** vouchers actually parsed into the books, per year — filing is not loading */
+  const [loaded, setLoaded] = useState<Record<string, number>>({});
   const [installed, setInstalled] = useState(true);
   const [mayUpload, setMayUpload] = useState(false);
   const [busy, setBusy] = useState<string>(""); // "fy|kind"
@@ -65,7 +67,7 @@ export default function YearFiles({ email, googleClientId }: { email?: string; g
 
   const load = useCallback(() => {
     fetch("/api/kuber/years", { cache: "no-store" }).then((r) => r.json())
-      .then((j) => { setFiles(j.files || []); setInstalled(j.installed !== false); setMayUpload(!!j.mayUpload); })
+      .then((j) => { setFiles(j.files || []); setLoaded(j.loaded || {}); setInstalled(j.installed !== false); setMayUpload(!!j.mayUpload); })
       .catch((e) => { swallow("kuber/years", e); setFiles([]); });
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -140,7 +142,8 @@ export default function YearFiles({ email, googleClientId }: { email?: string; g
         <div className="text-xs" style={{ color: "var(--muted)" }}>Tally masters and transactions, the audited financials and the GST reports, one row a year back to 2005-06 — the data the review draws on.</div>
       </div>
       <div className="text-xs mb-3" style={{ color: "var(--dim)", lineHeight: 1.6 }}>
-        Files go straight to Google Drive under <b>FY &lt;year&gt;</b> in the Tally folder; only the register row reaches Genie. The running year takes a month per file, and the newest is what the grid shows.
+        Files go straight to Google Drive under <b>FY &lt;year&gt;</b> in the Tally folder; only the register row reaches Genie.
+        <b> Filing is not loading</b> — to put a year into the books, open <b>Upload</b>, set the financial year, and choose the file there. The running year takes a month per file, and the newest is what the grid shows.
         {mayUpload ? " You may upload." : " Dr Raghu and Suresh upload; everyone with Kuber reads."}
         {!installed && <span style={{ color: "var(--red)" }}> Run migration 0145 first — the register does not exist yet.</span>}
       </div>
@@ -173,6 +176,19 @@ export default function YearFiles({ email, googleClientId }: { email?: string; g
               <tr key={fy} style={{ background: fy === current ? "#FFF7E6" : undefined }}>
                 <td className="font-bold tnum" style={{ color: "var(--ink)", whiteSpace: "nowrap" }}>
                   {fy}{fy === current && <div className="text-xs font-normal" style={{ color: "var(--muted)" }}>running · month-wise</div>}
+                  {/* FILING IS NOT LOADING. This register puts the file on
+                      Drive and writes a row; the books are only touched by
+                      Kuber → Upload. A year that has one and not the other
+                      should say so rather than be explained. */}
+                  {loaded[fy] ? (
+                    <div className="text-xs font-normal" style={{ color: "var(--green)" }}>
+                      ✓ in the books · {loaded[fy].toLocaleString("en-IN")} vouchers
+                    </div>
+                  ) : files?.some((f) => f.fy === fy && (f.kind === "masters" || f.kind === "transactions")) ? (
+                    <div className="text-xs font-normal" style={{ color: "var(--warn)", maxWidth: 190, lineHeight: 1.35 }}>
+                      filed to Drive — <b>not in the books</b>. Load it from <b>Upload</b>, with the year set to {fy}.
+                    </div>
+                  ) : null}
                 </td>
                 {KINDS.map((k) => <Cell key={k.key} fy={fy} kind={k} m={fy === current ? month : undefined} />)}
               </tr>

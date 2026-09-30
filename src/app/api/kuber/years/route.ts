@@ -3,6 +3,7 @@ import { requireKuber } from "@/lib/accounts";
 import { errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { readBody } from "@/lib/validate";
+import { swallow } from "@/lib/swallow";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,34 @@ export async function GET() {
       if (/kuber_year_file|schema cache|does not exist/i.test(error.message)) return NextResponse.json({ installed: false, files: [], mayUpload: false });
       throw new Error(error.message);
     }
-    return NextResponse.json({ installed: true, files: data ?? [], mayUpload: u.isOwner || YEAR_UPLOADERS.has(u.email) });
+    /**
+     * WHICH YEARS ARE ACTUALLY IN THE BOOKS.
+     *
+     * Dr Raghu filed Master2526 and Transactions2526 here and reasonably said
+     * "i uploaded it now" — twice. This register puts the file on Drive and
+     * writes a row; it does NOT parse anything, and the four upload buttons
+     * on each row look exactly like the ones that do.
+     *
+     * So the register now says it. A year with rows in kuber_voucher is IN
+     * THE BOOKS; a year with a filed XML and no rows is FILED ONLY, which is
+     * an archive and not a ledger. Saying it here is cheaper than explaining
+     * it again, and it is the kind of thing a person should never have to be
+     * told twice by a person.
+     */
+    const loaded: Record<string, number> = {};
+    try {
+      const admin = adminClient();
+      const fys = [...new Set((data ?? []).map((f) => String(f.fy)))];
+      for (const fy of fys) {
+        const { count } = await admin.from("kuber_voucher").select("id", { count: "exact", head: true }).eq("fy", fy);
+        if (count) loaded[fy] = count;
+      }
+    } catch (e) { swallow("kuber/years-loaded", e); /* pre-0178: nothing can be said */ }
+
+    return NextResponse.json({
+      installed: true, files: data ?? [], loaded,
+      mayUpload: u.isOwner || YEAR_UPLOADERS.has(u.email),
+    });
   } catch (e) {
     return errJson(e);
   }
