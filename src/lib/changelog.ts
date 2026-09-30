@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.8.3",
+    date: "2026-09-30",
+    module: "A column that says what it means",
+    items: [
+      "\"NOT DUE\" ON THE AGEING IS NOW \"WITHIN CREDIT PERIOD\". Dr Raghu asked what it meant, which is the only evidence a header ever gives you that it is not working. It is the part of the open bills whose credit period has not run out; every column after it is the overdue part split by how late, so the two together add back to Bills receivable.",
+    ],
+  },
+  {
     v: "5.9.8.2",
     date: "2026-09-30",
     module: "Bills Receivable",

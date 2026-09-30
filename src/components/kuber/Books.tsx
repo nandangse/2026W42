@@ -266,7 +266,11 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
     { key: "adv", label: words.adv, pick: (r) => -r.unadjusted },
     { key: "gross", label: words.bills, pick: (r) => r.gross },
     { key: "total", label: words.net, pick: (r) => r.total },
-    { key: "not_due", label: "Not due", pick: (r) => r.not_due },
+    /* "what does Not due mean?" (Dr Raghu, 30 Sep 2026). It meant the part
+       of the bills whose credit period has not run out — which the header
+       never said. The columns after it are the overdue parts, split by how
+       late, so this one plus those add back to Bills receivable. */
+    { key: "not_due", label: "Within credit period", pick: (r) => r.not_due },
     { key: "d0_30", label: "<30 days", pick: (r) => r.d0_30 },
     { key: "d31_90", label: "31–90", pick: (r) => r.d31_90 },
     { key: "d91_180", label: "91–180", pick: (r) => r.d91_180 },
