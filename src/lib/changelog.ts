@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.9.1",
+    date: "2026-09-30",
+    module: "The CFO Monthly Report",
+    items: [
+      "A SECOND TAB ON THE CFO NOTE: pick a month, make the report, keep it. Twelve A4 pages, page-numbered, drawn from the books \u2014 the May report's sixteen tabs, at what Dr Raghu called level 10: every figure has the same month a year ago beside it and the year to date under it; every ratio prints its own arithmetic; every head opens to the ledgers that made it; a thin month is marked as part-posted and says so on the cover.",
+      "A DEPRECIATION SCHEDULE STRUCK MONTHLY. Tally posts one journal a year (Rs 40.45 L on 31 March, nothing since), so a monthly P&L that waits for it reads eleven months of profit that is not there. The schedule takes the asset ledgers the XML does carry and strikes WDV at the rate typed per class \u2014 seven rates, seeded from the sheet \u2014 pro rata to the month, and the P&L uses it.",
+      "VARIANCE AGAINST BREAK-EVEN until a budget is typed. No budget lives in Tally; until nine figures are typed for the year the column is break-even struck from the books, and the page says so. Type them and the column switches on its own.",
+      "THE LAST PAGE SAYS WHAT THE XML COULD NOT SUPPLY \u2014 depreciation rates, the budget, item-wise stock, the bank statement, loan statements \u2014 instead of leaving a blank the reader has to guess about. Twelve of the sheet's sixteen tabs come from the upload alone; that is the honest answer to whether uploading the XML is enough.",
+      "Needs migration 0186 to keep reports; it previews without it.",
+    ],
+  },
+  {
     v: "5.9.9.0",
     date: "2026-09-30",
     module: "The 13-week cash flow plan, his sheet's shape",

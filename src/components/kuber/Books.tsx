@@ -2133,6 +2133,10 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
   const [archive, setArchive] = useState<{ id: string; on_date: string; title: string; by: string; at: string }[] | null>(null);
   const [making, setMaking] = useState(false);
   const [boardMsg, setBoardMsg] = useState("");
+  /* TWO DOCUMENTS UNDER ONE ROOF (Dr Raghu, 30 Sep 2026: "a tab on the top
+     called CFO Monthly Report"). The Saturday read stays the default; the
+     monthly report is the other tab. */
+  const [tab, setTab] = useState<"note" | "report">("note");
   const loadArchive = useCallback(() => {
     fetch("/api/board-report", { cache: "no-store" }).then((r) => r.json())
       .then((j) => setArchive(j.rows || [])).catch(() => setArchive([]));
@@ -2173,6 +2177,14 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
 
   return (
     <div style={{ maxWidth: 980 }}>
+      <div className="flex gap-1 mb-3">
+        {([["note", "CFO Note"], ["report", "CFO Monthly Report"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)} className="rounded px-3 py-1.5 text-sm font-bold"
+            style={tab === k ? { background: "var(--ink)", color: "#fff" } : { color: MUTED, background: "#fff", border: `1px solid ${BORDER}` }}>{l}</button>
+        ))}
+      </div>
+      {tab === "report" && <CfoMonthly />}
+      {tab === "note" && <>
       <div className="mb-3 flex items-start gap-3 flex-wrap">
         <div style={{ flex: 1, minWidth: 320 }}>
           <div className="text-lg font-bold" style={{ color: INK }}>The CFO Note</div>
@@ -2264,6 +2276,7 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
           </div>
         ))}
       </div>
+      </>}
     </div>
   );
 }
@@ -3437,6 +3450,87 @@ function PlanTab({ filter, title, addPurpose, approve, onChanged }: {
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+
+/**
+ * THE CFO MONTHLY REPORT — pick the month, make it, keep it.
+ *
+ * Dr Raghu, 30 Sep 2026: "On clicking have For Month, then make the statement
+ * like this for that month. All based on tally data and the data that's
+ * within the Genie. Idea is to see whether just uploading the XML shall be
+ * enough for this."
+ *
+ * Twelve A4 pages from the books, page-numbered, the same month a year back
+ * beside every figure, and a last page that says what the XML could not
+ * supply. "Preview" draws it from the books as they stand; "Make and keep"
+ * freezes the data so the report can be referred back to.
+ */
+function CfoMonthly() {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const lastMonth = (() => { const t = new Date(today + "T00:00:00Z"); t.setUTCDate(0); return t.toISOString().slice(0, 7); })();
+  const [month, setMonth] = useState(lastMonth);
+  const [rows, setRows] = useState<{ id: string; month: string; fy: string; title: string; by: string; at: string }[] | null>(null);
+  const [installed, setInstalled] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const load = useCallback(() => {
+    fetch("/api/cfo-report", { cache: "no-store" }).then((r) => r.json())
+      .then((j) => { setRows(j.rows || []); setInstalled(j.installed !== false); }).catch(() => setRows([]));
+  }, []);
+  useEffect(load, [load]);
+  const make = async () => {
+    setBusy(true); setMsg("Reading the books — twelve pages take a moment…");
+    try {
+      const r = await fetch("/api/cfo-report", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ month }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || "the report could not be built");
+      setMsg(""); load();
+      window.open(`/cfo-report/print?id=${encodeURIComponent(j.id)}`, "_blank");
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  const months: string[] = [];
+  for (let i = 0; i < 24; i++) { const t = new Date(today + "T00:00:00Z"); t.setUTCDate(1); t.setUTCMonth(t.getUTCMonth() - i); months.push(t.toISOString().slice(0, 7)); }
+  const ml = (ym: string) => new Date(`${ym}-01T00:00:00`).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  return (
+    <div>
+      <div className="mb-3">
+        <div className="text-lg font-bold" style={{ color: INK }}>CFO Monthly Report</div>
+        <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 720 }}>
+          The May report&apos;s sixteen tabs, drawn from the books for any month: summary, the detailed P&amp;L with the same month
+          last year beside it, a depreciation schedule struck monthly, twelve months across, variance, balance sheet, receipts
+          and payments, both ageings, inventory, the working-capital cycle, loans against their statements — and a last page
+          that says what the XML could not supply.
+        </div>
+      </div>
+      <div className="rounded p-3 mb-3 flex items-center gap-2 flex-wrap" style={{ background: "#F7F5EF", border: `1px solid ${BORDER}` }}>
+        <span className="text-xs font-bold" style={{ color: MUTED }}>FOR MONTH</span>
+        <select value={month} onChange={(e) => setMonth(e.target.value)} className="border rounded px-2 py-1.5 text-sm font-semibold" style={{ borderColor: BORDER, background: "#fff" }}>
+          {months.map((m) => <option key={m} value={m}>{ml(m)}</option>)}
+        </select>
+        <button onClick={make} disabled={busy || !installed} className="rounded px-3 py-2 text-sm font-bold text-white" style={{ background: busy ? MUTED : "var(--blue)" }}>
+          {busy ? "Building…" : "📄 Make and keep"}
+        </button>
+        <a href={`/cfo-report/print?month=${month}`} target="_blank" rel="noreferrer" className="text-sm font-bold" style={{ color: "var(--blue)" }}>preview without keeping →</a>
+        {!installed && <span className="text-xs" style={{ color: "#B45309" }}>Run migration 0186 first — the archive has nowhere to live yet.</span>}
+      </div>
+      {!!msg && <div className="text-xs rounded px-2.5 py-2 mb-3" style={{ background: "#FDF8EC", color: "#7A5B00" }}>{msg}</div>}
+      <div className="bg-white rounded-lg border" style={{ borderColor: BORDER }}>
+        <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>ARCHIVE — what was actually given, frozen</div>
+        {rows === null && <div className="px-3 py-3 text-xs" style={{ color: MUTED }}>reading…</div>}
+        {rows !== null && !rows.length && <div className="px-3 py-3 text-xs" style={{ color: MUTED }}>Nothing kept yet — the first report starts the archive.</div>}
+        {(rows || []).map((r) => (
+          <div key={r.id} className="flex items-center gap-3 px-3 py-2 border-t text-sm" style={{ borderColor: "var(--line-soft)" }}>
+            <a href={`/cfo-report/print?id=${encodeURIComponent(r.id)}`} target="_blank" rel="noreferrer" className="font-bold" style={{ color: "var(--blue)" }}>{r.title}</a>
+            <span className="text-xs ml-auto" style={{ color: MUTED }}>
+              {new Date(r.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {String(r.by || "").split("@")[0]}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
