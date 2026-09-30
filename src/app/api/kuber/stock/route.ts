@@ -26,8 +26,12 @@ export const dynamic = "force-dynamic";
  * — which is why nothing ships here without a full build.
  */
 function stockDates(fyStart: string, upto: string): string[] {
-  const out = [fyStart];
+  /* THE YEAR OPENS ON THE PREVIOUS YEAR'S CLOSING (0181). Suresh counts the
+     floor on 31 March; that figure closes one year and opens the next, and
+     asking him for the one he actually produces removes a translation step. */
   const s = new Date(`${fyStart}T00:00:00`);
+  const prior = new Date(s.getFullYear(), s.getMonth(), 0);
+  const out = [`${prior.getFullYear()}-${String(prior.getMonth() + 1).padStart(2, "0")}-${String(prior.getDate()).padStart(2, "0")}`];
   for (let i = 0; i < 24; i++) {
     /* day 0 of the next month is the last day of this one — the calendar's
        own arithmetic rather than a table of 30s and 31s. */
@@ -66,7 +70,7 @@ export async function GET(req: Request) {
         note: r?.note ?? null,
         by: r?.by ?? null,
         at: r?.at ?? null,
-        opening: d === fyStart,
+        opening: d < fyStart,          // the 31 March closing, which opens the year
       };
     });
     /* Anything entered outside the expected dates is still shown — somebody

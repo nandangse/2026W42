@@ -1045,7 +1045,7 @@ const lastMonthEndIso = () => {
  *  TVC via typed stocks → THROUGHPUT → Manufacturing → GROSS PROFIT →
  *  Indirect → EBITDA → Finance → Depreciation → NPBT → Tax → NPAT, with
  *  % of sales and average monthly, every head drillable to the voucher. */
-export function PnLScreen() {
+export function PnLScreen({ go }: { go?: (k: string) => void }) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
   const lme = lastMonthEndIso();
@@ -1088,13 +1088,26 @@ export function PnLScreen() {
           {/* WHERE THE STOCK CAME FROM. A gross profit struck against a stock
               value four months stale is a fiction nobody can see unless the
               statement says so. */}
+          {/* THE ENTRY IS ONE CLICK AWAY (Dr Raghu, 30 Sep 2026: "in this the
+              stock entry needs to have a button ... suresh will enter this").
+              The statement says what is missing; the button goes and gets it. */}
+          {go && (
+            <button onClick={() => go("stock")}
+              className="text-xs font-bold rounded px-2.5 py-1"
+              style={{ background: data.stock?.from === "register" && !data.stock.stale ? "#fff" : ORANGE,
+                       border: `1px solid ${data.stock?.from === "register" && !data.stock.stale ? BORDER : ORANGE}`,
+                       color: data.stock?.from === "register" && !data.stock.stale ? INK : "#fff" }}
+              title="Enter the 31 March closing and each month end">
+              📦 Stock entry
+            </button>
+          )}
           {data.stock?.from === "register" ? (
             <span className="text-xs" style={{ color: data.stock.stale ? "#B45309" : MUTED }}>
-              Stock read from the register{data.stock.stale ? ` — the latest valuation is ${fmtD(data.stock.closingAt || "")}, before this period ends` : ""}.
+              Stock read from the register{data.stock.stale ? ` — the latest valuation is ${fmtD(data.stock.closingAt || "")}, before this period ends. Enter ${fmtD(data.to)}'s closing and this statement corrects itself.` : "."}
             </span>
           ) : (
             <span className="text-xs" style={{ color: "#B45309" }}>
-              No stock valued yet — open the <b>Stock register</b> and enter the month ends.
+              No stock valued yet — the gross profit cannot be struck until the 31 March closing and the month ends are entered.
             </span>
           )}
         </div>

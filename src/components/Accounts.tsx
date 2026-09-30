@@ -217,7 +217,7 @@ export default function Accounts({
           {openKey === "upload" && <UploadFiles email={email} />}
           {openKey === "ledgers" && <LedgerBrowser />}
           {openKey === "vouchers" && <VoucherBrowser />}
-          {openKey === "pnl" && <PnLScreen />}
+          {openKey === "pnl" && <PnLScreen go={go} />}
           {openKey === "stock" && <StockRegister />}
           {openKey === "bs" && <BalanceSheetScreen />}
           {openKey === "playbook" && <PlaybookScreen kind="finance" email={email} />}

@@ -79,7 +79,8 @@ export default function StockRegister() {
     <div style={{ maxWidth: 860 }}>
       <div className="text-lg font-bold mb-1" style={{ color: INK }}>📦 Stock register</div>
       <div className="text-sm mb-3" style={{ color: "var(--dim)", lineHeight: 1.6, maxWidth: 680 }}>
-        Stock in hand at each month end. <b>Tally carries no stock value</b> — the Stock-in-hand group is there and every
+        Stock in hand at each month end, as Suresh counts it: <b>the closing of 31 March</b> &mdash; which opens the year &mdash;
+        then 30 April, 31 May and on. <b>Tally carries no stock value</b> — the Stock-in-hand group is there and every
         ledger under it is zero — so without these figures the P&amp;L can show purchases but not cost of sales, and the
         gross profit of a build-to-order business reads as a loss. The <b>Statement of Profit &amp; Loss reads this
         register</b>: opening from 1 April, closing from the latest month end on or before the period&rsquo;s last day.
@@ -92,13 +93,13 @@ export default function StockRegister() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
-        <Card label="MONTHS VALUED" value={`${filled.length} of ${rows.length}`} sub="1 April, then each month end" />
+        <Card label="MONTHS VALUED" value={`${filled.length} of ${rows.length}`} sub="31 March, then each month end" />
         <Card label="LATEST VALUATION" value={latest?.amount != null ? `₹${(latest.amount / CR).toFixed(2)} Cr` : "—"}
           sub={latest ? `as at ${dmy(latest.as_on)}` : "nothing entered yet"} />
-        <Card label="MOVEMENT SINCE 1 APRIL"
+        <Card label="MOVEMENT SINCE 31 MARCH"
           value={filled.length > 1 && filled[0].amount != null && latest?.amount != null
             ? `${latest.amount - filled[0].amount >= 0 ? "+" : "−"}₹${(Math.abs(latest.amount - filled[0].amount) / CR).toFixed(2)} Cr` : "—"}
-          sub="opening to the latest month end" />
+          sub="31 March to the latest month end" />
       </div>
 
       <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: BORDER }}>
@@ -117,8 +118,13 @@ export default function StockRegister() {
               return (
                 <tr key={key} className="border-t" style={{ borderColor: "var(--line-soft)", background: r.opening ? "#F7F5EF" : "#fff" }}>
                   <td className="px-3 py-1.5" style={{ fontWeight: r.opening ? 800 : 500, color: INK }}>
-                    {r.opening ? <>Opening stock <span style={{ color: MUTED, fontWeight: 400 }}>as at {dmy(r.as_on)}</span></>
-                      : <>{monthName(r.as_on)} <span style={{ color: MUTED, fontWeight: 400 }}>· {dmy(r.as_on)}</span></>}
+                    {/* HIS WORDS: "closing stock of 31st march, then stock of
+                        30th april, etc." One closing after another, which is
+                        how a stock register reads in any office. */}
+                    Closing stock &mdash; {dmy(r.as_on)}
+                    <span style={{ color: MUTED, fontWeight: 400 }}>
+                      {r.opening ? " \u00b7 opens the year" : ` \u00b7 ${monthName(r.as_on)}`}
+                    </span>
                   </td>
                   <td className="px-2 py-1.5 text-right">
                     <input

@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.5.1",
+    date: "2026-09-30",
+    module: "Stock entry, one click from the statement",
+    items: [
+      "<b>A Stock entry button on the P&amp;L</b> \u2014 amber while the valuation is missing or older than the period, plain once it is current. The statement already said what was missing; now it goes and gets it. <i>\u201cSuresh will enter this.\u201d</i>",
+      "<b>The first row is the closing of 31 March, not the opening of 1 April.</b> The same number, and not the same instruction: Suresh does not value a stock \u201cas at the opening of 1 April\u201d \u2014 he counts what is on the floor on the last day of March, and that figure closes one year and opens the next. Asking for the one he actually produces removes a translation step, and a translation step is where a wrong number gets entered confidently. Every row after it is a month end for the same reason. <b>Needs migration 0181</b>, which re-dates the figure already entered.",
+      "<b>And the stale-stock warning now says what to do about it</b> \u2014 which month end to enter for the statement to correct itself \u2014 rather than only that something is wrong.",
+    ],
+  },
+  {
     v: "5.9.5.0",
     date: "2026-09-30",
     module: "The board report, made in Genie and kept",
