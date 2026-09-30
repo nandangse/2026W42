@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.5.4",
+    date: "2026-09-30",
+    module: "The receivables were doubled, and the Tally XML had it right all along",
+    items: [
+      "<b>Every customer with activity this year was showing roughly twice what they owe.</b> 8 Base Repair Depot at exactly 2\u00d7, Transweigh at 2.8\u00d7, Airbus at 1.7\u00d7. Customers carrying only older bills \u2014 Vama, CO 1CIMD \u2014 were exactly right, and that difference is what gave it away.",
+      "<b>The cause: a table called <code>kuber_opening_bill</code> that is not an opening.</b> It is the bill-wise OUTSTANDING as at the moment the Tally masters were exported \u2014 1,358 of its 3,275 rows are dated after 1 April, including September invoices. Genie treated it as a position brought forward and added the year\u2019s movements on top, so a figure that already included the receipts had the receipts added again.",
+      "<b>The masters\u2019 list alone is the answer, to the rupee.</b> Proven party by party against Tally: Airbus \u20b92.95 Cr, Transweigh \u20b92.70 Cr, 8 Base \u20b91.20 Cr, Vama \u20b90.85 Cr, Three D \u20b91.67 Cr, Swarajya \u20b90.96 Cr \u2014 every one exact. Nothing is added to it now.",
+      "<b>The allocations are still loaded and still matter</b> \u2014 they are the history of each bill, what was raised and what was received against it. They are not the position, and <b>adding a history to a balance is how a balance stops being one</b>.",
+      "<b>A Recompute open bills button</b> on Upload, so a corrected derivation can be applied to the books already loaded without asking anybody to send a gigabyte again.",
+      "<b>Dr Raghu found this</b>, twice over: \u201cthis cannot be correct\u201d on the advances, then \u201ci am sure the tally xml is the correct one \u2014 u r misinfering something\u201d. He was right on every count, including that the Tally export never needed a spreadsheet to check it.",
+    ],
+  },
+  {
     v: "5.9.5.3",
     date: "2026-09-30",
     module: "The stock register finishes the sum",

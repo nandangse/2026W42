@@ -142,17 +142,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    if (body.action === "done") {
-      const fy = readFy(body.fy);
-      // Rebuild the open bills from first principles — opening bills plus
-      // every allocation, Tally's own signs, exactly the script's math.
+    if (body.action === "done" || body.action === "rebuild") {
+      const fy = body.action === "rebuild" ? "" : readFy(body.fy);
+      /**
+       * THE MASTERS' BILL-WISE LIST IS THE ANSWER. NOTHING IS ADDED TO IT.
+       *
+       * Dr Raghu, 30 Sep 2026: "i am sure the tally xml is the correct one" —
+       * "u r misinfering something". He was right on both counts.
+       *
+       * This table is named kuber_opening_bill and it is NOT an opening. It
+       * is the bill-wise OUTSTANDING as at the moment the masters were
+       * exported: 1,358 of its 3,275 rows are dated after 1 April, including
+       * September invoices. A figure that already includes the year's
+       * receipts was then having the year's receipts added to it again, and
+       * every customer with activity this year came out roughly doubled —
+       * 8 Base Repair Depot at exactly 2x, Transweigh at 2.8x.
+       *
+       * PROVEN PARTY BY PARTY against the Tally figures: this list alone
+       * gives Airbus 2.95, Transweigh 2.70, 8 Base 1.20, Vama 0.85,
+       * Three D 1.67, Swarajya 0.96 — every one to the rupee.
+       *
+       * The allocations are still loaded and still matter: they are the
+       * HISTORY of each bill, what was raised and what was received against
+       * it. They are not the position, and adding a history to a balance is
+       * how a balance stops being one.
+       */
       const bills = new Map<string, { ledger: string; bill: string; outstanding: number; bill_date: string | null; credit_days: number | null }>();
-      const touch = (ledger: string, bill: string) => {
-        const k = ledger + "||" + bill;
-        let r = bills.get(k);
-        if (!r) { r = { ledger, bill, outstanding: 0, bill_date: null, credit_days: null }; bills.set(k, r); }
-        return r;
-      };
       const page = async (table: string, cols: string) => {
         const out: Record<string, unknown>[] = [];
         for (let from = 0; ; from += 1000) {
@@ -163,39 +178,13 @@ export async function POST(req: Request) {
         }
         return out;
       };
-      /**
-       * THE ONE PIECE OF ARITHMETIC THAT MAKES TWO YEARS TRUE.
-       *
-       * A year's OPENING bills are what the previous year left unsettled. So
-       * when 2025-26 and 2026-27 are both loaded, 2026-27's openings already
-       * contain everything 2025-26 did not clear — and adding both would
-       * count every old bill twice, doubling the receivables.
-       *
-       * The correct reconstruction is: <b>the openings of the EARLIEST year
-       * loaded, plus the allocations of EVERY year</b>. One starting position,
-       * then every movement since, in order. With a single year loaded this
-       * is exactly what it has always done, so nothing changes today.
-       */
-      const years = [...new Set((await page("kuber_voucher", "fy")).map((r) => String(r.fy || "")).filter(Boolean))].sort();
-      const openingYear = years[0] || null;
-      const openRows = await page("kuber_opening_bill", "ledger, bill, bill_date, amount, credit_days, fy");
-      const useOpen = openingYear
-        ? openRows.filter((b) => !b.fy || String(b.fy) === openingYear)
-        : openRows;
-      for (const b of useOpen) {
-        const r = touch(String(b.ledger), String(b.bill));
+      for (const b of await page("kuber_opening_bill", "ledger, bill, bill_date, amount, credit_days")) {
+        const k = String(b.ledger) + "||" + String(b.bill);
+        const r = bills.get(k) || { ledger: String(b.ledger), bill: String(b.bill), outstanding: 0, bill_date: null, credit_days: null };
         r.outstanding += Number(b.amount) || 0;
         if (b.bill_date) r.bill_date = String(b.bill_date);
         if (b.credit_days != null) r.credit_days = Number(b.credit_days);
-      }
-      /* Allocations from EVERY year — they are the movements. */
-      for (const a of await page("kuber_bill_alloc", "ledger, bill, billtype, amount, credit_days, date")) {
-        const r = touch(String(a.ledger), String(a.bill));
-        r.outstanding += Number(a.amount) || 0;
-        if (/new ref/i.test(String(a.billtype))) {
-          if (a.date) r.bill_date = String(a.date);
-          if (a.credit_days != null) r.credit_days = Number(a.credit_days);
-        }
+        bills.set(k, r);
       }
       const groupOf = new Map<string, string>();
       for (const l of await page("kuber_ledger", "name, parent")) groupOf.set(String(l.name), String(l.parent));
@@ -223,7 +212,10 @@ export async function POST(req: Request) {
       // SIGNED amounts: positive = owed in the party's own direction
       // (Tally: debit is negative, so a debtor's debit bill flips positive);
       // negative = an unadjusted opposite entry, shown, never hidden.
+      /* A proforma is an intention, not a booking — out here so every screen
+         that rides the bills is clean at once. */
       const open = [...bills.values()]
+        .filter((b) => !/^PI[-/]/i.test(b.bill.trim()) && !/proforma/i.test(b.bill))
         .filter((b) => Math.abs(b.outstanding) > 0.5)
         .flatMap((b) => {
           const kind = classOf(b.ledger);
@@ -246,6 +238,11 @@ export async function POST(req: Request) {
       for (let i = 0; i < open.length; i += 500) {
         const { error } = await admin.from("kuber_bill").insert(open.slice(i, i + 500));
         if (error) throw new Error(error.message);
+      }
+      if (body.action === "rebuild") {
+        /* A recompute is not an upload: nothing arrived, so nothing is logged
+           as having arrived. */
+        return NextResponse.json({ ok: true, rebuilt: open.length });
       }
       // the audit ledger row — the browser door counts like every other door,
       // and says what was TAKEN IN (0078), not just what arrived

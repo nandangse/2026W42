@@ -31,6 +31,7 @@ type Stage = { name: string; state: "wait" | "run" | "done" | "skip" | "fail"; p
 
 export default function UploadFiles({ email }: { email?: string }) {
   const [forDate, setForDate] = useState(TODAY_IST);
+  const [rebuild, setRebuild] = useState("");
   /**
    * WHICH YEAR THIS LOAD BELONGS TO (0178).
    *
@@ -218,6 +219,33 @@ export default function UploadFiles({ email }: { email?: string }) {
         <div className="flex gap-3 flex-wrap mb-2">
           <Tile kind="masters" label="Tally XML Masters" />
           <Tile kind="transactions" label="Tally XML Transactions" />
+        </div>
+        {/* RECOMPUTE WITHOUT RE-UPLOADING. The open bills are derived, not
+            typed, so when the derivation is corrected the books should be
+            able to catch up without asking anybody to send a 1 GB file again. */}
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <button onClick={async () => {
+            setRebuild("working"); 
+            try {
+              const r = await fetch("/api/kuber/ingest", {
+                method: "POST", headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action: "rebuild" }),
+              });
+              const j = await r.json();
+              if (!r.ok) throw new Error(j?.error || "the recompute was refused");
+              setRebuild(`${Number(j.rebuilt || 0).toLocaleString("en-IN")} open bills rebuilt from the Tally masters ✓`);
+            } catch (e) { setRebuild("!" + (e instanceof Error ? e.message : String(e))); }
+          }} disabled={rebuild === "working" || !!running}
+            className="text-xs font-bold rounded px-3 py-1.5"
+            style={{ background: "#fff", border: `1px solid ${BORDER}`, color: INK }}
+            title="Rebuild the open bills from the masters already loaded — no upload needed">
+            {rebuild === "working" ? "Recomputing…" : "↻ Recompute open bills"}
+          </button>
+          {!!rebuild && rebuild !== "working" && (
+            <span className="text-xs" style={{ color: rebuild.startsWith("!") ? "var(--red)" : GREEN }}>
+              {rebuild.replace(/^!/, "")}
+            </span>
+          )}
         </div>
         {stages.length > 0 && (
           <div className="rounded border p-3 mt-1" style={{ borderColor: BORDER, background: "#FAF9F5" }}>
