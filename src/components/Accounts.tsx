@@ -18,7 +18,7 @@ import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
 import StockRegister from "@/components/kuber/StockRegister";
-import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen, CfoNoteScreen, VoucherRegister, RulesScreen } from "@/components/kuber/Books";
+import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen, CfoNoteScreen, VoucherRegister, RulesScreen, BillsReceivable } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
 import ComplianceCalendar from "@/components/kuber/Compliance";
@@ -34,7 +34,10 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
   },
   {
     header: "MONEY IN",
-    items: [{ key: "receivables", label: "Customer Receivables", icon: "₹" }],
+    items: [
+      { key: "receivables", label: "Customer Receivables", icon: "₹" },
+      { key: "billsrec", label: "Bills Receivable", icon: "▤" },
+    ],
   },
   {
     header: "MONEY OUT",
@@ -220,6 +223,7 @@ export default function Accounts({
           {openKey === "vouchers" && <VoucherBrowser />}
           {openKey === "pnl" && <PnLScreen go={go} />}
           {openKey === "rules" && <RulesScreen />}
+          {openKey === "billsrec" && <BillsReceivable />}
           {openKey === "stock" && <StockRegister />}
           {openKey === "bs" && <BalanceSheetScreen />}
           {openKey === "playbook" && <PlaybookScreen kind="finance" email={email} />}

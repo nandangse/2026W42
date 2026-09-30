@@ -2729,3 +2729,169 @@ function InvoiceBox({ row, kind, fams, salesmen, onClose, onSaved }: {
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ *
+ *  BILLS RECEIVABLE — every unpaid bill, one line each
+ * ------------------------------------------------------------------ */
+
+interface BillRow {
+  party: string; group: string | null; bill: string;
+  bill_date: string | null; due_date: string | null;
+  amount: number; age: number | null; overdue: number;
+  fam: string | null; salesman: string | null; scan: string | null;
+}
+interface BillsData {
+  kind: string; today: string; rows: BillRow[]; count: number; total: number;
+  held: number; creditParties: number; oldest: string | null;
+  bands: { key: string; label: string; count: number; amount: number }[];
+  parties: string[];
+}
+
+/**
+ * Dr Raghu, 30 Sep 2026: "add the Bills Receivable. Show all the bills which
+ * have the status as 'Unpaid'. this may be as old as 5 years also! See the
+ * status in tally. show me these."
+ *
+ * Tally's status IS this list — a bill sits in the bill-wise outstanding
+ * until it is knocked off. The ageing screen gathers this money by party;
+ * this one shows the bills themselves, oldest first, nothing netted and
+ * nothing summarised away. A bill that has been out for four years should
+ * have to be looked at.
+ */
+export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" | "payable" }) {
+  const [data, reload] = useBooks<BillsData>("billsdue", `&kind=${kind}`);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const [q, setQ] = useState("");
+  const [party, setParty] = useState("");
+  const [band, setBand] = useState("");
+  const [minAmt, setMinAmt] = useState("");
+  const [sortK, setSortK] = useState<"age" | "amount" | "party" | "bill_date">("age");
+  const [dir, setDir] = useState<1 | -1>(-1);
+  const rec = kind === "receivable";
+
+  if (!data) return <div className="text-sm" style={{ color: MUTED }}>reading the bills…</div>;
+  const needle = q.trim().toLowerCase();
+  const floor = Number(minAmt) || 0;
+  const bandOf = data.bands.find((b) => b.key === band);
+  const LO: Record<string, [number, number]> = { "0-90": [0, 90], "90-180": [90, 180], "180-365": [180, 365], "1-2y": [365, 730], "2-3y": [730, 1095], "3y+": [1095, 99999] };
+  const rows = data.rows
+    .filter((r) => !needle || r.party.toLowerCase().includes(needle) || r.bill.toLowerCase().includes(needle))
+    .filter((r) => !party || r.party === party)
+    .filter((r) => !band || ((r.age ?? 0) >= LO[band][0] && (r.age ?? 0) < LO[band][1]))
+    .filter((r) => !floor || r.amount >= floor)
+    .sort((a, b) => {
+      const v = sortK === "amount" ? a.amount - b.amount
+        : sortK === "age" ? (a.age ?? 0) - (b.age ?? 0)
+        : String(a[sortK] ?? "").localeCompare(String(b[sortK] ?? ""));
+      return v * dir;
+    });
+  const shown = rows.reduce((s2, r) => s2 + r.amount, 0);
+  const years = (d: string | null) => (d ? Math.floor(daysSince(d, data.today) / 365) : 0);
+
+  const Hd = ({ k, children, right }: { k: typeof sortK; children: React.ReactNode; right?: boolean }) => (
+    <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`}
+      onClick={() => { if (sortK === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSortK(k); setDir(k === "party" ? 1 : -1); } }}
+      style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}>
+      {children}{sortK === k ? (dir === 1 ? " ▲" : " ▼") : ""}
+    </th>
+  );
+
+  return (
+    <div style={{ maxWidth: 1120 }}>
+      <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>{rec ? "Bills Receivable" : "Bills Payable"}</div>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 720 }}>
+            Every bill still unpaid, one line each, oldest first — Tally&apos;s own bill-wise outstanding, which is where
+            a bill sits until it is knocked off. Nothing is netted and nothing is summarised away.
+            {data.oldest && <> The oldest is <b>{fmtD(data.oldest)}</b>.</>}
+          </div>
+        </div>
+        <button onClick={reload} title="Read the books again" className="rounded border font-bold"
+          style={{ borderColor: BORDER, background: "#fff", color: INK, padding: "3px 9px", fontSize: 14 }}>&#8635;</button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
+        <Card label={rec ? "UNPAID — DUE TO COME" : "UNPAID — TO PAY"} value={fmtMoney(data.total)}
+          sub={`${data.count} open bills`} color="var(--blue)" />
+        <Card label={rec ? "ADVANCES HELD — NOT NETTED" : "ADVANCES PAID — NOT NETTED"} value={fmtMoney(data.held)}
+          sub={`${data.creditParties} parties in credit · set off inside the party, never across`} color="#1B6B93" />
+        <Card label="OVER A YEAR OLD" value={fmtMoney(data.bands.filter((b) => ["1-2y", "2-3y", "3y+"].includes(b.key)).reduce((s2, b) => s2 + b.amount, 0))}
+          sub={`${data.bands.filter((b) => ["1-2y", "2-3y", "3y+"].includes(b.key)).reduce((s2, b) => s2 + b.count, 0)} bills`} color={RED} />
+      </div>
+
+      {/* the age bands, as buttons — pressing one filters the list */}
+      <div className="flex gap-1.5 mb-2 flex-wrap">
+        {data.bands.map((b) => (
+          <button key={b.key} onClick={() => setBand(band === b.key ? "" : b.key)}
+            className="rounded border px-2.5 py-1 text-left"
+            style={band === b.key ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" } : { background: "#fff", borderColor: BORDER, color: INK }}>
+            <div className="text-xs font-bold">{b.label}</div>
+            <div className="text-xs tnum">{fmtMoney(b.amount)} <span style={{ opacity: 0.65 }}>· {b.count}</span></div>
+          </button>
+        ))}
+        {band && <button onClick={() => setBand("")} className="text-xs font-bold self-center" style={{ color: MUTED }}>clear</button>}
+      </div>
+
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="party · bill no…"
+          className="border rounded px-2 py-1.5 text-sm" style={{ borderColor: needle ? ORANGE : BORDER, width: 220 }} />
+        <select value={party} onChange={(e) => setParty(e.target.value)} className="border rounded px-2 py-1.5 text-xs" style={{ borderColor: BORDER }}>
+          <option value="">every party</option>
+          {data.parties.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <input value={minAmt} onChange={(e) => setMinAmt(e.target.value)} placeholder="min ₹"
+          className="border rounded px-2 py-1.5 text-xs tnum" style={{ borderColor: BORDER, width: 92 }} />
+        <span className="text-xs ml-auto" style={{ color: MUTED }}>{rows.length} shown · {fmtMoney(shown)}</span>
+      </div>
+
+      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "62vh" }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 940, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
+              <Hd k="party">Party</Hd>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Bill</th>
+              <Hd k="bill_date">Bill date</Hd>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Due</th>
+              <Hd k="age" right>Age</Hd>
+              <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Overdue</th>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Family</th>
+              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Salesman</th>
+              <Hd k="amount" right>Amount</Hd>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && <tr><td colSpan={9} className="px-3 py-4 text-center" style={{ color: MUTED }}>Nothing matches.</td></tr>}
+            {rows.slice(0, 1500).map((r, i) => {
+              const y = years(r.bill_date);
+              return (
+                <tr key={r.party + r.bill + i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1 font-semibold" style={{ maxWidth: 210, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.party}>{r.party}</td>
+                  <td className="px-2 py-1 whitespace-nowrap">{r.bill}{r.scan && <span title={r.scan} style={{ marginLeft: 4 }}>&#128196;</span>}</td>
+                  <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.bill_date)}</td>
+                  <td className="px-2 py-1 tnum whitespace-nowrap" style={{ color: MUTED }}>{fmtD(r.due_date)}</td>
+                  <td className="px-2 py-1 text-right tnum whitespace-nowrap" style={{ color: y >= 1 ? RED : (r.age ?? 0) > 90 ? "#B45309" : MUTED, fontWeight: y >= 1 ? 700 : 400 }}>
+                    {r.age == null ? "—" : y >= 1 ? `${y}y ${Math.floor(((r.age % 365)) / 30)}m` : `${r.age}d`}
+                  </td>
+                  <td className="px-2 py-1 text-right tnum" style={{ color: r.overdue > 0 ? RED : MUTED }}>{r.overdue > 0 ? `${r.overdue}d` : "—"}</td>
+                  <td className="px-2 py-1" style={{ color: r.fam ? INK : "#D5D2C9", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.fam || "—"}</td>
+                  <td className="px-2 py-1" style={{ color: r.salesman ? INK : "#D5D2C9", whiteSpace: "nowrap" }}>{r.salesman || "—"}</td>
+                  <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 1500 && <p className="text-xs mt-1" style={{ color: "#8A6D1A" }}>Showing the first 1,500 of {rows.length} — narrow it with a filter.</p>}
+      <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
+        Family and Salesman come from the Sales Register, where they have been filled in — so a four-year-old bill
+        can be handed to whoever owns it without opening a second screen. Tell me what else belongs here and it goes in.
+      </p>
+    </div>
+  );
+}
+
+/** whole days between two ISO dates */
+const daysSince = (a: string, b: string) =>
+  Math.max(0, Math.round((new Date(b + "T00:00:00Z").getTime() - new Date(a + "T00:00:00Z").getTime()) / 86400000));

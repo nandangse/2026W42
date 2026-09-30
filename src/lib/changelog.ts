@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.8.2",
+    date: "2026-09-30",
+    module: "Bills Receivable",
+    items: [
+      "EVERY UNPAID BILL, ONE LINE EACH, OLDEST FIRST \u2014 under Money In. Tally's bill-wise outstanding IS the unpaid list: a bill sits there until it is knocked off. The ageing screen gathers that money by party; this shows the bills themselves, with nothing netted and nothing summarised away, because a bill that has been out for four years should have to be looked at.",
+      "SIX AGE BANDS AS BUTTONS \u2014 under 90 days, to 180, to a year, 1\u20132 years, 2\u20133 years, over three \u2014 each with its money and its count, and pressing one filters the list. The card above says what is over a year old in one figure.",
+      "Age reads in years and months once a bill passes twelve months, because \"1,438d\" is not a number anybody feels.",
+      "Product family and salesman ride along from the Sales Register where they have been filled in, so an old bill can be handed to whoever owns it without opening a second screen.",
+    ],
+  },
+  {
     v: "5.9.8.1",
     date: "2026-09-30",
     module: "The bill, and the paper behind it",

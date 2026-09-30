@@ -1745,6 +1745,81 @@ export async function GET(req: Request) {
     // ---- the voucher registers (Dr Raghu, 28 Aug 2026): SALES and PURCHASE,
     // YTD by default with dates / MTD / QTD — every voucher of the family in
     // the period, totals on top.
+    /**
+     * BILLS RECEIVABLE — every unpaid bill, however old.
+     *
+     * Dr Raghu, 30 Sep 2026: "add the Bills Receivable. Show all the bills
+     * which have the status as 'Unpaid'. this may be as old as 5 years also!
+     * See the status in tally."
+     *
+     * Tally's status IS this list: a bill sits in the bill-wise outstanding
+     * until it is knocked off, so what is here is what is unpaid, and the
+     * oldest of them run back years. The ageing screen shows this money
+     * gathered by party; this shows the bills themselves, one line each, with
+     * nothing netted and nothing summarised away.
+     *
+     * The product family, the salesman and the scan ride along where the
+     * Sales Register has been filled in, so a five-year-old bill can be
+     * handed to whoever owns it without opening a second screen.
+     */
+    if (view === "billsdue") {
+      const kind = url.searchParams.get("kind") === "payable" ? "payable" : "receivable";
+      const all = await allBills(admin);
+      const open = all.filter((b) => b.kind === kind && b.amount > 0);
+
+      let meta = new Map<string, RR>();
+      try {
+        const got = await pageAll<RR>(async (a, b) => {
+          const r = await admin.from("sales_invoice_meta").select("bill, fam, salesman, note, scan_path, scan_name").range(a, b);
+          return { data: r.data as RR[] | null, error: r.error };
+        }, "the invoice register");
+        meta = new Map(got.map((m) => [String(m.bill), m]));
+      } catch (e) { swallow("kuber/billsdue-meta", e); /* pre-0184 */ }
+
+      /* the credit a party holds, kept beside his bills rather than netted
+         into them — one customer's advance is not another bill's payment */
+      const credit = new Map<string, number>();
+      for (const b of all.filter((x) => x.kind === kind && x.amount < 0)) {
+        credit.set(b.party, (credit.get(b.party) || 0) + -b.amount);
+      }
+
+      const rows = open.map((b) => {
+        const m = meta.get(String(b.bill));
+        const age = b.bill_date ? daysBetween(String(b.bill_date), today) : null;
+        const over = b.due_date ? daysBetween(String(b.due_date), today) : null;
+        return {
+          party: b.party, group: b.party_group ?? null, bill: b.bill,
+          bill_date: b.bill_date ?? null, due_date: b.due_date ?? null,
+          amount: b.amount, age, overdue: over != null && over > 0 ? over : 0,
+          fam: m?.fam ?? null, salesman: m?.salesman ?? null,
+          scan: m?.scan_path ? String(m.scan_name || "scan") : null,
+        };
+      }).sort((a, b) => (b.age ?? 0) - (a.age ?? 0));
+
+      const total = rows.reduce((s2, r) => s2 + r.amount, 0);
+      const held = [...credit.values()].reduce((s2, v) => s2 + v, 0);
+      /* how far back the oldest one actually goes — he asked for five years
+         and the register should say whether that is the half of it */
+      const oldest = rows.reduce((a, r) => (r.bill_date && (!a || r.bill_date < a) ? r.bill_date : a), "" as string);
+      const bands = [
+        { key: "0-90", label: "under 90 days", lo: 0, hi: 90 },
+        { key: "90-180", label: "90 – 180 days", lo: 90, hi: 180 },
+        { key: "180-365", label: "180 days – a year", lo: 180, hi: 365 },
+        { key: "1-2y", label: "1 – 2 years", lo: 365, hi: 730 },
+        { key: "2-3y", label: "2 – 3 years", lo: 730, hi: 1095 },
+        { key: "3y+", label: "over 3 years", lo: 1095, hi: 99999 },
+      ].map((b) => {
+        const hit = rows.filter((r) => (r.age ?? 0) >= b.lo && (r.age ?? 0) < b.hi);
+        return { ...b, count: hit.length, amount: hit.reduce((s2, r) => s2 + r.amount, 0) };
+      });
+
+      return NextResponse.json({
+        kind, today, rows: rows.slice(0, 4000), count: rows.length, total,
+        held, creditParties: credit.size, oldest: oldest || null, bands,
+        parties: [...new Set(rows.map((r) => r.party))].sort(),
+      });
+    }
+
     if (view === "vreg") {
       const kind = url.searchParams.get("kind") === "purchase" ? "purchase" : "sales";
       const TYPES = kind === "sales" ? ["GST Sales"] : ["Purchase", "Cap-Ex Purchase", "Excise Purchase Import"];
