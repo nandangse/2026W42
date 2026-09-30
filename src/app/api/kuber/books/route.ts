@@ -1019,6 +1019,27 @@ export async function GET(req: Request) {
       const ebitda = grossProfit - indirect;
       const finance = sum(ents.finance);
       const depreciation = sum(ents.depreciation);
+      /**
+       * OPERATING EXPENSES — EVERY COST OF RUNNING THE PLACE, IN ONE LINE.
+       *
+       * Dr Raghu, 30 Sep 2026: "show OE here before depreciation which is all
+       * costs including wages and bonus, utilities, welfare expenses, all
+       * indirect expenses including finance charges, including directors
+       * remuneration."
+       *
+       * Indirect expenses and finance charges are separated above so EBITDA
+       * can be struck — that is what EBITDA means. But separating them leaves
+       * no line anywhere that answers "what does it cost to run this company
+       * for a month", and that is the number a managing director actually
+       * carries in his head. So it is added back as its own subtotal, below
+       * the pieces it is made of and above depreciation, which is not a cost
+       * of running anything.
+       *
+       * Salaries, welfare, directors' remuneration, rent, utilities and
+       * professional fees all sit inside the indirect root already; the only
+       * thing that had to be brought in was finance.
+       */
+      const operatingExpenses = indirect + finance;
       const netOperating = ebitda - finance - depreciation;
       const npbt = netOperating + otherIncome;
       const tax = sum(ents.tax);
@@ -1091,9 +1112,10 @@ export async function GET(req: Request) {
           line("throughput", "THROUGHPUT", throughput),
           line("manuf", "Manufacturing Expenses", manuf, ents.manuf),
           line("gross_profit", "GROSS PROFIT for the Period", grossProfit),
-          line("indirect", "Indirect Expenses", indirect, ents.indirect),
+          line("indirect", "Indirect Expenses — except finance charges", indirect, ents.indirect),
           line("ebitda", "EBITDA — Operating Profit before Interest, Depreciation & Tax", ebitda),
           line("finance", "Finance Charges", finance, ents.finance),
+          line("oe", "OPERATING EXPENSES — all indirect including finance & directors", operatingExpenses, [...ents.indirect, ...ents.finance]),
           line("depreciation", "Depreciation", depreciation, ents.depreciation),
           line("net_operating", "Net Operating Profit", netOperating),
           line("other_income", "Other Income", otherIncome, ents.otherIncome),

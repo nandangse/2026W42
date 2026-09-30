@@ -1147,8 +1147,8 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
   const toggle = (k: string) => setOpenLines((o) => ({ ...o, [k]: !o[k] }));
   if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
 
-  const BOLD = new Set(["revenue", "tvc", "throughput", "gross_profit", "ebitda", "net_operating", "npbt", "npat"]);
-  const TINT: Record<string, string> = { throughput: "#EEF1FA", gross_profit: "#FBF3E4", ebitda: "#E7F5EC", npat: "#E7F5EC" };
+  const BOLD = new Set(["revenue", "tvc", "throughput", "gross_profit", "ebitda", "oe", "net_operating", "npbt", "npat"]);
+  const TINT: Record<string, string> = { throughput: "#EEF1FA", gross_profit: "#FBF3E4", ebitda: "#E7F5EC", oe: "#F3F0FA", npat: "#E7F5EC" };
 
   return (
     <div style={{ maxWidth: 940 }}>

@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.6.3",
+    date: "2026-09-30",
+    module: "What it costs to run the place, in one line",
+    items: [
+      "<b>OPERATING EXPENSES</b> \u2014 a new subtotal below the pieces it is made of and above depreciation: <b>all indirect expenses plus finance charges</b>. Salaries and bonus, utilities, welfare, rent, professional fees and directors\u2019 remuneration all sit inside the indirect root already; finance was the only thing that had to be brought in.",
+      "<b>Why it needed adding at all.</b> Indirect and finance are separated further up so EBITDA can be struck \u2014 that is what EBITDA means. But separating them left no line anywhere answering <i>what does it cost to run this company for a month</i>, which is the number a managing director actually carries in his head. Depreciation stays out: it is not a cost of running anything.",
+      "<b>And the line above it now says what it is:</b> <i>Indirect Expenses \u2014 except finance charges</i>. It was labelled as though it held everything indirect while finance had already been lifted out of it two lines down.",
+    ],
+  },
+  {
     v: "5.9.6.2",
     date: "2026-09-30",
     module: "The supplier card reads across, and remembers twelve months",
