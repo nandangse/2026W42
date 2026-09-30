@@ -816,10 +816,28 @@ export async function GET(req: Request) {
           if (!amt) continue;
           const e = { ledger: name, group: grp, root, amount: amt };
           const rootN = stripNo(root);
-          if (/sales|direct income/i.test(rootN) && !/purchase/i.test(rootN)) ents.sales.push(e);
+          /**
+           * "INDIRECT EXPENSES" CONTAINS "DIRECT EXPENSE".
+           *
+           * Dr Raghu, 30 Sep 2026: "indirect expense should be coming below
+           * gross profit." It was not, and the reason was a substring: the
+           * manufacturing test read /manufacturing|direct expense/, and
+           * In-DIRECT EXPENSE-s matches it. Every indirect cost — Rs 6.41 Cr
+           * of salaries, rent, professional fees — was swept above the gross
+           * profit line into Manufacturing, and the Indirect Expenses line
+           * below it showed zero.
+           *
+           * The totals still reached the same EBITDA, which is exactly why it
+           * survived: the only two figures it broke were Gross Profit and
+           * Throughput, and both looked plausible.
+           *
+           * INDIRECT IS NOW TESTED FIRST, and "direct expenses" is anchored
+           * so it can only match a root that IS direct expenses.
+           */
+          if (/sales|direct income/i.test(rootN) && !/purchase|indirect/i.test(rootN)) ents.sales.push(e);
           else if (/purchase/i.test(rootN)) ents.purchases.push({ ...e, amount: -amt });
-          else if (/manufacturing|direct expense/i.test(rootN)) ents.manuf.push({ ...e, amount: -amt });
           else if (/indirect income/i.test(rootN)) ents.otherIncome.push(e);
+          else if (/manufacturing/i.test(rootN) || /^direct expenses?$/i.test(rootN.trim())) ents.manuf.push({ ...e, amount: -amt });
           else if (/indirect expense|expense/i.test(rootN)) {
             // finance, depreciation and tax step out of the indirect lump
             const hay = (grp + " " + name).toLowerCase();

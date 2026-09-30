@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.6.1",
+    date: "2026-09-30",
+    module: "\u201cIndirect Expenses\u201d contains \u201cdirect expense\u201d",
+    items: [
+      "<b>Every indirect cost was being counted as a manufacturing one.</b> <i>\u201cIndirect expense should be coming below gross profit.\u201d</i> It was not \u2014 and the reason was a substring. The test read <code>/manufacturing|direct expense/</code>, and <b>In<i>direct Expense</i>s matches it</b>. \u20b96.41 Cr of salaries, rent and professional fees was swept above the Gross Profit line into Manufacturing, and the Indirect Expenses line beneath showed \u20b90.00.",
+      "<b>Gross Profit was understated by the whole of it</b> \u2014 \u20b910.73 Cr where it should read about \u20b917.15 Cr \u2014 and Manufacturing Expenses overstated by the same. <b>EBITDA was right throughout</b>, which is precisely why it survived: the error moved a cost from one side of a subtotal to the other, so the bottom line never moved and nothing looked wrong.",
+      "<b>Indirect is now tested before manufacturing, and \u201cdirect expenses\u201d is anchored</b> so it can only match a root that IS direct expenses. Every root was walked through the classifier afterwards to prove where it lands \u2014 Direct Expenses still reaches Manufacturing, which is the thing an anchor could easily have broken.",
+    ],
+  },
+  {
     v: "5.9.6.0",
     date: "2026-09-30",
     module: "Pending tasks, one job to a page \u2014 and two sides that stop being netted",
