@@ -27,7 +27,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import {
   AUDIT_STATUS, STATUS_TONE, properName, overdue, readAmount,
-  AUDIT_RAISERS, AUDIT_CLOSERS,
+  AUDIT_RAISERS, AUDIT_CLOSERS, aiSummary,
   type AuditRow, type AuditEvent,
 } from "@/lib/audit-query";
 import { today, fmtFull } from "@/lib/schedule";
@@ -186,6 +186,16 @@ export default function AuditQueries({ isOwner }: { isOwner: boolean }) {
                     <td onClick={() => setEdit(r)} title="Click to edit" style={{ padding: "5px 8px", maxWidth: 420, lineHeight: 1.4, cursor: "text" }}>
                       {String(r.instruction || "").slice(0, 220)}{String(r.instruction || "").length > 220 ? "…" : ""}
                       {r.remarks && <div style={{ color: C.green, fontSize: 11, marginTop: 2 }}>↳ {String(r.remarks).slice(0, 140)}</div>}
+                      {/* GENIE'S READING, IN ONE LINE (Dr Raghu, 30 Sep 2026:
+                          "show summary in this"). A sparkle saying a reading
+                          exists is not the same as being able to see what it
+                          said \u2014 the whole point of scanning this list is to
+                          know which queries you can answer without opening. */}
+                      {!!r.ai_note && (
+                        <div style={{ color: "#3C4E63", fontSize: 11, marginTop: 3, lineHeight: 1.45, display: "flex", gap: 4 }}>
+                          <span>&#10024;</span><span>{aiSummary(r.ai_note)}</span>
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: "5px 8px", whiteSpace: "nowrap", textAlign: "right" }}>
                       {r.amount != null
@@ -206,9 +216,6 @@ export default function AuditQueries({ isOwner }: { isOwner: boolean }) {
                         read. It edits every field of the query \u2014 the ledger,
                         the wording, the amount, who it is for. */}
                     <td style={{ padding: "5px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
-                      {/* a query Genie has already read says so, so nobody
-                          spends the tokens twice to learn the same thing */}
-                      {r.ai_note && <span title="Genie has read this one — open it to see" style={{ marginRight: 6, fontSize: 12 }}>&#10024;</span>}
                       <button onClick={() => setEdit(r)} title="Edit this query — the wording, the ledger, the amount, who it is for"
                         className="rounded"
                         style={{ color: C.accent, fontWeight: 700, fontSize: 13, border: `1px solid ${C.line}`, background: "#fff", padding: "2px 7px", lineHeight: 1.2 }}>

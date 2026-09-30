@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.7.3",
+    date: "2026-09-30",
+    module: "Genie's reading, in the row",
+    items: [
+      "THE SUMMARY STANDS IN THE LIST, not just a sparkle saying a reading exists. The whole point of scanning two hundred and sixty-nine open queries is to know which ones can be answered without opening them, and an icon that only says \"there is something here\" does not help with that. Genie is now asked to open with one sentence of at most twenty words \u2014 what the query comes down to and what to do about it \u2014 and that line sits under the query in the row.",
+      "Readings written before this still show a summary: their own first sentence, cut cleanly at a sentence end. Never worse than showing nothing.",
+    ],
+  },
+  {
     v: "5.9.7.2",
     date: "2026-09-30",
     module: "Read the books again",

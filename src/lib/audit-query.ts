@@ -156,3 +156,27 @@ export function overdue(rows: AuditRow[], today: string): AuditRow[] {
     return new Date(`${r.assigned_on}T00:00:00Z`).getTime() < cut;
   });
 }
+
+/**
+ * THE ONE LINE OF GENIE'S READING THAT FITS IN A ROW.
+ *
+ * Dr Raghu, 30 Sep 2026: "show summary in this" \u2014 a sparkle saying a
+ * reading EXISTS is not the same as being able to see what it said. Genie is
+ * asked to open with a SUMMARY: line for exactly this; anything written
+ * before that instruction, or any answer that ignores it, falls back to its
+ * own first sentence, which is never worse than showing nothing.
+ */
+export function aiSummary(note: string | null | undefined): string {
+  const t = String(note || "").trim();
+  if (!t) return "";
+  /* markdown comes off first \u2014 a heading wearing ** is still a heading */
+  const plain = (l: string) => l.replace(/[*_`#]+/g, "").trim();
+  const m = t.match(/^\s*[*_#\s]*SUMMARY\s*:\s*(.+)$/im);
+  if (m) return plain(m[1]).slice(0, 220);
+  const isHeading = (l: string) => !l || (l.length < 60 && l === l.toUpperCase() && /[A-Z]/.test(l));
+  const first = t.split("\n").map(plain).find((l) => !isHeading(l)) || "";
+  /* a sentence if there is one inside a readable length; otherwise a clean cut */
+  const stop = first.match(/^(.{20,180}?[.!?])(\s|$)/);
+  if (stop) return stop[1];
+  return first.length > 150 ? first.slice(0, 150).replace(/\s+\S*$/, "") + "\u2026" : first;
+}
