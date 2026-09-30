@@ -65,6 +65,11 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
   if (!s) return <div className="text-sm" style={{ color: MUTED }}>Reading the books…</div>;
   const stale = !s.loadedAt;
   const days = Math.max(1, Math.round((new Date(s.today).getTime() - new Date(s.since).getTime()) / 86400000));
+  /* the period in words, so a Sales card cannot be read for the wrong months */
+  const periodWords = period === "ytd" ? `since 1 April (${days} days)`
+    : period === "mtd" ? `this month (${days} days)`
+    : period === "qtd" ? `this quarter (${days} days)`
+    : `last ${period} days`;
   const FLOW_ROWS: [string, string, string][] = [
     ["billing", "Billing", "GST Sales invoices — proformas excluded"],
     ["collections", "Collections", "receipts landing on customer accounts"],
@@ -87,8 +92,19 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
         </div>
       )}
 
-      {/* money owed and owing — gross first, advances named as what they are */}
+      {/* THE TWO CHAINS, EACH READ LEFT TO RIGHT (Dr Raghu, 30 Sep 2026:
+          "show first cell as Sales, then Receivables and then advances \u2014
+          The Purchase then Payables and then Advance to suppliers").
+
+          The cards were ordered by what they were: money owed, then money
+          held, then the bank. Read that way, the customer story and the
+          supplier story were interleaved and neither could be followed. In
+          his order each row is one chain from beginning to end \u2014 what we
+          billed, what is still to come in, what came in early; what we
+          bought, what is still to go out, what went out early. */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
+        <Card label={`SALES \u2014 ${periodWords.toUpperCase()}`} value={fmtMoney(s.flows?.billing?.value || 0)}
+          sub={`${s.flows?.billing?.count || 0} GST Sales invoices \u00b7 proformas excluded \u00b7 follows the period chips below`} color={INK} />
         {/* TWO SEPARATE THINGS, NO NET (Dr Raghu, 30 Sep 2026: "there is no
             purpose of nett recievable!!!"). Netting a customer who owes us
             against a different customer whose money we hold describes
@@ -97,10 +113,14 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
           sub={`${s.receivable.owingParties} customers in debit · real invoices only, proformas excluded`} color="var(--blue)" />
         <Card label="ADVANCES FROM CUSTOMERS" value={fmtMoney(s.receivable.held)}
           sub={`${s.receivable.creditParties} customers in credit · work owed against money held`} color="#1B6B93" />
+
+        <Card label={`PURCHASES \u2014 ${periodWords.toUpperCase()}`} value={fmtMoney(s.flows?.purchases?.value || 0)}
+          sub={`${s.flows?.purchases?.count || 0} Purchase \u00b7 Cap-Ex \u00b7 Import vouchers \u00b7 follows the period chips below`} color={INK} />
         <Card label="PAYABLES" value={fmtMoney(s.payable.owed)}
           sub={`${s.payable.owingParties} suppliers in credit · what we owe`} color="var(--blue)" />
         <Card label="ADVANCES PAID TO SUPPLIERS" value={fmtMoney(s.payable.held)}
           sub={`${s.payable.creditParties} suppliers · money out, goods awaited`} color="#1B6B93" />
+
         {/* AN OVERDRAFT IS NOT CASH. The CC account carried 5.39 Cr of the
             5.44 Cr this card used to show. */}
         <Card label="BANK & CASH" value={fmtMoney(s.bankCash || 0)} sub="bank and cash ledgers only — the overdraft is borrowing, not cash" color={(s.bankCash || 0) >= 0 ? GREEN : RED} />
@@ -131,7 +151,7 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
             style={{ width: 160, accentColor: "var(--accent)" }}
             title="Slide for any number of days" />
           <span className="text-xs tnum font-bold" style={{ color: INK }}>
-            {period === "ytd" ? `since 1 April (${days} days)` : period === "mtd" ? `this month (${days} days)` : period === "qtd" ? `this quarter (${days} days)` : `last ${period} days`}
+            {periodWords}
           </span>
         </div>
         <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>

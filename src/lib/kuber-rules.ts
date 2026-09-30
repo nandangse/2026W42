@@ -168,7 +168,7 @@ export function classifyLedger(c: LedgerCtx): { bucket: Bucket; rule: Rule } {
 }
 
 /* ------------------------------------------------------------------ *
- *  LADDER TWO — which of the eleven operating-expense heads
+ *  LADDER TWO — which of the twelve operating-expense heads
  * ------------------------------------------------------------------ */
 
 /**
@@ -176,13 +176,19 @@ export function classifyLedger(c: LedgerCtx): { bucket: Bucket; rule: Rule } {
  * ensure that you put the right ledgers in this and all are in the same."
  *
  * Tally's chart gives thirty-six groups under the indirect and finance roots,
- * ordered by nothing in particular. That is a bookkeeper's list. These eleven
- * are a managing director's, and the last one is a catch — so the eleven
- * always add back to the operating-expense total exactly, whatever new
- * ledgers get opened next month.
+ * ordered by nothing in particular. That is a bookkeeper's list. These are a
+ * managing director's, and the last one is a catch — so they always add back
+ * to the operating-expense total exactly, whatever new ledgers get opened
+ * next month.
+ *
+ * It began as eleven. Directors' remuneration joined the same day (30 Sep
+ * 2026, "yes directors remunerations also needs to add in OE") because the
+ * catch-all had become the hiding place for the one line a board asks about
+ * first. That is the test for a new rung: not how big it is, but whether
+ * somebody would ask about it by name.
  */
 export const OE_HEADS = [
-  "Labour Salaries", "Staff Salaries", "Consultant Salaries", "Consultancies",
+  "Labour Salaries", "Staff Salaries", "Consultant Salaries", "Directors' Remuneration", "Consultancies",
   "Finance Costs", "Bank Charges", "Utilities", "Rent & Others",
   "Marketing Expenses", "Sales Promotion", "Other OE",
 ] as const;
@@ -193,6 +199,13 @@ export interface OeRule { id: string; head: OeHead; says: string; why?: string; 
 const isPay = (g: string) => /salar|allowance|bonus|exgratia|gratuity|contribution to funds|welfare|site allowance|payment & provision to employee|wages/.test(g);
 
 export const OE_RULES: OeRule[] = [
+  {
+    id: "directors",
+    head: "Directors' Remuneration",
+    says: "What the directors are paid.",
+    why: "Dr Raghu, 30 Sep 2026: \"yes directors remunerations also needs to add in OE.\" It was falling into Other OE for want of a head, which made it the largest single thing hidden inside a catch-all \u2014 and what the owners draw is exactly the line a board asks about first. It is now its own rung, tested before every other, so no broader test can reach it.",
+    test: (g, l) => /directors?\s*remun/.test(g) || /directors?\s*remun/.test(l),
+  },
   {
     id: "labour",
     head: "Labour Salaries",
@@ -259,8 +272,8 @@ export const OE_RULES: OeRule[] = [
   {
     id: "other_oe",
     head: "Other OE",
-    says: "Everything left — named so rather than hidden. Directors' remuneration, travelling, motor car, printing, exchange differences and sundries.",
-    why: "The eleven heads have no line for directors' remuneration, so it lands here. It is the largest single thing in this head; ask and it becomes a twelfth.",
+    says: "Everything left — named so rather than hidden. Travelling, motor car, printing, exchange differences and sundries.",
+    why: "A catch-all earns its place only if it stays small and stays openable. Directors' remuneration used to sit here and no longer does; if anything else in this head grows large enough to be asked about, it deserves a rung of its own too.",
     test: () => true,
   },
 ];

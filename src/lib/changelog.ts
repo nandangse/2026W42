@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.7.1",
+    date: "2026-09-30",
+    module: "Directors' Remuneration gets its own line",
+    items: [
+      "DIRECTORS' REMUNERATION IS NOW A HEAD OF ITS OWN in operating expenses \u2014 Rs 37.50 L for Apr\u2013Sep, against Rs 40.42 L for everything else left in Other OE put together. It had been falling into the catch-all for want of a head, which made what the owners draw the largest single thing hidden inside it, and that is the line a board asks about first.",
+      "Other OE halves as a result, from Rs 77.92 L to Rs 40.42 L, and reads as what it is meant to be \u2014 travelling, motor car, exchange differences and sundries. The twelve heads still add back to the operating-expense total to the paisa; that is checked, not assumed.",
+      "The rule is tested before every other, so no broader test can reach it \u2014 and it catches Tally's own spelling, \"Remunaration\".",
+      "THE DASHBOARD READS AS TWO CHAINS NOW: Sales \u2192 Receivables \u2192 Advances from customers, then Purchases \u2192 Payables \u2192 Advances paid to suppliers. The cards used to be grouped by what they were \u2014 money owed, money held, the bank \u2014 which interleaved the customer story and the supplier story so neither could be followed. Each row is now one chain from beginning to end: what we billed, what is still to come in, what came in early. The two new cards follow the same period chips as the flows below and say so.",
+    ],
+  },
+  {
     v: "5.9.7.0",
     date: "2026-09-30",
     module: "An audit query becomes a conversation",
