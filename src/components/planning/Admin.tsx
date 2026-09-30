@@ -142,7 +142,45 @@ function HourlyFromErp() {
       const notes = [r.note, ...(r.notes || [])].filter(Boolean).join(" · ");
       setPullMsg(`${r.ok === false || r.pushFailed ? "!" : ""}${bits || "The pass ran and reported no counts."}${notes ? ` — ${notes}` : ""}`);
       load();
-    } catch (e) { setPullMsg("!" + (e instanceof Error ? e.message : String(e))); }
+    } catch (e) {
+      /**
+       * A DEAD CONNECTION IS NOT A FAILED PASS.
+       *
+       * The pull takes half a minute or more, and a request that long dies
+       * for reasons that have nothing to do with the ERP — a deploy swapping
+       * the function underneath it, a phone changing network, a proxy giving
+       * up. The browser reports "Failed to fetch", and on 30 September it
+       * said exactly that twice while the server had in fact finished both
+       * passes and moved a job from Painting to Final Inspection.
+       *
+       * Telling somebody the opposite of what happened is worse than telling
+       * them nothing: he presses it again, and again, against work that is
+       * already done. So when the fetch itself dies rather than the route
+       * answering, the ledger is asked what actually ran.
+       */
+      const said = e instanceof Error ? e.message : String(e);
+      const dropped = /failed to fetch|networkerror|load failed|network request failed|aborted/i.test(said);
+      if (dropped) {
+        setPullMsg("The connection dropped — asking Genie what actually ran…");
+        try {
+          const j = await api.get("/api/erp-hourly") as { lastRun?: { at: string; ok: boolean; error: string; summary: string } };
+          const r = j.lastRun;
+          if (r && Date.now() - Date.parse(r.at) < 15 * 60 * 1000) {
+            setPullMsg(r.ok
+              ? `The connection dropped, but the pass DID run — ${r.summary}. Nothing is stuck; there is no need to press it again.`
+              : `!The pass ran and failed: ${r.error || "no reason recorded"}.`);
+            load();
+            setBusy("");
+            return;
+          }
+          setPullMsg(`!${said} — and no pass is recorded in the last fifteen minutes, so it did not start. Try again.`);
+        } catch {
+          setPullMsg(`!${said} — and Genie could not be reached either, so the network is the problem, not the ERP.`);
+        }
+      } else {
+        setPullMsg("!" + said);
+      }
+    }
     setBusy("");
   };
 

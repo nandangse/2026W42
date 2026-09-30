@@ -89,6 +89,22 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.3.0",
+    date: "2026-09-30",
+    module: "The QR page writes back, and the picture reads on a phone",
+    items: [
+      "<b>The page the QR opens can now be changed, not just read.</b> The man who knows production is at sixty is standing at the machine with the code he has just scanned; every minute between his knowing it and its being in Genie is a minute the board is wrong, and the walk back to a desk is where most of those minutes went. <b>Kitting and production are tapped, not typed</b> \u2014 the same ten blocks the printed board carries, so he taps the one he has reached \u2014 with a box for a figure that is not a round ten.",
+      "<b>Status is one row and a dropdown</b>, and the choices are the board\u2019s own vocabulary read from the data, so the list cannot drift from what the ERP sends.",
+      "<b>The Current Update is editable, and what it said before is kept.</b> The line is prose \u2014 <i>W30 : Ord rcd</i>, then <i>W36 : panels at paint</i> \u2014 and the prose is the record. Overwriting it used to lose the only account of how the job actually went; each edit now pushes the old line onto <b>Past updates</b>, newest first. <b>Needs migration 0176.</b>",
+      "<b>Every edit here posts to the same route the lightbox uses</b>, so the permission, the ERP queue and the history are one code path \u2014 <b>planning and admin only</b>, and the pencil is not shown to anybody the server would refuse. A phone screen with a write path of its own is how two systems start disagreeing about one job.",
+      "<b>Add photo and Add recording</b>, straight from the camera rather than the gallery \u2014 the point is the machine in front of him. <b>The owners are on the page</b>, and <b>Pending tasks sits under the tiles</b> with an Add task button and everything open on the job. The duplicate Kitting % and Production % tiles are gone.",
+      "<b>The WhatsApp picture is two columns of boxes now</b>, which halves its height on the phone it is actually read on, and the date moves up beside the job number where the eye goes first. The banner is smaller, the strapline is gone, and <b>the page is cut to its content</b> instead of a fixed 1620 \u2014 no hand\u2019s width of blank paper on a light week.",
+      "<b>\u201cNext 20 going out\u201d now counts what is drawn beneath it.</b> It read <i>3</i> over a page of eleven jobs, because the figure came from the seven-day board on screen while the boxes came from a four-week sweep \u2014 two different questions under one label. The <i>nothing past due</i> line is gone: a zero announced in thirty-four point type is a line that says nothing loudly.",
+      "<b>\u201cFailed to fetch\u201d on the ERP pull no longer means it failed.</b> The pass takes half a minute or more, and a request that long dies for reasons that have nothing to do with the ERP \u2014 a deploy swapping the function underneath it, a phone changing network, a proxy giving up. This morning it said that twice while the server had finished <b>both</b> passes and moved a job from <i>P: Painting Stage</i> to <i>Q: Final Inspection</i>. Telling somebody the opposite of what happened is worse than telling them nothing, so when the connection dies the button now <b>asks the sync ledger what actually ran</b> and says so.",
+      "<b>Migration 0177 makes labour IDP-only.</b> Nobody granted Planning to sixty-seven workmen \u2014 0161 seeded it from everyone who could open the board on the day Planning became a door, which was everyone with a login. They keep <i>/idp</i>, which is their own attendance, payslip and appraisal; what goes is other men\u2019s jobs, customers, values and dates.",
+    ],
+  },
+  {
     v: "5.9.2.2",
     date: "2026-09-30",
     module: "The vehicle numbers, the owners' names, and a log you can read",

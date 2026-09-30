@@ -269,35 +269,42 @@ function DeliveryBoard({ jobs, board, onOpen, V, reload, canEdit, isStrat }: {
                 owner: ownerOf(j), colour: ownerColour(ownerOf(j)),
                 lateDays: j.tdd && j.tdd < TODAY ? Math.abs(daysBetween(TODAY, j.tdd)) : 0,
               });
+              /* THE PICTURE ALWAYS CARRIES TWENTY (Dr Raghu, 30 Sep 2026:
+                 "always show the next 20. this fits into one page jpeg"),
+                 whatever the board on screen happens to be showing — the two
+                 are answering different questions. Looked as far ahead as it
+                 needs to, rather than stopping at the visible week. */
+              const horizon = nextDays(TODAY, 60);
+              const nextOut: Job[] = [];
+              const runDays: { date: string; label: string; weekday: string; jobs: ReturnType<typeof toRun>[] }[] = [];
+              for (const d of horizon) {
+                if (nextOut.length >= 20) break;
+                const on = jobs.filter((j) => j.tdd === d).slice(0, 20 - nextOut.length);
+                if (!on.length) continue;
+                nextOut.push(...on);
+                runDays.push({ date: d, label: dayHead(d).day, weekday: dayHead(d).weekday, jobs: on.map(toRun) });
+              }
               const url = await runJpg(
                 TODAY,
                 past.map(toRun),
-                /* THE PICTURE ALWAYS CARRIES TWENTY (Dr Raghu, 30 Sep 2026:
-                   "always show the next 20. this fits into one page jpeg"),
-                   whatever the board on screen happens to be showing — the
-                   two are answering different questions. */
-                (() => {
-                  const horizon = nextDays(TODAY, 28);
-                  const out: { date: string; label: string; weekday: string; jobs: ReturnType<typeof toRun>[] }[] = [];
-                  let left = 20;
-                  for (const d of horizon) {
-                    if (left <= 0) break;
-                    const on = jobs.filter((j) => j.tdd === d).slice(0, left);
-                    if (!on.length) continue;
-                    left -= on.length;
-                    out.push({ date: d, label: dayHead(d).day, weekday: dayHead(d).weekday, jobs: on.map(toRun) });
-                  }
-                  return out;
-                })(),
+                runDays,
                 totalTp / 1e7,
                 /* The whole board, and the next twenty going out — the size
                    of the book and the size of the next bite of it. */
+                /**
+                 * THE HEADLINE IS TOTALLED FROM THE VERY ROWS DRAWN.
+                 *
+                 * It read "Next 20 going out  3" over a page of eleven jobs:
+                 * the figure came from `coming`, which is the seven-day board
+                 * on screen, while the boxes came from the sweep above. Two
+                 * different questions under one label. They are now the same
+                 * list, so the heading cannot contradict the page.
+                 */
                 (() => {
-                  const next20 = [...past, ...coming].slice(0, 20);
                   const sum = (rows: Job[], k: "val" | "tpv") => rows.reduce((a, j) => a + (Number(j[k]) || 0), 0);
                   return {
                     jobs: jobs.length, val: sum(jobs, "val"), tp: sum(jobs, "tpv"),
-                    nextJobs: next20.length, nextVal: sum(next20, "val"), nextTp: sum(next20, "tpv"),
+                    nextJobs: nextOut.length, nextVal: sum(nextOut, "val"), nextTp: sum(nextOut, "tpv"),
                   };
                 })(),
                 /**

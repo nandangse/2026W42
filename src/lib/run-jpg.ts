@@ -104,18 +104,67 @@ export async function runJpg(
   delivered: DeliveredRow[] = [],
 ): Promise<string> {
   /**
-   * TALLER, AND THE ROWS TIGHTER — because twenty must actually appear.
+   * TWO COLUMNS, AND BOXES RATHER THAN LINES (Dr Raghu, 30 Sep 2026: "try
+   * putting this into two columns. Mostly seen on mobile. so left job - right
+   * job then next line make as boxes so its more readable. let the dates also
+   * come on top").
    *
-   * Dr Raghu, 28 Sep 2026: "only 12 are seen in the jpg and NOT the 20!"
-   *
-   * At 4:5 with 58-point rows there was room for twelve, so the picture was
-   * promising twenty in its heading and showing twelve underneath. A summary
-   * that contradicts its own headline is worse than no summary. 2:3 is still
-   * one page on a phone, and a 44-point row still holds two lines.
+   * A full-width row wastes two thirds of its width on a tag that is forty
+   * characters long, and on a phone the page then runs past the fold. Two
+   * boxes to a row halves the height, and the date moves up beside the job
+   * number where it is read first — which is what the picture is about.
    */
-  const W = 1080, H = 1620, PAD = 34;
-  const rowH = 44;
-  const colTitle = 34;
+  const W = 1080, PAD = 34;
+  const GAP = 12;
+  const colW = (W - PAD * 2 - GAP) / 2;
+  const boxH = 84, boxGap = 10;
+  const headH = 32, headGap = 8;
+
+  /* THE BANNER, SMALLER (his instruction). It was taking a sixth of the page
+     to say a thing everybody in the group already knows. */
+  let banner: HTMLImageElement | null = null;
+  let bannerH = 0;
+  try {
+    banner = await loadImage(BREAKTHROUGH);
+    if (banner) bannerH = Math.round((banner.height / banner.width) * 340) + 12;
+  } catch { /* the picture stands without it */ }
+
+  /**
+   * WHAT WILL BE SHOWN IS DECIDED BEFORE THE PAGE IS SIZED.
+   *
+   * The canvas used to be a fixed 1620 and the content was cut to fit it,
+   * which left a hand's width of blank paper whenever the week was light.
+   * Deciding the content first and then cutting the paper to it gives one
+   * page either way, with nothing dangling and nothing padded.
+   */
+  const CAP = 20;
+  const shownDays: RunDay[] = [];
+  let left = CAP;
+  for (const d of week) {
+    if (left <= 0) break;
+    if (!d.jobs.length) continue;
+    const take = d.jobs.slice(0, left);
+    left -= take.length;
+    shownDays.push({ ...d, jobs: take });
+  }
+  const comingShown = shownDays.reduce((a, d) => a + d.jobs.length, 0);
+  const comingTotal = week.reduce((a, d) => a + d.jobs.length, 0);
+  /* Late work is never hidden, but it no longer takes half the page: eight
+     boxes is four rows, and the rest is counted at the foot. */
+  const pastShown = past.slice(0, 8);
+
+  const blockH = (n: number) => headH + headGap + Math.ceil(n / 2) * (boxH + boxGap) + 10;
+  const bandH = 280;
+  const headerH = bannerH + bandH;
+  const sumsH = 2 * 48 + 10;
+  /* THE HEADLINE LINE ONLY WHEN THERE IS SOMETHING TO HEAD (his instruction:
+     "nothing past due line is irrelevant"). A zero announced in thirty-four
+     point type is a line that says nothing loudly. */
+  const headlineH = past.length ? 42 : 0;
+  const bodyH = (past.length ? blockH(pastShown.length) : 0)
+    + shownDays.reduce((a, d) => a + blockH(d.jobs.length), 0);
+  const FOOT = 42;
+  const H = Math.round(headerH + sumsH + headlineH + bodyH + FOOT);
 
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
@@ -124,53 +173,29 @@ export async function runJpg(
   const F = (px: number, w = "400") => `${w} ${px}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
 
   x.fillStyle = C.paper; x.fillRect(0, 0, W, H);
-
-  /**
-   * THE BREAKTHROUGH BANNER (Dr Raghu, 30 Sep 2026: "put Nandan Breakthrough
-   * Image in the top"). On its own white strip, because the artwork carries a
-   * white ground and would print as a white block on the navy.
-   *
-   * Drawn from a data URI held in the source: an <img> fetched at draw time
-   * that has not finished loading draws as nothing at all, and a banner that
-   * is sometimes there is worse than one that always is.
-   */
-  let bannerH = 0;
-  try {
-    const img = await loadImage(BREAKTHROUGH);
-    if (img) {
-      const bw = Math.min(560, W - PAD * 2);
-      bannerH = Math.round((img.height / img.width) * bw) + 14;
-      x.drawImage(img, (W - bw) / 2, 8, bw, bannerH - 14);
-    }
-  } catch { /* the picture stands without it */ }
+  if (banner) x.drawImage(banner, (W - 340) / 2, 6, 340, bannerH - 12);
 
   // ---- the header band -----------------------------------------------
-  x.fillStyle = C.navy; x.fillRect(0, bannerH, W, 300);
+  /* The strapline above the date is gone (his instruction): the banner
+     directly above it already says whose picture this is. */
+  x.fillStyle = C.navy; x.fillRect(0, bannerH, W, bandH);
   const t = d0(today);
-  x.fillStyle = "#8FA1B3"; x.font = F(19, "700");
-  x.fillText("NANDAN GSE · DELIVERY RUN", PAD, bannerH + 32);
   x.fillStyle = "#fff"; x.font = F(40, "700");
-  x.fillText(`${LONG_DAY[t.getDay()]}, ${t.getDate()} ${LONG_MON[t.getMonth()]} ${t.getFullYear()}`, PAD, bannerH + 78);
+  x.fillText(`${LONG_DAY[t.getDay()]}, ${t.getDate()} ${LONG_MON[t.getMonth()]} ${t.getFullYear()}`, PAD, bannerH + 58);
 
   /**
    * THE THREE CLOCKS — how much of the period is gone, what went out in it,
    * and the rate that produced it.
    *
-   * Dr Raghu, 29 Sep 2026: "show number of jobs also for each box. Also
-   * mention 182 days done 183 left for each box. Below each period stats
-   * also show the Run rate for each period of nos, value, T."
-   *
-   * THE RATE IS PER MONTH, for all three. It is the unit he already reads
-   * the year report in — "₹10.02 Cr per month" — and a rate stated per day
-   * in crores is a number nobody can hold in their head. The month's own box
-   * is a rate per month computed from part of a month, which is the point:
-   * it says what THIS month is running at, not what it has reached.
+   * THE RATE IS PER MONTH, for all three. It is the unit the year report is
+   * already read in, and a rate stated per day in crores is a number nobody
+   * can hold in their head.
    */
   const cl = clocks(today);
   const cw = (W - PAD * 2 - 24) / 3;
   cl.forEach((c, i) => {
-    const cx = PAD + i * (cw + 12), cy = bannerH + 94;
-    const left = c.total - c.done;
+    const cx = PAD + i * (cw + 12), cy = bannerH + 78;
+    const daysLeft = c.total - c.done;
     x.fillStyle = "rgba(255,255,255,.08)"; roundRect(x, cx, cy, cw, 176, 8); x.fill();
     x.fillStyle = "#8FA1B3"; x.font = F(15, "700");
     x.fillText(c.label.toUpperCase(), cx + 14, cy + 22);
@@ -180,7 +205,7 @@ export async function runJpg(
     x.fillText(`${c.done}`, cx + 14, cy + 50);
     const dw = x.measureText(`${c.done}`).width;
     x.fillStyle = "#8FA1B3"; x.font = F(14);
-    x.fillText(`days done  ·  ${left} left`, cx + 20 + dw, cy + 50);
+    x.fillText(`days done  ·  ${daysLeft} left`, cx + 20 + dw, cy + 50);
 
     x.fillStyle = "rgba(255,255,255,.16)"; roundRect(x, cx + 14, cy + 60, cw - 28, 7, 4); x.fill();
     x.fillStyle = "#F0A02A"; roundRect(x, cx + 14, cy + 60, (cw - 28) * (c.done / c.total), 7, 4); x.fill();
@@ -198,20 +223,24 @@ export async function runJpg(
     x.fillText(`${n}`, px, cy + 112); px += x.measureText(`${n}`).width + 5;
     x.fillStyle = "#8FA1B3"; x.font = F(13);
     x.fillText(n === 1 ? "Job" : "Jobs", px, cy + 112); px += x.measureText(n === 1 ? "Job" : "Jobs").width + 7;
-    x.fillStyle = "#4E6377"; x.fillText("|", px, cy + 112); px += 10;
-    x.fillStyle = "#F0A02A"; x.font = F(15, "700");
+    x.fillStyle = "#6E8298"; x.font = F(13);
+    x.fillText("|", px, cy + 112); px += x.measureText("|").width + 7;
+    x.fillStyle = "#F0A02A"; x.font = F(16, "700");
     const vs = `V: ₹${(v / 1e7).toFixed(2)} Cr`;
     x.fillText(vs, px, cy + 112); px += x.measureText(vs).width + 7;
-    x.fillStyle = "#4E6377"; x.font = F(13); x.fillText("|", px, cy + 112); px += 10;
-    x.fillStyle = "#7BC67E"; x.font = F(15, "700");
+    x.fillStyle = "#6E8298"; x.font = F(13);
+    x.fillText("|", px, cy + 112); px += x.measureText("|").width + 7;
+    x.fillStyle = "#5FC98B"; x.font = F(16, "700");
     x.fillText(`T: ₹${(tp / 1e7).toFixed(2)} Cr`, px, cy + 112);
 
-    /* The rate that produced it, in the unit the year report already uses. */
-    const perMonth = c.done > 0 ? 30.44 / c.done : 0;
-    x.fillStyle = "rgba(255,255,255,.10)"; roundRect(x, cx + 10, cy + 140, cw - 20, 28, 5); x.fill();
-    x.fillStyle = "#6E8298"; x.font = F(10);
-    x.fillText("RUN RATE / MONTH", cx + 16, cy + 152);
-    x.fillStyle = "#C8D2DC"; x.font = F(12.5, "700");
+    /* THE RATE THAT PRODUCED IT. Days done, not days in the period — the
+       month's own box then says what this month is RUNNING at rather than
+       what it has reached. */
+    const perMonth = 30.44 / Math.max(1, c.done);
+    x.fillStyle = "rgba(255,255,255,.07)"; roundRect(x, cx + 12, cy + 126, cw - 24, 38, 6); x.fill();
+    x.fillStyle = "#6E8298"; x.font = F(11, "700");
+    x.fillText("RUN RATE / MONTH", cx + 16, cy + 142);
+    x.fillStyle = "#C7D3DE"; x.font = F(13, "700");
     x.fillText(
       `${(n * perMonth).toFixed(1)} jobs  ·  ₹${((v / 1e7) * perMonth).toFixed(2)} Cr  ·  ₹${((tp / 1e7) * perMonth).toFixed(2)} Cr`,
       cx + 16, cy + 165,
@@ -219,10 +248,9 @@ export async function runJpg(
   });
 
   // ---- what the board is worth ----------------------------------------
-  /* Dr Raghu, 28 Sep 2026: "Total Jobs: <> | Value | Throughput. Next 20
-     Jobs <> | Value | Throughput." The two together say the size of the book
-     and the size of the next bite of it — a count on its own says neither. */
-  let y = bannerH + 308;
+  /* The size of the book, and the size of the next bite of it — a count on
+     its own says neither. */
+  let y = bannerH + bandH + 8;
   const money = (r: number) => `₹${(r / 1e7).toFixed(2)} Cr`;
   const sumLine = (label: string, n: number, val: number, tp: number, tone: string) => {
     x.fillStyle = C.band; roundRect(x, PAD, y, W - PAD * 2, 42, 6); x.fill();
@@ -244,126 +272,122 @@ export async function runJpg(
     x.fillText(money(tp), PAD + 28 + lw + nw2 + barW + vw + barW, y + 27);
     /* The labels for the two figures, said once, on the right. */
     x.fillStyle = C.faint; x.font = F(13);
-    const t = "value  ·  throughput";
-    x.fillText(t, W - PAD - 14 - x.measureText(t).width, y + 27);
+    const lbl = "value  ·  throughput";
+    x.fillText(lbl, W - PAD - 14 - x.measureText(lbl).width, y + 27);
     y += 48;
   };
   sumLine("Pending Jobs in progress", tot.jobs, tot.val, tot.tp, C.navy);
-  sumLine("Next 20 going out", tot.nextJobs, tot.nextVal, tot.nextTp, C.accent);
+  /**
+   * THE HEADING COUNTS WHAT IS DRAWN UNDERNEATH IT.
+   *
+   * It said "Next 20 going out 3" over a page of eleven jobs, because the
+   * figure came from the seven-day board on screen while the boxes came from
+   * a four-week sweep. Two different questions, one label. The count, the
+   * value and the throughput are now totalled from the very rows below, so
+   * the headline cannot contradict the page again.
+   */
+  sumLine(
+    comingShown >= CAP ? `Next ${CAP} going out` : `Next ${comingShown} going out`,
+    comingShown, tot.nextVal, tot.nextTp, C.accent,
+  );
 
   // ---- the headline number --------------------------------------------
-  y += 8;
-  x.fillStyle = past.length ? C.red : C.green;
-  x.font = F(34, "700");
-  x.fillText(`${past.length}`, PAD, y + 12);
-  const nw = x.measureText(`${past.length}`).width;
-  x.fillStyle = C.ink; x.font = F(20);
-  x.fillText(past.length ? "  past due" : "  nothing past due", PAD + nw, y + 12);
-  if (heldCr > 0) {
-    x.fillStyle = C.sub; x.font = F(17);
-    const s = `₹${heldCr.toFixed(2)} Cr held up`;
-    x.fillText(s, W - PAD - x.measureText(s).width, y + 12);
+  if (past.length) {
+    y += 8;
+    x.fillStyle = C.red; x.font = F(34, "700");
+    x.fillText(`${past.length}`, PAD, y + 12);
+    const nw = x.measureText(`${past.length}`).width;
+    x.fillStyle = C.ink; x.font = F(20);
+    x.fillText("  past due", PAD + nw, y + 12);
+    if (heldCr > 0) {
+      x.fillStyle = C.sub; x.font = F(17);
+      const s = `₹${heldCr.toFixed(2)} Cr held up`;
+      x.fillText(s, W - PAD - x.measureText(s).width, y + 12);
+    }
+    y += 34;
   }
-  y += 34;
 
   /**
-   * HOW MANY ROWS THERE IS ROOM FOR — counted before anything is drawn.
+   * ONE BOX PER JOB, TWO TO A ROW.
    *
-   * Past due is served first because it is the part that cannot wait, then
-   * the days in order until the page is full.
+   * The date sits on the top line beside the number because it is what the
+   * eye goes to; the tag, which is long and read second, gets a line of its
+   * own underneath instead of fighting the percentages for space.
    */
-  const FOOT = 40;
-  const blocksWanted = 1 + week.filter((d) => d.jobs.length).length;
-  let room = Math.floor((H - y - FOOT - blocksWanted * (colTitle + 6)) / rowH);
-  let notShown = 0;
-  /**
-   * THE WEEK IS SERVED FIRST, UP TO TWENTY.
-   *
-   * The heading says "next 20 going out", so the twenty is the promise the
-   * picture has already made. Past due takes what is left — never nothing,
-   * because late work must always be visible, but it no longer takes half
-   * the page and leaves the twenty unshowable.
-   */
-  const comingRows = week.reduce((a, d) => a + d.jobs.length, 0);
-  const forDays = Math.min(20, comingRows, Math.max(0, room - 3));
-  const pastRoomMax = Math.max(0, room - forDays);
+  const box = (j: RunJob, bx: number, by: number) => {
+    x.fillStyle = j.colour + "14"; roundRect(x, bx, by, colW, boxH, 8); x.fill();
+    x.fillStyle = j.colour; roundRect(x, bx, by, 5, boxH, 3); x.fill();
 
-  // ---- one list per block ---------------------------------------------
+    x.fillStyle = j.colour; x.font = F(21, "700");
+    x.fillText(j.id, bx + 16, by + 28);
+    const idw = x.measureText(j.id).width;
+
+    /* THE DATE, ON TOP. */
+    const otd = j.otd
+      ? (days(today, j.otd) < 0 ? `OTD ${dm(j.otd)} · ${-days(today, j.otd)}d over` : `OTD ${dm(j.otd)} · in ${days(today, j.otd)}d`)
+      : "no OTD set";
+    x.font = F(13, "700");
+    x.fillStyle = j.otd && days(today, j.otd) < 0 ? C.red : C.sub;
+    x.fillText(otd, bx + 24 + idw, by + 28);
+
+    /* K AND P. Production alone says how far the building has got; kitting
+       says whether it can go any further. */
+    const pTxt = `P: ${j.pct}%`, kTxt = `K: ${j.kit}%`;
+    x.font = F(15, "700");
+    x.fillStyle = j.pct >= 100 ? C.green : j.pct >= 60 ? C.amber : C.red;
+    const pw = x.measureText(pTxt).width;
+    x.fillText(pTxt, bx + colW - 14 - pw, by + 52);
+    x.fillStyle = j.kit >= 80 ? C.green : j.kit >= 40 ? C.amber : C.red;
+    const kw = x.measureText(kTxt).width;
+    x.fillText(kTxt, bx + colW - 24 - pw - kw, by + 52);
+
+    x.fillStyle = C.ink; x.font = F(16);
+    x.fillText(cut(x, j.tag, colW - 40 - pw - kw), bx + 16, by + 52);
+
+    x.fillStyle = C.faint; x.font = F(13);
+    x.fillText(cut(x, j.owner, colW - 120), bx + 16, by + 73);
+    if (j.lateDays > 0) {
+      x.font = F(13, "700"); x.fillStyle = C.red;
+      const l = `${j.lateDays}d late`;
+      x.fillText(l, bx + colW - 14 - x.measureText(l).width, by + 73);
+    }
+  };
+
   const block = (title: string, sub: string, tone: string, jobs: RunJob[]) => {
-    x.fillStyle = tone; roundRect(x, PAD, y, W - PAD * 2, 30, 6); x.fill();
+    x.fillStyle = tone; roundRect(x, PAD, y, W - PAD * 2, headH, 6); x.fill();
     x.fillStyle = "#fff"; x.font = F(17, "700");
-    x.fillText(title, PAD + 12, y + 21);
-    /* MEASURED IN THE TITLE'S OWN FONT. It was measured after switching to
-       the smaller one, so the subtitle started too far left and printed on
-       top of the title. */
+    x.fillText(title, PAD + 12, y + 22);
+    /* MEASURED IN THE TITLE'S OWN FONT — measured after switching to the
+       smaller one, the subtitle printed on top of the title. */
     const tw = x.measureText(title).width;
     x.font = F(14);
     x.fillStyle = "rgba(255,255,255,.75)";
-    if (sub) x.fillText(sub, PAD + 12 + tw + 14, y + 21);
-    y += 30 + 6;
-    if (!jobs.length) {
-      x.fillStyle = C.faint; x.font = F(15);
-      x.fillText("—", PAD + 14, y + 18); y += 30;
-      return;
-    }
-    for (const j of jobs) {
-      x.fillStyle = j.colour + "14"; roundRect(x, PAD, y, W - PAD * 2, rowH - 5, 6); x.fill();
-      x.fillStyle = j.colour; roundRect(x, PAD, y, 5, rowH - 5, 3); x.fill();
-      x.fillStyle = j.colour; x.font = F(18, "700");
-      x.fillText(j.id, PAD + 16, y + 20);
-      x.fillStyle = C.ink; x.font = F(16);
-      x.fillText(cut(x, j.tag, W - PAD * 2 - 300), PAD + 82, y + 20);
-      const otd = j.otd
-        ? (days(today, j.otd) < 0 ? `OTD ${dm(j.otd)} · ${-days(today, j.otd)}d over` : `OTD ${dm(j.otd)} · in ${days(today, j.otd)}d`)
-        : "no OTD set";
-      x.font = F(13);
-      x.fillStyle = j.otd && days(today, j.otd) < 0 ? C.red : C.sub;
-      x.fillText(otd, PAD + 82, y + 36);
-      x.fillStyle = C.faint; x.font = F(13);
-      x.fillText(j.owner, PAD + 300, y + 36);
-      // per cent, right-aligned
-      /* K AND P, BOTH (Dr Raghu, 30 Sep 2026: "on the right side show K: XX %
-         P: YY%"). Production alone says how far the building has got;
-         kitting says whether it can go further. */
-      const pTxt = `P: ${j.pct}%`, kTxt = `K: ${j.kit}%`;
-      x.font = F(16, "700");
-      x.fillStyle = j.pct >= 100 ? C.green : j.pct >= 60 ? C.amber : C.red;
-      const pw = x.measureText(pTxt).width;
-      x.fillText(pTxt, W - PAD - 16 - pw, y + 20);
-      x.fillStyle = j.kit >= 80 ? C.green : j.kit >= 40 ? C.amber : C.red;
-      x.fillText(kTxt, W - PAD - 26 - pw - x.measureText(kTxt).width, y + 20);
-      if (j.lateDays > 0) {
-        x.font = F(13, "700"); x.fillStyle = C.red;
-        const l = `${j.lateDays}d late`;
-        x.fillText(l, W - PAD - 16 - x.measureText(l).width, y + 36);
-      }
-      y += rowH;
-    }
-    y += 8;
+    if (sub) x.fillText(sub, PAD + 12 + tw + 14, y + 22);
+    y += headH + headGap;
+    jobs.forEach((j, i) => {
+      const bx = PAD + (i % 2) * (colW + GAP);
+      const by = y + Math.floor(i / 2) * (boxH + boxGap);
+      box(j, bx, by);
+    });
+    y += Math.ceil(jobs.length / 2) * (boxH + boxGap) + 10;
   };
 
-  const pastRoom = Math.min(past.length, Math.max(past.length ? 1 : 0, pastRoomMax));
-  notShown += past.length - pastRoom;
-  room -= Math.min(pastRoom, past.length);
-  block("Past due", past.length > pastRoom ? `${pastRoom} of ${past.length} · oldest first` : "oldest first",
-    past.length ? C.red : C.green, past.slice(0, pastRoom));
-
-  for (const d of week) {
-    if (!d.jobs.length) continue;
-    if (room <= 0) { notShown += d.jobs.length; continue; }
-    const take = Math.min(d.jobs.length, room);
-    room -= take;
-    notShown += d.jobs.length - take;
-    block(`${d.label} · ${d.weekday}`, d.date === today ? "today" : "", C.navy, d.jobs.slice(0, take));
+  if (past.length) {
+    block("Past due", past.length > pastShown.length ? `${pastShown.length} of ${past.length} · oldest first` : "oldest first",
+      C.red, pastShown);
+  }
+  for (const d of shownDays) {
+    block(`${d.label} · ${d.weekday}`, d.date === today ? "today" : "", C.navy, d.jobs);
   }
 
+  const notShown = (past.length - pastShown.length) + (comingTotal - comingShown);
   x.fillStyle = C.faint; x.font = F(14);
-  x.fillText(`Genie · as at ${dm(today)}-${d0(today).getFullYear()}`, PAD, H - 22);
+  x.fillText(`Genie · as at ${dm(today)}-${d0(today).getFullYear()}`, PAD, H - 20);
   if (notShown > 0) {
     /* Said, not silently dropped. */
     const m = `${notShown} more not shown — open Genie for the rest`;
     x.fillStyle = C.sub;
-    x.fillText(m, W - PAD - x.measureText(m).width, H - 22);
+    x.fillText(m, W - PAD - x.measureText(m).width, H - 20);
   }
 
   return cv.toDataURL("image/jpeg", 0.92);

@@ -4,6 +4,7 @@ import { errJson, HttpError, requireUser } from "@/lib/auth";
 import { readBody } from "@/lib/validate";
 import { ERP_DOCS, isOn } from "@/lib/erp-hourly";
 import { ERP_HANDS_WITH_FILES } from "@/lib/erp-hands";
+import { swallow } from "@/lib/swallow";
 
 export const dynamic = "force-dynamic";
 
@@ -44,10 +45,47 @@ export async function GET() {
   try {
     await hand();
     const s = await read();
+    /**
+     * THE LAST PASS, WHATEVER HAPPENED TO THE BROWSER'S REQUEST.
+     *
+     * The pull takes half a minute or more, and a request that long dies for
+     * reasons that have nothing to do with the pass — a phone changing
+     * network, a deploy swapping the function underneath it, a proxy giving
+     * up. The browser then says "Failed to fetch" while the server has in
+     * fact finished the work, which is the worst thing a status message can
+     * do: report the opposite of the truth.
+     *
+     * So the screen can always ask the ledger what actually ran, instead of
+     * concluding anything from a broken connection.
+     */
+    let lastRun: { at: string; ok: boolean; by: string; error: string; summary: string } | null = null;
+    try {
+      const { data } = await adminClient()
+        .from("erp_sync_log")
+        .select("at, ok, by, error, jobs_changed, proj_changed, deliv_changed, jobs_new, deliv_new")
+        .order("at", { ascending: false }).limit(1).maybeSingle();
+      if (data) {
+        const r = data as Record<string, unknown>;
+        const n = (k: string) => Number(r[k]) || 0;
+        const moved = [
+          n("jobs_changed") ? `${n("jobs_changed")} job(s) changed` : "",
+          n("jobs_new") ? `${n("jobs_new")} new` : "",
+          n("proj_changed") ? `${n("proj_changed")} project(s) changed` : "",
+          n("deliv_changed") ? `${n("deliv_changed")} delivered changed` : "",
+          n("deliv_new") ? `${n("deliv_new")} newly delivered` : "",
+        ].filter(Boolean).join(" · ");
+        lastRun = {
+          at: String(r.at), ok: !!r.ok, by: String(r.by || ""), error: String(r.error || ""),
+          summary: moved || "nothing moved",
+        };
+      }
+    } catch (e) { swallow("erp-hourly/last", e); /* no ledger yet */ }
+
     return NextResponse.json({
       ok: true,
       ready: s.ready,
       winner: s.winner,
+      lastRun,
       docs: ERP_DOCS.map((d) => ({ ...d, on: d.hourly ? isOn(s.on, d.key) : false })),
       note: s.ready ? undefined : "Run Genie migration 0168 — until then every document refreshes and nothing can be turned off.",
     });

@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { currentUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { today } from "@/lib/schedule";
-import { ownerRegister, type Owner } from "@/lib/owner-register";
+import { ownerRegister } from "@/lib/owner-register";
+import JobLive, { JobTasks, type LiveTask, type PastUpdate } from "@/components/job/JobLive";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Job · Nandan Genie" };
@@ -32,7 +33,6 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, view
  * THE BOXES ON THE PAPER ARE EMPTY FOR A PEN. Here they are filled in,
  * because the screen knows.
  */
-const PCT = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 const dmy = (s: string | null | undefined) =>
   s ? `${s.slice(8, 10)}-${s.slice(5, 7)}-${s.slice(0, 4)}` : "—";
 const daysBetween = (a: string, b: string) =>
@@ -59,11 +59,51 @@ export default async function JobBoardPage({ params }: { params: { no: string } 
   const who = await ownerRegister(adminClient());
 
   const full = String(j.id);
-  const [photos, docs, tasks] = await Promise.all([
+  const [photos, docs, erpTasks, manualTasks, noteLog, statRows] = await Promise.all([
     adminClient().from("job_photo").select("id", { count: "exact", head: true }).eq("job_id", full),
     adminClient().from("project_doc").select("id", { count: "exact", head: true }).eq("job_id", full).then((r) => r, () => ({ count: null })),
-    adminClient().from("erp_tasks").select("job_id", { count: "exact", head: true }).eq("job_id", full).eq("done", false),
+    adminClient().from("erp_tasks").select("id, title, who, due").eq("job_id", full).eq("done", false)
+      .then((r) => r, () => ({ data: null })),
+    adminClient().from("manual_tasks").select("id, title, who, due").eq("job_id", full).eq("done", false)
+      .then((r) => r, () => ({ data: null })),
+    /* PAST UPDATES (0176). Falls back to nothing rather than to an error, so
+       the page still works on a database where the migration has not run. */
+    adminClient().from("job_field_log").select("at, by_name, old_value, new_value")
+      .eq("job_id", full).eq("field", "note").order("at", { ascending: false }).limit(25)
+      .then((r) => r, () => ({ data: null })),
+    /* THE STATUS CHOICES ARE THE BOARD'S OWN VOCABULARY, read from the data
+       rather than typed here, so the list cannot drift from what the ERP
+       sends and a new stage appears the day a job carries it. */
+    adminClient().from("jobs").select("stat").not("stat", "is", null),
   ]);
+
+  const liveTasks: LiveTask[] = [
+    ...(((erpTasks as { data?: Record<string, unknown>[] }).data) || []).map((t) => ({
+      id: String(t.id), kind: "erp" as const,
+      title: String(t.title || "—"),
+      who: t.who ? String(t.who) : null,
+      due: (t.due as string) || null,
+    })),
+    ...(((manualTasks as { data?: Record<string, unknown>[] }).data) || []).map((t) => ({
+      id: String(t.id), kind: "manual" as const,
+      title: String(t.title || "—"),
+      who: t.who ? String(t.who) : null,
+      due: (t.due as string) || null,
+    })),
+  ].sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999"));
+
+  const updates: PastUpdate[] = (((noteLog as { data?: Record<string, unknown>[] }).data) || []).map((r) => ({
+    at: String(r.at), by: r.by_name ? String(r.by_name) : null,
+    old: r.old_value ? String(r.old_value) : null,
+    now: r.new_value ? String(r.new_value) : null,
+  }));
+
+  const statuses = [...new Set(((statRows.data || []) as { stat: string }[]).map((r) => String(r.stat).trim()).filter(Boolean))].sort();
+
+  /* PLANNING AND ADMIN ONLY (his rule). The same three roles /api/job-field
+     enforces — shown here so the page does not offer a pencil that the server
+     will refuse, which is a worse experience than no pencil. */
+  const mayEdit = ["admin", "planner", "project_owner"].includes(String(user.role || ""));
 
   const kit = Math.round(Number(j.kit) || 0);
   const pct = Math.round(Number(j.pct) || 0);
@@ -119,18 +159,27 @@ export default async function JobBoardPage({ params }: { params: { no: string } 
           </div>
         )}
 
-        <Bar label="KITTING" value={kit} colour="#B45309" />
-        <Bar label="PRODUCTION" value={pct} colour="#0D7A3F" />
-
-        {!!j.stat && <Field label="STATUS" value={String(j.stat)} />}
-        {!!j.note && <Field label="CURRENT UPDATE" value={String(j.note)} />}
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, margin: "12px 0" }}>
-          <Owner label="PROJECT" o={who(j.own)} />
-          <Owner label="KITTING" o={who(j.kitting_owner)} />
-          <Owner label="PRODUCTION" o={who(j.production_owner)} />
-          <Owner label="DESIGN" o={who(j.design_owner)} />
-        </div>
+        {/* Everything that can be changed lives in one client island, so
+            the page stays a server render and only the editable parts ship
+            JavaScript to a phone on shop-floor 4G. */}
+        <JobLive
+          jobId={full}
+          kit={kit}
+          pct={pct}
+          stat={String(j.stat || "")}
+          note={String(j.note || "")}
+          statuses={statuses}
+          mayEdit={mayEdit}
+          delivered={delivered}
+          owners={[
+            { label: "PROJECT", o: who(j.own) },
+            { label: "KITTING", o: who(j.kitting_owner) },
+            { label: "PRODUCTION", o: who(j.production_owner) },
+            { label: "DESIGN", o: who(j.design_owner) },
+          ]}
+          tasks={liveTasks}
+          updates={updates}
+        />
 
         <div style={{ fontWeight: 700, margin: "18px 0 8px" }}>
           {pct > 0 || kit > 0 ? "This job is in production" : "Not started on the floor yet"}
@@ -138,10 +187,6 @@ export default async function JobBoardPage({ params }: { params: { no: string } 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 8 }}>
           <Act href={`/?job=${encodeURIComponent(full)}`} icon="📋" label="Details of the job" />
           <Act href={`/?job=${encodeURIComponent(full)}`} icon="◆" label="Milestones" />
-          <Act href={`/?job=${encodeURIComponent(full)}`} icon="%" label={`Kitting ${kit}%`} />
-          <Act href={`/?job=${encodeURIComponent(full)}`} icon="%" label={`Production ${pct}%`} />
-          <Act href={`/?job=${encodeURIComponent(full)}`} icon="✎" label="Status" />
-          <Act href={`/?job=${encodeURIComponent(full)}`} icon="☑" label={`To-do${tasks.count ? ` · ${tasks.count}` : ""}`} />
           <Act href="/?tab=floor" icon="📷" label={`Photos${photos.count ? ` · ${photos.count}` : " · none yet"}`} />
           <Act href="/?tab=jobcomm" icon="₹" label="Commercials" />
           <Act href="/?tab=manpower" icon="👷" label="Labour" />
@@ -151,6 +196,10 @@ export default async function JobBoardPage({ params }: { params: { no: string } 
           <Act label="GAD" soon />
           <Act label="QAP" soon />
         </div>
+
+        {/* PENDING TASKS, BELOW THE TILES (his order). */}
+        <JobTasks jobId={full} tasks={liveTasks} />
+
         <p style={{ color: "#8B8F87", fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>
           Greyed tiles have nowhere to go yet — Genie holds no QC record and the document shelf is empty.
           They are shown so you can say where they should live, not so the page can pretend.
@@ -163,47 +212,8 @@ export default async function JobBoardPage({ params }: { params: { no: string } 
   );
 }
 
-/** The per-cent bar, with the ten marks the paper board has. */
-function Bar({ label, value, colour }: { label: string; value: number; colour: string }) {
-  return (
-    <div style={{ background: "#fff", border: "1px solid #DCD8CC", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
-      <div style={{ display: "flex", alignItems: "baseline" }}>
-        <b style={{ fontSize: 11, letterSpacing: .6, color: "#8B8F87" }}>{label}</b>
-        <span style={{ flex: 1 }} />
-        <b style={{ fontSize: 20, color: colour }}>{value}%</b>
-      </div>
-      <div style={{ display: "flex", gap: 3, marginTop: 6 }}>
-        {PCT.map((p) => (
-          <div key={p} style={{
-            flex: 1, height: 14, borderRadius: 3,
-            background: value >= p ? colour : "#F0EEE8",
-            border: `1px solid ${value >= p ? colour : "#DCD8CC"}`,
-          }} />
-        ))}
-      </div>
-    </div>
-  );
-}
 
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ background: "#fff", border: "1px solid #DCD8CC", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
-      <b style={{ fontSize: 11, letterSpacing: .6, color: "#8B8F87" }}>{label}</b>
-      <div style={{ fontSize: 13.5, lineHeight: 1.45, marginTop: 2 }}>{value}</div>
-    </div>
-  );
-}
 
-/** The code the floor says, and under it the man it means. */
-function Owner({ label, o }: { label: string; o: Owner }) {
-  return (
-    <div style={{ background: "#fff", border: "1px solid #DCD8CC", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
-      <div style={{ fontSize: 8.5, letterSpacing: .5, color: "#8B8F87" }}>{label}</div>
-      <b style={{ fontSize: 14 }}>{o.code || (o.name ? "" : "—")}</b>
-      {!!o.name && <div style={{ fontSize: 10.5, color: "#46545F", lineHeight: 1.2, marginTop: 1 }}>{o.name}</div>}
-    </div>
-  );
-}
 
 function Act({ href, icon, label, soon }: { href?: string; icon?: string; label: string; soon?: boolean }) {
   const base: React.CSSProperties = {
