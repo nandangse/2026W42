@@ -34,6 +34,12 @@ export const FOLDERS = {
   card: "Visiting cards",
   selfie: "Selfies",
   job: "Job photos",
+  /* Dr Raghu, 30 Sep 2026: "The saving of all my files will be in the drive.
+     make the relevant folders for it." A scanned bill is the single source of
+     truth for an audit \u2014 it belongs where the rest of his files are, in a
+     folder somebody can open without Genie. */
+  sales_bill: "Bills \u2014 Sales",
+  purchase_bill: "Bills \u2014 Purchase",
 } as const;
 export type FileKind = keyof typeof FOLDERS;
 

@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.8.1",
+    date: "2026-09-30",
+    module: "The bill, and the paper behind it",
+    items: [
+      "THE PURCHASE REGISTER GETS ITS ITEMS, AND THEY ARE CLICKABLE. Every voucher now shows what was actually on it; clicking opens the bill in a lightbox with the scan large on the right, the voucher's own details, and every item line with qty, rate and amount. Where the lines do not add to the voucher the box says so and why \u2014 tax and charges sit on their own ledgers. This is the audit view.",
+      "THE SCANS GO TO THE SHARED DRIVE, into their own two folders \u2014 Bills \u2014 Sales and Bills \u2014 Purchase \u2014 beside the job photos. What is kept is a reference in the same column a bucket path used, so nothing already uploaded has to move and there is no day with half the scans in each place. The bucket stays as the fallback: a clerk attaching a bill at the moment of entry is never refused because a Drive setting is missing. Nobody is handed the folder either way.",
+      "The register now keys on the kind as well as the number, because a purchase voucher number is Suresh's own running count \u2014 1296, 72 \u2014 and one of those was always going to collide with an invoice number eventually. Fixed before it happened rather than after.",
+      "Needs migrations 0184 and 0185.",
+    ],
+  },
+  {
     v: "5.9.8.0",
     date: "2026-09-30",
     module: "The Sales Register becomes a working register",

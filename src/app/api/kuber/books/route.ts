@@ -1798,11 +1798,42 @@ export async function GET(req: Request) {
       let meta = new Map<string, RR>();
       try {
         const got = await pageAll<RR>(async (a, b) => {
-          const r = await admin.from("sales_invoice_meta").select("*").range(a, b);
+          const r = await admin.from("sales_invoice_meta").select("*").eq("kind", kind).range(a, b);
           return { data: r.data as RR[] | null, error: r.error };
         }, "the invoice register");
         meta = new Map(got.map((m) => [String(m.bill), m]));
-      } catch (e) { swallow("kuber/vreg-meta", e); /* pre-0184 */ }
+      } catch (e) {
+        swallow("kuber/vreg-meta", e); /* pre-0184, or pre-0185 (no kind yet) */
+        try {
+          const got = await pageAll<RR>(async (a, b) => {
+            const r = await admin.from("sales_invoice_meta").select("*").range(a, b);
+            return { data: r.data as RR[] | null, error: r.error };
+          }, "the invoice register");
+          if (kind === "sales") meta = new Map(got.map((m) => [String(m.bill), m]));
+        } catch (e2) { swallow("kuber/vreg-meta2", e2); }
+      }
+
+      /**
+       * WHAT WAS ON THE BILL (Dr Raghu, 30 Sep 2026: "in this also there has
+       * to be the items ... this will be VERY important for the audit of the
+       * bills"). The item lines ride with the voucher so the lightbox can
+       * open on a click without a second round trip \u2014 an auditor checking
+       * two hundred bills should not wait for two hundred fetches.
+       */
+      const itemsOf = new Map<string, { item: string; qty: string; rate: number; amount: number }[]>();
+      try {
+        const ids = rows.slice(0, 3000).map((r) => String(r.id));
+        for (let i = 0; i < ids.length; i += 200) {
+          const { data: it } = await admin.from("kuber_voucher_item")
+            .select("voucher_id, item, qty, rate, amount").in("voucher_id", ids.slice(i, i + 200));
+          for (const x of (it || []) as RR[]) {
+            const k = String(x.voucher_id);
+            const list = itemsOf.get(k) || [];
+            list.push({ item: String(x.item || ""), qty: String(x.qty || ""), rate: Number(x.rate) || 0, amount: Math.abs(Number(x.amount) || 0) });
+            itemsOf.set(k, list);
+          }
+        }
+      } catch (e) { swallow("kuber/vreg-items", e); /* pre-0081 */ }
 
       const out = rows.slice(0, 3000).map((r) => {
         const no = String(r.vno || "").trim();
@@ -1827,6 +1858,7 @@ export async function GET(req: Request) {
           days, interest,
           fam: m?.fam ?? null, salesman: m?.salesman ?? null, note: m?.note ?? null,
           scan: m?.scan_path ? { path: String(m.scan_path), name: String(m.scan_name || ""), at: m.scan_at } : null,
+          items: itemsOf.get(String(r.id)) || [],
         };
       });
 
@@ -2073,8 +2105,9 @@ export async function POST(req: Request) {
         const { data: vs } = await adminClient().from("kuber_voucher").select("vno, party").in("vno", bills);
         for (const v of (vs || []) as { vno: string; party: string }[]) partyOf.set(String(v.vno), String(v.party || ""));
       }
-      const rows = bills.map((bill) => ({ bill, party: partyOf.get(bill) || null, ...patch }));
-      const { error } = await adminClient().from("sales_invoice_meta").upsert(rows, { onConflict: "bill" });
+      const kindB = String(body.kind || "sales") === "purchase" ? "purchase" : "sales";
+      const rows = bills.map((bill) => ({ kind: kindB, bill, party: partyOf.get(bill) || null, ...patch }));
+      const { error } = await adminClient().from("sales_invoice_meta").upsert(rows, { onConflict: "kind,bill" });
       if (error) {
         if (/does not exist|schema cache/i.test(error.message))
           throw new HttpError(503, "Run migration 0184 first — the register has nowhere to keep this yet.");

@@ -2279,6 +2279,7 @@ interface VregRow {
   paid_on: string | null; days: number | null; interest: number;
   fam: string | null; salesman: string | null; note: string | null;
   scan: { path: string; name: string } | null;
+  items: { item: string; qty: string; rate: number; amount: number }[];
 }
 interface VregData { empty?: boolean; kind: string; from: string; to: string; rows: VregRow[]; count: number; total: number; fams: string[]; salesmen: string[] }
 
@@ -2355,10 +2356,10 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
     </th>
   );
   const box = { borderColor: BORDER } as React.CSSProperties;
-  const cols = sales ? 13 : 5;
+  const cols = sales ? 13 : 8;
 
   return (
-    <div style={{ maxWidth: sales ? 1240 : 940 }}>
+    <div style={{ maxWidth: sales ? 1240 : 1060 }}>
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>{sales ? "Sales Register" : "Purchase Register"}</div>
@@ -2438,7 +2439,7 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
           )}
 
           <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "64vh" }}>
-            <table className="w-full text-xs genie-table" style={{ minWidth: sales ? 1180 : 720, borderCollapse: "separate", borderSpacing: 0 }}>
+            <table className="w-full text-xs genie-table" style={{ minWidth: sales ? 1180 : 900, borderCollapse: "separate", borderSpacing: 0 }}>
               <thead>
                 <tr style={{ background: "var(--ink)", color: "#fff" }}>
                   {sales && (
@@ -2450,10 +2451,15 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
                   {sales ? <>
                     <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Family</th>
                     <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Salesman</th>
-                  </> : (
+                  </> : <>
                     <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Narration</th>
-                  )}
+                    <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Items</th>
+                  </>}
                   <Hd k="amount" right>Amount</Hd>
+                  {!sales && <>
+                    <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Bill</th>
+                    <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)" }} />
+                  </>}
                   {sales && <>
                     <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Received</th>
                     <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>O/S</th>
@@ -2465,8 +2471,9 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
                   </>}
                 </tr>
                 <tr style={{ background: "#F3F1EB" }}>
-                  <td colSpan={sales ? 6 : 4} className="px-2 py-1.5 font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>SHOWN — {rows.length}</td>
+                  <td colSpan={sales ? 6 : 5} className="px-2 py-1.5 font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>SHOWN — {rows.length}</td>
                   <td className="px-2 py-1.5 text-right tnum font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>{fmtMoney(shown)}</td>
+                  {!sales && <td colSpan={2} style={{ position: "sticky", top: 33, background: "#F3F1EB" }} />}
                   {sales && <>
                     <td style={{ position: "sticky", top: 33, background: "#F3F1EB" }} />
                     <td className="px-2 py-1.5 text-right tnum font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>{fmtMoney(shownOs)}</td>
@@ -2489,10 +2496,32 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
                       {sales ? <>
                         <td className="px-2 py-1" style={{ color: r.fam ? INK : MUTED, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.fam || ""}>{r.fam || "—"}</td>
                         <td className="px-2 py-1" style={{ color: r.salesman ? INK : MUTED, whiteSpace: "nowrap" }}>{r.salesman || "—"}</td>
-                      </> : (
-                        <td className="px-2 py-1" style={{ color: MUTED, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.narration}</td>
-                      )}
+                      </> : <>
+                        <td className="px-2 py-1" style={{ color: MUTED, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.narration}</td>
+                        {/* THE ITEMS, CLICKABLE (Dr Raghu, 30 Sep 2026: "we
+                            should be able to click it, the lightbox will open
+                            up ... VERY important for the audit of the bills") */}
+                        <td className="px-2 py-1" style={{ maxWidth: 220 }}>
+                          {r.items.length
+                            ? <button onClick={() => setEdit(r)} title={r.items.map((x) => x.item).join(", ")}
+                                style={{ color: "#2C5B82", textDecoration: "underline", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 210, display: "block", textAlign: "left" }}>
+                                {r.items[0].item}{r.items.length > 1 ? ` +${r.items.length - 1}` : ""}
+                              </button>
+                            : <span style={{ color: "#D5D2C9" }}>—</span>}
+                        </td>
+                      </>}
                       <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
+                      {!sales && <>
+                        <td className="px-2 py-1 text-center">
+                          {r.scan
+                            ? <button onClick={() => void openScan(r.vno, kind)} title={r.scan.name} style={{ fontSize: 13 }}>&#128196;</button>
+                            : <span style={{ color: "#D5D2C9" }}>&#128196;</span>}
+                        </td>
+                        <td className="px-2 py-1 text-center">
+                          <button onClick={() => setEdit(r)} title="Open this bill" className="rounded"
+                            style={{ border: `1px solid ${BORDER}`, background: "#fff", color: INK, padding: "1px 6px", fontSize: 12 }}>&#9998;</button>
+                        </td>
+                      </>}
                       {sales && <>
                         <td className="px-2 py-1 text-right tnum" style={{ color: MUTED }}>{r.received == null ? "—" : fmtMoney(r.received)}</td>
                         <td className="px-2 py-1 text-right tnum font-bold" style={{ color: (r.outstanding || 0) > 1 ? INK : MUTED }}>{r.outstanding == null ? "—" : fmtMoney(r.outstanding)}</td>
@@ -2504,7 +2533,7 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
                         <td className="px-2 py-1 text-right tnum" style={{ color: r.interest > 0 ? RED : MUTED }}>{r.interest > 0 ? fmtMoney(r.interest) : "—"}</td>
                         <td className="px-2 py-1 text-center">
                           {r.scan
-                            ? <button onClick={() => void openScan(r.vno)} title={r.scan.name} style={{ fontSize: 13 }}>&#128196;</button>
+                            ? <button onClick={() => void openScan(r.vno, kind)} title={r.scan.name} style={{ fontSize: 13 }}>&#128196;</button>
                             : <span style={{ color: "#D5D2C9" }}>&#128196;</span>}
                         </td>
                         <td className="px-2 py-1 text-center">
@@ -2521,34 +2550,45 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
           {data.count > 3000 && <p className="text-xs mt-1" style={{ color: "#8A6D1A" }}>Showing the first 3,000 of {data.count} — narrow the period for the rest.</p>}
         </>
       )}
-      {edit && <InvoiceBox row={edit} fams={data?.fams || []} salesmen={data?.salesmen || []} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />}
+      {edit && <InvoiceBox row={edit} kind={kind} fams={data?.fams || []} salesmen={data?.salesmen || []} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />}
     </div>
   );
 }
 
-/** a signed link, minted on the press and opened once */
-async function openScan(bill: string) {
+/** a link minted on the press — Drive through Genie, a bucket path signed */
+async function scanUrl(bill: string, kind: string): Promise<string | null> {
   try {
-    const r = await fetch(`/api/kuber/bill-scan?bill=${encodeURIComponent(bill)}`, { cache: "no-store" });
+    const r = await fetch(`/api/kuber/bill-scan?bill=${encodeURIComponent(bill)}&kind=${kind}`, { cache: "no-store" });
     const j = await r.json();
-    if (j.url) window.open(j.url, "_blank", "noopener");
-  } catch { /* the button simply does nothing rather than shouting */ }
+    return j.url || null;
+  } catch { return null; }
+}
+async function openScan(bill: string, kind: string) {
+  const u = await scanUrl(bill, kind);
+  if (u) window.open(u, "_blank", "noopener");
 }
 
 /** One invoice, everything Genie is allowed to change about it. */
-function InvoiceBox({ row, fams, salesmen, onClose, onSaved }: {
-  row: VregRow; fams: string[]; salesmen: string[]; onClose: () => void; onSaved: () => void;
+function InvoiceBox({ row, kind, fams, salesmen, onClose, onSaved }: {
+  row: VregRow; kind: "sales" | "purchase"; fams: string[]; salesmen: string[]; onClose: () => void; onSaved: () => void;
 }) {
+  const sales = kind === "sales";
   const [f, setF] = useState({ fam: row.fam || "", salesman: row.salesman || "", pay_status: row.overridden ? (row.status || "") : "", note: row.note || "" });
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const { fmt: fmtMoney } = useMoneyFmt();
+  /* THE BILL ITSELF, LARGE (Dr Raghu, 30 Sep 2026: "showing the particular
+     invoice thumbnail in large, the invoice details and later on details from
+     the items ... VERY important for the audit of the bills"). Fetched when
+     the box opens, so the register itself never carries two hundred images. */
+  const [scan, setScan] = useState<string | null>(null);
+  useEffect(() => { void scanUrl(row.vno, kind).then(setScan); }, [row.vno, kind]);
   const save = async () => {
     setBusy("save"); setErr("");
     try {
       const r = await fetch("/api/kuber/books", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "invoice_meta", bill: row.vno, ...f }),
+        body: JSON.stringify({ action: "invoice_meta", kind, bill: row.vno, ...f }),
       });
       if (!r.ok) throw new Error((await r.json()).error || "could not save");
       onSaved();
@@ -2559,7 +2599,7 @@ function InvoiceBox({ row, fams, salesmen, onClose, onSaved }: {
     setBusy("scan"); setErr("");
     try {
       const fd = new FormData();
-      fd.append("bill", row.vno); fd.append("file", file);
+      fd.append("bill", row.vno); fd.append("kind", kind); fd.append("file", file);
       const r = await fetch("/api/kuber/bill-scan", { method: "POST", body: fd });
       if (!r.ok) throw new Error((await r.json()).error || "could not upload");
       onSaved();
@@ -2572,13 +2612,14 @@ function InvoiceBox({ row, fams, salesmen, onClose, onSaved }: {
   const inp = { borderColor: BORDER, width: "100%" } as React.CSSProperties;
   return (
     <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)", zIndex: 70 }}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg" style={{ width: "min(560px,100%)", maxHeight: "90vh", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg" style={{ width: "min(1020px,100%)", maxHeight: "92vh", overflowY: "auto" }}>
         <div className="px-4 py-3 flex items-center" style={{ background: "var(--navy)", borderRadius: "8px 8px 0 0" }}>
           <b className="text-white" style={{ fontSize: 14 }}>{row.vno}</b>
           <div className="flex-1" />
           <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3" }}>✕</button>
         </div>
-        <div className="p-4">
+        <div className="p-4" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,400px)", gap: 16, alignItems: "start" }}>
+          <div>
           <div className="rounded p-3 mb-3" style={{ background: "#F4F2EC" }}>
             <div className="font-bold" style={{ color: INK }}>{row.party}</div>
             <div className="text-xs mt-1" style={{ color: MUTED }}>
@@ -2586,11 +2627,44 @@ function InvoiceBox({ row, fams, salesmen, onClose, onSaved }: {
               {row.outstanding != null && <> · received {fmtMoney(row.received || 0)} · still out <b style={{ color: (row.outstanding || 0) > 1 ? RED : "#0D7A3F" }}>{fmtMoney(row.outstanding)}</b></>}
               {row.days ? ` · ${row.days} days` : ""}
             </div>
+            {!!row.narration && <div className="text-xs mt-1" style={{ color: INK }}>{row.narration}</div>}
             <div className="text-xs mt-1" style={{ color: MUTED }}>
               These come from the books and are not editable — change them in Tally.
             </div>
           </div>
-          <L label="Product family"><select value={f.fam} onChange={(e) => setF({ ...f, fam: e.target.value })} className="border rounded px-2 py-1.5 text-sm" style={inp}>
+
+          {/* WHAT WAS ON THE BILL — the audit's whole point */}
+          {!!row.items.length && (
+            <div className="mb-3">
+              <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>WHAT WAS ON THE BILL — {row.items.length} line{row.items.length > 1 ? "s" : ""}</div>
+              <div className="rounded border overflow-auto" style={{ borderColor: BORDER, maxHeight: 240 }}>
+                <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+                  <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+                    <th className="px-2 py-1.5 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Item</th>
+                    <th className="px-2 py-1.5 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Qty</th>
+                    <th className="px-2 py-1.5 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Rate</th>
+                    <th className="px-2 py-1.5 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Amount</th>
+                  </tr></thead>
+                  <tbody>
+                    {row.items.map((x, i) => (
+                      <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                        <td className="px-2 py-1">{x.item}</td>
+                        <td className="px-2 py-1 text-right tnum" style={{ color: MUTED, whiteSpace: "nowrap" }}>{x.qty || "—"}</td>
+                        <td className="px-2 py-1 text-right tnum" style={{ color: MUTED }}>{x.rate ? fmtMoney(x.rate) : "—"}</td>
+                        <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(x.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {Math.abs(row.items.reduce((a, x) => a + x.amount, 0) - row.amount) > 1 && (
+                <div className="text-xs mt-1" style={{ color: "#B45309" }}>
+                  The item lines come to {fmtMoney(row.items.reduce((a, x) => a + x.amount, 0))} against a voucher of {fmtMoney(row.amount)} — the difference is tax and charges booked on their own ledgers.
+                </div>
+              )}
+            </div>
+          )}
+          {sales && <><L label="Product family"><select value={f.fam} onChange={(e) => setF({ ...f, fam: e.target.value })} className="border rounded px-2 py-1.5 text-sm" style={inp}>
             <option value="">— not set —</option>
             {fams.map((x) => <option key={x} value={x}>{x}</option>)}
           </select></L>
@@ -2606,18 +2680,8 @@ function InvoiceBox({ row, fams, salesmen, onClose, onSaved }: {
               <option value="paid">Paid</option>
             </select>
           </L>
+          </>}
           <L label="Note"><textarea value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} rows={2} className="border rounded px-2 py-1.5 text-sm" style={{ ...inp, resize: "vertical" }} /></L>
-
-          <div className="rounded p-3 mb-3" style={{ border: `1px dashed ${BORDER}` }}>
-            <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>SCANNED BILL — the single source of truth</div>
-            {row.scan
-              ? <div className="text-xs mb-2"><button onClick={() => void openScan(row.vno)} style={{ color: "#2C5B82", textDecoration: "underline", fontWeight: 600 }}>{row.scan.name || "open the scan"}</button></div>
-              : <div className="text-xs mb-2" style={{ color: MUTED }}>Nothing uploaded yet.</div>}
-            <input type="file" accept="image/*,application/pdf"
-              onChange={(e) => { const x = e.target.files?.[0]; if (x) void upload(x); }}
-              disabled={!!busy} className="text-xs" />
-            {busy === "scan" && <span className="text-xs ml-2" style={{ color: MUTED }}>uploading…</span>}
-          </div>
 
           {err && <div className="text-xs mb-2" style={{ color: RED }}>{err}</div>}
           <div className="flex gap-2">
@@ -2626,6 +2690,39 @@ function InvoiceBox({ row, fams, salesmen, onClose, onSaved }: {
             </button>
             <div className="flex-1" />
             <button onClick={onClose} className="rounded px-3 py-2" style={{ color: MUTED, fontSize: 12.5 }}>Cancel</button>
+          </div>
+          </div>
+
+          {/* THE BILL, LARGE. An auditor checking a voucher against the paper
+              should see the paper without leaving the row. A PDF gets a frame
+              rather than an image, because a browser will not draw one. */}
+          <div>
+            <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>SCANNED BILL — the single source of truth</div>
+            <div className="rounded border flex items-center justify-center"
+              style={{ borderColor: BORDER, background: "#F4F2EC", minHeight: 260, overflow: "hidden" }}>
+              {!row.scan ? (
+                <span className="text-xs p-4 text-center" style={{ color: MUTED }}>
+                  Nothing attached yet. The accounts team attaches it when they book the entry —
+                  it files itself into the shared drive, not into the database.
+                </span>
+              ) : !scan ? (
+                <span className="text-xs" style={{ color: MUTED }}>fetching…</span>
+              ) : /\.pdf/i.test(row.scan.name) ? (
+                <iframe src={scan} title={row.scan.name} style={{ width: "100%", height: 460, border: 0 }} />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={scan} alt={row.scan.name} style={{ maxWidth: "100%", maxHeight: 460, display: "block" }} />
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {row.scan && <button onClick={() => void openScan(row.vno, kind)} className="text-xs font-bold" style={{ color: "#2C5B82", textDecoration: "underline" }}>open full size</button>}
+              <label className="text-xs font-bold rounded px-2 py-1" style={{ border: `1px solid ${BORDER}`, background: "#fff", color: INK, cursor: "pointer" }}>
+                {row.scan ? "replace" : "attach a scan"}
+                <input type="file" accept="image/*,application/pdf" style={{ display: "none" }}
+                  onChange={(e) => { const x = e.target.files?.[0]; if (x) void upload(x); }} disabled={!!busy} />
+              </label>
+              {busy === "scan" && <span className="text-xs" style={{ color: MUTED }}>uploading…</span>}
+            </div>
           </div>
         </div>
       </div>
