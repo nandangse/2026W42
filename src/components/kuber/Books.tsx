@@ -1176,7 +1176,7 @@ function MonthPick({ value, onChange, end }: { value: string; onChange: (v: stri
   );
 }
 
-function PeriodBar({ from, to, setFrom, setTo }: { from: string; to: string; setFrom: (v: string) => void; setTo: (v: string) => void }) {
+function PeriodBar({ from, to, setFrom, setTo, onRefresh }: { from: string; to: string; setFrom: (v: string) => void; setTo: (v: string) => void; onRefresh?: () => void }) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
   const mtdStart = today.slice(0, 8) + "01";
@@ -1195,6 +1195,18 @@ function PeriodBar({ from, to, setFrom, setTo }: { from: string; to: string; set
       ))}
       from <MonthPick value={from} onChange={setFrom} />
       to <MonthPick value={to} onChange={setTo} end />
+      {/* A REFRESH, NEXT TO THE PERIOD (Dr Raghu, 30 Sep 2026: "next to this
+          put a refresh icon"). Nothing on this screen changes on its own \u2014
+          but the BOOKS do: an upload lands, Suresh types a month's stock,
+          somebody presses Recompute. Without this the only way to see it was
+          to move the period and move it back. */}
+      {onRefresh && (
+        <button onClick={onRefresh} title="Read the books again \u2014 after an upload, a stock entry or a recompute"
+          className="rounded border font-bold"
+          style={{ borderColor: BORDER, background: "#fff", color: INK, padding: "3px 8px", fontSize: 13, lineHeight: 1.2 }}>
+          &#8635;
+        </button>
+      )}
     </div>
   );
 }
@@ -1328,7 +1340,7 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
             {data?.ly ? <> Last year&apos;s same months stand beside it.</> : null} Every head opens to its ledgers and their vouchers.
           </div>
         </div>
-        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} onRefresh={reload} />
       </div>
       {!!data && (
         <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -1509,7 +1521,7 @@ export function RulesScreen() {
   const lme = lastMonthEndIso();
   const [from, setFrom] = useState(fyStart);
   const [to, setTo] = useState(lme >= fyStart ? lme : today);
-  const [data] = useBooks<RulesData>("rules", `&from=${from}&to=${to}`);
+  const [data, reload] = useBooks<RulesData>("rules", `&from=${from}&to=${to}`);
   const { num: bare, label: unitLabel } = useMoneyFmt();
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [q, setQ] = useState("");
@@ -1576,7 +1588,7 @@ export function RulesScreen() {
             in this period. This page does not describe the rules; it runs them, so it cannot go stale.
           </div>
         </div>
-        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} onRefresh={reload} />
       </div>
 
       {!data ? <div className="text-sm" style={{ color: MUTED }}>reading…</div> : (
@@ -1676,7 +1688,7 @@ export function RatioScreen() {
             {" "}Every ratio states its own formula; targets are yours to type. A dash is an honest &quot;the input isn&apos;t in yet&quot;, never a guess.
           </div>
         </div>
-        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} onRefresh={reload} />
       </div>
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : GROUPS.map(([title, keys]) => (
         <div key={title} className="bg-white rounded-lg border mb-3 overflow-auto" style={{ borderColor: BORDER }}>
@@ -1904,7 +1916,7 @@ export function ActualCashFlowScreen() {
   const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
   const [from, setFrom] = useState(fyStart);
   const [to, setTo] = useState(today);
-  const [data] = useBooks<CashActual>("cashflow_actual", `&from=${from}&to=${to}`);
+  const [data, reload] = useBooks<CashActual>("cashflow_actual", `&from=${from}&to=${to}`);
   const { fmt: fmtMoney } = useMoneyFmt();
   const [drill, setDrill] = useState<string | null>(null);
   if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
@@ -1915,7 +1927,7 @@ export function ActualCashFlowScreen() {
           <div className="text-lg font-bold" style={{ color: INK }}>Actual Cash Flow</div>
           <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640 }}>What actually moved through bank and cash in the period, head by head — every voucher touching a bank or cash ledger, read from its other side.</div>
         </div>
-        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} onRefresh={reload} />
       </div>
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
         <>
@@ -1952,7 +1964,7 @@ export function FundFlowScreen() {
   const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
   const [from, setFrom] = useState(fyStart);
   const [to, setTo] = useState(today);
-  const [data] = useBooks<FundFlow>("fundflow", `&from=${from}&to=${to}`);
+  const [data, reload] = useBooks<FundFlow>("fundflow", `&from=${from}&to=${to}`);
   const { fmt: fmtMoney } = useMoneyFmt();
   const [drill, setDrill] = useState<string | null>(null);
   if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
@@ -1963,7 +1975,7 @@ export function FundFlowScreen() {
           <div className="text-lg font-bold" style={{ color: INK }}>Fund Flow</div>
           <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640 }}>Where the money CAME FROM and WHERE IT WENT between the two dates — every balance-sheet head&apos;s change, sources against applications, with operations&apos; own funds on top.</div>
         </div>
-        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} onRefresh={reload} />
       </div>
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
         <>
@@ -2197,7 +2209,7 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
   const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
   const [from, setFrom] = useState(fyStart);
   const [to, setTo] = useState(today);
-  const [data] = useBooks<VregData>("vreg", `&kind=${kind}&from=${from}&to=${to}`);
+  const [data, reload] = useBooks<VregData>("vreg", `&kind=${kind}&from=${from}&to=${to}`);
   const { fmt: fmtMoney } = useMoneyFmt();
   const [sortK, setSortK] = useState<"date" | "party" | "amount" | "vno">("date");
   const [dir, setDir] = useState<1 | -1>(-1);
@@ -2224,7 +2236,7 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
             Every {kind === "sales" ? "GST Sales voucher" : "purchase-family voucher (Purchase · Cap-Ex · Import)"} in the period, straight from the books.
           </div>
         </div>
-        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} onRefresh={reload} />
       </div>
       {!data ? <div className="text-sm" style={{ color: MUTED }}>reading…</div> : (
         <>

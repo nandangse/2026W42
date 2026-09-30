@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.7.2",
+    date: "2026-09-30",
+    module: "Read the books again",
+    items: [
+      "A REFRESH BESIDE THE PERIOD, on every statement that has one \u2014 P&L, Ratios, How the books are read, Actual Cash Flow, Fund Flow and the Sales and Purchase registers. Nothing on those screens changes on its own, but the BOOKS do: an upload lands, Suresh types a month's closing stock, somebody presses Recompute. Until now the only way to pick that up was to move the period and move it back.",
+    ],
+  },
+  {
     v: "5.9.7.1",
     date: "2026-09-30",
     module: "Directors' Remuneration gets its own line",
