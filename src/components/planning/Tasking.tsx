@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
 
+import { taskSheetHtml, type SheetJob } from "@/lib/task-sheet";
+import { taskJpg } from "@/lib/task-jpg";
 import { fmt, fmtFull, jobNo, initials, whoTag, computeSchedule, manDays, isoWeek, dueStyle, toISO, TASK_CATS, catColour, ESC_LEVELS, escalated } from "@/lib/schedule";
 
 import { Board, GROUP_ORDER, Job, Person, TODAY, Task, assignees, myHandles, personLabel, taskJobRef, taskLate } from "./shared";
@@ -161,6 +163,52 @@ export function Tasking({
       .sort((a, b) => ((a.tdd || "9999") < (b.tdd || "9999") ? -1 : 1));
   }, [board.jobs, tasksByJob, filterCust, filterFam, filterOwn, taskAll]);
 
+  /**
+   * THE PENDING-TASK SHEET — one job to a page.
+   *
+   * Dr Raghu, 30 Sep 2026: "pending tasks for every job in an A4 portrait ...
+   * sorted by the assigned person ... a page break for every job and also
+   * sort by the TDD of the job."
+   *
+   * Both buttons read the SAME filtered set the board is showing, so what is
+   * downloaded is what is on screen. A pack that quietly includes jobs the
+   * filter excluded is a pack nobody trusts twice.
+   */
+  const sheetFor = useCallback((j: typeof board.jobs[number]): SheetJob => ({
+    id: j.id, tag: j.tag || "", fam: j.fam || "", cust: j.cust || "",
+    tdd: j.tdd ?? null, otd: j.otd ?? null,
+    owner: j.own || j.ownerInitials || null,
+    kit: Math.round(Number(j.kit) || 0), pct: Math.round(Number(j.pct) || 0),
+    stat: j.stat ?? null,
+    tasks: (tasksByJob.get(j.id) ?? []).filter((t) => !t.done).map((t) => ({
+      t: t.t, who: t.who ?? null, due: t.due ?? null, cat: t.cat ?? null,
+      esc: t.esc ?? null, original_due: t.original_due ?? null, push_count: t.push_count ?? null,
+    })),
+  }), [tasksByJob]);
+
+  /** The whole filtered board as one A4 pack, a page per job, TDD order. */
+  const openTaskPack = useCallback(() => {
+    const jobs = taskingJobs.map(sheetFor);
+    const html = taskSheetHtml(jobs, TODAY, `Pending tasks — ${jobs.length} job${jobs.length === 1 ? "" : "s"}`);
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    /* The print dialog is opened for them — "Save as PDF" is a destination in
+       it on every platform this runs on, so this needs no library. */
+    setTimeout(() => w.print(), 400);
+  }, [taskingJobs, sheetFor]);
+
+  /** One job, as a picture that can go into a chat. */
+  const downloadTaskJpg = useCallback((j: typeof board.jobs[number]) => {
+    const url = taskJpg(sheetFor(j), TODAY);
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pending-${jobNo(j.id)}-${TODAY}.jpg`;
+    a.click();
+  }, [sheetFor]);
+
   // next upcoming crewed milestone per job — computeSchedule ran for every job
   // on every render (including every keystroke in a filter); now once per plan change
   const nextMilestone = useMemo(() => {
@@ -282,6 +330,14 @@ export function Tasking({
         {view === "jobs" && (
           <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "#D9D6CD" }}>
             {(["board", "cal"] as const).map((k) => (<button key={k} onClick={() => setTaskView(k)} className="px-3 py-1 rounded text-sm font-semibold" style={taskView === k ? { background: "var(--ink)", color: "#fff" } : { color: "var(--dim)" }}>{k === "board" ? "Board" : "📅 Calendar (ISO weeks)"}</button>))}
+            {/* THE WHOLE FILTERED BOARD AS A PACK — a page per job, in the
+                order the work has to leave the gate. */}
+            <button onClick={openTaskPack} disabled={!taskingJobs.length}
+              className="px-3 py-1 rounded text-sm font-bold"
+              style={{ background: "#fff", border: "1px solid var(--navy)", color: "var(--navy)", opacity: taskingJobs.length ? 1 : .45 }}
+              title="A4 portrait, one page per job, sorted by target delivery — opens the print dialog where Save as PDF is a destination">
+              ⬇ PDF — pending by job ({taskingJobs.length})
+            </button>
           </div>
         )}
       </div>
@@ -321,6 +377,16 @@ export function Tasking({
                   </div>
                   <div className="text-xs opacity-70">JOB {jobNo(j.id)} · TDD {fmt(j.tdd)}{j.own ? " · " + j.own : ""}</div>
                   <div className="text-xs opacity-70 truncate">{j.cust}</div>
+                  {/* THE SHEET FOR THIS ONE JOB, as a picture that can be sent
+                      (Dr Raghu, 30 Sep 2026). A4 proportions, so it sits beside
+                      the printed pack without looking like a different document. */}
+                  <button onClick={() => downloadTaskJpg(j)} disabled={!open}
+                    className="mt-1.5 w-full rounded py-1 text-xs font-bold"
+                    style={{ background: open ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.06)",
+                             color: open ? "#fff" : "rgba(255,255,255,.35)", border: "1px solid rgba(255,255,255,.25)" }}
+                    title={open ? "Download this job's pending tasks as a JPG — sorted by person, one A4" : "Nothing open on this job"}>
+                    ⬇ Pending JPG
+                  </button>
                 </div>
                 {/* tasks — flow horizontally across the screen */}
                 <div className="flex flex-wrap gap-1.5 flex-1 items-start rounded-lg p-2" style={{ background: "#E9E6DD" }}>

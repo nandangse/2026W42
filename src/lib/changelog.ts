@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.6.0",
+    date: "2026-09-30",
+    module: "Pending tasks, one job to a page \u2014 and two sides that stop being netted",
+    items: [
+      "<b>A PDF of pending tasks, a page per job, in target-delivery order.</b> <i>\u201cPending tasks for every job in an A4 portrait ... sorted by the assigned person ... a page break for every job.\u201d</i> A list of four hundred open tasks is a document nobody finishes; a single page for a single job is a thing you hand to the man running it, pin beside the machine, or send to a supplier \u2014 and when it is done, it is visibly done. Both buttons read the same filtered set the board is showing.",
+      "<b>Sorted by person, and the name is printed once per run</b>, so the page shows blocks of work per man rather than the same word forty times down a column. Within a name, by date \u2014 the top line is the next thing to do. The category rides as a coloured chip rather than a sort key, because nobody works through all their material tasks and then all their quality ones.",
+      "<b>A band across the top answers \u201cwhere is this job stuck\u201d</b> before a single row is read: the count per category, biggest first. Twelve material tasks and one quality task is a different problem from the reverse.",
+      "<b>And a Pending JPG button on every job card</b> \u2014 drawn at A4 proportions so the picture sits beside the printed pack without looking like a different document.",
+      "<b>Receivables and advances stopped being netted against each other.</b> <i>\u201cThere is no purpose of nett recievable!!! Same with supplier.\u201d</i> Netting a customer who owes us against a different customer whose money we hold produces a figure that is neither collectable nor payable \u2014 it describes nobody\u2019s position. Each party is netted within itself; then those in debit are the receivable and those in credit are money held, counted apart.",
+      "<b>An overdraft is not cash.</b> Bank &amp; Cash read \u20b95.44 Cr, of which <b>\u20b95.39 Cr was the Union Bank cash-credit account</b> \u2014 money borrowed from the bank, not money held at it. Counting it as cash turned the company\u2019s borrowing into its liquidity. It now reports on its own as <b>Overdraft drawn</b>.",
+    ],
+  },
+  {
     v: "5.9.5.4",
     date: "2026-09-30",
     module: "The receivables were doubled, and the Tally XML had it right all along",

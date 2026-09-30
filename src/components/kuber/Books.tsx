@@ -35,10 +35,11 @@ const Card = ({ label, value, sub, color = INK }: { label: string; value: string
 
 // ---------------- Dashboard ----------------
 interface Summary {
-  today: string; loadedAt: string | null; since: string; period: string; bankCash?: number;
+  today: string; loadedAt: string | null; since: string; period: string; bankCash?: number; bankOd?: number;
   flows: Record<string, { value: number; count: number }>;
-  receivable: { total: number; gross: number; overdue: number; due30: number; parties: number; unadjusted: number };
-  payable: { total: number; gross: number; overdue: number; due30: number; parties: number; unadjusted: number };
+  /** owed = parties in debit; held = parties in credit. Never netted across parties. */
+  receivable: { total: number; gross: number; overdue: number; due30: number; parties: number; unadjusted: number; owed: number; held: number; owingParties: number; creditParties: number };
+  payable: { total: number; gross: number; overdue: number; due30: number; parties: number; unadjusted: number; owed: number; held: number; owingParties: number; creditParties: number };
   bg: { count: number; amount: number; expiring: number };
   fd: { count: number; amount: number; expiring: number };
   insurance: { count: number; amount: number; expiring: number };
@@ -88,17 +89,24 @@ export function KuberDashboard({ go }: { go: (key: string) => void }) {
 
       {/* money owed and owing — gross first, advances named as what they are */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
-        <Card label="RECEIVABLES — DUE TO COME" value={fmtMoney(s.receivable.gross)} sub={`${s.receivable.parties} customers · real invoices only — proformas are not considered`} color="var(--blue)" />
-        <Card label="MONEY HELD FROM CUSTOMERS" value={fmtMoney(-s.receivable.unadjusted)} sub="advances + receipts not yet tied to bills in Tally (Agst Ref)" color="#1B6B93" />
-        <Card label="NET RECEIVABLE" value={fmtMoney(s.receivable.total)} sub="bills less every rupee held — small while receipts sit untied" />
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
-        <Card label="PAYABLES — TO PAY" value={fmtMoney(s.payable.gross)} sub={`${s.payable.parties} suppliers · gross bills`} color="var(--blue)" />
-        <Card label="ADVANCES PAID TO SUPPLIERS" value={fmtMoney(-s.payable.unadjusted)} sub="money out, goods awaited" color="#1B6B93" />
-        <Card label="NET PAYABLE" value={fmtMoney(s.payable.total)} sub="bills less advances" />
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
-        <Card label="BANK & CASH" value={fmtMoney(s.bankCash || 0)} sub="every bank, OD and cash ledger — as of the last upload" color={(s.bankCash || 0) >= 0 ? GREEN : RED} />
+        {/* TWO SEPARATE THINGS, NO NET (Dr Raghu, 30 Sep 2026: "there is no
+            purpose of nett recievable!!!"). Netting a customer who owes us
+            against a different customer whose money we hold describes
+            nobody's position. */}
+        <Card label="RECEIVABLES" value={fmtMoney(s.receivable.owed)}
+          sub={`${s.receivable.owingParties} customers in debit · real invoices only, proformas excluded`} color="var(--blue)" />
+        <Card label="ADVANCES FROM CUSTOMERS" value={fmtMoney(s.receivable.held)}
+          sub={`${s.receivable.creditParties} customers in credit · work owed against money held`} color="#1B6B93" />
+        <Card label="PAYABLES" value={fmtMoney(s.payable.owed)}
+          sub={`${s.payable.owingParties} suppliers in credit · what we owe`} color="var(--blue)" />
+        <Card label="ADVANCES PAID TO SUPPLIERS" value={fmtMoney(s.payable.held)}
+          sub={`${s.payable.creditParties} suppliers · money out, goods awaited`} color="#1B6B93" />
+        {/* AN OVERDRAFT IS NOT CASH. The CC account carried 5.39 Cr of the
+            5.44 Cr this card used to show. */}
+        <Card label="BANK & CASH" value={fmtMoney(s.bankCash || 0)} sub="bank and cash ledgers only — the overdraft is borrowing, not cash" color={(s.bankCash || 0) >= 0 ? GREEN : RED} />
+        {!!s.bankOd && (
+          <Card label="OVERDRAFT DRAWN" value={fmtMoney(Math.abs(s.bankOd))} sub="cash credit utilised — money borrowed, shown apart" color={"var(--warn)"} />
+        )}
       </div>
 
       {/* the day ratios (Dr Raghu, 28 Aug 2026) — each card SAYS its own
@@ -1658,8 +1666,8 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
 
       {s && (
         <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
-          <Card label="NET RECEIVABLE" value={fmtMoney(s.receivable.total)} sub={`${s.receivable.parties} customers`} />
-          <Card label="NET PAYABLE" value={fmtMoney(s.payable.total)} sub={`${s.payable.parties} suppliers`} />
+          <Card label="RECEIVABLES" value={fmtMoney(s.receivable.owed)} sub={`${s.receivable.owingParties} customers in debit`} />
+          <Card label="PAYABLES" value={fmtMoney(s.payable.owed)} sub={`${s.payable.owingParties} suppliers`} />
           <Card label="BANK & CASH" value={fmtMoney(s.bankCash || 0)} color={(s.bankCash || 0) >= 0 ? GREEN : RED} />
           <Card label="OVERDUE TO COLLECT" value={fmtMoney(a.overdueReceivable)} color={a.overdueReceivable > 0 ? "var(--warn)" : GREEN} />
         </div>

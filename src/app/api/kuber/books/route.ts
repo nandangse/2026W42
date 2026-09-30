@@ -71,6 +71,26 @@ type RR = Record<string, unknown>;
 
 /** The whole parsed book, paged past the cap — groups, ledgers, vouchers,
  *  lines — with the group tree ready to walk. One load, many statements. */
+/**
+ * Each party netted within itself, then split by which side it lands on.
+ * `owed` is the real receivable/payable; `held` is the pure-advance population.
+ */
+function partySides(bills: Bill[]) {
+  const per = new Map<string, number>();
+  for (const b of bills) per.set(b.party, (per.get(b.party) || 0) + b.amount);
+  let owed = 0, held = 0, owing = 0, credit = 0;
+  for (const v of per.values()) {
+    if (v > 0.5) { owed += v; owing += 1; }
+    else if (v < -0.5) { held += -v; credit += 1; }
+  }
+  return {
+    owed, held, owingParties: owing, creditParties: credit,
+    parties: per.size,
+    /* kept so the ageing screens and the cash flow keep working unchanged */
+    total: owed - held, gross: owed, unadjusted: -held,
+  };
+}
+
 async function loadWorld(admin: ReturnType<typeof adminClient>) {
   const pageAllW = async (build: (a: number, b: number) => PromiseLike<{ data: RR[] | null; error: { message: string } | null }>) => {
     const out: RR[] = [];
@@ -1258,7 +1278,8 @@ export async function GET(req: Request) {
     // Tally signs on the lines: debit negative, credit positive.
     const flows: Record<string, { value: number; count: number }> = Object.fromEntries(
       ["billing", "collections", "purchases", "supplier_payments", "money_in", "money_out"].map((k) => [k, { value: 0, count: 0 }]));
-    let bankCash = 0;
+    let bankCash = 0, bankOd = 0;
+    const odSet = new Set<string>();
     try {
       const world = await loadWorld(admin);
       const PURCH = new Set(["Purchase", "Cap-Ex Purchase", "Excise Purchase Import"]);
@@ -1269,7 +1290,21 @@ export async function GET(req: Request) {
         if (String(v.vtype) === "GST Sales") { flows.billing.value += Number(v.amount) || 0; flows.billing.count += 1; }
         if (PURCH.has(String(v.vtype))) { flows.purchases.value += Number(v.amount) || 0; flows.purchases.count += 1; }
       }
-      const isBankParent = (parent: string) => world.chainHas(parent, /^bank accounts$|^bank od|^cash-in-hand$/);
+      /**
+       * AN OVERDRAFT IS NOT CASH (Dr Raghu, 30 Sep 2026: "Bank and cash is
+       * wrong again!!!").
+       *
+       * The Union Bank CC account carried Rs 5.39 Cr of the Rs 5.44 Cr this
+       * card was showing — and a cash-credit account is money BORROWED from
+       * the bank, not money held at it. Counting it as cash turned the
+       * company's borrowing into its liquidity.
+       *
+       * It is not discarded: it is reported on its own, because what is drawn
+       * on the CC is a number worth seeing beside what is actually in hand.
+       */
+      const isCash = (parent: string) => world.chainHas(parent, /^bank accounts$|^cash-in-hand$/);
+      const isOd = (parent: string) => world.chainHas(parent, /^bank od/);
+      const isBankParent = (parent: string) => isCash(parent) || isOd(parent);
       const seen: Record<string, Set<string>> = { collections: new Set(), supplier_payments: new Set(), money_in: new Set(), money_out: new Set() };
       for (const l of world.lines) {
         const v = vById.get(String(l.voucher_id));
@@ -1294,9 +1329,14 @@ export async function GET(req: Request) {
       // with all closings zeroed). NOT windowed — a balance, not a flow.
       const bankSet = new Set<string>();
       for (const l of world.ledgers) {
-        if (isBankParent(String(l.parent || ""))) { bankCash += Number(l.opening) || 0; bankSet.add(String(l.name)); }
+        const par = String(l.parent || "");
+        if (isCash(par)) { bankCash += Number(l.opening) || 0; bankSet.add(String(l.name)); }
+        else if (isOd(par)) { bankOd += Number(l.opening) || 0; odSet.add(String(l.name)); }
       }
-      for (const l of world.lines) if (bankSet.has(String(l.ledger))) bankCash += Number(l.amount) || 0;
+      for (const l of world.lines) {
+        if (bankSet.has(String(l.ledger))) bankCash += Number(l.amount) || 0;
+        else if (odSet.has(String(l.ledger))) bankOd += Number(l.amount) || 0;
+      }
     } catch (e) { swallow("kuber/books", e); /* books not loaded yet */ }
     const bills = await allBills(admin);
     const rec = bills.filter((b) => b.kind === "receivable");
@@ -1328,9 +1368,23 @@ export async function GET(req: Request) {
     ]);
     return NextResponse.json({
       today, loadedAt, since, period,
-      flows, bankCash,
-      receivable: { total: sum(rec), gross: sum(pos(rec)), overdue: sum(overdue(rec)), due30: sum(dueSoon(rec, 30)), parties: new Set(rec.map((b) => b.party)).size, unadjusted: sum(rec.filter((b) => b.amount < 0)) },
-      payable: { total: sum(pay), gross: sum(pos(pay)), overdue: sum(overdue(pay)), due30: sum(dueSoon(pay, 30)), parties: new Set(pay.map((b) => b.party)).size, unadjusted: sum(pay.filter((b) => b.amount < 0)) },
+      flows, bankCash, bankOd,
+      /**
+       * TWO SEPARATE THINGS, AND NO NET BETWEEN THEM.
+       *
+       * Dr Raghu, 30 Sep 2026: "Receivables is real receivables. Advances is
+       * for those customers where there is nett advance only. There is no
+       * purpose of nett recievable!!! Same with supplier."
+       *
+       * He is right, and it is not a presentation preference. Netting a
+       * customer who owes us against a different customer whose money we are
+       * holding produces a figure that is neither collectable nor payable —
+       * it describes nobody's position. So each party is netted WITHIN
+       * ITSELF, and then the two populations are counted apart: those in
+       * debit are the receivable, those in credit are money held.
+       */
+      receivable: partySides(rec),
+      payable: partySides(pay),
       bg, fd, insurance: ins,
     });
   } catch (e) {
