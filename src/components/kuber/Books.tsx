@@ -2458,11 +2458,13 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
           {sales && sel.size > 0 && (
             <div className="rounded p-2 mb-2 flex items-center gap-2 flex-wrap" style={{ background: "#EEF1FA", border: `1px solid ${BORDER}` }}>
               <b className="text-xs" style={{ color: INK }}>{sel.size} selected</b>
-              <select defaultValue="" onChange={(e) => { if (e.target.value) { void bulk({ fam: e.target.value }); e.target.value = ""; } }}
-                disabled={bulkBusy} className="border rounded px-2 py-1 text-xs" style={box}>
-                <option value="">set product family…</option>
-                {(data.fams || []).map((f) => <option key={f} value={f}>{f}</option>)}
-              </select>
+              {/* TYPED, NOT PICKED (Dr Raghu, 30 Sep 2026: "make this typing").
+                  Twenty-five families is too many to scroll and too few to
+                  search; a field that offers as you type is both. */}
+              <input placeholder="set product family + Enter" disabled={bulkBusy} list="vreg-fams"
+                onKeyDown={(e) => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value.trim(); if (v) { void bulk({ fam: v }); (e.target as HTMLInputElement).value = ""; } } }}
+                className="border rounded px-2 py-1 text-xs" style={{ ...box, width: 200 }} />
+              <datalist id="vreg-fams">{(data.fams || []).map((f) => <option key={f} value={f} />)}</datalist>
               <input placeholder="set salesman + Enter" disabled={bulkBusy}
                 onKeyDown={(e) => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value.trim(); if (v) { void bulk({ salesman: v }); (e.target as HTMLInputElement).value = ""; } } }}
                 list="vreg-salesmen" className="border rounded px-2 py-1 text-xs" style={{ ...box, width: 160 }} />
@@ -2706,10 +2708,10 @@ function InvoiceBox({ row, kind, fams, salesmen, onClose, onSaved }: {
               )}
             </div>
           )}
-          {sales && <><L label="Product family"><select value={f.fam} onChange={(e) => setF({ ...f, fam: e.target.value })} className="border rounded px-2 py-1.5 text-sm" style={inp}>
-            <option value="">— not set —</option>
-            {fams.map((x) => <option key={x} value={x}>{x}</option>)}
-          </select></L>
+          {sales && <><L label="Product family — start typing">
+            <input list="ibox-fams" value={f.fam} onChange={(e) => setF({ ...f, fam: e.target.value })} className="border rounded px-2 py-1.5 text-sm" style={inp} />
+            <datalist id="ibox-fams">{fams.map((x) => <option key={x} value={x} />)}</datalist>
+          </L>
           <L label="Salesman — who follows this up">
             <input list="ibox-sales" value={f.salesman} onChange={(e) => setF({ ...f, salesman: e.target.value })} className="border rounded px-2 py-1.5 text-sm" style={inp} />
             <datalist id="ibox-sales">{salesmen.map((x) => <option key={x} value={x} />)}</datalist>
@@ -2923,11 +2925,10 @@ export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" |
           <b className="text-xs" style={{ color: INK }}>{sel1} ticked · {fmtMoney(rows.filter((r) => sel.has(key(r))).reduce((s2, r) => s2 + r.amount, 0))}</b>
           <input type="date" disabled={busy} onChange={(e) => { if (e.target.value) void apply({ expected_on: e.target.value }); }}
             title="Expected date" className="border rounded px-2 py-1 text-xs" style={{ borderColor: BORDER }} />
-          <select defaultValue="" disabled={busy} onChange={(e) => { if (e.target.value) { void apply({ fam: e.target.value }); e.target.value = ""; } }}
-            className="border rounded px-2 py-1 text-xs" style={{ borderColor: BORDER }}>
-            <option value="">set product…</option>
-            {fams.map((f) => <option key={f} value={f}>{f}</option>)}
-          </select>
+          <input placeholder="set product + Enter" disabled={busy} list="br-fams"
+            onKeyDown={(e) => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value.trim(); if (v) { void apply({ fam: v }); (e.target as HTMLInputElement).value = ""; } } }}
+            className="border rounded px-2 py-1 text-xs" style={{ borderColor: BORDER, width: 180 }} />
+          <datalist id="br-fams">{fams.map((f) => <option key={f} value={f} />)}</datalist>
           <input placeholder="salesperson + Enter" disabled={busy} list="br-sales"
             onKeyDown={(e) => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value.trim(); if (v) { void apply({ salesman: v }); (e.target as HTMLInputElement).value = ""; } } }}
             className="border rounded px-2 py-1 text-xs" style={{ borderColor: BORDER, width: 160 }} />
