@@ -537,3 +537,52 @@ const Pill = ({ s }: { s: string }) => {
   const t = STATUS_TONE[s] || { bg: "#F2F2EE", fg: C.sub };
   return <b className="rounded" style={{ background: t.bg, color: t.fg, padding: "1px 6px", fontSize: 11 }}>{s}</b>;
 };
+
+/**
+ * "+ AUDIT" — RAISE ONE FROM ANYWHERE.
+ *
+ * Dr Raghu, 30 Sep 2026: "show on top before the bell a '+ Audit' icon so
+ * from any page an audit entry can be put. By default from logged in person!"
+ *
+ * A query noticed while reading the P&L had to be carried in the head as far
+ * as the Audit Queries page, and a query carried in the head is a query that
+ * gets lost. It sits in Kuber's header now, on every screen in the module.
+ *
+ * ASKED BY IS THE PERSON SIGNED IN, and the date is today, both already
+ * filled — the two fields that are never in doubt and were always retyped.
+ * Assigned to starts at Suresh because all two hundred and sixty-nine open
+ * queries are his; it is a starting point, not a rule, and the box changes it.
+ */
+export function QuickAudit({ who }: { who: string }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const d = new Date();
+  const dmy = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+
+  const save = async (r: Partial<AuditRow>) => {
+    setBusy(true);
+    try {
+      await api.post("/api/kuber/audit", { action: "save", ...r });
+      setOpen(false); setSaved(true);
+      window.setTimeout(() => setSaved(false), 3000);
+    } catch { /* the box stays open so nothing typed is lost */ }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} title="Raise an audit query from here — it lands in Kuber → Audit Queries"
+        className="rounded px-2.5 py-1 font-bold"
+        style={{ background: saved ? "#0D7A3F" : "#22303C", color: "#fff", border: "1px solid #33424F", fontSize: 12 }}>
+        {saved ? "✓ raised" : "+ Audit"}
+      </button>
+      {open && (
+        <QueryBox
+          row={{ status: "Pending", instructed_by: who || "", assigned_to: "Suresh", assigned_text: dmy }}
+          busy={busy} onClose={() => setOpen(false)} onSave={save} />
+      )}
+    </>
+  );
+}

@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.7.4",
+    date: "2026-09-30",
+    module: "+ Audit, from anywhere in Kuber",
+    items: [
+      "A \"+ Audit\" BUTTON IN KUBER'S HEADER, on every screen in the module. A query noticed while reading the P&L had to be carried in the head as far as the Audit Queries page, and a query carried in the head is a query that gets lost.",
+      "Asked by is the person signed in and the date is today, both already filled \u2014 the two fields that are never in doubt and were always retyped. Assigned to starts at Suresh because all 269 open queries are his; a starting point, not a rule.",
+    ],
+  },
+  {
     v: "5.9.7.3",
     date: "2026-09-30",
     module: "Genie's reading, in the row",

@@ -22,7 +22,7 @@ import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerB
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
 import ComplianceCalendar from "@/components/kuber/Compliance";
-import AuditQueries from "@/components/kuber/AuditQueries";
+import AuditQueries, { QuickAudit } from "@/components/kuber/AuditQueries";
 import { LOGO } from "@/lib/logo";
 
 const NAV: { header?: string; items: { key: string; label: string; icon: string }[] }[] = [
@@ -170,7 +170,7 @@ export default function Accounts({
     <MoneyProvider>
     <div className="min-h-screen" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       {/* ═══════════════════ header ═══════════════════ */}
-      <GenieShell module="accounts" title="Nandan Kuber" tagline="The books, the bank and the balances" user={{ email, displayName, initials, role }} tools={<UnitPicker />} />
+      <GenieShell module="accounts" title="Nandan Kuber" tagline="The books, the bank and the balances" user={{ email, displayName, initials, role }} tools={<><QuickAudit who={displayName || email.split("@")[0]} /><UnitPicker /></>} />
 
       <div style={{ display: "flex", alignItems: "stretch", minHeight: "calc(100vh - 46px)" }}>
         {/* ═══════════════════ left navbar — folds to an icon rail ═══════════════════ */}
