@@ -5,6 +5,8 @@ import { adminClient } from "@/lib/supabase/admin";
 import { readBody } from "@/lib/validate";
 import { pageAll } from "@/lib/page-all";
 import { tidyStatus, readDate, readAmount, type AuditRow } from "@/lib/audit-query";
+import { assertAiOn } from "@/lib/ai-gate";
+import { AI, anthropicClient } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -58,13 +60,35 @@ export async function POST(req: Request) {
         NOT_INSTALLED.test(m) ? "Run migration 0172 first — the audit queries have nowhere to live yet." : m);
     };
 
+    /**
+     * A STATE CHANGE IS AN EVENT, NOT AN OVERWRITE (Dr Raghu, 30 Sep 2026:
+     * "make it log change from pending to done for review and then close").
+     *
+     * Pending \u2192 Done for Review \u2192 Closed is the shape of the work, and the
+     * only interesting question about it is how long each leg took. Writing
+     * the new state over the old one answers none of that, so the old state
+     * goes into the thread with who moved it and when.
+     */
     if (action === "status") {
-      const { error } = await db.from("audit_query")
-        .update({ status: tidyStatus(String(body.status || "")), updated_by: u.email, updated_at: new Date().toISOString() })
-        .eq("id", String(body.id || ""));
+      const id = String(body.id || "");
+      const to = tidyStatus(String(body.status || ""));
+      const now = new Date().toISOString();
+      const { data: before } = await db.from("audit_query").select("status, answered_at, closed_at").eq("id", id).maybeSingle();
+      const from = String((before as { status?: string } | null)?.status || "");
+      const upd: Record<string, unknown> = { status: to, updated_by: u.email, updated_at: now };
+      /* the clock on each leg, stamped the first time it is reached */
+      if (/done for review/i.test(to) && !(before as { answered_at?: string } | null)?.answered_at) upd.answered_at = now;
+      if (/^(done|closed)$/i.test(to) && !(before as { closed_at?: string } | null)?.closed_at) upd.closed_at = now;
+      const { error } = await db.from("audit_query").update(upd).eq("id", id);
       if (error) fail(error.message);
+      if (from !== to) {
+        const { error: le } = await db.from("audit_query_event")
+          .insert({ query_id: id, kind: "status", from_status: from || null, to_status: to, by_email: u.email });
+        if (le && !NOT_INSTALLED.test(le.message)) fail(le.message);
+      }
       return NextResponse.json({ ok: true });
     }
+
 
     if (action === "save") {
       const row: Record<string, unknown> = {
@@ -95,6 +119,94 @@ export async function POST(req: Request) {
         if (error) fail(error.message);
       }
       return NextResponse.json({ ok: true });
+    }
+
+    /**
+     * THE THREAD (0182).
+     *
+     * events   everything said about one query, oldest first
+     * comment  somebody writes on it
+     * genie    Genie reads it and the reading is KEPT — Dr Raghu, 30 Sep
+     *          2026: "this will be seen". An insight that only the person
+     *          who pressed the button can see is worth nothing to the next
+     *          person who opens the query.
+     */
+    if (action === "events") {
+      const { data, error } = await db.from("audit_query_event").select("*")
+        .eq("query_id", String(body.id || "")).order("at", { ascending: true }).limit(200);
+      if (error) fail(error.message);
+      return NextResponse.json({ events: data || [] });
+    }
+
+    if (action === "comment") {
+      const text = S(body.body, 4000);
+      if (!text) throw new HttpError(400, "Nothing to say.");
+      const { error } = await db.from("audit_query_event")
+        .insert({ query_id: String(body.id || ""), kind: "comment", body: text, by_email: u.email });
+      if (error) fail(error.message);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "genie") {
+      await assertAiOn();
+      const { data: q } = await db.from("audit_query").select("*").eq("id", String(body.id || "")).maybeSingle();
+      const row = q as AuditRow | null;
+      if (!row) throw new HttpError(404, "No such query.");
+
+      /* WHAT THE BOOKS SAY ABOUT THE LEDGER IT NAMES. An insight drawn from
+         the wording alone is a paraphrase; the useful part is the figure
+         sitting behind it, so the ledger named in the query is looked up and
+         its closing and last few vouchers go in with the question. */
+      let ledgerFacts = "The query does not name a ledger that exists in the books.";
+      const named = String(row.related_to || "").trim();
+      if (named) {
+        const { data: leds } = await db.from("kuber_ledger")
+          .select("name, parent, opening, closing").ilike("name", `%${named.slice(0, 40)}%`).limit(6);
+        const list = (leds || []) as { name: string; parent: string; opening: number; closing: number }[];
+        if (list.length) {
+          ledgerFacts = list.map((l) => `${l.name} (under ${l.parent}) — opening ${Math.round(Number(l.opening) || 0)}, closing ${Math.round(Number(l.closing) || 0)}`).join("\n");
+        }
+      }
+      const { data: ev } = await db.from("audit_query_event").select("kind, body, by_email, at")
+        .eq("query_id", row.id).order("at", { ascending: true }).limit(40);
+      const thread = ((ev || []) as { kind: string; body: string | null; by_email: string | null }[])
+        .filter((e) => e.body).map((e) => `${(e.by_email || "").split("@")[0]}: ${e.body}`).join("\n") || "(nothing said yet)";
+
+      const prompt = [
+        "You are Genie, the in-house assistant inside Nandan GSE's accounts system. An auditor has raised a query on the books and the accounts team has to answer it.",
+        "",
+        `THE QUERY (raised ${row.assigned_text || row.assigned_on || "date not recorded"} by ${row.instructed_by || "unknown"}, for ${row.assigned_to || "nobody named"}):`,
+        `Ledger or vendor: ${row.related_to || "not named"}`,
+        `Amount: ${row.amount_text || "not stated"}`,
+        `Status: ${row.status}`,
+        row.instruction || "(no wording)",
+        "",
+        "WHAT THE BOOKS SAY ABOUT THAT LEDGER:",
+        ledgerFacts,
+        "",
+        "THE THREAD SO FAR:",
+        thread,
+        "",
+        "Write a short reading for the person who has to answer this, in four parts, each a heading followed by one to three sentences:",
+        "WHAT IS BEING ASKED — in plain words, what the auditor actually wants.",
+        "WHY IT MATTERS — what it would mean for the accounts if the answer is bad.",
+        "WHAT TO CHECK — the specific vouchers, ledgers or documents to pull, named.",
+        "WHAT A GOOD ANSWER LOOKS LIKE — what to write back so it can be closed.",
+        "",
+        "Rules: Indian accounting and Tally conventions. Rupees in lakhs or crores. Never invent a figure — if the books above do not carry it, say what to look up instead. Be direct; no preamble, no flattery. Under 220 words.",
+      ].join("\n");
+
+      const ai = anthropicClient();
+      const msg = await ai.messages.create({
+        model: AI.FRONT, max_tokens: 900,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const note = msg.content.filter((c) => c.type === "text").map((c) => (c as { text: string }).text).join("\n").trim();
+      if (!note) throw new HttpError(502, "Genie had nothing to say — try again.");
+      const at = new Date().toISOString();
+      await db.from("audit_query").update({ ai_note: note, ai_at: at, ai_by: u.email }).eq("id", row.id);
+      await db.from("audit_query_event").insert({ query_id: row.id, kind: "ai", body: note, by_email: u.email });
+      return NextResponse.json({ ok: true, note, at });
     }
 
     /**

@@ -122,7 +122,30 @@ export interface AuditRow {
   verified_text: string | null; verified_on: string | null;
   source: string; sheet_row: number | null;
   updated_at: string | null; updated_by: string | null;
+  /** Genie's reading of the query — kept so everyone sees the same one (0182) */
+  ai_note?: string | null; ai_at?: string | null; ai_by?: string | null;
+  answered_at?: string | null; closed_at?: string | null;
 }
+
+/** One entry in a query's thread — append-only (0182). */
+export interface AuditEvent {
+  id: string; query_id: string;
+  kind: "status" | "comment" | "ai";
+  from_status: string | null; to_status: string | null;
+  body: string | null; by_email: string | null; at: string;
+}
+
+/**
+ * WHO RAISES AND WHO ANSWERS (Dr Raghu, 30 Sep 2026: "people giving \u2014
+ * Jyoti, UDS, Sandeep. People closing \u2014 Suresh, Sandesh").
+ *
+ * Typed free-hand, the same person arrives as "Jyoti", "jyoti" and "Jyoti
+ * mam" and the by-person filter splits three ways. These are the two lists
+ * the screen offers; anything already in the sheet is still accepted, because
+ * five years of history is not going to be re-keyed to suit a dropdown.
+ */
+export const AUDIT_RAISERS = ["Jyoti", "UDS", "Sandeep"] as const;
+export const AUDIT_CLOSERS = ["Suresh", "Sandesh"] as const;
 
 /** Older than seven days and still not done — the sheet's own headline. */
 export function overdue(rows: AuditRow[], today: string): AuditRow[] {

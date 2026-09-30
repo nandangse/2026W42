@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.7.0",
+    date: "2026-09-30",
+    module: "An audit query becomes a conversation",
+    items: [
+      "A PENCIL, AND A LIGHTBOX THAT OPENS WITH THE QUERY. The word \"open\" read like a status rather than an action; the pencil says what it does without being read, and clicking the query text opens it too. The query itself now stands at the top of the box in full \u2014 it was a textarea among twelve other fields.",
+      "ASK GENIE ABOUT THIS QUERY. Genie reads the wording, looks up the ledger it names in the books, reads everything said on it so far, and answers in four parts: what is actually being asked, why it matters, what to pull, and what a good answer looks like. AND IT IS KEPT \u2014 the reading goes into the thread with the name of whoever asked for it, so the next person to open the query finds it waiting. A query Genie has already read carries a mark in the list, so nobody spends the same tokens twice.",
+      "COMMENTS, AND A LOG OF EVERY MOVE. Pending \u2192 Done for Review \u2192 Closed is the shape of the work, and the only interesting question about it is how long each leg took \u2014 which writing the new state over the old one answers not at all. Every change now goes into the thread with who moved it and when, and the two legs are stamped so the wait can be measured. Nothing in the thread can be edited afterwards.",
+      "Asked by and Assigned to now offer the names \u2014 Jyoti, UDS, Sandeep raising; Suresh, Sandesh closing \u2014 while still accepting anything, because five years of sheet history is not going to be re-keyed to suit a dropdown.",
+    ],
+  },
+  {
     v: "5.9.6.9",
     date: "2026-09-30",
     module: "Which way is better",

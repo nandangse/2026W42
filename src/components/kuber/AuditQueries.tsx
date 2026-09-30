@@ -27,7 +27,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import {
   AUDIT_STATUS, STATUS_TONE, properName, overdue, readAmount,
-  type AuditRow,
+  AUDIT_RAISERS, AUDIT_CLOSERS,
+  type AuditRow, type AuditEvent,
 } from "@/lib/audit-query";
 import { today, fmtFull } from "@/lib/schedule";
 
@@ -182,7 +183,7 @@ export default function AuditQueries({ isOwner }: { isOwner: boolean }) {
                     <td style={{ padding: "5px 8px", whiteSpace: "nowrap" }}>{properName(r.instructed_by || "")}</td>
                     <td style={{ padding: "5px 8px", whiteSpace: "nowrap", fontWeight: 600 }}>{properName(r.assigned_to || "") || <span style={{ color: C.faint }}>nobody</span>}</td>
                     <td style={{ padding: "5px 8px", maxWidth: 190 }}>{r.related_to}</td>
-                    <td style={{ padding: "5px 8px", maxWidth: 420, lineHeight: 1.4 }}>
+                    <td onClick={() => setEdit(r)} title="Click to edit" style={{ padding: "5px 8px", maxWidth: 420, lineHeight: 1.4, cursor: "text" }}>
                       {String(r.instruction || "").slice(0, 220)}{String(r.instruction || "").length > 220 ? "…" : ""}
                       {r.remarks && <div style={{ color: C.green, fontSize: 11, marginTop: 2 }}>↳ {String(r.remarks).slice(0, 140)}</div>}
                     </td>
@@ -198,8 +199,21 @@ export default function AuditQueries({ isOwner }: { isOwner: boolean }) {
                         {[...new Set([r.status, ...AUDIT_STATUS])].map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </td>
+                    {/* THE PENCIL, NEXT TO THE STATUS (Dr Raghu, 30 Sep 2026:
+                        "put an edit icon next to it \u2014 I will get Jyoti to
+                        write here itself"). The word "open" read like a status,
+                        not an action; a pencil says what it does without being
+                        read. It edits every field of the query \u2014 the ledger,
+                        the wording, the amount, who it is for. */}
                     <td style={{ padding: "5px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
-                      <button onClick={() => setEdit(r)} style={{ color: C.accent, fontWeight: 700, fontSize: 11 }}>open</button>
+                      {/* a query Genie has already read says so, so nobody
+                          spends the tokens twice to learn the same thing */}
+                      {r.ai_note && <span title="Genie has read this one — open it to see" style={{ marginRight: 6, fontSize: 12 }}>&#10024;</span>}
+                      <button onClick={() => setEdit(r)} title="Edit this query — the wording, the ledger, the amount, who it is for"
+                        className="rounded"
+                        style={{ color: C.accent, fontWeight: 700, fontSize: 13, border: `1px solid ${C.line}`, background: "#fff", padding: "2px 7px", lineHeight: 1.2 }}>
+                        &#9998;
+                      </button>
                     </td>
                   </tr>
                 );
@@ -255,13 +269,44 @@ function QueryBox({ row, busy, onClose, onSave }: {
           <div className="flex-1" />
           <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3" }}>✕</button>
         </div>
+        {/* THE QUERY FIRST, IN FULL (Dr Raghu, 30 Sep 2026: "put a lightbox
+            to open, show the query"). It was a textarea among twelve other
+            fields; the one thing the person opening this came to read should
+            not have to be found. */}
+        {!!f.id && (
+          <div className="px-4 pt-4">
+            <div className="rounded" style={{ background: C.panel, padding: "12px 14px", borderLeft: `3px solid ${C.accent}` }}>
+              <div style={{ fontSize: 11, color: C.mute, marginBottom: 4 }}>
+                {f.related_to ? <b style={{ color: C.ink }}>{f.related_to}</b> : null}
+                {f.related_to && (f.assigned_text || f.instructed_by) ? " · " : ""}
+                {f.instructed_by ? `asked by ${properName(String(f.instructed_by))}` : ""}
+                {f.assigned_text ? ` · ${f.assigned_text}` : ""}
+                {f.amount_text ? ` · ${f.amount_text}` : ""}
+              </div>
+              <div style={{ fontSize: 14, lineHeight: 1.55, color: C.ink }}>{f.instruction || <i style={{ color: C.faint }}>nothing written yet</i>}</div>
+            </div>
+          </div>
+        )}
+        {!!f.id && <Thread row={f as AuditRow} />}
         <div className="p-4">
           <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
             <L label="Raised on" hint="as you would write it">
               <input value={f.assigned_text || ""} onChange={(e) => set("assigned_text", e.target.value)} style={box} placeholder="29/09/2026" />
             </L>
-            <L label="Asked by"><input value={f.instructed_by || ""} onChange={(e) => set("instructed_by", e.target.value)} style={box} /></L>
-            <L label="Assigned to"><input value={f.assigned_to || ""} onChange={(e) => set("assigned_to", e.target.value)} style={box} /></L>
+            {/* THE TWO LISTS, TYPED ONCE (Dr Raghu, 30 Sep 2026: "people
+                giving \u2014 Jyoti, UDS, Sandeep. People closing \u2014 Suresh,
+                Sandesh"). Free text splits one person three ways in the
+                by-person filter; a datalist offers the names and still takes
+                anything, because five years of sheet history will not be
+                re-keyed to suit a dropdown. */}
+            <L label="Asked by">
+              <input list="audit-raisers" value={f.instructed_by || ""} onChange={(e) => set("instructed_by", e.target.value)} style={box} />
+              <datalist id="audit-raisers">{AUDIT_RAISERS.map((n) => <option key={n} value={n} />)}</datalist>
+            </L>
+            <L label="Assigned to">
+              <input list="audit-closers" value={f.assigned_to || ""} onChange={(e) => set("assigned_to", e.target.value)} style={box} />
+              <datalist id="audit-closers">{AUDIT_CLOSERS.map((n) => <option key={n} value={n} />)}</datalist>
+            </L>
           </div>
           <L label="Ledger or vendor"><input value={f.related_to || ""} onChange={(e) => set("related_to", e.target.value)} style={box} /></L>
           <L label="The query"><textarea value={f.instruction || ""} onChange={(e) => set("instruction", e.target.value)} rows={5} style={{ ...box, resize: "vertical", lineHeight: 1.55 }} /></L>
@@ -376,3 +421,112 @@ function parseCsv(text: string): string[][] {
   if (cell || row.length) { row.push(cell); out.push(row); }
   return out;
 }
+
+/**
+ * THE THREAD — what was said, and how the query moved.
+ *
+ * Dr Raghu, 30 Sep 2026: "also make the comment there. and make it log change
+ * from pending to done for review and then close." And: "show a genie icon so
+ * that suresh can click on it and it will give greater insight about this.
+ * this will be seen."
+ *
+ * THE GENIE READING IS KEPT, NOT SHOWN AND FORGOTTEN. An insight that only
+ * the person who pressed the button can see helps nobody — so it is written
+ * into the thread with their name on it, and the next person to open the
+ * query finds it waiting. It is generated once and then read; pressing again
+ * re-reads the query with whatever has been said since.
+ */
+function Thread({ row }: { row: AuditRow }) {
+  const [events, setEvents] = useState<AuditEvent[] | null>(null);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+
+  const load = useCallback(() => {
+    api.post("/api/kuber/audit", { action: "events", id: row.id })
+      .then((r: { events?: AuditEvent[] }) => setEvents(r.events || []))
+      .catch(() => setEvents([]));
+  }, [row.id]);
+  useEffect(load, [load]);
+
+  const say = async () => {
+    const t = text.trim();
+    if (!t) return;
+    setBusy("comment"); setErr("");
+    try { await api.post("/api/kuber/audit", { action: "comment", id: row.id, body: t }); setText(""); load(); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(""); }
+  };
+  const ask = async () => {
+    setBusy("genie"); setErr("");
+    try { await api.post("/api/kuber/audit", { action: "genie", id: row.id }); load(); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(""); }
+  };
+
+  const when = (at: string) => new Date(at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  const who = (e: AuditEvent) => (e.by_email || "").split("@")[0] || "somebody";
+
+  return (
+    <div className="px-4 pt-3">
+      {/* ASK GENIE — the one button Suresh presses before he starts looking */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button onClick={ask} disabled={!!busy} className="rounded px-3 py-1.5 font-bold flex items-center gap-1.5"
+          title="Genie reads the query, the ledger behind it and everything said so far, and says what to check"
+          style={{ background: busy === "genie" ? C.faint : "#1E2B3A", color: "#fff", fontSize: 12.5 }}>
+          <span style={{ fontSize: 14 }}>&#10024;</span>
+          {busy === "genie" ? "Genie is reading…" : events?.some((e) => e.kind === "ai") ? "Ask Genie again" : "Ask Genie about this"}
+        </button>
+        <span style={{ fontSize: 11, color: C.mute }}>
+          it reads the ledger behind the query too — and whatever it says stays here for the next person
+        </span>
+      </div>
+      {err && <div style={{ color: C.red, fontSize: 11.5, marginTop: 6 }}>{err}</div>}
+
+      {events === null ? (
+        <div style={{ fontSize: 11.5, color: C.mute, marginTop: 10 }}>reading the thread…</div>
+      ) : (
+        <div style={{ marginTop: 10 }}>
+          {events.map((e) => (
+            <div key={e.id} style={{ borderTop: `1px solid ${C.soft}`, padding: "8px 0" }}>
+              {e.kind === "status" ? (
+                <div style={{ fontSize: 11.5, color: C.sub }}>
+                  <b style={{ color: C.ink }}>{who(e)}</b> moved it
+                  {e.from_status ? <> from <Pill s={e.from_status} /></> : null} to <Pill s={e.to_status || ""} />
+                  <span style={{ color: C.faint }}> · {when(e.at)}</span>
+                </div>
+              ) : e.kind === "ai" ? (
+                <div className="rounded" style={{ background: "#F2F4F8", padding: "10px 12px", borderLeft: "3px solid #1E2B3A" }}>
+                  <div style={{ fontSize: 11, color: C.mute, marginBottom: 4 }}>
+                    <b style={{ color: C.ink }}>&#10024; Genie</b> — asked by {who(e)} · {when(e.at)}
+                  </div>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.6, color: C.ink, whiteSpace: "pre-wrap" }}>{e.body}</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 11, color: C.mute }}><b style={{ color: C.ink }}>{who(e)}</b> · {when(e.at)}</div>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.6, color: C.ink, whiteSpace: "pre-wrap" }}>{e.body}</div>
+                </div>
+              )}
+            </div>
+          ))}
+          {!events.length && <div style={{ fontSize: 11.5, color: C.faint }}>Nothing said yet.</div>}
+        </div>
+      )}
+
+      <div className="flex gap-2 items-end" style={{ marginTop: 10 }}>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} placeholder="Write a comment…"
+          style={{ ...box, resize: "vertical", lineHeight: 1.5, flex: 1 }} />
+        <button onClick={say} disabled={!text.trim() || !!busy} className="rounded px-3 py-2 font-bold"
+          style={{ background: text.trim() ? C.accent : C.faint, color: "#fff", fontSize: 12.5 }}>
+          {busy === "comment" ? "…" : "Comment"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const Pill = ({ s }: { s: string }) => {
+  const t = STATUS_TONE[s] || { bg: "#F2F2EE", fg: C.sub };
+  return <b className="rounded" style={{ background: t.bg, color: t.fg, padding: "1px 6px", fontSize: 11 }}>{s}</b>;
+};
