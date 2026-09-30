@@ -390,6 +390,24 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "email and password required" }, { status: 400 });
       if (String(body.password).length < 8)
         return NextResponse.json({ error: "password must be at least 8 characters" }, { status: 400 });
+      /**
+       * ALREADY THERE IS NOT A FAILURE, IT IS AN ANSWER.
+       *
+       * Supabase refuses a second login on the same address with "A user
+       * with this email address has already been registered", which arrived
+       * here as a 500 and read like the button was broken. It happens most
+       * often when the person was made from another tab — the list in THIS
+       * tab was fetched before he existed, so a search for him finds nobody
+       * and adding him is refused, and both halves look like a bug.
+       */
+      {
+        const { data: already } = await admin.from("profiles")
+          .select("id, disabled").eq("email", email).maybeSingle();
+        if (already)
+          return NextResponse.json({
+            error: `${email} is already on Genie${already.disabled ? " (disabled — open the row and enable)" : ""}. Reload this page and search for them.`,
+          }, { status: 409 });
+      }
       // initials are the assignment key — auto-derive one if not supplied
       const initials = normInitials(body.initials) ?? (await suggestInitials(body.display_name || email));
       const { data, error } = await admin.auth.admin.createUser({

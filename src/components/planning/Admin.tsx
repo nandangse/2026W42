@@ -768,6 +768,37 @@ export function AdminTabs({ tab, setTab, owner }: { tab: AdminTab; setTab: (t: A
 }
 
 /**
+ * THE LOG IS WRITTEN WITH EMPHASIS, SO IT HAS TO BE READ WITH EMPHASIS.
+ *
+ * Every entry since the log began carries <b>, <i> and <code> around the
+ * part that matters — and React renders a string as a string, so the page
+ * printed the tags: "<b>One colour per month</b>". Nine hundred lines of
+ * release notes reading like view-source.
+ *
+ * The fix is a reader, not dangerouslySetInnerHTML. The log is ours, but it
+ * is also the one place in Genie where prose is stored and re-displayed, and
+ * a whitelist of three tags costs fifteen lines and cannot ever render
+ * anything but bold, italic and monospace.
+ */
+const RICH = /<(b|i|code)>([\s\S]*?)<\/\1>/g;
+function Rich({ text }: { text: string }) {
+  const out: React.ReactNode[] = [];
+  let at = 0;
+  for (const m of text.matchAll(RICH)) {
+    if (m.index! > at) out.push(text.slice(at, m.index));
+    const inner = <Rich text={m[2]} />;
+    out.push(
+      m[1] === "b" ? <b key={m.index} style={{ color: "var(--ink)" }}>{inner}</b>
+      : m[1] === "i" ? <i key={m.index}>{inner}</i>
+      : <code key={m.index} className="tnum" style={{ background: "#F1EFE9", borderRadius: 3, padding: "0 3px", fontSize: "92%" }}>{inner}</code>,
+    );
+    at = m.index! + m[0].length;
+  }
+  if (at < text.length) out.push(text.slice(at));
+  return <>{out}</>;
+}
+
+/**
  * The release log. Reads src/lib/changelog.ts, so the version badge in the
  * header and this page can never disagree — they are the same list.
  */
@@ -784,8 +815,16 @@ export function Updates() {
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: "var(--line)" }}>
       <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
         <div className="font-bold text-sm">What&apos;s changed in Genie</div>
+        {/* THE BADGE AND THE LOG CAN DISAGREE, AND THE PAGE SHOULD SAY SO.
+            The version is compiled into the browser's bundle; the log is
+            fetched. A tab left open across a deploy therefore shows an old
+            number beside a newer top entry, which reads like a bug in the
+            numbering rather than a page that wants reloading. */}
         <div className="text-xs" style={{ color: "var(--muted)" }}>
           Running version <b style={{ color: "var(--accent)" }}>{APP_VERSION}</b> · {UPDATES.length} release{UPDATES.length === 1 ? "" : "s"} logged
+          {UPDATES[0] && UPDATES[0].v !== APP_VERSION && (
+            <> · <b style={{ color: "var(--accent)" }}>{UPDATES[0].v} has shipped</b> — reload this page</>
+          )}
         </div>
       </div>
       {/* What it has cost, in time. Measured from the commit history rather
@@ -829,7 +868,7 @@ export function Updates() {
           </div>
           <ul className="mt-1" style={{ listStyle: "disc", paddingLeft: 20 }}>
             {u.items.map((it, i) => (
-              <li key={i} className="text-sm" style={{ color: "var(--dim)" }}>{it}</li>
+              <li key={i} className="text-sm" style={{ color: "var(--dim)", lineHeight: 1.5 }}><Rich text={it} /></li>
             ))}
           </ul>
         </div>

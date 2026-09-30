@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { currentUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { today } from "@/lib/schedule";
+import { ownerRegister, type Owner } from "@/lib/owner-register";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Job · Nandan Genie" };
@@ -52,6 +53,10 @@ export default async function JobBoardPage({ params }: { params: { no: string } 
     .limit(1);
   const j = (data || [])[0];
   if (!j) return <Plain title={`No job ${no} on the board.`} sub="It may have been delivered and archived." link="/" linkText="Go to Genie" />;
+
+  /* The four owners, named through the profiles register — the same
+     mapping the printed board uses. */
+  const who = await ownerRegister(adminClient());
 
   const full = String(j.id);
   const [photos, docs, tasks] = await Promise.all([
@@ -121,10 +126,10 @@ export default async function JobBoardPage({ params }: { params: { no: string } 
         {!!j.note && <Field label="CURRENT UPDATE" value={String(j.note)} />}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, margin: "12px 0" }}>
-          <Owner label="PROJECT" v={init(j.own)} />
-          <Owner label="KITTING" v={init(j.kitting_owner)} />
-          <Owner label="PRODUCTION" v={init(j.production_owner)} />
-          <Owner label="DESIGN" v={init(j.design_owner)} />
+          <Owner label="PROJECT" o={who(j.own)} />
+          <Owner label="KITTING" o={who(j.kitting_owner)} />
+          <Owner label="PRODUCTION" o={who(j.production_owner)} />
+          <Owner label="DESIGN" o={who(j.design_owner)} />
         </div>
 
         <div style={{ fontWeight: 700, margin: "18px 0 8px" }}>
@@ -158,13 +163,6 @@ export default async function JobBoardPage({ params }: { params: { no: string } 
   );
 }
 
-const init = (v: unknown) => {
-  const s = String(v || "").trim();
-  if (!s) return null;
-  if (s.includes("@")) return s.split("@")[0].slice(0, 4).toUpperCase();
-  return s.length <= 4 ? s.toUpperCase() : s.split(/\s+/).map((w) => w[0]).join("").slice(0, 4).toUpperCase();
-};
-
 /** The per-cent bar, with the ten marks the paper board has. */
 function Bar({ label, value, colour }: { label: string; value: number; colour: string }) {
   return (
@@ -196,11 +194,13 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Owner({ label, v }: { label: string; v: string | null }) {
+/** The code the floor says, and under it the man it means. */
+function Owner({ label, o }: { label: string; o: Owner }) {
   return (
     <div style={{ background: "#fff", border: "1px solid #DCD8CC", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
       <div style={{ fontSize: 8.5, letterSpacing: .5, color: "#8B8F87" }}>{label}</div>
-      <b style={{ fontSize: 14 }}>{v || "—"}</b>
+      <b style={{ fontSize: 14 }}>{o.code || (o.name ? "" : "—")}</b>
+      {!!o.name && <div style={{ fontSize: 10.5, color: "#46545F", lineHeight: 1.2, marginTop: 1 }}>{o.name}</div>}
     </div>
   );
 }

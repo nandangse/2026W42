@@ -89,6 +89,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.2.2",
+    date: "2026-09-30",
+    module: "The vehicle numbers, the owners' names, and a log you can read",
+    items: [
+      "<b>The chassis and engine numbers are syncing.</b> They had been asked for as <code>custom_vehicle_model</code>, <code>custom_engine_no</code> and <code>custom_chassis_no</code> \u2014 inferred from the <code>custom_</code> prefix every other added field in this ERP wears. The ERP refused all three, the sync dropped them exactly as it was built to and carried on, and the three columns stayed empty beside an <i>is_vehicle</i> flag coming through true on forty-odd jobs. Fetching one vehicle Jobmaster whole settled it in a second: <b>they are spelt plainly \u2014 <code>chassis_model</code>, <code>engine_no</code>, <code>chassis_no</code></b>, because they are older than that convention. <i>Eicher 2095 \u00b7 MC2EBGRC0PKB38714.</i>",
+      "<b>A typed \u201cNA\u201d is read as the nothing it is</b>, and trailing spaces are trimmed. An empty box invites the storekeeper to write the number in; <i>NA</i> tells him somebody already decided there isn\u2019t one.",
+      "<b>Owners are named from the register, not guessed from an e-mail</b> \u2014 <i>AF: Alpesh Fendange, UD: Ulhas Deshmukh, RNN: Rajesh Nayak</i>. The ERP writes the planning owner as an address and the other three as the codes the floor says out loud, and both were being chopped into initials at the point of display, which is how <i>pankajs@nandan.co.in</i> became <b>PANK</b>. <code>profiles</code> has held the mapping all along \u2014 the code in <i>initials</i>, the man in <i>display name</i> \u2014 so the paper board, the phone page and every screen inside now name him the same way. <b>A code nobody has entered prints as the bare code</b>; a name invented here would be read off the machine as a fact.",
+      "<b>The pending-material line is off the printed board.</b>",
+      "<b>Admin \u2192 Updates reads as prose again.</b> Every entry in this log is written with emphasis on the part that matters, and the page was printing the tags themselves \u2014 nine hundred lines of release notes looking like view-source. Read now through a three-tag whitelist rather than by trusting the string.",
+      "<b>A tab left open across a deploy says so</b> instead of showing an old version beside a newer top entry, which reads like a fault in the numbering rather than a page that wants reloading.",
+      "<b>Adding somebody who is already on Genie answers instead of failing.</b> It is most often the same person twice from two tabs \u2014 the list here was fetched before they existed, so searching finds nobody and adding is refused, and both halves look like a broken button.",
+    ],
+  },
+  {
     v: "5.9.2.1",
     date: "2026-09-30",
     module: "Twelve month colours, and a board that says more at a distance",

@@ -39,7 +39,6 @@ export interface BoardJob {
   kitting: string | null; kittingName?: string | null;
   production: string | null; productionName?: string | null;
   design: string | null; designName?: string | null;
-  escalation: string | null;
   /** Built on a vehicle — the row only prints when this is true. */
   isVehicle?: boolean;
   chassisNo?: string | null;
@@ -126,15 +125,17 @@ export async function jobBoardBody(jobs: BoardJob[], on: string, by: string, ver
 
 export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, version: string): Promise<string> {
   const page = async (j: BoardJob) => {
-    /* INITIALS AND THE FIRST NAME (Dr Raghu, 30 Sep 2026: "it has space to
-       show the first name of the guy. PS: PANKAJ"). Initials are for the
-       people who know them; the first name is for the new man on the floor
-       who has to go and find him. */
+    /* THE CODE AND THE NAME (Dr Raghu, 30 Sep 2026: "it should be seen as
+       AF: Alpesh / UD: Ullhas / RNN: Rajesh / SS: Saurabh shirke").
+       The code is what the ERP writes on the job and what the people who
+       work here say out loud; the name is for the new man who has to go and
+       find him. Written exactly as he wrote it — CODE, colon, name. */
     const owner = (label: string, v: string | null, name?: string | null) => {
-      const first = String(name || "").trim().split(/\s+/)[0] || "";
-      return `<div class="ow"><span class="owl">${esc(label)}</span>
-        <b>${esc(v || "—")}${first && first.toUpperCase() !== String(v || "").toUpperCase()
-          ? `<i class="ofn">${esc(first)}</i>` : ""}</b></div>`;
+      const code = String(v || "").trim();
+      const who = String(name || "").trim();
+      const body = code && who ? `${esc(code)}: <i class="ofn">${esc(who)}</i>`
+        : code ? esc(code) : who ? `<i class="ofn">${esc(who)}</i>` : "—";
+      return `<div class="ow"><span class="owl">${esc(label)}</span><b>${body}</b></div>`;
     };
     const boxes = (vals: (string | number)[], wide = false) =>
       vals.map((v) => `<div class="bx${wide ? " w" : ""}"><span>${esc(String(v))}${typeof v === "number" ? "%" : ""}</span></div>`).join("");
@@ -170,7 +171,6 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
       <div class="vb"><span>CHASSIS NO</span><i>${esc(j.chassisNo || "")}</i></div>
       <div class="vb"><span>ENGINE NO</span><i>${esc(j.engineNo || "")}</i></div>
     </div>` : ""}
-    ${j.escalation ? `<div class="esc">&#9888; ${esc(j.escalation.slice(0, 150))}</div>` : ""}
     <div class="notes"><span>NOTES</span><i></i></div>
   </div>
 
@@ -217,8 +217,8 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
   .owners { display:grid; grid-template-columns: repeat(4,1fr); gap:1.5mm; margin-top:1.5mm; }
   .ow { border:.3mm solid #C9C6BD; border-radius:1mm; padding:1mm 1.5mm; text-align:center; }
   .owl { display:block; font-size:6.5pt; letter-spacing:.1em; color:#8B8F87; }
-  .ow b { font-size:13pt; }
-  .ofn { font-style:normal; font-weight:normal; font-size:7.5pt; color:#46545F; margin-left:1.2mm; }
+  .ow b { font-size:11.5pt; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ofn { font-style:normal; font-weight:normal; font-size:7.5pt; color:#46545F; margin-left:.6mm; }
   .owl { text-transform:uppercase; }
 
   .grid { display:grid; grid-template-columns: 24mm 1fr; gap:1.2mm 2mm; margin-top:2mm; align-items:center; }
@@ -250,7 +250,6 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
   .vb span { display:block; font-size:5.8pt; letter-spacing:.1em; color:#8B8F87; }
   .vb i { font-style:normal; font-size:10pt; font-weight:bold; letter-spacing:-.01em;
           display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .esc { margin-top:2mm; font-size:8pt; color:#B3392E; font-weight:bold; line-height:1.25; }
   .notes { margin-top:auto; display:flex; align-items:flex-end; gap:2mm; }
   .notes span { font-size:6.5pt; letter-spacing:.1em; color:#8B8F87; }
   .notes i { flex:1; border-bottom:.3mm dotted #8B8F87; height:5mm; }

@@ -165,16 +165,39 @@ const N = (v: unknown) => {
 };
 
 /**
- * The three fields the ERP's Project carries about the vehicle.
+ * The three fields the Jobmaster carries about the vehicle.
  *
- * Kept in their own list because they are the only names here that are
- * INFERRED rather than known: ERPNext prefixes a field added through
- * Customise Form with custom_, which is what every other custom field in
- * this ERP does. An inferred name must be able to fail out loud, so these
- * are optional — if the ERP does not know them the request is retried
- * without them and the sync reports which were dropped.
+ * READ OFF A DOCUMENT, NOT GUESSED (30 Sep 2026). They were first inferred
+ * as custom_vehicle_model / custom_engine_no / custom_chassis_no, on the
+ * reasoning that everything added through Customise Form wears a custom_
+ * prefix. Frappe refused all three, the sync dropped them exactly as it was
+ * built to, and the three columns filled with nothing for a week while
+ * is_vehicle came through true on 40-odd jobs — a flag saying "there is a
+ * vehicle here" beside three permanently empty boxes.
+ *
+ * Fetching one vehicle Jobmaster whole settled it: the ERP spells them
+ * plainly — chassis_model, engine_no, chassis_no — because they are older
+ * than the custom_ convention. The model is called CHASSIS model there, and
+ * it is the same thing: "Eicher 2095".
+ *
+ * They stay in this list so that a name which turns out to be wrong still
+ * fails out loud rather than taking every project's sync down with it.
  */
-export const VEHICLE_FIELDS = ["custom_vehicle_model", "custom_engine_no", "custom_chassis_no"];
+export const VEHICLE_FIELDS = ["chassis_model", "engine_no", "chassis_no"];
+
+/**
+ * A CHASSIS NUMBER, OR NOTHING.
+ *
+ * The ERP's values arrive with trailing spaces ("E446CDPK084141 ") and some
+ * carry the typed placeholder "NA". A board printed with NA in the chassis
+ * box is worse than one printed empty: empty invites the storekeeper to
+ * write the number in, NA tells him somebody already decided there isn't
+ * one. So a placeholder is read as the absence it is.
+ */
+const VEH = (v: unknown) => {
+  const s = S(v);
+  return !s || /^(na|n\/a|nil|none|-+)$/i.test(s) ? null : s;
+};
 
 /**
  * CONFIRMED to exist on the Jobmaster — read off a whole document, not
@@ -301,9 +324,9 @@ const JOB_FIELDS = [
   // types it 112 times.
   "custom_gst_rate",
   /* THE VEHICLE IT IS BUILT ON (Dr Raghu, 29 Sep 2026: "its in ERP ... not
-     project this is in jobmaster"). Optional, because these three names are
-     inferred from ERPNext's custom_ habit rather than known — see
-     VEHICLE_FIELDS. */
+     project this is in jobmaster"). Read off a Jobmaster document — see
+     VEHICLE_FIELDS — and still optional, so a wrong name would fail loudly
+     rather than stop every job syncing. */
   ...VEHICLE_FIELDS,
   VEHICLE_FLAG,
   // when the ERP last touched the row -- "latest entry wins" needs it
@@ -526,9 +549,9 @@ export async function erpSync(
        protects a number somebody typed here from a blank arriving from the
        ERP — an empty field is not later information, it is none. */
     is_vehicle: j[VEHICLE_FLAG] == null ? null : !!Number(j[VEHICLE_FLAG]),
-    vehicle_model: S(j.custom_vehicle_model) || null,
-    engine_no: S(j.custom_engine_no) || null,
-    chassis_no: S(j.custom_chassis_no) || null,
+    vehicle_model: VEH(j.chassis_model),
+    engine_no: VEH(j.engine_no),
+    chassis_no: VEH(j.chassis_no),
     _erp_modified: S(j.modified),
   })).filter((j) => j.id);
 

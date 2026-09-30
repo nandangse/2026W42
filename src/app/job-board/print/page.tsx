@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { jobBoardHtml, type BoardJob } from "@/lib/job-board";
+import { ownerRegister } from "@/lib/owner-register";
 import { APP_VERSION } from "@/lib/version";
 import { today } from "@/lib/schedule";
 
@@ -28,15 +29,12 @@ export default async function JobBoardPrint({ searchParams }: { searchParams: { 
 
   const { data } = await adminClient()
     .from("jobs")
-    .select("id, tag, fam, tdd, otd, escalation, own, production_owner, kitting_owner, design_owner, is_vehicle, chassis_no, engine_no, vehicle_model")
+    .select("id, tag, fam, tdd, otd, own, production_owner, kitting_owner, design_owner, is_vehicle, chassis_no, engine_no, vehicle_model")
     .in("id", ids);
 
-  const init = (v: unknown) => {
-    const s = String(v || "").trim();
-    if (!s) return null;
-    if (s.includes("@")) return s.split("@")[0].slice(0, 4).toUpperCase();
-    return s.length <= 4 ? s.toUpperCase() : s.split(/\s+/).map((w) => w[0]).join("").slice(0, 4).toUpperCase();
-  };
+  /* WHO EACH OWNER IS — resolved through the profiles register rather than
+     chopped out of an e-mail. See src/lib/owner-register.ts. */
+  const who = await ownerRegister(adminClient());
   /* Kept in the order they were ticked, so a stack of printouts comes out in
      the order somebody chose rather than in the database's. */
   const byId = new Map((data || []).map((j) => [String(j.id), j]));
@@ -46,11 +44,10 @@ export default async function JobBoardPrint({ searchParams }: { searchParams: { 
     fam: String(j!.fam || ""),
     tdd: (j!.tdd as string) || null,
     otd: (j!.otd as string) || null,
-    pm: init(j!.own), pmName: String(j!.own || ""),
-    kitting: init(j!.kitting_owner), kittingName: String(j!.kitting_owner || ""),
-    production: init(j!.production_owner), productionName: String(j!.production_owner || ""),
-    design: init(j!.design_owner), designName: String(j!.design_owner || ""),
-    escalation: (j!.escalation as string) || null,
+    pm: who(j!.own).code, pmName: who(j!.own).name,
+    kitting: who(j!.kitting_owner).code, kittingName: who(j!.kitting_owner).name,
+    production: who(j!.production_owner).code, productionName: who(j!.production_owner).name,
+    design: who(j!.design_owner).code, designName: who(j!.design_owner).name,
     /* Ticked, or answered by the fact that somebody has already recorded a
        number — recording one is itself saying it is a vehicle. */
     isVehicle: !!j!.is_vehicle || !!j!.chassis_no || !!j!.engine_no || !!j!.vehicle_model,

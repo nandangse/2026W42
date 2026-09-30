@@ -151,6 +151,38 @@ export async function POST(req: Request) {
     // A Genie-only field has no ERP column to be pushed to. Queueing one would
     // put a line in Pankaj's export that nothing on the other side can receive.
     const changed = show(oldValue) !== show(value);
+
+    /**
+     * THE HISTORY, WHICH THE QUEUE IS NOT (0176).
+     *
+     * erp_update collapses repeated edits on purpose — the ERP must receive
+     * the latest value, not three edits to replay in order. That makes it
+     * useless as a record, and the Current Update is the one field on a job
+     * that is prose: "W30 : Ord rcd", then "W36 : panels at paint". The
+     * earlier line is the only account there is of how the job actually
+     * went, and it was being written over.
+     *
+     * Logged for every field, not only the note, because "who moved the
+     * target date, and from what" is asked more often than anything else and
+     * needs no second design.
+     */
+    if (changed) {
+      try {
+        const { error: le } = await adminClient().from("job_field_log").insert({
+          job_id: body.job_id,
+          field,
+          label: meta.label,
+          old_value: show(oldValue),
+          new_value: show(value),
+          by_email: user.email,
+          by_name: user.displayName || user.initials || user.email.split("@")[0],
+        });
+        /* The client returns the error rather than throwing it, so a missing
+           table would otherwise pass silently as a success. */
+        if (le) swallow("job-field/log", new Error(le.message));
+      } catch (e) { swallow("job-field/log", e); /* 0176 not run yet — the edit still stands */ }
+    }
+
     let queued = false;
     if (changed && !meta.genieOnly) {
       try {
