@@ -1123,84 +1123,174 @@ export async function GET(req: Request) {
         stockFrom, stocksTyped, tvc, throughput, manuf, grossProfit, indirect, ebitda, finance, depreciation,
         operatingExpenses, netOperating, npbt, tax, npat } = cur;
 
-      // the P&L to date (for equity) and the balance-sheet closings the
-      // ratio pack needs — both are as-at `to`, not period movements
-      let profitToDate = 0;
-      const closingOfRoot = new Map<string, number>();
-      for (const l of w.ledgers) {
-        const name = String(l.name), grp = String(l.parent || "");
-        if (!grp) continue;
-        const root = w.rootOf(grp);
-        /* the same ladder decides this too — a head cannot be a P&L head
-           for the statement and a balance-sheet head for the ratios */
-        if (classifyLedger({ ledger: name, group: grp, root, rootN: stripNo(root) }).bucket !== "balance") {
-          profitToDate += toDate.get(name) || 0; continue;
+      /**
+       * THE RATIO PACK, COMPUTED FOR ANY DATE — SO LAST YEAR GETS ONE TOO.
+       *
+       * Dr Raghu, 30 Sep 2026: "in this also show the last years like period."
+       *
+       * The P&L half of a ratio is a period movement and was already computed
+       * twice. The balance-sheet half is a CLOSING, and a closing needs an
+       * opening to stand on — which is the trap. `kuber_ledger.opening` is the
+       * opening of the NEWEST masters year: as at 1 April 2026. Adding it to
+       * movements up to 30 September 2025 would be arithmetic on two different
+       * anchors, and would look plausible.
+       *
+       * So the anchor is named, and the walk goes both ways from it: forward
+       * to a date after it, BACKWARD out of it for a date before. A closing on
+       * 30 September 2025 is the 1 April 2026 opening less everything posted
+       * between the two. That is exact, and it is the only honest way to strike
+       * a balance sheet for a year whose own opening was never exported.
+       */
+      const anchor = (() => {
+        const fy = (w.ledgers as RR[]).reduce((a, r) => { const f = String(r.fy || ""); return f > a ? f : a; }, "");
+        const y = Number(String(fy).slice(0, 4));
+        return y ? `${y}-04-01` : from;
+      })();
+      const closingsAt = (asOf: string) => {
+        /* signed movement between the anchor and asOf — forward adds, backward subtracts */
+        const delta = new Map<string, number>();
+        for (const l of w.lines) {
+          const d = w.dateOf.get(String(l.voucher_id)) || "";
+          if (!d) continue;
+          const fwd = d >= anchor && d <= asOf;
+          const back = d > asOf && d < anchor;
+          if (!fwd && !back) continue;
+          const n = String(l.ledger);
+          delta.set(n, (delta.get(n) || 0) + (Number(l.amount) || 0) * (fwd ? 1 : -1));
         }
-        // balance-sheet closing per root, for the ratio pack
-        const closing = (Number(l.opening) || 0) + (toDate.get(name) || 0);
-        closingOfRoot.set(root, (closingOfRoot.get(root) || 0) + closing);
-        // the debtor/creditor chains, held separately
-        const chainHas = (want: RegExp) => {
-          let cur2 = grp.toLowerCase();
-          for (let i = 0; i < 25; i++) {
-            if (want.test(cur2)) return true;
-            const g2 = w.groups.find((g) => String(g.name).toLowerCase() === cur2);
-            const nx = g2 ? String(g2.parent || "").toLowerCase() : "";
-            if (!nx || nx === cur2) return false;
-            cur2 = nx;
+        let profitToDate = 0;
+        const closingOfRoot = new Map<string, number>();
+        for (const l of w.ledgers) {
+          const name = String(l.name), grp = String(l.parent || "");
+          if (!grp) continue;
+          const root = w.rootOf(grp);
+          /* the same ladder decides this too — a head cannot be a P&L head
+             for the statement and a balance-sheet head for the ratios */
+          if (classifyLedger({ ledger: name, group: grp, root, rootN: stripNo(root) }).bucket !== "balance") {
+            profitToDate += toDateUpto(asOf, name); continue;
           }
-          return false;
-        };
-        if (chainHas(/sundry debtor/)) closingOfRoot.set("__debtors", (closingOfRoot.get("__debtors") || 0) + closing);
-        if (chainHas(/sundry creditor/)) closingOfRoot.set("__creditors", (closingOfRoot.get("__creditors") || 0) + closing);
+          const closing = (Number(l.opening) || 0) + (delta.get(name) || 0);
+          closingOfRoot.set(root, (closingOfRoot.get(root) || 0) + closing);
+          const chainHas = (want: RegExp) => {
+            let cur2 = grp.toLowerCase();
+            for (let i = 0; i < 25; i++) {
+              if (want.test(cur2)) return true;
+              const g2 = w.groups.find((g) => String(g.name).toLowerCase() === cur2);
+              const nx = g2 ? String(g2.parent || "").toLowerCase() : "";
+              if (!nx || nx === cur2) return false;
+              cur2 = nx;
+            }
+            return false;
+          };
+          if (chainHas(/sundry debtor/)) closingOfRoot.set("__debtors", (closingOfRoot.get("__debtors") || 0) + closing);
+          if (chainHas(/sundry creditor/)) closingOfRoot.set("__creditors", (closingOfRoot.get("__creditors") || 0) + closing);
+        }
+        return { profitToDate, closingOfRoot };
+      };
+      /* the P&L carried forward to a date — every P&L line ever posted up to it */
+      const pnlToDate = new Map<string, Map<string, number>>();
+      function toDateUpto(asOf: string, ledger: string): number {
+        let m = pnlToDate.get(asOf);
+        if (!m) {
+          m = new Map<string, number>();
+          for (const l of w.lines) {
+            const d = w.dateOf.get(String(l.voucher_id)) || "";
+            if (!d || d > asOf) continue;
+            const n = String(l.ledger);
+            m.set(n, (m.get(n) || 0) + (Number(l.amount) || 0));
+          }
+          pnlToDate.set(asOf, m);
+        }
+        return m.get(ledger) || 0;
       }
+
       const months = Math.max(1, (Number(to.slice(0, 4)) - Number(from.slice(0, 4))) * 12 + (Number(to.slice(5, 7)) - Number(from.slice(5, 7))) + 1);
       const days = Math.max(1, daysBetween(from, to) + 1);
 
       // ---- the ratio pack — each states its formula; "—" where an input
       // is honestly absent, never a guess ----
-      const rootVal = (re: RegExp) => {
-        let t2 = 0;
-        for (const [r, v] of closingOfRoot) if (re.test(stripNo(r))) t2 += v;
-        return t2;
-      };
-      const equity = rootVal(/capital/i) + profitToDate;
       const loans = ((loanRes.data as RR[]) || []).filter((x) => String(x.status) !== "closed");
       const loanOut = loans.reduce((s2, x) => s2 + (Number(x.outstanding) || 0), 0);
       const emiMonthly = loans.reduce((s2, x) => s2 + (Number(x.emi) || 0), 0);
-      const debtBooks = rootVal(/loans? \(liability\)|^loans|bank od/i);
-      const debt = loanOut > 0 ? loanOut : Math.max(0, debtBooks);
-      const curLiab = rootVal(/current liabilit/i);
-      const curAssets = -rootVal(/current asset/i);
-      const debtors = -(closingOfRoot.get("__debtors") || 0);
-      const creditors = closingOfRoot.get("__creditors") || 0;
-      const ann = 365 / days;
-      const R = (key: string, label: string, value: number | null, unit: string, formula: string) =>
-        ({ key, label, value: value != null && isFinite(value) ? value : null, unit, formula, target: targets[key] || "" });
-      const ratios = [
-        R("ebitda_sales", "EBITDA to Sales %", revenue ? (ebitda / revenue) * 100 : null, "%", "EBITDA ÷ revenue"),
-        R("pbt_sales", "PBT to Sales %", revenue ? (npbt / revenue) * 100 : null, "%", "net profit before tax ÷ revenue"),
-        R("pat_sales", "PAT to Sales %", revenue ? (npat / revenue) * 100 : null, "%", "net profit after tax ÷ revenue"),
-        R("int_cover", "Interest Coverage (times)", finance ? ebitda / finance : null, "x", "EBITDA ÷ finance charges"),
-        R("debt_equity", "Debt / Equity", equity ? debt / equity : null, "x", loanOut > 0 ? "loan-register outstanding ÷ (capital + P&L to date)" : "loan roots in the books ÷ (capital + P&L to date)"),
-        R("current_ratio", "Current Ratio", curLiab ? curAssets / curLiab : null, "x", "current assets ÷ current liabilities, at their book closings"),
-        R("quick_ratio", "Quick Ratio", curLiab && stocksTyped ? (curAssets - closingStock) / curLiab : null, "x", stocksTyped ? "(current assets − closing stock) ÷ current liabilities" : "needs the closing stock typed on the P&L"),
-        R("debt_service", "Debt Service (period)", emiMonthly ? emiMonthly * months : null, "₹", "loan-register monthly EMI × months in the period"),
-        R("dscr", "DSCR", emiMonthly ? ebitda / (emiMonthly * months) : null, "x", "EBITDA ÷ (EMI × months); the loan register is the source"),
-        R("gp_cr", "Gross Profit", grossProfit, "₹", "throughput − manufacturing expenses"),
-        R("expenses_cr", "Direct + Indirect + Interest", manuf + indirect + finance, "₹", "manufacturing + indirect + finance charges"),
-        R("productivity", "Business Productivity (GP ÷ Expenses)", manuf + indirect + finance ? grossProfit / (manuf + indirect + finance) : null, "x", "gross profit ÷ (manufacturing + indirect + finance)"),
-        R("tol_tnw", "TOL / TNW", equity ? (debt + curLiab) / equity : null, "x", "(debt + current liabilities) ÷ (capital + P&L to date)"),
-        R("roce", "RoCE %", equity + debt ? ((ebitda - depreciation) * ann / (equity + debt)) * 100 : null, "%", "EBIT annualised ÷ (equity + debt)"),
-        R("roi", "ROI %", equity ? (npat * ann / equity) * 100 : null, "%", "PAT annualised ÷ equity"),
-        R("debtor_days", "Debtors — days to Sales", revenue ? debtors / (revenue / days) : null, "days", "sundry debtors (books) ÷ per-day revenue"),
-        R("inventory_days", "Inventory — days to COGS", stocksTyped && tvc ? ((openingStock + closingStock) / 2) / (tvc / days) : null, "days", stocksTyped ? "average stock ÷ per-day TVC" : "needs opening and closing stock typed on the P&L"),
-        R("creditor_days", "Creditors — days to Purchases", purchases ? creditors / (purchases / days) : null, "days", "sundry creditors (books) ÷ per-day purchases"),
+
+      type Pnl = ReturnType<typeof computePnl>;
+      const ratioPack = (p: Pnl, live: boolean) => {
+        const { profitToDate, closingOfRoot } = closingsAt(p.to);
+        const rootVal = (re: RegExp) => {
+          let t2 = 0;
+          for (const [r, v] of closingOfRoot) if (re.test(stripNo(r))) t2 += v;
+          return t2;
+        };
+        const equity = rootVal(/capital/i) + profitToDate;
+        const debtBooks = rootVal(/loans? \(liability\)|^loans|bank od/i);
+        /* the loan register knows only today, so last year's pack stands on
+           the books alone rather than borrowing this year's outstanding */
+        const debt = live && loanOut > 0 ? loanOut : Math.max(0, debtBooks);
+        const emi = live ? emiMonthly : 0;
+        const curLiab = rootVal(/current liabilit/i);
+        const curAssets = -rootVal(/current asset/i);
+        const debtors = -(closingOfRoot.get("__debtors") || 0);
+        const creditors = closingOfRoot.get("__creditors") || 0;
+        const pDays = Math.max(1, daysBetween(p.from, p.to) + 1);
+        const pMonths = p.months;
+        const ann = 365 / pDays;
+        const V = (n: number | null) => (n != null && isFinite(n) ? n : null);
+        return {
+          ebitda_sales: V(p.revenue ? (p.ebitda / p.revenue) * 100 : null),
+          pbt_sales: V(p.revenue ? (p.npbt / p.revenue) * 100 : null),
+          pat_sales: V(p.revenue ? (p.npat / p.revenue) * 100 : null),
+          int_cover: V(p.finance ? p.ebitda / p.finance : null),
+          debt_equity: V(equity ? debt / equity : null),
+          current_ratio: V(curLiab ? curAssets / curLiab : null),
+          quick_ratio: V(curLiab && p.stocksTyped ? (curAssets - p.closingStock) / curLiab : null),
+          debt_service: V(emi ? emi * pMonths : null),
+          dscr: V(emi ? p.ebitda / (emi * pMonths) : null),
+          gp_cr: V(p.grossProfit),
+          expenses_cr: V(p.manuf + p.indirect + p.finance),
+          productivity: V(p.manuf + p.indirect + p.finance ? p.grossProfit / (p.manuf + p.indirect + p.finance) : null),
+          tol_tnw: V(equity ? (debt + curLiab) / equity : null),
+          roce: V(equity + debt ? ((p.ebitda - p.depreciation) * ann / (equity + debt)) * 100 : null),
+          roi: V(equity ? (p.npat * ann / equity) * 100 : null),
+          debtor_days: V(p.revenue ? debtors / (p.revenue / pDays) : null),
+          inventory_days: V(p.stocksTyped && p.tvc ? ((p.openingStock + p.closingStock) / 2) / (p.tvc / pDays) : null),
+          creditor_days: V(p.purchases ? creditors / (p.purchases / pDays) : null),
+        } as Record<string, number | null>;
+      };
+      const packNow = ratioPack(cur, true);
+      const packLy = ly ? ratioPack(ly, false) : null;
+      for (const p of [packNow, packLy]) {
+        if (!p) continue;
+        p.ccc = p.debtor_days != null && p.inventory_days != null && p.creditor_days != null
+          ? p.debtor_days + p.inventory_days - p.creditor_days : null;
+      }
+
+      const SPEC: [string, string, string, string][] = [
+        ["ebitda_sales", "EBITDA to Sales %", "%", "EBITDA ÷ revenue"],
+        ["pbt_sales", "PBT to Sales %", "%", "net profit before tax ÷ revenue"],
+        ["pat_sales", "PAT to Sales %", "%", "net profit after tax ÷ revenue"],
+        ["int_cover", "Interest Coverage (times)", "x", "EBITDA ÷ finance charges"],
+        ["debt_equity", "Debt / Equity", "x", loanOut > 0 ? "loan-register outstanding ÷ (capital + P&L to date); last year from the books" : "loan roots in the books ÷ (capital + P&L to date)"],
+        ["current_ratio", "Current Ratio", "x", "current assets ÷ current liabilities, at their book closings"],
+        ["quick_ratio", "Quick Ratio", "x", stocksTyped ? "(current assets − closing stock) ÷ current liabilities" : "needs the closing stock in the stock register"],
+        ["debt_service", "Debt Service (period)", "₹", "loan-register monthly EMI × months in the period; the register knows only today, so last year reads —"],
+        ["dscr", "DSCR", "x", "EBITDA ÷ (EMI × months); the loan register is the source"],
+        ["gp_cr", "Gross Profit", "₹", "throughput − manufacturing expenses"],
+        ["expenses_cr", "Direct + Indirect + Interest", "₹", "manufacturing + indirect + finance charges"],
+        ["productivity", "Business Productivity (GP ÷ Expenses)", "x", "gross profit ÷ (manufacturing + indirect + finance)"],
+        ["tol_tnw", "TOL / TNW", "x", "(debt + current liabilities) ÷ (capital + P&L to date)"],
+        ["roce", "RoCE %", "%", "EBIT annualised ÷ (equity + debt)"],
+        ["roi", "ROI %", "%", "PAT annualised ÷ equity"],
+        ["debtor_days", "Debtors — days to Sales", "days", "sundry debtors (books) ÷ per-day revenue"],
+        ["inventory_days", "Inventory — days to COGS", "days", stocksTyped ? "average stock ÷ per-day TVC" : "needs opening and closing stock in the stock register"],
+        ["creditor_days", "Creditors — days to Purchases", "days", "sundry creditors (books) ÷ per-day purchases"],
+        ["ccc", "Cash Conversion Cycle (days)", "days", "debtor days + inventory days − creditor days"],
       ];
-      const dD = ratios.find((r) => r.key === "debtor_days")?.value;
-      const iD = ratios.find((r) => r.key === "inventory_days")?.value;
-      const cD = ratios.find((r) => r.key === "creditor_days")?.value;
-      ratios.push(R("ccc", "Cash Conversion Cycle (days)", dD != null && iD != null && cD != null ? dD + iD - cD : null, "days", "debtor days + inventory days − creditor days"));
+      const ratios = SPEC.map(([key, label, unit, formula]) => ({
+        key, label, unit, formula,
+        value: packNow[key] ?? null,
+        ly: packLy ? packLy[key] ?? null : null,
+        target: targets[key] || "",
+      }));
 
       /**
        * EVERY LINE CARRIES ITS OWN TWIN.

@@ -1222,7 +1222,39 @@ function FinSection({ s, flip, fmtMoney }: { s: FinSec; flip: boolean; fmtMoney:
 interface MisLine { key: string; label: string; amount: number; pct: number | null; avg: number;
   /** the same head over the same months a year back, and its own monthly average */
   ly?: number | null; lyPct?: number | null; lyAvg?: number | null; tree?: TreeSec[] }
-interface MisRatio { key: string; label: string; value: number | null; unit: string; formula: string; target: string }
+interface MisRatio { key: string; label: string; value: number | null; ly?: number | null; unit: string; formula: string; target: string }
+
+/**
+ * WHICH WAY IS BETTER (Dr Raghu, 30 Sep 2026: "show the arrow of up or down
+ * compared to last years numbers! green arrow for up and red arrow for down
+ * for the positive things — for things like expenses, etc as a %, when down
+ * is better make the down arrow green and up arrow red").
+ *
+ * The arrow is about DIRECTION; the colour is about whether that direction is
+ * good, and the two are not the same thing. Sales up is green and up. Indirect
+ * expenses up is red and up. Getting this backwards on one line would be worse
+ * than having no arrows at all, so the polarity is declared per line rather
+ * than inferred from the sign. A line whose polarity is genuinely ambiguous —
+ * stock, creditor days — carries no arrow rather than a confident wrong one.
+ */
+const GOOD_UP = new Set(["sales", "revenue", "throughput", "gross_profit", "ebitda", "net_operating", "other_income", "npbt", "npat",
+  "ebitda_sales", "pbt_sales", "pat_sales", "int_cover", "current_ratio", "quick_ratio", "dscr", "gp_cr", "productivity", "roce", "roi"]);
+const GOOD_DOWN = new Set(["purchases", "tvc", "manuf", "indirect", "finance", "oe", "depreciation", "tax",
+  "debt_equity", "tol_tnw", "expenses_cr", "debtor_days", "inventory_days", "ccc"]);
+
+function Arrow({ now, before, k, dp = 2, suffix = " pts" }: { now: number | null | undefined; before: number | null | undefined; k: string; dp?: number; suffix?: string }) {
+  const goodUp = GOOD_UP.has(k) ? true : GOOD_DOWN.has(k) ? false : null;
+  if (goodUp == null || now == null || before == null || !isFinite(now) || !isFinite(before)) return null;
+  const d = now - before;
+  if (Math.abs(d) < 0.005) return null;
+  const up = d > 0;
+  return (
+    <span title={`${up ? "+" : ""}${d.toFixed(dp)}${suffix} against last year`}
+      style={{ color: up === goodUp ? "#1B7A43" : RED, fontWeight: 700, marginLeft: 4 }}>
+      {up ? "\u25B2" : "\u25BC"}
+    </span>
+  );
+}
 interface MisData { empty?: boolean; from: string; to: string; months: number; stocksTyped: boolean;
   /** the last depreciation posting anywhere in the books — Tally carries one a year, not one a month */
   depNote?: { at: string; amount: number } | null;
@@ -1376,7 +1408,9 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
                               are typed in the register and read here. */}
                           {bare(l.amount)}
                         </td>
-                        <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{fmtPct(l.pct)}</td>
+                        <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED, whiteSpace: "nowrap" }}>
+                          {fmtPct(l.pct)}<Arrow now={l.pct} before={l.lyPct} k={l.key} />
+                        </td>
                         <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{stock ? "—" : bare(l.avg)}</td>
                         {!!data.ly && <>
                           <td className="px-2 py-1.5 text-right tnum" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: l.ly == null ? MUTED : "var(--dim)", borderLeft: `1px solid ${BORDER}` }}>
@@ -1597,11 +1631,12 @@ export function RatioScreen() {
     ["BALANCE SHEET RATIOS", ["debt_equity", "current_ratio", "quick_ratio", "debt_service", "dscr", "tol_tnw", "roce", "roi"]],
     ["THE DAYS", ["debtor_days", "inventory_days", "creditor_days", "ccc"]],
   ];
-  const show = (r: MisRatio) => r.value == null ? "—"
-    : r.unit === "%" ? `${r.value.toFixed(2)}%`
-    : r.unit === "x" ? r.value.toFixed(2)
-    : r.unit === "days" ? `${Math.round(r.value)} days`
-    : fmtMoney(r.value);
+  const show = (r: MisRatio, v: number | null | undefined = r.value) => v == null ? "—"
+    : r.unit === "%" ? fmtPct(v)
+    : r.unit === "x" ? v.toFixed(2)
+    : r.unit === "days" ? `${Math.round(v)} days`
+    : fmtMoney(v);
+  const hasLy = !!data?.ly;
   const saveTarget = async (key: string, target: string) => {
     await fetch("/api/kuber/books", {
       method: "POST", headers: { "content-type": "application/json" },
@@ -1617,7 +1652,8 @@ export function RatioScreen() {
           <div className="text-lg font-bold" style={{ color: INK }}>Ratio Analysis</div>
           <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640 }}>
             Trial balance {data ? `${fmtD(data.from)} → ${fmtD(data.to)}` : "…"} — upto last month&apos;s last day by default.
-            Every ratio states its own formula; targets are yours to type. A dash is an honest &quot;the input isn&apos;t in yet&quot;, never a guess.
+            {data?.ly ? <> The same months a year back stand beside it, struck on the same closings.</> : null}
+            {" "}Every ratio states its own formula; targets are yours to type. A dash is an honest &quot;the input isn&apos;t in yet&quot;, never a guess.
           </div>
         </div>
         <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
@@ -1625,10 +1661,11 @@ export function RatioScreen() {
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : GROUPS.map(([title, keys]) => (
         <div key={title} className="bg-white rounded-lg border mb-3 overflow-auto" style={{ borderColor: BORDER }}>
           <div className="px-3 py-2 text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>{title}</div>
-          <table className="w-full text-xs genie-table" style={{ minWidth: 640, borderCollapse: "separate", borderSpacing: 0 }}>
+          <table className="w-full text-xs genie-table" style={{ minWidth: hasLy ? 780 : 640, borderCollapse: "separate", borderSpacing: 0 }}>
             <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
               <th className="px-3 py-1.5 text-left">Particulars</th>
-              <th className="px-2 py-1.5 text-right">Reporting</th>
+              <th className="px-2 py-1.5 text-right" style={{ whiteSpace: "nowrap" }}>{data.ly ? periodLabel(data.from, data.to) : "Reporting"}</th>
+              {hasLy && <th className="px-2 py-1.5 text-right" style={{ whiteSpace: "nowrap", fontStyle: "italic", fontWeight: 500, color: "#C7D2DD" }}>{periodLabel(data.ly!.from, data.ly!.to)}</th>}
               <th className="px-2 py-1.5 text-right">Target</th>
               <th className="px-3 py-1.5 text-left" style={{ color: "#8FA1B3" }}>The arithmetic</th>
             </tr></thead>
@@ -1639,7 +1676,10 @@ export function RatioScreen() {
                 return (
                   <tr key={k} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
                     <td className="px-3 py-1.5 font-semibold">{r.label}</td>
-                    <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: r.value == null ? MUTED : INK }}>{show(r)}</td>
+                    <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: r.value == null ? MUTED : INK, whiteSpace: "nowrap" }}>
+                      {show(r)}<Arrow now={r.value} before={r.ly} k={r.key} dp={r.unit === "days" ? 0 : 2} suffix={r.unit === "%" ? " pts" : ""} />
+                    </td>
+                    {hasLy && <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED, fontStyle: "italic" }}>{show(r, r.ly)}</td>}
                     <td className="px-2 py-1.5 text-right">
                       <input value={drafts[k] ?? r.target} placeholder="—"
                         onChange={(e) => setDrafts((d) => ({ ...d, [k]: e.target.value }))}

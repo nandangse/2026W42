@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.6.9",
+    date: "2026-09-30",
+    module: "Which way is better",
+    items: [
+      "ARROWS ON THE P&L AND THE RATIOS. Every percentage now carries a direction against last year \u2014 and the colour says whether that direction is good, which is not the same thing. Sales up is a green up arrow; indirect expenses up is a RED up arrow. The polarity is declared line by line rather than read off the sign, because getting it backwards on one row would be worse than having no arrows at all. A line whose polarity is genuinely arguable \u2014 stock, creditor days \u2014 carries no arrow rather than a confident wrong one. Hover any arrow for the movement in points.",
+      "RATIO ANALYSIS GETS LAST YEAR TOO, the same months, struck on the same closings. That needed one thing solved first: a closing needs an opening, and the only opening Tally exported is 1 April 2026. So the anchor is named and the walk goes both ways from it \u2014 a closing on 30 September 2025 is the 1 April 2026 opening LESS everything posted between the two. Exact, and the only honest way to strike a balance sheet for a year whose own opening was never exported.",
+      "The loan register knows only today, so last year's Debt Service and DSCR read \u2014 rather than borrowing this year's outstanding, and Debt/Equity falls back to the loan roots in the books.",
+    ],
+  },
+  {
     v: "5.9.6.8",
     date: "2026-09-30",
     module: "How the books are read",
