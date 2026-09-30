@@ -46,10 +46,10 @@ export default async function JobBoardPrint({ searchParams }: { searchParams: { 
     fam: String(j!.fam || ""),
     tdd: (j!.tdd as string) || null,
     otd: (j!.otd as string) || null,
-    pm: init(j!.own),
-    kitting: init(j!.kitting_owner),
-    production: init(j!.production_owner),
-    design: init(j!.design_owner),
+    pm: init(j!.own), pmName: String(j!.own || ""),
+    kitting: init(j!.kitting_owner), kittingName: String(j!.kitting_owner || ""),
+    production: init(j!.production_owner), productionName: String(j!.production_owner || ""),
+    design: init(j!.design_owner), designName: String(j!.design_owner || ""),
     escalation: (j!.escalation as string) || null,
     /* Ticked, or answered by the fact that somebody has already recorded a
        number — recording one is itself saying it is a vehicle. */

@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.2.1",
+    date: "2026-09-30",
+    module: "Twelve month colours, and a board that says more at a distance",
+    items: [
+      "<b>One colour per month, used everywhere.</b> Twelve, walking the hue wheel from January\u2019s blue round to December\u2019s indigo, <b>every one dark enough for white type</b> \u2014 that constraint is what chooses them, because a palette that looks handsome and cannot be read gets replaced by black within a month. April is deliberately green: the financial year opens there. The Target Delivery box now wears its month, so <b>a wall of October boards looks like October from across the floor</b>.",
+      "<b>The job number takes the product\u2019s colour</b> \u2014 AGSE dark blue, DEF maroon, everything else dark green. It is the one thing on the sheet read from a distance, so it may as well say two things at that distance: which job, and what kind of machine. Matched on the prefix the families already carry, not a list somebody has to maintain.",
+      "<b>Owners show initials and a first name</b> \u2014 <i>PANK Pankaj</i>. The initials are for the people who know them; the first name is for the new man on the floor who has to go and find him.",
+      "<b>Vehicle, Chassis No and Engine No print with their values</b> where the ERP has them, and as empty boxes for a marker where it does not.",
+    ],
+  },
+  {
     v: "5.9.2.0",
     date: "2026-09-30",
     module: "The delivery picture, as it should read",

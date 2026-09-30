@@ -1,4 +1,5 @@
 import QRCode from "qrcode";
+import { monthColour } from "./month-colour";
 import { LOGO } from "./logo";
 import { esc } from "@/lib/fmt";
 
@@ -34,10 +35,10 @@ export interface BoardJob {
   fam: string;
   tdd: string | null;
   otd: string | null;
-  pm: string | null;
-  kitting: string | null;
-  production: string | null;
-  design: string | null;
+  pm: string | null; pmName?: string | null;
+  kitting: string | null; kittingName?: string | null;
+  production: string | null; productionName?: string | null;
+  design: string | null; designName?: string | null;
   escalation: string | null;
   /** Built on a vehicle — the row only prints when this is true. */
   isVehicle?: boolean;
@@ -57,6 +58,24 @@ const dmy = (s: string | null | undefined) =>
 
 const daysBetween = (a: string, b: string) =>
   Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+
+/**
+ * THE JOB NUMBER TAKES THE PRODUCT'S COLOUR (Dr Raghu, 30 Sep 2026).
+ *
+ * AGSE dark blue, DEF maroon, everything else dark green. The number is the
+ * one thing on this sheet read from across the floor, so it may as well say
+ * two things at that distance: which job, and what kind of machine.
+ *
+ * Matched on the prefix the family already carries — "AGSE - Hi Lift",
+ * "DEF - Specialized Vehicles", "MHE - Multi Scissor Lift" — because that
+ * prefix is how the families are named, not a list somebody has to keep.
+ */
+export function familyColour(fam: string | null | undefined): string {
+  const f = String(fam || "").trim().toUpperCase();
+  if (f.startsWith("AGSE") || f.startsWith("AAE")) return "#12386B";   // dark blue
+  if (f.startsWith("DEF")) return "#6E1220";                            // maroon
+  return "#14532D";                                                     // dark green
+}
 
 /** genie.nandan.co.in/job/2162 — the number painted on the machine. */
 export const boardUrl = (no: string) =>
@@ -107,8 +126,16 @@ export async function jobBoardBody(jobs: BoardJob[], on: string, by: string, ver
 
 export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, version: string): Promise<string> {
   const page = async (j: BoardJob) => {
-    const owner = (label: string, v: string | null) =>
-      `<div class="ow"><span class="owl">${esc(label)}</span><b>${esc(v || "—")}</b></div>`;
+    /* INITIALS AND THE FIRST NAME (Dr Raghu, 30 Sep 2026: "it has space to
+       show the first name of the guy. PS: PANKAJ"). Initials are for the
+       people who know them; the first name is for the new man on the floor
+       who has to go and find him. */
+    const owner = (label: string, v: string | null, name?: string | null) => {
+      const first = String(name || "").trim().split(/\s+/)[0] || "";
+      return `<div class="ow"><span class="owl">${esc(label)}</span>
+        <b>${esc(v || "—")}${first && first.toUpperCase() !== String(v || "").toUpperCase()
+          ? `<i class="ofn">${esc(first)}</i>` : ""}</b></div>`;
+    };
     const boxes = (vals: (string | number)[], wide = false) =>
       vals.map((v) => `<div class="bx${wide ? " w" : ""}"><span>${esc(String(v))}${typeof v === "number" ? "%" : ""}</span></div>`).join("");
 
@@ -120,7 +147,7 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
     </div>
 
     <div class="idrow">
-      <div class="jno">${esc(j.id)}</div>
+      <div class="jno" style="color:${familyColour(j.fam)}">${esc(j.id)}</div>
       <div class="tagwrap">
         <div class="tag">${esc(j.tag)}</div>
         <div class="fam">${esc(j.fam || "")}</div>
@@ -128,7 +155,7 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
     </div>
 
     <div class="owners">
-      ${owner("PROJECT MANAGER", j.pm)}${owner("KITTING", j.kitting)}${owner("PRODUCTION", j.production)}${owner("DESIGN", j.design)}
+      ${owner("PROJECT MANAGER", j.pm, j.pmName)}${owner("KITTING", j.kitting, j.kittingName)}${owner("PRODUCTION", j.production, j.productionName)}${owner("DESIGN", j.design, j.designName)}
     </div>
 
     <div class="grid">
@@ -148,7 +175,10 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
   </div>
 
   <aside class="side">
-    <div class="dbox">
+    <!-- THE MONTH HAS A COLOUR (Dr Raghu, 30 Sep 2026). A wall of October
+         boards should look like October from across the floor, before
+         anybody is close enough to read a date. -->
+    <div class="dbox" style="background:${monthColour(j.tdd)}">
       <div class="dl">TARGET DELIVERY</div>
       <div class="dv">${dmy(j.tdd)}</div>
     </div>
@@ -188,6 +218,7 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
   .ow { border:.3mm solid #C9C6BD; border-radius:1mm; padding:1mm 1.5mm; text-align:center; }
   .owl { display:block; font-size:6.5pt; letter-spacing:.1em; color:#8B8F87; }
   .ow b { font-size:13pt; }
+  .ofn { font-style:normal; font-weight:normal; font-size:7.5pt; color:#46545F; margin-left:1.2mm; }
   .owl { text-transform:uppercase; }
 
   .grid { display:grid; grid-template-columns: 24mm 1fr; gap:1.2mm 2mm; margin-top:2mm; align-items:center; }
@@ -205,10 +236,20 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
   /* THE VEHICLE ROW. Written in by hand like every other box on this sheet
      when Genie does not hold the number yet -- a chassis number is read off
      the plate on the machine, which is exactly where this board is hanging. */
-  .veh { display:grid; grid-template-columns:0.8fr 1.1fr 1.1fr; gap:2mm; margin-top:2mm; }
-  .vb { border:.3mm solid #16232F; border-radius:.8mm; padding:1mm 2mm; min-height:8mm; }
-  .vb span { display:block; font-size:6pt; letter-spacing:.1em; color:#8B8F87; }
-  .vb i { font-style:normal; font-size:11pt; font-weight:bold; letter-spacing:.02em; }
+  /* THE VEHICLE, IN THE SIDE COLUMN (Dr Raghu, 30 Sep 2026) — the space
+     between the date and the code was empty on every vehicle-mounted job.
+     A tick each, and each on ONE line, sized to the column rather than to
+     the text: a chassis number is seventeen characters and it has 38mm. */
+  /* KEPT IN THE MAIN COLUMN (Dr Raghu, 30 Sep 2026: "this is also ok. use
+     the engine no and chassis no here itself"). Three boxes across, the
+     value printed where the ERP has it and the box left empty for a marker
+     where it does not — a chassis number is read off the plate on the
+     machine, which is where this sheet is hanging. */
+  .veh { display:grid; grid-template-columns:0.85fr 1.25fr 1.05fr; gap:2mm; margin-top:2mm; }
+  .vb { border:.3mm solid #16232F; border-radius:.8mm; padding:1mm 2mm; min-height:8.5mm; }
+  .vb span { display:block; font-size:5.8pt; letter-spacing:.1em; color:#8B8F87; }
+  .vb i { font-style:normal; font-size:10pt; font-weight:bold; letter-spacing:-.01em;
+          display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .esc { margin-top:2mm; font-size:8pt; color:#B3392E; font-weight:bold; line-height:1.25; }
   .notes { margin-top:auto; display:flex; align-items:flex-end; gap:2mm; }
   .notes span { font-size:6.5pt; letter-spacing:.1em; color:#8B8F87; }
@@ -216,7 +257,7 @@ export async function jobBoardHtml(jobs: BoardJob[], on: string, by: string, ver
 
   .side { display:flex; flex-direction:column; gap:2mm; }
   .dbox { background:#16232F; color:#fff; border-radius:1.5mm; padding:2mm; text-align:center; }
-  .dl { font-size:6.5pt; letter-spacing:.12em; color:#9AA8B5; }
+  .dl { font-size:6.5pt; letter-spacing:.12em; color:rgba(255,255,255,.72); }
   .dv { font-size:15pt; font-weight:bold; letter-spacing:-.01em; }
   .obox { border:.4mm solid #C9C6BD; border-radius:1.5mm; padding:1.5mm; text-align:center; }
   .ol { font-size:6.5pt; letter-spacing:.12em; color:#8B8F87; }
