@@ -354,12 +354,25 @@ export function AgeingScreen({ kind }: { kind: "receivable" | "payable" }) {
                       <td className="px-2 py-1 text-right tnum font-bold" style={{ color: b.amount < 0 ? "#1B6B93" : INK }} title="Pending">
                         {b.amount < 0 ? "−" + fmtMoney(-b.amount) : fmtMoney(b.amount)}
                       </td>
-                      <td colSpan={5} className="px-2 py-1 text-right tnum" style={{ color: overdueDays !== null && overdueDays > 0 ? RED : MUTED }}>
-                        billed {fmtD(b.bill_date)}
-                        {overdueDays === null ? " · no due date"
-                          : overdueDays > 0 ? ` · ${overdueDays} days overdue`
-                          : overdueDays === 0 ? " · due today"
-                          : ` · due in ${-overdueDays} days`}
+                      {/* THE BILL DATE GETS ITS OWN COLUMN (Dr Raghu, 30 Sep
+                          2026: "here can we have date of the bill please?").
+                          It was in the sentence at the end of the row, where
+                          it could not be read down a list or compared between
+                          two bills — which is the only reason anybody looks at
+                          a bill date. */}
+                      <td className="px-2 py-1 text-right tnum" style={{ color: b.bill_date ? "var(--dim)" : MUTED }}
+                        title={b.bill_date ? "The date the bill was raised" : "The ERP carries no date for this bill"}>
+                        {b.bill_date ? fmtD(b.bill_date) : "no date"}
+                      </td>
+                      <td className="px-2 py-1 text-right tnum" style={{ color: b.due_date ? "var(--dim)" : MUTED }}
+                        title="The date it falls due, bill date plus the credit days">
+                        {b.due_date ? fmtD(b.due_date) : "·"}
+                      </td>
+                      <td colSpan={3} className="px-2 py-1 text-right" style={{ color: overdueDays !== null && overdueDays > 0 ? RED : MUTED }}>
+                        {overdueDays === null ? "no due date"
+                          : overdueDays > 0 ? `${overdueDays} days overdue`
+                          : overdueDays === 0 ? "due today"
+                          : `due in ${-overdueDays} days`}
                       </td>
                       <td />
                     </tr>

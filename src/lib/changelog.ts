@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.5.2",
+    date: "2026-09-30",
+    module: "The bill date, in a column of its own",
+    items: [
+      "<b>Open a party on Receivables or Payables and each bill now carries its own <i>Bill date</i> and <i>Due date</i> columns</b>, with how overdue it is beside them. The date was already there \u2014 buried in a sentence at the end of the row, where it could not be read down a list or compared between two bills, which is the only reason anybody looks at a bill date at all.",
+      "<b>A bill the ERP has no date for says <i>no date</i></b> rather than showing an empty space. Those are the brought-forward items, and knowing which ones they are is half of what makes an old balance explainable.",
+    ],
+  },
+  {
     v: "5.9.5.1",
     date: "2026-09-30",
     module: "Stock entry, one click from the statement",
