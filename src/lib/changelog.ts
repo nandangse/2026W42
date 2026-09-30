@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.8.0",
+    date: "2026-09-30",
+    module: "The Sales Register becomes a working register",
+    items: [
+      "PRODUCT FAMILY, SALESMAN AND THE SCANNED BILL, on every invoice. The family is the Jobmaster's own list of twenty-five, never free text; the salesman says who follows it up; the scan is the single source of truth, kept private and opened through a link that expires in half an hour.",
+      "SELECT MULTIPLE OR SELECT ALL, THEN EDIT. Set the family, the salesman or the status on two hundred invoices at once. Each change writes ONLY the field pressed, so setting a salesman cannot wipe a family somebody set yesterday.",
+      "STATUS, RECEIVED, DAYS PENDING AND INTEREST LOST ARE READ FROM THE BOOKS \u2014 NOT TYPED. This is the point. Tally already tracks what is open against each invoice bill by bill; typing a payment status beside it would have created the second truth that drifts from the first, which IS the double work rather than the cure for it. Interest lost runs at 15% on what is still out, day by day since the bill. An override exists for the bill where the books are honestly wrong, and it is marked with a star so an overruled figure never passes itself off as the books' own.",
+      "FILTERS BY CLIENT, BY FAMILY, BY SALESMAN, BY STATUS AND BY AMOUNT, on top of the period. The totals bar re-adds itself to whatever is shown \u2014 including the outstanding and the interest it is costing.",
+      "Needs migration 0184.",
+    ],
+  },
+  {
     v: "5.9.7.5",
     date: "2026-09-30",
     module: "Purchase Orders on the supplier card",

@@ -2252,7 +2252,42 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
 // (Dr Raghu, 28 Aug 2026): every voucher of the family in the period —
 // YTD by default, dates / MTD / QTD on the bar, totals on top, sortable.
 
-interface VregData { empty?: boolean; kind: string; from: string; to: string; rows: { id: string; date: string; vtype: string; vno: string; party: string; narration: string; amount: number }[]; count: number; total: number }
+/**
+ * THE SALES REGISTER, AS A WORKING REGISTER (Dr Raghu, 30 Sep 2026).
+ *
+ * "in this we will have edit also. Add the Product Family ... field -
+ * Salesman (this will help to know who has to follow it) ... Have the
+ * scanned copy of the bill also which they will upload here as the single
+ * source of truth! I think if we are able to do this quickly then a lot of
+ * double work will eliminate!"
+ *
+ * WHICH IS EXACTLY WHY STATUS IS NOT TYPED. Tally already tracks what is
+ * open against each invoice, bill by bill. A typed payment status beside it
+ * would be a second truth that drifts from the first — which is the double
+ * work, not the cure for it. So Status, Received, Outstanding, Days pending
+ * and Interest loss are all COMPUTED from the books and shown in his columns;
+ * only the product family, the salesman and the scan are typed, because they
+ * are the three things Tally cannot know.
+ *
+ * An override exists for the bill where the books are honestly wrong. It is
+ * marked when used, so a figure somebody has overruled never passes itself
+ * off as the books' own.
+ */
+interface VregRow {
+  id: string; date: string; vno: string; party: string; narration: string; amount: number;
+  received: number | null; outstanding: number | null; status: string | null; overridden: boolean;
+  paid_on: string | null; days: number | null; interest: number;
+  fam: string | null; salesman: string | null; note: string | null;
+  scan: { path: string; name: string } | null;
+}
+interface VregData { empty?: boolean; kind: string; from: string; to: string; rows: VregRow[]; count: number; total: number; fams: string[]; salesmen: string[] }
+
+const STATUS_CHIP: Record<string, { bg: string; fg: string; label: string }> = {
+  paid: { bg: "#E6F4EA", fg: "#0D7A3F", label: "Paid" },
+  partial: { bg: "#FFF3E8", fg: "#8A5B00", label: "Partly paid" },
+  unpaid: { bg: "#FBEAE8", fg: "#B3392E", label: "Unpaid" },
+};
+
 export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
@@ -2260,29 +2295,76 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
   const [to, setTo] = useState(today);
   const [data, reload] = useBooks<VregData>("vreg", `&kind=${kind}&from=${from}&to=${to}`);
   const { fmt: fmtMoney } = useMoneyFmt();
-  const [sortK, setSortK] = useState<"date" | "party" | "amount" | "vno">("date");
+  const [sortK, setSortK] = useState<"date" | "party" | "amount" | "vno" | "days" | "interest">("date");
   const [dir, setDir] = useState<1 | -1>(-1);
   const [q, setQ] = useState("");
+  const [fClient, setFClient] = useState("");
+  const [fFam, setFFam] = useState("");
+  const [fSales, setFSales] = useState("");
+  const [fStatus, setFStatus] = useState("");
+  const [minAmt, setMinAmt] = useState("");
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [edit, setEdit] = useState<VregRow | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const sales = kind === "sales";
   if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
+
   const needle = q.trim().toLowerCase();
+  const floor = Number(minAmt) || 0;
   const rows = (data?.rows || [])
-    .filter((r) => !needle || r.party.toLowerCase().includes(needle) || r.vno.toLowerCase().includes(needle) || r.narration.toLowerCase().includes(needle))
-    .sort((a, b) => (sortK === "amount" ? a.amount - b.amount : String(a[sortK]).localeCompare(String(b[sortK]))) * dir);
+    .filter((r) => !needle || r.party.toLowerCase().includes(needle) || r.vno.toLowerCase().includes(needle) || (r.narration || "").toLowerCase().includes(needle))
+    .filter((r) => !fClient || r.party === fClient)
+    .filter((r) => !fFam || r.fam === fFam)
+    .filter((r) => !fSales || r.salesman === fSales)
+    .filter((r) => !fStatus || r.status === fStatus)
+    .filter((r) => !floor || r.amount >= floor)
+    .sort((a, b) => {
+      const v = sortK === "amount" ? a.amount - b.amount
+        : sortK === "days" ? (a.days || 0) - (b.days || 0)
+        : sortK === "interest" ? a.interest - b.interest
+        : String(a[sortK] ?? "").localeCompare(String(b[sortK] ?? ""));
+      return v * dir;
+    });
   const shown = rows.reduce((s2, r) => s2 + r.amount, 0);
+  const shownOs = rows.reduce((s2, r) => s2 + (r.outstanding || 0), 0);
+  const shownInt = rows.reduce((s2, r) => s2 + r.interest, 0);
+  const clients = [...new Set((data?.rows || []).map((r) => r.party).filter(Boolean))].sort();
+
+  const allOn = rows.length > 0 && rows.every((r) => sel.has(r.vno));
+  const toggleAll = () => setSel(allOn ? new Set() : new Set(rows.map((r) => r.vno)));
+  const toggle = (vno: string) => setSel((s2) => { const n = new Set(s2); if (n.has(vno)) n.delete(vno); else n.add(vno); return n; });
+
+  const bulk = async (patch: Record<string, unknown>) => {
+    if (!sel.size) return;
+    setBulkBusy(true);
+    try {
+      await fetch("/api/kuber/books", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "invoice_meta", bills: [...sel], ...patch }),
+      });
+      setSel(new Set()); reload();
+    } finally { setBulkBusy(false); }
+  };
+
   const Hd = ({ k, children, right }: { k: typeof sortK; children: React.ReactNode; right?: boolean }) => (
     <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`}
-      onClick={() => { if (sortK === k) setDir((d2) => (d2 === 1 ? -1 : 1)); else { setSortK(k); setDir(k === "amount" ? -1 : k === "date" ? -1 : 1); } }}
+      onClick={() => { if (sortK === k) setDir((d2) => (d2 === 1 ? -1 : 1)); else { setSortK(k); setDir(k === "party" || k === "vno" ? 1 : -1); } }}
       style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}>
       {children}{sortK === k ? (dir === 1 ? " ▲" : " ▼") : ""}
     </th>
   );
+  const box = { borderColor: BORDER } as React.CSSProperties;
+  const cols = sales ? 13 : 5;
+
   return (
-    <div style={{ maxWidth: 940 }}>
+    <div style={{ maxWidth: sales ? 1240 : 940 }}>
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
-          <div className="text-lg font-bold" style={{ color: INK }}>{kind === "sales" ? "Sales Register" : "Purchase Register"}</div>
-          <div className="text-sm" style={{ color: "var(--dim)" }}>
-            Every {kind === "sales" ? "GST Sales voucher" : "purchase-family voucher (Purchase · Cap-Ex · Import)"} in the period, straight from the books.
+          <div className="text-lg font-bold" style={{ color: INK }}>{sales ? "Sales Register" : "Purchase Register"}</div>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 720 }}>
+            Every {sales ? "GST Sales voucher" : "purchase-family voucher (Purchase · Cap-Ex · Import)"} in the period, straight from the books.
+            {sales && <> <b>Status, received, days and interest are read from the books</b> — only the family, the salesman and the scan are typed here.</>}
           </div>
         </div>
         <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} onRefresh={reload} />
@@ -2290,40 +2372,263 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
       {!data ? <div className="text-sm" style={{ color: MUTED }}>reading…</div> : (
         <>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <Card label={`TOTAL — ${data.count} vouchers`} value={fmtMoney(data.total)} color={kind === "sales" ? GREEN : "#1B6B93"} />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="filter party · no · narration…"
-              className="border rounded px-2 py-1.5 text-sm ml-auto" style={{ borderColor: needle ? ORANGE : BORDER, width: 240, alignSelf: "center" }} />
+            <Card label={`TOTAL — ${data.count} vouchers`} value={fmtMoney(data.total)} color={sales ? GREEN : "#1B6B93"} />
+            {sales && <Card label="OUTSTANDING — SHOWN" value={fmtMoney(shownOs)} sub={`${rows.filter((r) => (r.outstanding || 0) > 1).length} invoices still open`} color="var(--blue)" />}
+            {sales && <Card label="INTEREST LOST @ 15%" value={fmtMoney(shownInt)} sub="on what is still out, day by day since the bill" color={RED} />}
           </div>
+
+          {/* FILTERS — by client, by amount, by date (the date is the period
+              bar above), plus the two fields this register adds */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="party · no · narration…"
+              className="border rounded px-2 py-1.5 text-sm" style={{ borderColor: needle ? ORANGE : BORDER, width: 210 }} />
+            <select value={fClient} onChange={(e) => setFClient(e.target.value)} className="border rounded px-2 py-1.5 text-xs" style={box}>
+              <option value="">every client</option>
+              {clients.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {sales && <>
+              <select value={fFam} onChange={(e) => setFFam(e.target.value)} className="border rounded px-2 py-1.5 text-xs" style={box}>
+                <option value="">every family</option>
+                {(data.fams || []).map((f) => <option key={f} value={f}>{f}</option>)}
+                <option value="__none">— not set —</option>
+              </select>
+              <select value={fSales} onChange={(e) => setFSales(e.target.value)} className="border rounded px-2 py-1.5 text-xs" style={box}>
+                <option value="">every salesman</option>
+                {(data.salesmen || []).map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+              {(["", "unpaid", "partial", "paid"] as const).map((k) => (
+                <button key={k || "all"} onClick={() => setFStatus(k)}
+                  className="rounded-full border px-2.5 py-0.5 text-xs font-bold"
+                  style={fStatus === k ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" } : { color: MUTED, borderColor: BORDER, background: "#fff" }}>
+                  {k ? STATUS_CHIP[k].label : "all"}
+                </button>
+              ))}
+            </>}
+            <input value={minAmt} onChange={(e) => setMinAmt(e.target.value)} placeholder="min ₹"
+              className="border rounded px-2 py-1.5 text-xs tnum" style={{ ...box, width: 92 }} />
+          </div>
+
+          {/* THE BULK BAR — "select multiple or select all, then edit where
+              you can change salesperson, product, payment status". It writes
+              only the field pressed, so setting a salesman on two hundred
+              invoices cannot wipe a family somebody set yesterday. */}
+          {sales && sel.size > 0 && (
+            <div className="rounded p-2 mb-2 flex items-center gap-2 flex-wrap" style={{ background: "#EEF1FA", border: `1px solid ${BORDER}` }}>
+              <b className="text-xs" style={{ color: INK }}>{sel.size} selected</b>
+              <select defaultValue="" onChange={(e) => { if (e.target.value) { void bulk({ fam: e.target.value }); e.target.value = ""; } }}
+                disabled={bulkBusy} className="border rounded px-2 py-1 text-xs" style={box}>
+                <option value="">set product family…</option>
+                {(data.fams || []).map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+              <input placeholder="set salesman + Enter" disabled={bulkBusy}
+                onKeyDown={(e) => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value.trim(); if (v) { void bulk({ salesman: v }); (e.target as HTMLInputElement).value = ""; } } }}
+                list="vreg-salesmen" className="border rounded px-2 py-1 text-xs" style={{ ...box, width: 160 }} />
+              <datalist id="vreg-salesmen">{(data.salesmen || []).map((s2) => <option key={s2} value={s2} />)}</datalist>
+              <select defaultValue="" onChange={(e) => { if (e.target.value) { void bulk({ pay_status: e.target.value === "__books" ? "" : e.target.value }); e.target.value = ""; } }}
+                disabled={bulkBusy} className="border rounded px-2 py-1 text-xs" style={box}>
+                <option value="">override status…</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="partial">Partly paid</option>
+                <option value="paid">Paid</option>
+                <option value="__books">— back to the books —</option>
+              </select>
+              <span className="text-xs" style={{ color: MUTED }}>{bulkBusy ? "writing…" : "each change writes only that field"}</span>
+              <button onClick={() => setSel(new Set())} className="text-xs font-bold ml-auto" style={{ color: MUTED }}>clear</button>
+            </div>
+          )}
+
           <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "64vh" }}>
-            <table className="w-full text-xs genie-table" style={{ minWidth: 720, borderCollapse: "separate", borderSpacing: 0 }}>
+            <table className="w-full text-xs genie-table" style={{ minWidth: sales ? 1180 : 720, borderCollapse: "separate", borderSpacing: 0 }}>
               <thead>
                 <tr style={{ background: "var(--ink)", color: "#fff" }}>
+                  {sales && (
+                    <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)", width: 30 }}>
+                      <input type="checkbox" checked={allOn} onChange={toggleAll} title="Select everything shown" />
+                    </th>
+                  )}
                   <Hd k="date">Date</Hd><Hd k="vno">No</Hd><Hd k="party">Party</Hd>
-                  <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Narration</th>
+                  {sales ? <>
+                    <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Family</th>
+                    <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Salesman</th>
+                  </> : (
+                    <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Narration</th>
+                  )}
                   <Hd k="amount" right>Amount</Hd>
+                  {sales && <>
+                    <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Received</th>
+                    <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>O/S</th>
+                    <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Status</th>
+                    <Hd k="days" right>Days</Hd>
+                    <Hd k="interest" right>Interest @15%</Hd>
+                    <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Bill</th>
+                    <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)" }} />
+                  </>}
                 </tr>
                 <tr style={{ background: "#F3F1EB" }}>
-                  <td colSpan={4} className="px-2 py-1.5 font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>SHOWN — {rows.length}</td>
+                  <td colSpan={sales ? 6 : 4} className="px-2 py-1.5 font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>SHOWN — {rows.length}</td>
                   <td className="px-2 py-1.5 text-right tnum font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>{fmtMoney(shown)}</td>
+                  {sales && <>
+                    <td style={{ position: "sticky", top: 33, background: "#F3F1EB" }} />
+                    <td className="px-2 py-1.5 text-right tnum font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>{fmtMoney(shownOs)}</td>
+                    <td colSpan={3} style={{ position: "sticky", top: 33, background: "#F3F1EB" }} />
+                    <td className="px-2 py-1.5 text-right tnum font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB", color: RED }}>{fmtMoney(shownInt)}</td>
+                    <td colSpan={2} style={{ position: "sticky", top: 33, background: "#F3F1EB" }} />
+                  </>}
                 </tr>
               </thead>
               <tbody>
-                {rows.length === 0 && (<tr><td colSpan={5} className="px-3 py-4 text-center" style={{ color: MUTED }}>Nothing in the period.</td></tr>)}
-                {rows.map((r, i) => (
-                  <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
-                    <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.date)}</td>
-                    <td className="px-2 py-1 whitespace-nowrap">{r.vno}</td>
-                    <td className="px-2 py-1 font-semibold">{r.party || "—"}</td>
-                    <td className="px-2 py-1" style={{ color: MUTED, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.narration}</td>
-                    <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
-                  </tr>
-                ))}
+                {rows.length === 0 && (<tr><td colSpan={cols} className="px-3 py-4 text-center" style={{ color: MUTED }}>Nothing matches.</td></tr>)}
+                {rows.map((r, i) => {
+                  const chip = r.status ? STATUS_CHIP[r.status] : null;
+                  return (
+                    <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: sel.has(r.vno) ? "#EEF1FA" : i % 2 ? "#FAF9F5" : "#fff" }}>
+                      {sales && <td className="px-2 py-1"><input type="checkbox" checked={sel.has(r.vno)} onChange={() => toggle(r.vno)} /></td>}
+                      <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.date)}</td>
+                      <td className="px-2 py-1 whitespace-nowrap">{r.vno}</td>
+                      <td className="px-2 py-1 font-semibold" style={{ maxWidth: 190, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.party}>{r.party || "—"}</td>
+                      {sales ? <>
+                        <td className="px-2 py-1" style={{ color: r.fam ? INK : MUTED, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.fam || ""}>{r.fam || "—"}</td>
+                        <td className="px-2 py-1" style={{ color: r.salesman ? INK : MUTED, whiteSpace: "nowrap" }}>{r.salesman || "—"}</td>
+                      </> : (
+                        <td className="px-2 py-1" style={{ color: MUTED, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.narration}</td>
+                      )}
+                      <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
+                      {sales && <>
+                        <td className="px-2 py-1 text-right tnum" style={{ color: MUTED }}>{r.received == null ? "—" : fmtMoney(r.received)}</td>
+                        <td className="px-2 py-1 text-right tnum font-bold" style={{ color: (r.outstanding || 0) > 1 ? INK : MUTED }}>{r.outstanding == null ? "—" : fmtMoney(r.outstanding)}</td>
+                        <td className="px-2 py-1 whitespace-nowrap">
+                          {chip && <b className="rounded px-1.5 py-0.5" style={{ background: chip.bg, color: chip.fg, fontSize: 11 }}>{chip.label}</b>}
+                          {r.overridden && <span title="overruled by hand — the books say otherwise" style={{ color: "#B45309", marginLeft: 3 }}>*</span>}
+                        </td>
+                        <td className="px-2 py-1 text-right tnum" style={{ color: (r.days || 0) > 60 ? RED : MUTED }}>{r.days ?? "—"}</td>
+                        <td className="px-2 py-1 text-right tnum" style={{ color: r.interest > 0 ? RED : MUTED }}>{r.interest > 0 ? fmtMoney(r.interest) : "—"}</td>
+                        <td className="px-2 py-1 text-center">
+                          {r.scan
+                            ? <button onClick={() => void openScan(r.vno)} title={r.scan.name} style={{ fontSize: 13 }}>&#128196;</button>
+                            : <span style={{ color: "#D5D2C9" }}>&#128196;</span>}
+                        </td>
+                        <td className="px-2 py-1 text-center">
+                          <button onClick={() => setEdit(r)} title="Edit this invoice" className="rounded"
+                            style={{ border: `1px solid ${BORDER}`, background: "#fff", color: INK, padding: "1px 6px", fontSize: 12 }}>&#9998;</button>
+                        </td>
+                      </>}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           {data.count > 3000 && <p className="text-xs mt-1" style={{ color: "#8A6D1A" }}>Showing the first 3,000 of {data.count} — narrow the period for the rest.</p>}
         </>
       )}
+      {edit && <InvoiceBox row={edit} fams={data?.fams || []} salesmen={data?.salesmen || []} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />}
+    </div>
+  );
+}
+
+/** a signed link, minted on the press and opened once */
+async function openScan(bill: string) {
+  try {
+    const r = await fetch(`/api/kuber/bill-scan?bill=${encodeURIComponent(bill)}`, { cache: "no-store" });
+    const j = await r.json();
+    if (j.url) window.open(j.url, "_blank", "noopener");
+  } catch { /* the button simply does nothing rather than shouting */ }
+}
+
+/** One invoice, everything Genie is allowed to change about it. */
+function InvoiceBox({ row, fams, salesmen, onClose, onSaved }: {
+  row: VregRow; fams: string[]; salesmen: string[]; onClose: () => void; onSaved: () => void;
+}) {
+  const [f, setF] = useState({ fam: row.fam || "", salesman: row.salesman || "", pay_status: row.overridden ? (row.status || "") : "", note: row.note || "" });
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const save = async () => {
+    setBusy("save"); setErr("");
+    try {
+      const r = await fetch("/api/kuber/books", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "invoice_meta", bill: row.vno, ...f }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || "could not save");
+      onSaved();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(""); }
+  };
+  const upload = async (file: File) => {
+    setBusy("scan"); setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("bill", row.vno); fd.append("file", file);
+      const r = await fetch("/api/kuber/bill-scan", { method: "POST", body: fd });
+      if (!r.ok) throw new Error((await r.json()).error || "could not upload");
+      onSaved();
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(""); }
+  };
+  const L = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <label className="block mb-2"><div className="text-xs font-bold mb-0.5" style={{ color: MUTED }}>{label}</div>{children}</label>
+  );
+  const inp = { borderColor: BORDER, width: "100%" } as React.CSSProperties;
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)", zIndex: 70 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg" style={{ width: "min(560px,100%)", maxHeight: "90vh", overflowY: "auto" }}>
+        <div className="px-4 py-3 flex items-center" style={{ background: "var(--navy)", borderRadius: "8px 8px 0 0" }}>
+          <b className="text-white" style={{ fontSize: 14 }}>{row.vno}</b>
+          <div className="flex-1" />
+          <button onClick={onClose} className="font-bold" style={{ color: "#8FA1B3" }}>✕</button>
+        </div>
+        <div className="p-4">
+          <div className="rounded p-3 mb-3" style={{ background: "#F4F2EC" }}>
+            <div className="font-bold" style={{ color: INK }}>{row.party}</div>
+            <div className="text-xs mt-1" style={{ color: MUTED }}>
+              {fmtD(row.date)} · {fmtMoney(row.amount)}
+              {row.outstanding != null && <> · received {fmtMoney(row.received || 0)} · still out <b style={{ color: (row.outstanding || 0) > 1 ? RED : "#0D7A3F" }}>{fmtMoney(row.outstanding)}</b></>}
+              {row.days ? ` · ${row.days} days` : ""}
+            </div>
+            <div className="text-xs mt-1" style={{ color: MUTED }}>
+              These come from the books and are not editable — change them in Tally.
+            </div>
+          </div>
+          <L label="Product family"><select value={f.fam} onChange={(e) => setF({ ...f, fam: e.target.value })} className="border rounded px-2 py-1.5 text-sm" style={inp}>
+            <option value="">— not set —</option>
+            {fams.map((x) => <option key={x} value={x}>{x}</option>)}
+          </select></L>
+          <L label="Salesman — who follows this up">
+            <input list="ibox-sales" value={f.salesman} onChange={(e) => setF({ ...f, salesman: e.target.value })} className="border rounded px-2 py-1.5 text-sm" style={inp} />
+            <datalist id="ibox-sales">{salesmen.map((x) => <option key={x} value={x} />)}</datalist>
+          </L>
+          <L label="Status override — leave empty and the books decide">
+            <select value={f.pay_status} onChange={(e) => setF({ ...f, pay_status: e.target.value })} className="border rounded px-2 py-1.5 text-sm" style={inp}>
+              <option value="">— the books ({row.overridden ? "overruled now" : STATUS_CHIP[row.status || "unpaid"]?.label} ) —</option>
+              <option value="unpaid">Unpaid</option>
+              <option value="partial">Partly paid</option>
+              <option value="paid">Paid</option>
+            </select>
+          </L>
+          <L label="Note"><textarea value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} rows={2} className="border rounded px-2 py-1.5 text-sm" style={{ ...inp, resize: "vertical" }} /></L>
+
+          <div className="rounded p-3 mb-3" style={{ border: `1px dashed ${BORDER}` }}>
+            <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>SCANNED BILL — the single source of truth</div>
+            {row.scan
+              ? <div className="text-xs mb-2"><button onClick={() => void openScan(row.vno)} style={{ color: "#2C5B82", textDecoration: "underline", fontWeight: 600 }}>{row.scan.name || "open the scan"}</button></div>
+              : <div className="text-xs mb-2" style={{ color: MUTED }}>Nothing uploaded yet.</div>}
+            <input type="file" accept="image/*,application/pdf"
+              onChange={(e) => { const x = e.target.files?.[0]; if (x) void upload(x); }}
+              disabled={!!busy} className="text-xs" />
+            {busy === "scan" && <span className="text-xs ml-2" style={{ color: MUTED }}>uploading…</span>}
+          </div>
+
+          {err && <div className="text-xs mb-2" style={{ color: RED }}>{err}</div>}
+          <div className="flex gap-2">
+            <button onClick={save} disabled={!!busy} className="rounded px-4 py-2 font-bold" style={{ background: GREEN, color: "#fff", fontSize: 12.5 }}>
+              {busy === "save" ? "Saving…" : "Save"}
+            </button>
+            <div className="flex-1" />
+            <button onClick={onClose} className="rounded px-3 py-2" style={{ color: MUTED, fontSize: 12.5 }}>Cancel</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

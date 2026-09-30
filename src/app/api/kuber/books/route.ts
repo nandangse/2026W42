@@ -6,6 +6,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { requireKuber } from "@/lib/accounts";
 import { addDays } from "@/lib/fmt";
 import { newestByName } from "@/lib/kuber-fy";
+import { pageAll } from "@/lib/page-all";
 import { OE_HEADS, oeHead, classifyLedger, PNL_RULES, OE_RULES, BOOK_RULES, BUCKET_LABEL, oeRuleOf, type Bucket } from "@/lib/kuber-rules";
 
 export const dynamic = "force-dynamic";
@@ -1764,7 +1765,83 @@ export async function GET(req: Request) {
         if (!data || data.length < 1000) break;
       }
       const total = rows.reduce((s2, r) => s2 + (Number(r.amount) || 0), 0);
-      return NextResponse.json({ kind, from, to, rows: rows.slice(0, 3000), count: rows.length, total });
+
+      /**
+       * WHAT IS STILL OPEN COMES FROM THE BOOKS, NOT FROM A TYPED BOX.
+       *
+       * Dr Raghu, 30 Sep 2026, asked for Status, Payment received, Payment
+       * date, Days pending and Interest loss on this register — and for the
+       * double work to end. Typing a payment status beside a bill Tally
+       * already tracks bill-by-bill would have created the second truth, not
+       * cured it. So all five are COMPUTED: kuber_bill carries what is still
+       * open against each invoice, the invoice carries what it was raised
+       * for, and received is the difference.
+       *
+       * Only what Tally cannot know is typed — the product family, the
+       * salesman, the scan — plus an override for the rare bill where the
+       * books are wrong and somebody has to say so out loud.
+       */
+      const openOf = new Map<string, number>();
+      if (kind === "sales") {
+        try {
+          const bills = await pageAll<{ bill: string; amount: number; kind: string }>(async (a, b) => {
+            const r = await admin.from("kuber_bill").select("bill, amount, kind").eq("kind", "receivable").range(a, b);
+            return { data: r.data as { bill: string; amount: number; kind: string }[] | null, error: r.error };
+          }, "the open bills");
+          for (const b of bills) {
+            const k = String(b.bill || "").trim();
+            if (k) openOf.set(k, (openOf.get(k) || 0) + (Number(b.amount) || 0));
+          }
+        } catch (e) { swallow("kuber/vreg-bills", e); }
+      }
+
+      let meta = new Map<string, RR>();
+      try {
+        const got = await pageAll<RR>(async (a, b) => {
+          const r = await admin.from("sales_invoice_meta").select("*").range(a, b);
+          return { data: r.data as RR[] | null, error: r.error };
+        }, "the invoice register");
+        meta = new Map(got.map((m) => [String(m.bill), m]));
+      } catch (e) { swallow("kuber/vreg-meta", e); /* pre-0184 */ }
+
+      const out = rows.slice(0, 3000).map((r) => {
+        const no = String(r.vno || "").trim();
+        const gross = Math.abs(Number(r.amount) || 0);
+        const m = meta.get(no);
+        const open = openOf.has(no) ? Math.max(0, openOf.get(no)!) : null;
+        /* no open bill against an invoice that IS in the books means it is
+           settled; null means we cannot say, and the screen says so */
+        const settled = kind === "sales" ? (open == null ? gross : gross - open) : null;
+        const outstanding = kind === "sales" ? (open == null ? 0 : open) : null;
+        const derived = kind !== "sales" ? null
+          : outstanding! <= 1 ? "paid" : settled! > 1 ? "partial" : "unpaid";
+        const status = (m?.pay_status as string) || derived;
+        const days = r.date && outstanding && outstanding > 1 ? daysBetween(String(r.date), today) : null;
+        /* what the delay has cost, at his 15% — only while it is still out */
+        const interest = days && days > 0 && outstanding ? (outstanding * 0.15 * days) / 365 : 0;
+        return {
+          id: r.id, date: r.date, vno: no, party: r.party, narration: r.narration, amount: gross,
+          received: m?.paid_amount != null ? Number(m.paid_amount) : settled,
+          outstanding, status, overridden: !!m?.pay_status,
+          paid_on: m?.paid_on ?? null,
+          days, interest,
+          fam: m?.fam ?? null, salesman: m?.salesman ?? null, note: m?.note ?? null,
+          scan: m?.scan_path ? { path: String(m.scan_path), name: String(m.scan_name || ""), at: m.scan_at } : null,
+        };
+      });
+
+      /* the dropdowns the screen offers — his own lists, never free text */
+      let fams: string[] = [];
+      try {
+        const jf = await pageAll<{ fam: string }>(async (a, b) => {
+          const r = await admin.from("jobs").select("fam").range(a, b);
+          return { data: r.data as { fam: string }[] | null, error: r.error };
+        }, "the product families");
+        fams = [...new Set(jf.map((x) => String(x.fam || "").trim()).filter(Boolean))].sort();
+      } catch (e) { swallow("kuber/vreg-fams", e); }
+      const salesmen = [...new Set(out.map((r) => r.salesman).filter(Boolean) as string[])].sort();
+
+      return NextResponse.json({ kind, from, to, rows: out, count: rows.length, total, fams, salesmen });
     }
 
     if (view === "ledgers") {
@@ -1961,6 +2038,51 @@ export async function POST(req: Request) {
       }
       return NextResponse.json({ ok: true });
     }
+    /**
+     * THE SALES REGISTER'S OWN FIELDS (0184).
+     *
+     * One row or five hundred — "Also have a facility to do Select multiple
+     * or select all then edit where you can change salesperson, product,
+     * payment status" (Dr Raghu, 30 Sep 2026). A bulk edit writes only the
+     * fields actually sent, so setting the salesman on two hundred invoices
+     * cannot wipe the product family somebody set on one of them yesterday.
+     */
+    if (String(body.action) === "invoice_meta") {
+      const bills = (Array.isArray(body.bills) ? body.bills : [body.bill])
+        .map((b) => String(b || "").trim()).filter(Boolean).slice(0, 2000);
+      if (!bills.length) throw new HttpError(400, "No invoice named.");
+      const patch: Record<string, unknown> = { by_email: user.email, at: new Date().toISOString() };
+      const F = (k: string, max = 200) => {
+        if (!(k in body)) return;
+        const v = body[k];
+        patch[k] = v === null || v === "" ? null : String(v).slice(0, max);
+      };
+      F("fam"); F("salesman"); F("note", 2000);
+      if ("pay_status" in body) {
+        const v = String(body.pay_status || "");
+        if (v && !["unpaid", "partial", "paid"].includes(v)) throw new HttpError(400, "Unknown status.");
+        patch.pay_status = v || null;          // empty means "the books are right"
+      }
+      if ("paid_on" in body) patch.paid_on = body.paid_on ? String(body.paid_on).slice(0, 10) : null;
+      if ("paid_amount" in body) patch.paid_amount = body.paid_amount === null || body.paid_amount === "" ? null : Number(body.paid_amount) || 0;
+      if (Object.keys(patch).length <= 2) throw new HttpError(400, "Nothing to change.");
+      /* the party rides along so the row reads on its own if the voucher
+         ever leaves the books */
+      const partyOf = new Map<string, string>();
+      if (bills.length <= 500) {
+        const { data: vs } = await adminClient().from("kuber_voucher").select("vno, party").in("vno", bills);
+        for (const v of (vs || []) as { vno: string; party: string }[]) partyOf.set(String(v.vno), String(v.party || ""));
+      }
+      const rows = bills.map((bill) => ({ bill, party: partyOf.get(bill) || null, ...patch }));
+      const { error } = await adminClient().from("sales_invoice_meta").upsert(rows, { onConflict: "bill" });
+      if (error) {
+        if (/does not exist|schema cache/i.test(error.message))
+          throw new HttpError(503, "Run migration 0184 first — the register has nowhere to keep this yet.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true, wrote: rows.length });
+    }
+
     if (String(body.action) !== "classify") throw new HttpError(400, "Unknown action.");
     const ledger = String(body.ledger || "").trim();
     const cls = String(body.cls || "");
