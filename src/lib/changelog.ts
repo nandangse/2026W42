@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.9.5",
+    date: "2026-09-30",
+    module: "The collection call, and the mail half-written",
+    items: [
+      "CALL OR E-MAIL A CUSTOMER FROM BILLS RECEIVABLE. Tick that customer's bills and press contact: the CRM is asked who to call \u2014 decision-makers first, with phone and e-mail \u2014 and a payment-reminder mail is drafted with every ticked invoice, its date, amount and days overdue, and the total. One party at a time, because a dunning mail to two customers at once is a mistake waiting.",
+      "THE CHASE IS KEPT ON THE BILL. Logging a call or opening the mail stamps a dated line on each bill's collection remark \u2014 who, when, what was said \u2014 so the history of chasing lives where the bill is, not in someone's head. No new table; nothing to migrate.",
+      "This is the first bridge from Kuber into the CRM: Kuber knows the party as Tally spells it, the CRM knows the people. Read only; nothing is written to the CRM from here.",
+    ],
+  },
+  {
     v: "5.9.9.4",
     date: "2026-09-30",
     module: "Type the family",

@@ -7,6 +7,7 @@ import { requireKuber } from "@/lib/accounts";
 import { addDays } from "@/lib/fmt";
 import { newestByName } from "@/lib/kuber-fy";
 import { pageAll } from "@/lib/page-all";
+import { crmDb, crmConfigured } from "@/crm/db";
 import { OE_HEADS, oeHead, classifyLedger, PNL_RULES, OE_RULES, BOOK_RULES, BUCKET_LABEL, oeRuleOf, type Bucket } from "@/lib/kuber-rules";
 
 export const dynamic = "force-dynamic";
@@ -2128,6 +2129,40 @@ export async function GET(req: Request) {
      * Sales Register has been filled in, so a five-year-old bill can be
      * handed to whoever owns it without opening a second screen.
      */
+    /**
+     * WHO TO CALL AT A CUSTOMER (Dr Raghu, 30 Sep 2026, on Bills Receivable:
+     * "Later I will make the collection calls and also emails from here").
+     *
+     * Kuber knows the party as Tally spells it and nothing else. The CRM
+     * knows the company and the people in it. This is the bridge: the party
+     * name matched against the CRM's company names, and the live people of
+     * that company with an e-mail or a phone, decision-makers first. Read
+     * only; nothing is written to the CRM from here.
+     */
+    if (view === "party_contact") {
+      const party = (url.searchParams.get("party") || "").trim();
+      if (!party) throw new HttpError(400, "party required");
+      if (!crmConfigured()) return NextResponse.json({ party, company: null, people: [], why: "the CRM is not configured on this deploy" });
+      const crm = crmDb();
+      const stem = party.replace(/\b(pvt|private|ltd|limited|llp)\b\.?/gi, "").replace(/[^A-Za-z0-9 ]/g, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 2).join(" ");
+      const { data: cos } = await crm.from("company").select("id, name, city, website, domain_name")
+        .ilike("name", `%${stem.replace(/[%_]/g, "\\$&")}%`).is("deleted_at", null).is("merged_into_id", null).limit(6);
+      const list = (cos || []) as { id: string; name: string; city: string | null; website: string | null; domain_name: string | null }[];
+      /* the closest name wins — exact first, then the shortest that contains the stem */
+      const norm = (s: string) => s.toLowerCase().replace(/\b(pvt|private|ltd|limited|llp)\b\.?/g, "").replace(/[^a-z0-9]/g, "");
+      const best = list.find((c) => norm(c.name) === norm(party)) || list.sort((a, b) => a.name.length - b.name.length)[0] || null;
+      if (!best) return NextResponse.json({ party, company: null, people: [], candidates: list.map((c) => c.name) });
+      const { data: ppl } = await crm.from("person")
+        .select("id, full_name, job_title, primary_email, primary_phone, whatsapp_number, is_decision_maker, is_primary")
+        .eq("company_id", best.id).is("deleted_at", null).limit(40);
+      const people = ((ppl || []) as Record<string, unknown>[])
+        .filter((p) => p.primary_email || p.primary_phone || p.whatsapp_number)
+        .sort((a, b) => (b.is_primary ? 2 : 0) + (b.is_decision_maker ? 1 : 0) - ((a.is_primary ? 2 : 0) + (a.is_decision_maker ? 1 : 0)))
+        .slice(0, 12)
+        .map((p) => ({ name: String(p.full_name || ""), title: String(p.job_title || ""), email: String(p.primary_email || ""), phone: String(p.primary_phone || p.whatsapp_number || ""), dm: !!p.is_decision_maker, primary: !!p.is_primary }));
+      return NextResponse.json({ party, company: { id: best.id, name: best.name, city: best.city, web: best.website || best.domain_name }, people, candidates: list.map((c) => c.name) });
+    }
+
     if (view === "billsdue") {
       const kind = url.searchParams.get("kind") === "payable" ? "payable" : "receivable";
       const all = await allBills(admin);
@@ -2613,6 +2648,23 @@ export async function POST(req: Request) {
       const fu: Record<string, unknown> = {};
       if ("expected_on" in body) fu.expected_on = body.expected_on ? String(body.expected_on).slice(0, 10) : null;
       if ("remarks" in body) fu.challenge = body.remarks === null || body.remarks === "" ? null : String(body.remarks).slice(0, 2000);
+      /* A CALL OR A MAIL IS A DATED LINE ON THE REMARK. It is the collection
+         history the sheet never had, and it needs no new table to keep. */
+      if ("touch" in body) {
+        const kind = String(body.touch) === "mail" ? "e-mailed" : "called";
+        const stamp = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+        const who = String(user.email || "").split("@")[0];
+        const { data: cur } = await db.from("collection_followup").select("party, bill, challenge").in("party", [...new Set(rows.map((r) => r.party))]);
+        const have = new Map(((cur || []) as { party: string; bill: string; challenge: string | null }[]).map((c) => [`${c.party}|${c.bill}`, c.challenge || ""]));
+        const stamped = rows.map((r) => {
+          const prev = have.get(`${r.party}|${r.bill}`) || "";
+          const line = `[${stamp} · ${kind} by ${who}${body.note ? ` — ${String(body.note).slice(0, 200)}` : ""}]`;
+          return { ...r, challenge: (prev ? prev + " " : "") + line, by_email: user.email, at: now };
+        });
+        const { error } = await db.from("collection_followup").upsert(stamped, { onConflict: "party,bill" });
+        if (error) throw new Error(error.message);
+        return NextResponse.json({ ok: true, wrote: stamped.length });
+      }
       if (Object.keys(fu).length) {
         const { error } = await db.from("collection_followup")
           .upsert(rows.map((r) => ({ ...r, ...fu, by_email: user.email, at: now })), { onConflict: "party,bill" });

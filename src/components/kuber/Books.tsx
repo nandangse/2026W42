@@ -2937,6 +2937,12 @@ export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" |
             onKeyDown={(e) => { if (e.key === "Enter" && remarkDraft.trim()) void apply({ remarks: remarkDraft.trim() }); }}
             disabled={busy} className="border rounded px-2 py-1 text-xs" style={{ borderColor: BORDER, width: 260 }} />
           <span className="text-xs" style={{ color: MUTED }}>{busy ? "writing…" : "Enter to apply"}</span>
+          {/* THE CALL AND THE MAIL (Dr Raghu, 30 Sep 2026: "Later I will make
+              the collection calls and also emails from here"). The CRM knows
+              who to call; Kuber knows what is owed. One party at a time —
+              a dunning mail to two customers at once is a mistake waiting. */}
+          <CollectionContact rows={rows.filter((r) => sel.has(key(r)))} fmtMoney={fmtMoney} disabled={busy}
+            onLogged={() => { setSel(new Set()); reload(); }} />
           <button onClick={() => setSel(new Set())} className="text-xs font-bold ml-auto" style={{ color: MUTED }}>clear</button>
         </div>
       )}
@@ -3588,5 +3594,74 @@ function HeadPie({ title, tone, rows, total, fmtMoney }: { title: string; tone: 
         </tbody>
       </table>
     </div>
+  );
+}
+
+
+/**
+ * WHO TO CALL, AND THE MAIL HALF-WRITTEN.
+ *
+ * Reads the CRM for the ticked party's people (decision-makers first), then
+ * offers a phone to ring and a mail already drafted: every ticked bill with
+ * its date, amount and days overdue, the total, and a courteous ask. Pressing
+ * "log the call" or "open the mail" stamps a dated line on each bill's
+ * collection remark, so the history of chasing lives on the bill itself.
+ */
+function CollectionContact({ rows, fmtMoney, disabled, onLogged }: { rows: BillRow[]; fmtMoney: (n: number) => string; disabled: boolean; onLogged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [info, setInfo] = useState<{ company: { name: string; city: string | null } | null; people: { name: string; title: string; email: string; phone: string; dm: boolean; primary: boolean }[]; candidates?: string[] } | null>(null);
+  const [note, setNote] = useState("");
+  const parties = [...new Set(rows.map((r) => r.party))];
+  const party = parties.length === 1 ? parties[0] : "";
+  useEffect(() => {
+    if (!open || !party) { setInfo(null); return; }
+    fetch(`/api/kuber/books?view=party_contact&party=${encodeURIComponent(party)}`, { cache: "no-store" })
+      .then((r) => r.json()).then(setInfo).catch(() => setInfo({ company: null, people: [] }));
+  }, [open, party]);
+  const total = rows.reduce((s2, r) => s2 + r.amount, 0);
+  const lines = rows.map((r) => `  • ${r.bill} dated ${fmtD(r.bill_date)} — ${fmtMoney(r.amount)}${r.overdue > 0 ? ` (${r.overdue} days overdue)` : ""}`).join("\n");
+  const subject = `Payment reminder — ${rows.length} invoice${rows.length > 1 ? "s" : ""} outstanding, ${fmtMoney(total)}`;
+  const body = `Dear Sir / Madam,\n\nThe following invoice${rows.length > 1 ? "s remain" : " remains"} outstanding in our books as on ${fmtD(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }))}:\n\n${lines}\n\nTotal outstanding: ${fmtMoney(total)}\n\nWe would be grateful for your confirmation of the payment date. If any invoice is under query, please let us know so we can resolve it at once.\n\nWith regards,\nAccounts — Nandan Ground Support Equipment Pvt Ltd`;
+  const log = async (touch: "call" | "mail") => {
+    await fetch("/api/kuber/books", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "collection", touch, note: note.trim(), bills: rows.map((r) => ({ party: r.party, bill: r.bill })) }) });
+    setNote(""); setOpen(false); onLogged();
+  };
+  const mailTo = (info?.people || []).filter((p) => p.email).slice(0, 3).map((p) => p.email).join(",");
+  return (
+    <span style={{ position: "relative" }}>
+      <button onClick={() => setOpen((o) => !o)} disabled={disabled || !party} title={party ? `Call or e-mail ${party}` : "Tick bills of ONE customer to call or e-mail"}
+        className="rounded px-2 py-1 text-xs font-bold" style={{ background: party ? INK : "#D5D2C9", color: "#fff" }}>
+        &#9742; &#9993; contact
+      </button>
+      {open && party && (
+        <div className="rounded border p-3" style={{ position: "absolute", top: "110%", left: 0, zIndex: 20, background: "#fff", borderColor: BORDER, width: 420, boxShadow: "0 8px 24px rgba(0,0,0,.12)" }}>
+          <div className="text-xs font-bold mb-1" style={{ color: INK }}>{party}</div>
+          {!info ? <div className="text-xs" style={{ color: MUTED }}>asking the CRM…</div> : !info.company ? (
+            <div className="text-xs" style={{ color: "#B45309" }}>Not found in the CRM under this name{info.candidates?.length ? ` — nearest: ${info.candidates.slice(0, 3).join(", ")}` : ""}. The mail can still be drafted.</div>
+          ) : (
+            <>
+              <div className="text-xs mb-1" style={{ color: MUTED }}>CRM: <b style={{ color: INK }}>{info.company.name}</b>{info.company.city ? ` · ${info.company.city}` : ""}</div>
+              {!info.people.length && <div className="text-xs" style={{ color: MUTED }}>Nobody with an e-mail or phone on this company yet.</div>}
+              {info.people.slice(0, 6).map((p) => (
+                <div key={p.name + p.email} className="text-xs py-0.5 flex items-center gap-2" style={{ borderTop: "1px solid var(--line-soft)" }}>
+                  <span style={{ flex: 1 }}><b>{p.name}</b>{p.title ? <span style={{ color: MUTED }}> · {p.title}</span> : null}{p.dm ? <span title="decision maker" style={{ color: "#0D7A3F" }}> ★</span> : null}</span>
+                  {p.phone && <a href={`tel:${p.phone.replace(/\s/g, "")}`} style={{ color: "var(--blue)", fontWeight: 700 }}>{p.phone}</a>}
+                  {p.email && <a href={`mailto:${p.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`} style={{ color: "var(--blue)" }} title={p.email}>&#9993;</a>}
+                </div>
+              ))}
+            </>
+          )}
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="what was said (optional)" className="border rounded px-2 py-1 text-xs w-full mt-2" style={{ borderColor: BORDER }} />
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => void log("call")} className="rounded px-2 py-1 text-xs font-bold" style={{ background: GREEN, color: "#fff" }}>&#9742; log the call</button>
+            <a href={`mailto:${mailTo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`} onClick={() => void log("mail")}
+              className="rounded px-2 py-1 text-xs font-bold" style={{ background: "var(--blue)", color: "#fff" }}>&#9993; open the mail</a>
+            <button onClick={() => setOpen(false)} className="text-xs ml-auto" style={{ color: MUTED }}>close</button>
+          </div>
+          <div className="text-xs mt-1" style={{ color: MUTED }}>{rows.length} bill{rows.length > 1 ? "s" : ""} · {fmtMoney(total)} · each gets a dated line on its remark</div>
+        </div>
+      )}
+    </span>
   );
 }
