@@ -89,6 +89,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.9.0",
+    date: "2026-09-30",
+    module: "The 13-week cash flow plan, his sheet's shape",
+    items: [
+      "THE PLAN IS HIS SHEET, FED FROM WHERE EACH HEAD ACTUALLY LIVES. Twelve heads in his order, weeks Sunday to Saturday like his W40, the 1\u201313 and W-numbers and from/to dates across the top, a 13-week total column, opening and closing per week. Under every head, in small print, is where the figure was read from \u2014 so no number on the page has to be believed.",
+      "INFLOW: Advance Payment, Bank Loan and Other Income from what somebody has said is coming, on a date. Collection from Order Execution from the Jobmaster's own terms \u2014 value plus GST, less the advance in, split by the % on delivery / +30 / +60 / +90 from the TDD; 92 live jobs, Rs 21.91 Cr inside the window, 12 with no terms read as 100% on delivery and counted in the note. Follow Up Payment is every open bill on the date said on Bills Receivable, else its due date, overdue in week 1.",
+      "OUTFLOW: \"will all come from the Tally.\" Salaries, EMI, Statutory, Regular and PDC are read from forward-dated Payment and Journal vouchers, sorted by the debit side's ledger \u2014 a post-dated payment to a Sundry Creditor is a PDC. Nothing is typed in Genie for these five; while Tally carries nothing dated ahead they read zero and the screen says why. Old Vendor Payments and Other expenses come from Payment Planning.",
+      "THE OPENING IS THE BANK AND CASH AT THE START OF THAT SUNDAY, from the books \u2014 and can be STATED when the books are staler than the plan, in which case the screen names whose figure it is and what the books said. A memo row shows supplier bills falling due that nobody has planned, outside the totals: an unplanned bill is a question, not a decision. The track record his sheet keeps underneath \u2014 Booking, Billing, Collection YTD and Order in Hand \u2014 sits under the table.",
+      "PAYMENT PLANNING IS NOW THE HUB. The plan's week strip on top, then Supplier Bills (tick, pick a day, plan \u2014 a bill already in the plan is not planned twice), Advance Payments, Other Incomes, Other Payments, Payment Request (approve or drop), and the full register. An entry here moves the strip above it.",
+      "THE SUPPLIER REPORT CARD READS AS AT ANY MONTH-END, years back if wanted. Two honest limits, stated on the card: the outstanding at a past date is exact \u2014 each supplier's ledger walked from the one opening Tally exported, backward when needed \u2014 while the ageing can only cover bills that were open then and are still open now, because a bill settled since has left the bill-wise list.",
+      "Needs migration 0183, which is in.",
+    ],
+  },
+  {
     v: "5.9.8.5",
     date: "2026-09-30",
     module: "Audit queries: the ledger offers itself, and Details takes a screenshot",

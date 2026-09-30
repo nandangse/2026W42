@@ -350,7 +350,46 @@ export async function GET(req: Request) {
     if (view === "reportcard") {
       // The supplier's story: what they carry, how late we are with them, and
       // how late THEY leave us to run — the card reads both directions.
-      const bills = (await allBills(admin)).filter((b) => b.kind === "payable");
+      /**
+       * AS AT ANY DATE (Dr Raghu, 30 Sep 2026: "put the date impacts please!
+       * I may want to see previous years too").
+       *
+       * Two different things have to be honest about two different limits.
+       * The OUTSTANDING at a past date is exact: it is the supplier's ledger
+       * walked from the one opening Tally exported (1 April of the newest
+       * year) — forward to a later date, BACKWARD out of it to an earlier
+       * one. The AGEING at a past date is not: a bill settled since then has
+       * left the bill-wise list and cannot be aged, so what is aged is what
+       * was open then AND is still open now. The card says which is which.
+       */
+      const asofRaw = url.searchParams.get("asof") || today;
+      const asof = asofRaw > today ? today : asofRaw;
+      const dated = asof < today;
+      const bills = (await allBills(admin)).filter((b) => b.kind === "payable" && (!dated || !b.bill_date || b.bill_date <= asof));
+      /* the exact figure for a past date: each creditor's ledger closing */
+      const ledgerClosing = new Map<string, number>();
+      if (dated) {
+        const w = await loadWorld(admin);
+        const anchorFy = (w.ledgers as RR[]).reduce((a, r) => { const f = String(r.fy || ""); return f > a ? f : a; }, "");
+        const anchor = anchorFy ? `${anchorFy.slice(0, 4)}-04-01` : asof;
+        const creditors = new Set<string>();
+        for (const l of w.ledgers) if (w.chainHas(String(l.parent || ""), /^sundry creditors$/)) creditors.add(String(l.name));
+        const delta = new Map<string, number>();
+        for (const l of w.lines) {
+          const n = String(l.ledger);
+          if (!creditors.has(n)) continue;
+          const d = w.dateOf.get(String(l.voucher_id)) || "";
+          if (!d) continue;
+          const fwd = d >= anchor && d <= asof, back = d > asof && d < anchor;
+          if (!fwd && !back) continue;
+          delta.set(n, (delta.get(n) || 0) + (Number(l.amount) || 0) * (fwd ? 1 : -1));
+        }
+        for (const l of w.ledgers) {
+          const n = String(l.name);
+          if (!creditors.has(n)) continue;
+          ledgerClosing.set(n, (Number(l.opening) || 0) + (delta.get(n) || 0));
+        }
+      }
       const byParty = new Map<string, { party: string; group: string | null; outstanding: number; gross: number; overdue: number; oldest: string | null; nbills: number; wsum: number }>();
       for (const b of bills) {
         const p = byParty.get(b.party) || { party: b.party, group: b.party_group, outstanding: 0, gross: 0, overdue: 0, oldest: null, nbills: 0, wsum: 0 };
@@ -358,9 +397,9 @@ export async function GET(req: Request) {
         if (b.amount > 0) {
           p.gross += b.amount;
           p.nbills += 1;
-          if (b.due_date && b.due_date < today) {
+          if (b.due_date && b.due_date < asof) {
             p.overdue += b.amount;
-            p.wsum += daysBetween(b.due_date, today) * b.amount;
+            p.wsum += daysBetween(b.due_date, asof) * b.amount;
             if (!p.oldest || b.due_date < p.oldest) p.oldest = b.due_date;
           }
         }
@@ -370,7 +409,9 @@ export async function GET(req: Request) {
       // a one-bill stranger even at the same outstanding
       const vol = new Map<string, { n: number }>();
       try {
-        const { data } = await admin.from("kuber_voucher").select("party, vtype").in("vtype", ["Purchase", "Cap-Ex Purchase", "Outside Labour", "Expenses", "Site Exps"]).limit(20000);
+        const fyOf = (d: string) => (d.slice(5, 7) >= "04" ? d.slice(0, 4) + "-04-01" : String(Number(d.slice(0, 4)) - 1) + "-04-01");
+        const fyA = fyOf(asof), fyB = addDays(fyA, 365);
+        const { data } = await admin.from("kuber_voucher").select("party, vtype").in("vtype", ["Purchase", "Cap-Ex Purchase", "Outside Labour", "Expenses", "Site Exps"]).gte("date", fyA).lt("date", fyB).limit(20000);
         for (const v of data || []) {
           if (!v.party) continue;
           const r = vol.get(v.party) || { n: 0 };
@@ -388,17 +429,25 @@ export async function GET(req: Request) {
         if (b.amount > 0) {
           grossAll += b.amount;
           nbillsAll += 1;
-          if (b.bill_date) ageWsum += daysBetween(b.bill_date, today) * b.amount;
-          if (b.due_date && b.due_date < today) overdueAll += b.amount;
+          if (b.bill_date) ageWsum += daysBetween(b.bill_date, asof) * b.amount;
+          if (b.due_date && b.due_date < asof) overdueAll += b.amount;
         }
       }
       const stats = {
-        net: netAll, gross: grossAll, nbills: nbillsAll,
+        get net() { return netAll; }, gross: grossAll, nbills: nbillsAll,
         parties: byParty.size,
         avg_age_days: grossAll > 0 ? Math.round(ageWsum / grossAll) : 0,
         overdue: overdueAll,
         overdue_pct: grossAll > 0 ? Math.round((overdueAll / grossAll) * 100) : 0,
       };
+      if (dated) {
+        for (const [name, closing] of ledgerClosing) {
+          const p = byParty.get(name) || { party: name, group: "Sundry Creditors", outstanding: 0, gross: 0, overdue: 0, oldest: null, nbills: 0, wsum: 0 };
+          p.outstanding = closing;                       // exact, from the ledger
+          byParty.set(name, p);
+        }
+        netAll = [...ledgerClosing.values()].reduce((a, v) => a + v, 0);
+      }
       const rows = [...byParty.values()].filter((p) => Math.abs(p.outstanding) > 0.5).map((p) => {
         const avgDelay = p.overdue > 0 ? Math.round(p.wsum / p.overdue) : 0;
         // % of GROSS open bills, so unadjusted credits can never push it past 100
@@ -408,7 +457,8 @@ export async function GET(req: Request) {
         const grade = overduePct < 0.1 ? "A" : overduePct < 0.35 ? "B" : avgDelay <= 60 ? "C" : "D";
         return { ...p, vouchers: vol.get(p.party)?.n || 0, avg_delay_days: avgDelay, overdue_pct: Math.round(overduePct * 100), grade };
       }).sort((a, b2) => b2.outstanding - a.outstanding);
-      return NextResponse.json({ rows, stats, today });
+      return NextResponse.json({ rows, stats: { ...stats, net: netAll }, today, asof, dated,
+        caveat: dated ? "Outstanding is exact — each supplier's ledger walked to that date. The ageing and overdue columns cover only bills that were open then and are still open now; a bill settled since has left the bill-wise list and cannot be aged." : null });
     }
 
     if (view === "supplier") {
@@ -727,6 +777,287 @@ export async function GET(req: Request) {
         payments: payments.slice(0, 200), invoices: invoices.slice(0, 200), plans, items: items.slice(0, 100),
         pos: poList.slice(0, 400),
         bills: bills.sort((a, b2) => String(a.due_date || "9999").localeCompare(String(b2.due_date || "9999"))),
+      });
+    }
+
+    /**
+     * THE 13-WEEK CASH FLOW PLAN — HIS SHEET'S TWELVE HEADS, FED FROM WHERE
+     * EACH ONE ACTUALLY LIVES (Dr Raghu, 30 Sep 2026).
+     *
+     * WEEKS RUN SUNDAY TO SATURDAY. His W40 is 27/09 to 03/10 and 27 September
+     * 2026 is a Sunday; Genie was starting Mondays and every figure sat one
+     * day out from the sheet he reads.
+     *
+     * INFLOW
+     *   Advance Payment ............ cash_expected, kind advance
+     *   Collection from Order Exec . the Jobmaster's own terms: (value + GST −
+     *                                advance) split by the % on delivery / +30
+     *                                / +60 / +90, from the TDD. The pcts are of
+     *                                the BALANCE after advance — that is how
+     *                                every job that has both reads.
+     *   Follow Up Payment .......... every open receivable bill, on the date
+     *                                somebody has said it will come, else its
+     *                                due date; anything already past → week 1
+     *   Bank Loan / Other Income ... cash_expected, kinds bank_loan and
+     *                                other_income, plus FD maturities in window
+     *
+     * OUTFLOW — "will all come from the Tally. Suresh will put entries in the
+     * Tally where he will book EMI for the next month, salary approx etc."
+     *   Every FORWARD-DATED Payment or Journal voucher is read, and its debit
+     *   side sorted by ledger into Salaries · EMI · Statutory · Regular · PDC
+     *   (a post-dated payment to a Sundry Creditor is a PDC). Nothing is typed
+     *   in Genie for these five; when Tally has nothing dated ahead, they read
+     *   zero and the screen says why.
+     *   Old Vendor Payments ........ Payment Planning, status planned/approved
+     *   Other expenses ............. Payment Planning, purpose "Other…"
+     *
+     * A memo line shows supplier bills falling due that nobody has planned —
+     * outside the totals, because an unplanned bill is a question, not a
+     * decision.
+     */
+    if (view === "cashplan") {
+      const sundayOf = (iso: string) => addDays(iso, -new Date(iso + "T00:00:00Z").getUTCDay());
+      const start = sundayOf(today);
+      const isoWeek = (iso: string) => {
+        const d = new Date(iso + "T00:00:00Z");
+        const day = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - day);
+        const y0 = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d.getTime() - y0.getTime()) / 86400000) + 1) / 7);
+      };
+      const weeks = Array.from({ length: 13 }, (_, i) => {
+        const from = addDays(start, i * 7);
+        return { i: i + 1, from, to: addDays(from, 6), wno: isoWeek(addDays(from, 1)) };
+      });
+      const end = weeks[12].to;
+      const weekIdx = (d: string | null | undefined) => {
+        if (!d) return -1;
+        if (d < start) return 0;
+        const i = Math.floor(daysBetween(start, d) / 7);
+        return i >= 0 && i < 13 ? i : -1;
+      };
+      const zero = () => Array.from({ length: 13 }, () => 0);
+      const IN = ["advance", "order_exec", "followup", "bank_loan", "other_income"] as const;
+      const OUT = ["salaries", "emi", "statutory", "regular", "pdc", "vendor", "other_out"] as const;
+      const rows: Record<string, number[]> = Object.fromEntries([...IN, ...OUT, "memo_unplanned"].map((k) => [k, zero()]));
+      const notes: string[] = [];
+
+      const w = await loadWorld(admin);
+      const fyStartC = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+
+      /* ---- OPENING: bank + cash at the start of the Sunday, unless stated ---- */
+      const isCash = (parent: string) => w.chainHas(parent, /^bank accounts$|^cash-in-hand$/);
+      const isOd = (parent: string) => w.chainHas(parent, /^bank od/);
+      let openingBooks = 0;
+      {
+        const cashSet = new Set<string>();
+        for (const l of w.ledgers) {
+          const par = String(l.parent || "");
+          if (isCash(par)) { openingBooks += Number(l.opening) || 0; cashSet.add(String(l.name)); }
+        }
+        for (const l of w.lines) {
+          if (!cashSet.has(String(l.ledger))) continue;
+          const d = w.dateOf.get(String(l.voucher_id)) || "";
+          if (d && d < start) openingBooks += Number(l.amount) || 0;
+        }
+      }
+      let opening = openingBooks, openingFrom: "books" | "stated" = "books", openingNote: string | null = null;
+      try {
+        const { data: st } = await admin.from("cash_opening").select("amount, note, by_email").eq("on_date", start).maybeSingle();
+        if (st) { opening = Number((st as RR).amount) || 0; openingFrom = "stated"; openingNote = String((st as RR).note || "") || null; }
+      } catch (e) { swallow("kuber/cashplan-opening", e); }
+      const lastUpload = w.vouchers.reduce((a, v) => { const d = String(v.date || ""); return d > a && d <= today ? d : a; }, "");
+
+      /* ---- INFLOW 1 · 4 · 5: what somebody expects, on a date ---- */
+      try {
+        const exp = await pageAll<RR>(async (a, b) => {
+          const r = await admin.from("cash_expected").select("kind, party, amount, expected_on, received").eq("received", false).range(a, b);
+          return { data: r.data as RR[] | null, error: r.error };
+        }, "expected inflows");
+        for (const e of exp) {
+          const i = weekIdx(String(e.expected_on || ""));
+          if (i < 0) continue;
+          const k = String(e.kind) === "bank_loan" ? "bank_loan" : String(e.kind) === "other_income" ? "other_income" : "advance";
+          rows[k][i] += Number(e.amount) || 0;
+        }
+      } catch (e) { swallow("kuber/cashplan-expected", e); notes.push("Advance / loan / other inflows need migration 0183."); }
+      try {
+        const { data: fds } = await admin.from("kuber_fd").select("maturity_date, maturity_amount, principal, status").eq("status", "live");
+        for (const f of (fds || []) as RR[]) {
+          const i = weekIdx(String(f.maturity_date || ""));
+          if (i >= 0) rows.other_income[i] += Number(f.maturity_amount ?? f.principal) || 0;
+        }
+      } catch (e) { swallow("kuber/cashplan-fd", e); }
+
+      /* ---- INFLOW 2: the jobs, by their own terms ---- */
+      let jobsCounted = 0, jobsNoTerms = 0, jobsBeyond = 0;
+      try {
+        const jobs = await pageAll<RR>(async (a, b) => {
+          const r = await admin.from("jobs").select("tag, val, gst, tdd, advance, pay_pct_on, pay_pct_30, pay_pct_60, pay_pct_90")
+            .eq("active", true).eq("delivered", false).range(a, b);
+          return { data: r.data as RR[] | null, error: r.error };
+        }, "the live jobs");
+        for (const j of jobs) {
+          const tdd = String(j.tdd || "");
+          if (!tdd) continue;
+          const gross = (Number(j.val) || 0) * (1 + (Number(j.gst) || 0) / 100);
+          const bal = Math.max(0, gross - (Number(j.advance) || 0));
+          let on = Number(j.pay_pct_on) || 0, p30 = Number(j.pay_pct_30) || 0, p60 = Number(j.pay_pct_60) || 0, p90 = Number(j.pay_pct_90) || 0;
+          if (on + p30 + p60 + p90 === 0) { on = 100; jobsNoTerms++; }
+          jobsCounted++;
+          let any = false;
+          for (const [pct, off] of [[on, 0], [p30, 30], [p60, 60], [p90, 90]] as [number, number][]) {
+            if (!pct) continue;
+            const i = weekIdx(addDays(tdd, off));
+            if (i >= 0) { rows.order_exec[i] += (bal * pct) / 100; any = true; }
+          }
+          if (!any) jobsBeyond++;
+        }
+      } catch (e) { swallow("kuber/cashplan-jobs", e); }
+
+      /* ---- INFLOW 3: the open bills, on the day they are believed to come ---- */
+      const bills = await allBills(admin);
+      let fup = new Map<string, string>();
+      try {
+        const got = await pageAll<RR>(async (a, b) => {
+          const r = await admin.from("collection_followup").select("party, bill, expected_on").not("expected_on", "is", null).range(a, b);
+          return { data: r.data as RR[] | null, error: r.error };
+        }, "follow-ups");
+        fup = new Map(got.map((m) => [`${m.party}|${m.bill}`, String(m.expected_on)]));
+      } catch (e) { swallow("kuber/cashplan-fup", e); }
+      let fupDated = 0;
+      for (const b of bills.filter((x) => x.kind === "receivable" && x.amount > 0)) {
+        const said = fup.get(`${b.party}|${b.bill}`);
+        if (said) fupDated++;
+        const i = weekIdx(said || b.due_date || b.bill_date || today);
+        if (i >= 0) rows.followup[i] += b.amount;
+      }
+
+      /* ---- OUTFLOW 6–10: Tally, dated ahead ---- */
+      const headOf = (ledger: string, parent: string): (typeof OUT)[number] | null => {
+        if (isCash(parent) || isOd(parent)) return null;
+        if (w.chainHas(parent, /^sundry creditors$/)) return "pdc";
+        const hay = (ledger + " " + parent).toLowerCase();
+        if (w.chainHas(parent, /^duties & taxes$|^duties and taxes$/) || /\b(pf|esic|esi|tds|tcs|gst|cgst|sgst|igst|profession(al)? tax|pt payable|provident|gratuity payable|mlwf)\b/.test(hay)) return "statutory";
+        if (w.chainHas(parent, /loans? \(liability\)|^secured loans$|^unsecured loans$|^bank od/)) return "emi";
+        if (/salar|wages|directors? remun|bonus payable/.test(hay)) return "salaries";
+        const root = w.rootOf(parent);
+        const { bucket } = classifyLedger({ ledger, group: parent, root, rootN: stripNo(root) });
+        if (bucket === "finance") return "emi";
+        if (bucket === "tax") return "statutory";
+        if (bucket === "indirect" || bucket === "manuf") {
+          const h = oeHead(parent, ledger);
+          return /salar|directors/i.test(h) ? "salaries" : "regular";
+        }
+        return "regular";
+      };
+      let fwdVouchers = 0;
+      {
+        const vById = new Map(w.vouchers.map((v) => [String(v.id), v]));
+        const fwdIds = new Set(w.vouchers.filter((v) => String(v.date || "") > today && /^(payment|journal)$/i.test(String(v.vtype))).map((v) => String(v.id)));
+        fwdVouchers = fwdIds.size;
+        for (const l of w.lines) {
+          const id = String(l.voucher_id);
+          if (!fwdIds.has(id)) continue;
+          const amt = Number(l.amount) || 0;
+          if (amt >= 0) continue;                                 // the debit side only
+          const parent = String(w.ledgerByName.get(String(l.ledger))?.parent || "");
+          const h = headOf(String(l.ledger), parent);
+          if (!h) continue;
+          const i = weekIdx(String(vById.get(id)?.date || ""));
+          if (i >= 0) rows[h][i] += -amt;
+        }
+      }
+      if (!fwdVouchers) notes.push("Tally carries nothing dated ahead of today yet — Salaries, EMI, Statutory, Regular and PDC read zero until Suresh books next month's entries forward.");
+
+      /* ---- OUTFLOW 11 · 12: the plan ---- */
+      const plannedParties = new Set<string>();
+      try {
+        const plans = await pageAll<RR>(async (a, b) => {
+          const r = await admin.from("kuber_payment_plan").select("plan_date, party, amount, purpose, status").in("status", ["planned", "approved"]).range(a, b);
+          return { data: r.data as RR[] | null, error: r.error };
+        }, "the payment plan");
+        for (const p of plans) {
+          plannedParties.add(String(p.party || ""));
+          const i = weekIdx(String(p.plan_date || ""));
+          if (i < 0) continue;
+          rows[/^other/i.test(String(p.purpose || "")) ? "other_out" : "vendor"][i] += Number(p.amount) || 0;
+        }
+      } catch (e) { swallow("kuber/cashplan-plan", e); }
+      /* the memo: bills due that nobody has planned — a question, not a decision */
+      for (const b of bills.filter((x) => x.kind === "payable" && x.amount > 0)) {
+        if (plannedParties.has(b.party)) continue;
+        const i = weekIdx(b.due_date || b.bill_date || today);
+        if (i >= 0) rows.memo_unplanned[i] += b.amount;
+      }
+
+      /* ---- the walk ---- */
+      const inflow = zero(), outflow = zero(), openings = zero(), closings = zero(), net = zero();
+      let run = opening;
+      for (let i = 0; i < 13; i++) {
+        openings[i] = run;
+        inflow[i] = IN.reduce((s2, k) => s2 + rows[k][i], 0);
+        outflow[i] = OUT.reduce((s2, k) => s2 + rows[k][i], 0);
+        net[i] = inflow[i] - outflow[i];
+        run += net[i];
+        closings[i] = run;
+      }
+      const total = (k: string) => rows[k].reduce((s2, v) => s2 + v, 0);
+
+      /* ---- the track record his sheet keeps under the plan ---- */
+      let billingYtd = 0, collectionYtd = 0, orderInHand = 0, bookingYtd = 0;
+      {
+        const vById = new Map(w.vouchers.map((v) => [String(v.id), v]));
+        for (const v of w.vouchers) {
+          const d = String(v.date || "");
+          if (d < fyStartC || d > today) continue;
+          if (String(v.vtype) === "GST Sales") billingYtd += Number(v.amount) || 0;
+        }
+        for (const l of w.lines) {
+          const v = vById.get(String(l.voucher_id));
+          if (!v || String(v.vtype) !== "Receipt") continue;
+          const d = String(v.date || "");
+          if (d < fyStartC || d > today) continue;
+          const amt = Number(l.amount) || 0;
+          if (amt > 0 && w.chainHas(String(w.ledgerByName.get(String(l.ledger))?.parent || ""), /^sundry debtors$/)) collectionYtd += amt;
+        }
+        try {
+          const js = await pageAll<RR>(async (a, b) => {
+            const r = await admin.from("jobs").select("val, start_date, active, delivered").eq("active", true).range(a, b);
+            return { data: r.data as RR[] | null, error: r.error };
+          }, "jobs");
+          for (const j of js) {
+            if (!j.delivered) orderInHand += Number(j.val) || 0;
+            if (String(j.start_date || "") >= fyStartC) bookingYtd += Number(j.val) || 0;
+          }
+        } catch (e) { swallow("kuber/cashplan-track", e); }
+      }
+
+      return NextResponse.json({
+        today, start, end, weeks,
+        opening: { amount: opening, from: openingFrom, books: openingBooks, note: openingNote, asAt: addDays(start, -1), lastUpload: lastUpload || null },
+        heads: {
+          in: [
+            { key: "advance", label: "Advance Payment", src: "expected inflows — Payment Planning › Advance Payments" },
+            { key: "order_exec", label: "Collection from Order Execution", src: `${jobsCounted} live jobs by their own terms · ${jobsNoTerms} with no terms read as 100% on delivery · ${jobsBeyond} fall beyond the 13 weeks` },
+            { key: "followup", label: "Follow Up Payment", src: `open bills on the date said (${fupDated} dated on Bills Receivable), else due date; overdue in week 1` },
+            { key: "bank_loan", label: "Bank Loan", src: "expected inflows — Payment Planning › Other Incomes" },
+            { key: "other_income", label: "Other Income", src: "expected inflows and live FD maturities" },
+          ],
+          out: [
+            { key: "salaries", label: "Salaries & wages", src: "Tally, dated ahead" },
+            { key: "emi", label: "EMI", src: "Tally, dated ahead — loan principal and interest" },
+            { key: "statutory", label: "Statutory", src: "Tally, dated ahead — duties & taxes, PF, ESIC, TDS, GST" },
+            { key: "regular", label: "Monthly Regular Expenses", src: "Tally, dated ahead — everything else" },
+            { key: "pdc", label: "PDC", src: "Tally — post-dated payments to suppliers" },
+            { key: "vendor", label: "Old Vendor Payments", src: "Payment Planning, planned or approved" },
+            { key: "other_out", label: "Other expenses", src: "Payment Planning, purpose Other" },
+          ],
+        },
+        rows, totals: Object.fromEntries(Object.keys(rows).map((k) => [k, total(k)])),
+        inflow, outflow, net, openings, closings,
+        fwdVouchers, notes,
+        track: { billingYtd, collectionYtd, orderInHand, bookingYtd, fyStart: fyStartC },
       });
     }
 
@@ -2187,6 +2518,54 @@ export async function POST(req: Request) {
      * setting an expected date on forty bills cannot blank the remarks
      * somebody wrote on one of them this morning.
      */
+    /**
+     * TICKED SUPPLIER BILLS BECOME THE PLAN (Payment Planning › Supplier
+     * Bills, 30 Sep 2026). One row per bill, dated, status planned — a
+     * request until somebody approves it. The bill ref rides along so the
+     * cash flow and the supplier card can both see which bill the plan is
+     * for, and the same bill is not planned twice.
+     */
+    if (String(body.action) === "plan_bills") {
+      const list = (Array.isArray(body.bills) ? body.bills : []) as { party: string; bill: string; amount: number }[];
+      const on = String(body.plan_date || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(on)) throw new HttpError(400, "A pay-on date is needed.");
+      const rows = list.map((x) => ({ party: String(x?.party || "").trim(), bill: String(x?.bill || "").trim(), amount: Number(x?.amount) || 0 }))
+        .filter((x) => x.party && x.bill && x.amount > 0).slice(0, 500);
+      if (!rows.length) throw new HttpError(400, "No bill ticked.");
+      const db = adminClient();
+      const { data: have } = await db.from("kuber_payment_plan").select("party, bill_ref").in("status", ["planned", "approved"]).in("party", [...new Set(rows.map((r) => r.party))]);
+      const dup = new Set(((have || []) as { party: string; bill_ref: string }[]).map((h) => `${h.party}|${h.bill_ref}`));
+      const fresh = rows.filter((r) => !dup.has(`${r.party}|${r.bill}`));
+      if (fresh.length) {
+        const { error } = await db.from("kuber_payment_plan").insert(fresh.map((r) => ({
+          plan_date: on, party: r.party, amount: r.amount, purpose: "Supplier bill", bill_ref: r.bill, status: "planned", note: "", by: user.email,
+        })));
+        if (error) throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true, planned: fresh.length, alreadyPlanned: rows.length - fresh.length });
+    }
+
+    /** the Sunday opening, stated because the books are staler than the plan */
+    if (String(body.action) === "cash_opening") {
+      const on = String(body.on_date || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(on)) throw new HttpError(400, "Which Sunday?");
+      const db = adminClient();
+      if (body.amount === null || body.amount === "") {
+        const { error } = await db.from("cash_opening").delete().eq("on_date", on);
+        if (error) throw new Error(error.message);
+        return NextResponse.json({ ok: true, cleared: true });
+      }
+      const { error } = await db.from("cash_opening").upsert(
+        { on_date: on, amount: Number(body.amount) || 0, note: body.note ? String(body.note).slice(0, 300) : null, by_email: user.email, at: new Date().toISOString() },
+        { onConflict: "on_date" },
+      );
+      if (error) {
+        if (/does not exist|schema cache/i.test(error.message)) throw new HttpError(503, "Run migration 0183 first.");
+        throw new Error(error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     if (String(body.action) === "collection") {
       const list = (Array.isArray(body.bills) ? body.bills : []) as { party: string; bill: string }[];
       const rows = list.map((x) => ({ party: String(x?.party || "").trim(), bill: String(x?.bill || "").trim() }))

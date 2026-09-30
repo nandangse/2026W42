@@ -49,6 +49,18 @@ const KINDS: Record<string, { table: string; fields: string[]; order: string }> 
     table: "kuber_cash_item", order: "date",
     fields: ["date", "direction", "label", "amount", "weekly", "note"],
   },
+  /* the inflows somebody expects on a date (0183): advances from customers,
+     a bank loan, anything else coming in — one table, three kinds, because
+     they are the same act */
+  cashexp: {
+    table: "cash_expected", order: "expected_on",
+    fields: ["kind", "party", "amount", "expected_on", "confidence", "note", "received", "received_on"],
+  },
+  /* the stated Sunday opening, when the books are staler than the plan */
+  cashopen: {
+    table: "cash_opening", order: "on_date",
+    fields: ["on_date", "amount", "note"],
+  },
 };
 
 const spec = (kind: string) => {
@@ -102,10 +114,11 @@ export async function POST(req: Request) {
     }
     // text columns are not-null-default-'' — put the empties back
     for (const [key, v] of Object.entries(row))
-      if (v === null && !/date|amount|premium|principal|rate|margin|sum_insured|paid_on|weekly|closing|upto/.test(key)) row[key] = "";
+      if (v === null && !/date|amount|premium|principal|rate|margin|sum_insured|paid_on|weekly|closing|upto|received|expected_on/.test(key)) row[key] = "";
 
     if (body.action === "add") {
-      const { error } = await admin.from(k.table).insert({ ...row, by: user.email });
+      const stamp = k.table.startsWith("cash_") ? { by_email: user.email } : { by: user.email };
+      const { error } = await admin.from(k.table).insert({ ...row, ...stamp });
       if (error) {
         if (/does not exist|schema cache/i.test(error.message))
           throw new HttpError(503, "Run migration 0076 first — this register has nowhere to live yet.");

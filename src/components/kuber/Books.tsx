@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { fmtD } from "./Registers";
+import RegisterScreen, { fmtD } from "./Registers";
 import { useMoneyFmt, fmtPct } from "./money";
 
 const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", RED = "var(--red)", GREEN = "var(--green)", ORANGE = "var(--accent)";
@@ -425,7 +425,14 @@ interface CardStats { net: number; gross: number; nbills: number; parties: numbe
 const gradeColor: Record<string, string> = { A: GREEN, B: "#7A8A1E", C: "var(--warn)", D: RED };
 
 export function ReportCardScreen() {
-  const [data] = useBooks<{ rows: CardRow[]; stats: CardStats; today: string }>("reportcard");
+  /* AS AT ANY DATE (Dr Raghu, 30 Sep 2026: "put the date impacts please! I
+     may want to see previous years too"). A month picker, month-end; today
+     when nothing is chosen. The card says what a past date can and cannot
+     honestly show. */
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const [asof, setAsof] = useState(today);
+  const dated = asof < today;
+  const [data] = useBooks<{ rows: CardRow[]; stats: CardStats; today: string; asof?: string; dated?: boolean; caveat?: string | null }>("reportcard", dated ? `&asof=${asof}` : "");
   const { fmt: fmtMoney } = useMoneyFmt();
   const [q, setQ] = useState("");
   const [openParty, setOpenParty] = useState<string | null>(null);
@@ -465,9 +472,18 @@ export function ReportCardScreen() {
         <span className="text-xs" style={{ color: MUTED }}>
           The grade reads the relationship's health — A means current, D means old and mostly overdue. Weighted delay is rupee-weighted, the sheet's own measure.
         </span>
+        <span className="text-xs font-semibold ml-auto flex items-center gap-1" style={{ color: MUTED }}>
+          as at <MonthPick value={asof} onChange={setAsof} end />
+          {dated && <button onClick={() => setAsof(today)} className="font-bold" style={{ color: "var(--blue)" }}>today</button>}
+        </span>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 supplier"
-          className="px-2 py-1 rounded border text-sm ml-auto" style={{ borderColor: BORDER }} />
+          className="px-2 py-1 rounded border text-sm" style={{ borderColor: BORDER }} />
       </div>
+      {data.dated && data.caveat && (
+        <div className="rounded px-3 py-2 text-xs mb-2" style={{ background: "#FBF3E4", color: "#8A6D3B", border: "1px solid #EED9B0", lineHeight: 1.55 }}>
+          <b>As at {fmtD(data.asof || asof)}.</b> {data.caveat}
+        </div>
+      )}
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "72vh" }}>
         <table className="w-full text-xs genie-table" style={{ minWidth: 860, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
@@ -2969,4 +2985,459 @@ function cmp(a: BillRow, b: BillRow, k: SortK): number {
      an empty cell is not "the first of January" */
   if (k === "expected_on") return String(a.expected_on || "9999").localeCompare(String(b.expected_on || "9999"));
   return String(a[k] ?? "").localeCompare(String(b[k] ?? ""));
+}
+
+/* ------------------------------------------------------------------ *
+ *  THE 13-WEEK CASH FLOW PLAN — his sheet, fed from the books
+ * ------------------------------------------------------------------ */
+
+interface PlanHead { key: string; label: string; src: string }
+interface PlanData {
+  today: string; start: string; end: string;
+  weeks: { i: number; from: string; to: string; wno: number }[];
+  opening: { amount: number; from: "books" | "stated"; books: number; note: string | null; asAt: string; lastUpload: string | null };
+  heads: { in: PlanHead[]; out: PlanHead[] };
+  rows: Record<string, number[]>; totals: Record<string, number>;
+  inflow: number[]; outflow: number[]; net: number[]; openings: number[]; closings: number[];
+  fwdVouchers: number; notes: string[];
+  track: { billingYtd: number; collectionYtd: number; orderInHand: number; bookingYtd: number; fyStart: string };
+}
+
+/**
+ * Dr Raghu, 30 Sep 2026 — the twelve heads of his own sheet, in his order,
+ * each fed from the one place it actually lives (the API says which, and the
+ * screen prints it under every row). Weeks run Sunday to Saturday like his
+ * W40. The opening is the bank and cash at the start of that Sunday, from
+ * the books, unless somebody has stated it because the books are staler
+ * than the plan — and then the screen says whose figure it is.
+ *
+ * NOTHING ON THIS SCREEN IS TYPED. What can be typed lives in Payment
+ * Planning, and the plan reads it.
+ */
+export function CashPlanScreen({ go }: { go: (key: string) => void }) {
+  const [data, reload] = useBooks<PlanData>("cashplan");
+  const { num, label, fmt: fmtMoney } = useMoneyFmt();
+  const [editOpen, setEditOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  if (!data) return <div className="text-sm" style={{ color: MUTED }}>Reading the books…</div>;
+  const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+  const cell = (v: number, tone?: string) =>
+    Math.abs(v) >= 0.5 ? <span className="tnum" style={{ color: tone || INK }}>{num(v)}</span> : <span style={{ color: "#D5D2C8" }}>·</span>;
+  const stateOpening = async (clear = false) => {
+    await fetch("/api/kuber/books", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "cash_opening", on_date: data.start, amount: clear ? null : Number(draft.replace(/,/g, "")) || 0 }),
+    });
+    setEditOpen(false); reload();
+  };
+  const L = 236;                                   // the sticky first column
+  const Th = ({ children, right, bg }: { children: React.ReactNode; right?: boolean; bg?: string }) => (
+    <th className={`px-2 py-1 text-${right ? "right" : "left"} whitespace-nowrap`} style={{ background: bg || "var(--ink)", color: "#fff" }}>{children}</th>
+  );
+  const Row = ({ label, vals, total, bold, bg, color, src, sign }: {
+    label: string; vals: number[]; total: number; bold?: boolean; bg?: string; color?: string; src?: string; sign?: 1 | -1;
+  }) => (
+    <tr className="border-t" style={{ borderColor: "var(--line-soft)", background: bg || "#fff" }}>
+      <td className="px-2 py-1" style={{ position: "sticky", left: 0, background: bg || "#fff", minWidth: L, fontWeight: bold ? 800 : 600, color: color || INK }}>
+        {label}
+        {src && <div style={{ fontWeight: 400, fontSize: 10, color: MUTED, lineHeight: 1.3 }}>{src}</div>}
+      </td>
+      <td className="px-2 py-1 text-right tnum" style={{ background: "#F3F1EB", fontWeight: bold ? 800 : 700, color: color || INK, whiteSpace: "nowrap" }}>{cell(total, color)}</td>
+      {vals.map((v, i) => (
+        <td key={i} className="px-2 py-1 text-right" style={{ whiteSpace: "nowrap", fontWeight: bold ? 800 : 400 }}>
+          {cell(v, sign === -1 && v ? RED : color)}
+        </td>
+      ))}
+    </tr>
+  );
+  const sum = (a: number[]) => a.reduce((s2, v) => s2 + v, 0);
+
+  return (
+    <div style={{ maxWidth: 1400 }}>
+      <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+        <div className="text-lg font-bold" style={{ color: INK }}>13-Week Cash Flow Plan</div>
+        <span className="text-xs font-bold" style={{ color: "#7A5E1E", letterSpacing: 0.5 }}>SALES IS VANITY · PROFIT IS SANITY · CASH FLOW IS KING</span>
+        <button onClick={reload} title="Read the books again" className="rounded border font-bold ml-auto"
+          style={{ borderColor: BORDER, background: "#fff", color: INK, padding: "2px 8px", fontSize: 13 }}>&#8635;</button>
+      </div>
+      <div className="text-xs mb-2" style={{ color: MUTED, lineHeight: 1.55, maxWidth: 900 }}>
+        Figures in <b>{label}</b>. {dm(data.start)} → {dm(data.end)}, weeks Sunday to Saturday. Every head says under its name where it is read from.
+        What can be typed lives in <button onClick={() => go("payplan")} className="font-bold" style={{ color: "var(--blue)" }}>Payment Planning</button>;
+        the outflows come from Tally dated ahead.
+        {data.opening.lastUpload && <> Books as at <b>{fmtD(data.opening.lastUpload)}</b>.</>}
+      </div>
+
+      {data.notes.map((n, i) => (
+        <div key={i} className="rounded px-3 py-2 text-xs mb-2" style={{ background: "#FBF3E4", color: "#8A6D3B", border: "1px solid #EED9B0" }}>{n}</div>
+      ))}
+
+      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER }}>
+        <table className="text-xs genie-table" style={{ minWidth: 1360, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead>
+            <tr>
+              <Th>{" "}</Th><Th right bg="#3D4A5C">13 wk</Th>
+              {data.weeks.map((w) => <Th key={w.i} right>{w.i}</Th>)}
+            </tr>
+            <tr>
+              <th className="px-2 py-1 text-left" style={{ position: "sticky", left: 0, background: "var(--ink)", color: "#fff", minWidth: L }}>{label}</th>
+              <Th right bg="#3D4A5C">total</Th>
+              {data.weeks.map((w) => <Th key={w.i} right>W {w.wno}</Th>)}
+            </tr>
+            <tr style={{ background: "#F3F1EB" }}>
+              <td className="px-2 py-0.5 text-left" style={{ position: "sticky", left: 0, background: "#F3F1EB", color: MUTED }}>from</td><td style={{ background: "#F3F1EB" }} />
+              {data.weeks.map((w) => <td key={w.i} className="px-2 py-0.5 text-right tnum whitespace-nowrap" style={{ color: MUTED, fontSize: 10 }}>{dm(w.from)}</td>)}
+            </tr>
+            <tr style={{ background: "#F3F1EB" }}>
+              <td className="px-2 py-0.5 text-left" style={{ position: "sticky", left: 0, background: "#F3F1EB", color: MUTED }}>to</td><td style={{ background: "#F3F1EB" }} />
+              {data.weeks.map((w) => <td key={w.i} className="px-2 py-0.5 text-right tnum whitespace-nowrap" style={{ color: MUTED, fontSize: 10 }}>{dm(w.to)}</td>)}
+            </tr>
+          </thead>
+          <tbody>
+            {/* OPENING — whose figure, said plainly */}
+            <tr className="border-t" style={{ borderColor: "var(--ink)", background: "#FFF8E6" }}>
+              <td className="px-2 py-1.5 font-bold" style={{ position: "sticky", left: 0, background: "#FFF8E6", color: INK, minWidth: L }}>
+                Opening Balance
+                <div style={{ fontWeight: 400, fontSize: 10, color: MUTED, lineHeight: 1.3 }}>
+                  {data.opening.from === "stated"
+                    ? <>stated for {dm(data.start)}{data.opening.note ? ` — ${data.opening.note}` : ""} · books said {num(data.opening.books)}</>
+                    : <>bank + cash at close of {dm(data.opening.asAt)}, from the books</>}
+                  {" · "}
+                  {editOpen ? (
+                    <span>
+                      <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="₹ as stated" className="border rounded px-1 tnum" style={{ borderColor: BORDER, width: 110, fontSize: 11 }} />
+                      {" "}<button onClick={() => void stateOpening()} className="font-bold" style={{ color: GREEN }}>save</button>
+                      {" · "}<button onClick={() => void stateOpening(true)} style={{ color: MUTED }}>back to the books</button>
+                      {" · "}<button onClick={() => setEditOpen(false)} style={{ color: MUTED }}>cancel</button>
+                    </span>
+                  ) : <button onClick={() => { setDraft(String(Math.round(data.opening.amount))); setEditOpen(true); }} className="font-bold" style={{ color: "var(--blue)" }}>state it</button>}
+                </div>
+              </td>
+              <td style={{ background: "#F3F1EB" }} />
+              {data.openings.map((v, i) => <td key={i} className="px-2 py-1.5 text-right tnum font-bold" style={{ color: v < 0 ? RED : INK, whiteSpace: "nowrap" }}>{num(v)}</td>)}
+            </tr>
+
+            <Row label="INFLOW" vals={data.inflow} total={sum(data.inflow)} bold bg="#E6F4EA" color="#0D7A3F" />
+            {data.heads.in.map((h) => <Row key={h.key} label={h.label} vals={data.rows[h.key]} total={data.totals[h.key]} src={h.src} sign={1} />)}
+
+            <Row label="OUTFLOW" vals={data.outflow} total={sum(data.outflow)} bold bg="#FFF3E8" color="#8A5B00" />
+            {data.heads.out.map((h) => <Row key={h.key} label={h.label} vals={data.rows[h.key]} total={data.totals[h.key]} src={h.src} sign={-1} />)}
+
+            <tr className="border-t" style={{ borderColor: "var(--ink)", background: "#1B3A5C" }}>
+              <td className="px-2 py-1.5 font-bold text-white" style={{ position: "sticky", left: 0, background: "#1B3A5C", minWidth: L }}>Closing Balance (cum)</td>
+              <td style={{ background: "#1B3A5C" }} />
+              {data.closings.map((v, i) => <td key={i} className="px-2 py-1.5 text-right tnum font-bold" style={{ color: v < 0 ? "#FFB4A8" : "#fff", whiteSpace: "nowrap" }}>{num(v)}</td>)}
+            </tr>
+            <Row label="Net cash generation" vals={data.net} total={sum(data.net)} bold bg="#F7F5EF" />
+
+            {/* the memo — a question, not a decision */}
+            <tr className="border-t" style={{ borderColor: "var(--line-soft)", background: "#FAF9F5" }}>
+              <td className="px-2 py-1" style={{ position: "sticky", left: 0, background: "#FAF9F5", minWidth: L, color: "#B45309", fontStyle: "italic", fontWeight: 600 }}>
+                memo · supplier bills falling due, not yet planned
+                <div style={{ fontWeight: 400, fontSize: 10, color: MUTED, lineHeight: 1.3, fontStyle: "normal" }}>outside the totals — tick them into the plan on Payment Planning › Supplier Bills</div>
+              </td>
+              <td className="px-2 py-1 text-right tnum" style={{ background: "#F3F1EB", color: "#B45309", fontStyle: "italic" }}>{cell(data.totals.memo_unplanned, "#B45309")}</td>
+              {data.rows.memo_unplanned.map((v, i) => <td key={i} className="px-2 py-1 text-right" style={{ fontStyle: "italic" }}>{cell(v, "#B45309")}</td>)}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* TRACK RECORD — the four figures his sheet keeps under the plan */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+        <Card label="BOOKING YTD" value={fmtMoney(data.track.bookingYtd)} sub={`jobs opened since ${fmtD(data.track.fyStart)}`} color={INK} />
+        <Card label="BILLING YTD" value={fmtMoney(data.track.billingYtd)} sub="GST Sales invoices, proformas excluded" color={GREEN} />
+        <Card label="COLLECTION YTD" value={fmtMoney(data.track.collectionYtd)} sub="receipts landing on customer accounts" color="var(--blue)" />
+        <Card label="ORDER IN HAND" value={fmtMoney(data.track.orderInHand)} sub="live jobs not yet delivered, ex-GST" color={INK} />
+      </div>
+      <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "90ch", lineHeight: 1.6 }}>
+        <b>Collection from Order Execution</b> takes each live job&apos;s value plus GST, less the advance already in, and splits the balance by the
+        Jobmaster&apos;s own terms — the % on delivery from the TDD, then +30, +60, +90 days. Where a job carries no terms it is read as
+        100% on delivery and counted in the note under the row. <b>Follow Up Payment</b> is every open bill on the date somebody
+        has said it will come (set on Bills Receivable), else its due date; anything already past sits in week 1.
+        The five Tally outflows read forward-dated Payment and Journal vouchers by the debit side&apos;s ledger.
+      </p>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ *  PAYMENT PLANNING — the hub the plan reads from
+ * ------------------------------------------------------------------ */
+
+type ExpectedRow = { id: string; kind: string; party: string | null; amount: number; expected_on: string; confidence: string | null; note: string | null; received: boolean; received_on: string | null };
+type PlanRow = { id: string; plan_date: string; party: string; amount: number; purpose: string | null; bill_ref: string | null; status: string; paid_on: string | null; note: string | null };
+
+/**
+ * Dr Raghu, 30 Sep 2026: "below the main buttons and where we will also show
+ * the cash flow plan summary week wise, show tabs: Supplier Bills · Advance
+ * Payments · Other Incomes · Other Payments · Payment Request."
+ *
+ * Everything the 13-week plan can read from a person is entered here, and
+ * the strip at the top is the plan itself, so the effect of an entry is seen
+ * on the same screen that took it.
+ */
+export function PaymentHub() {
+  const [tab, setTab] = useState<"bills" | "advance" | "income" | "other" | "request" | "all">("bills");
+  const [plan, reloadPlan] = useBooks<PlanData>("cashplan");
+  const { num, label, fmt: fmtMoney } = useMoneyFmt();
+  const bump = () => { reloadPlan(); };
+  const TABS: [typeof tab, string][] = [
+    ["bills", "Supplier Bills"], ["advance", "Advance Payments"], ["income", "Other Incomes"],
+    ["other", "Other Payments"], ["request", "Payment Request"], ["all", "All planned"],
+  ];
+  return (
+    <div style={{ maxWidth: 1400 }}>
+      <div className="flex items-end justify-between gap-3 mb-2 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>Payment Planning</div>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 760 }}>
+            What WILL be paid and when, and what is expected in. The strip below is the 13-week plan reading this screen — an entry here moves it.
+          </div>
+        </div>
+      </div>
+
+      {/* THE PLAN, WEEK-WISE, AS A STRIP */}
+      {plan && (
+        <div className="bg-white rounded-lg border overflow-auto mb-3" style={{ borderColor: BORDER }}>
+          <table className="text-xs genie-table" style={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0 }}>
+            <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+              <th className="px-2 py-1 text-left" style={{ position: "sticky", left: 0, background: "var(--ink)", minWidth: 150 }}>{label}</th>
+              {plan.weeks.map((w) => <th key={w.i} className="px-2 py-1 text-right whitespace-nowrap">W {w.wno}<div style={{ fontWeight: 400, fontSize: 9, color: "#8FA1B3" }}>{w.from.slice(8, 10)}/{w.from.slice(5, 7)}</div></th>)}
+            </tr></thead>
+            <tbody>
+              {([["Opening", plan.openings, INK], ["Inflow", plan.inflow, "#0D7A3F"], ["Outflow", plan.outflow, "#8A5B00"], ["Closing", plan.closings, "var(--blue)"]] as [string, number[], string][]).map(([l, vals, c]) => (
+                <tr key={l} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
+                  <td className="px-2 py-1 font-bold" style={{ position: "sticky", left: 0, background: "#fff", color: c }}>{l}</td>
+                  {vals.map((v, i) => <td key={i} className="px-2 py-1 text-right tnum" style={{ color: v < 0 ? RED : c, fontWeight: l === "Closing" ? 700 : 400 }}>{Math.abs(v) >= 0.5 ? num(v) : "·"}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="flex gap-1 mb-3 flex-wrap">
+        {TABS.map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)} className="rounded px-3 py-1.5 text-sm font-bold"
+            style={tab === k ? { background: "var(--ink)", color: "#fff" } : { color: MUTED, background: "#fff", border: `1px solid ${BORDER}` }}>{l}</button>
+        ))}
+      </div>
+
+      {tab === "bills" && <SupplierBillsTab onChanged={bump} />}
+      {tab === "advance" && <ExpectedTab kinds={["advance"]} title="Advances expected from customers" onChanged={bump} />}
+      {tab === "income" && <ExpectedTab kinds={["bank_loan", "other_income"]} title="Bank loans and other inflows expected" onChanged={bump} />}
+      {tab === "other" && <PlanTab filter={(r) => /^other/i.test(r.purpose || "")} title="Other payments — not a supplier bill" addPurpose="Other" onChanged={bump} />}
+      {tab === "request" && <PlanTab filter={(r) => r.status === "planned"} title="Payment requests awaiting approval" approve onChanged={bump} />}
+      {tab === "all" && <RegisterScreen kind="payplan" />}
+      <p className="text-xs mt-3" style={{ color: MUTED }}>{fmtMoney(0).replace(/[\d.,]+/, "")}figures in {label} — change it at the top of Kuber.</p>
+    </div>
+  );
+}
+
+/** the payable bills, ticked into the plan on a date */
+function SupplierBillsTab({ onChanged }: { onChanged: () => void }) {
+  const [data, reload] = useBooks<BillsData>("billsdue", "&kind=payable");
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [on, setOn] = useState("");
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  if (!data) return <div className="text-sm" style={{ color: MUTED }}>reading the bills…</div>;
+  const needle = q.trim().toLowerCase();
+  const rows = data.rows.filter((r) => !needle || r.party.toLowerCase().includes(needle) || r.bill.toLowerCase().includes(needle)).slice(0, 800);
+  const key = (r: BillRow) => `${r.party}|${r.bill}`;
+  const toggle = (k: string) => setSel((s2) => { const n = new Set(s2); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const allOn = rows.length > 0 && rows.every((r) => sel.has(key(r)));
+  const picked = rows.filter((r) => sel.has(key(r)));
+  const plan = async () => {
+    if (!on || !picked.length) return;
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/kuber/books", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "plan_bills", plan_date: on, bills: picked.map((b) => ({ party: b.party, bill: b.bill, amount: b.amount })) }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "could not plan");
+      setMsg(`${j.planned} planned for ${fmtD(on)}${j.alreadyPlanned ? ` · ${j.alreadyPlanned} already in the plan` : ""}`);
+      setSel(new Set()); reload(); onChanged();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="supplier · bill…" className="border rounded px-2 py-1.5 text-sm" style={{ borderColor: BORDER, width: 220 }} />
+        <span className="text-xs" style={{ color: MUTED }}>{data.count} open bills · {fmtMoney(data.total)} — tick, pick a day, plan</span>
+        <div className="flex items-center gap-2 ml-auto">
+          <b className="text-xs" style={{ color: INK }}>{picked.length} ticked · {fmtMoney(picked.reduce((s2, r) => s2 + r.amount, 0))}</b>
+          <input type="date" value={on} onChange={(e) => setOn(e.target.value)} className="border rounded px-2 py-1 text-xs" style={{ borderColor: BORDER }} />
+          <button onClick={() => void plan()} disabled={busy || !on || !picked.length} className="rounded px-3 py-1.5 text-xs font-bold"
+            style={{ background: on && picked.length ? ORANGE : "#D5D2C9", color: "#fff" }}>{busy ? "…" : "Plan to pay"}</button>
+        </div>
+      </div>
+      {msg && <div className="text-xs mb-2" style={{ color: "#0D7A3F" }}>{msg}</div>}
+      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "52vh" }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 820, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+            <th className="px-2 py-2" style={{ width: 30 }}><input type="checkbox" checked={allOn} onChange={() => setSel(allOn ? new Set() : new Set(rows.map(key)))} /></th>
+            <th className="px-2 py-2 text-left">Supplier</th><th className="px-2 py-2 text-left">Bill</th>
+            <th className="px-2 py-2 text-left">Bill date</th><th className="px-2 py-2 text-left">Due</th>
+            <th className="px-2 py-2 text-right">Overdue</th><th className="px-2 py-2 text-right">Amount</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const k = key(r);
+              return (
+                <tr key={k} className="border-t" style={{ borderColor: "var(--line-soft)", background: sel.has(k) ? "#EEF1FA" : i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1"><input type="checkbox" checked={sel.has(k)} onChange={() => toggle(k)} /></td>
+                  <td className="px-2 py-1 font-semibold" style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.party}</td>
+                  <td className="px-2 py-1 whitespace-nowrap">{r.bill}</td>
+                  <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.bill_date)}</td>
+                  <td className="px-2 py-1 tnum whitespace-nowrap" style={{ color: MUTED }}>{fmtD(r.due_date)}</td>
+                  <td className="px-2 py-1 text-right tnum" style={{ color: r.overdue > 90 ? RED : r.overdue > 0 ? "#B45309" : MUTED }}>{r.overdue > 0 ? `${r.overdue}d` : "—"}</td>
+                  <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** expected inflows of one or two kinds — a small register with its own add row */
+function ExpectedTab({ kinds, title, onChanged }: { kinds: string[]; title: string; onChanged: () => void }) {
+  const [rows, setRows] = useState<ExpectedRow[] | null>(null);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const [f, setF] = useState({ kind: kinds[0], party: "", amount: "", expected_on: "", note: "" });
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    fetch("/api/kuber/register?kind=cashexp", { cache: "no-store" }).then((r) => r.json())
+      .then((j: { rows?: ExpectedRow[] }) => setRows((j.rows || []).filter((r) => kinds.includes(r.kind)))).catch(() => setRows([]));
+  }, [kinds]);
+  useEffect(load, [load]);
+  const post = async (body: Record<string, unknown>) => {
+    setBusy(true);
+    try { await fetch("/api/kuber/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "cashexp", ...body }) }); load(); onChanged(); }
+    finally { setBusy(false); }
+  };
+  const add = async () => {
+    if (!f.amount || !f.expected_on) return;
+    await post({ action: "add", row: { kind: f.kind, party: f.party, amount: Number(f.amount.replace(/,/g, "")) || 0, expected_on: f.expected_on, confidence: "likely", note: f.note, received: false } });
+    setF({ kind: kinds[0], party: "", amount: "", expected_on: "", note: "" });
+  };
+  const KIND_WORDS: Record<string, string> = { advance: "Advance from customer", bank_loan: "Bank loan", other_income: "Other inflow" };
+  const box = { borderColor: BORDER } as React.CSSProperties;
+  return (
+    <div>
+      <div className="text-sm font-bold mb-1" style={{ color: INK }}>{title}</div>
+      <div className="rounded p-2 mb-2 flex items-end gap-2 flex-wrap" style={{ background: "#F7F5EF", border: `1px solid ${BORDER}` }}>
+        {kinds.length > 1 && (
+          <select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })} className="border rounded px-2 py-1 text-xs" style={box}>
+            {kinds.map((k) => <option key={k} value={k}>{KIND_WORDS[k] || k}</option>)}
+          </select>
+        )}
+        <input value={f.party} onChange={(e) => setF({ ...f, party: e.target.value })} placeholder={f.kind === "advance" ? "customer" : "from whom"} className="border rounded px-2 py-1 text-xs" style={{ ...box, width: 200 }} />
+        <input value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} placeholder="₹" className="border rounded px-2 py-1 text-xs tnum" style={{ ...box, width: 120 }} />
+        <input type="date" value={f.expected_on} onChange={(e) => setF({ ...f, expected_on: e.target.value })} className="border rounded px-2 py-1 text-xs" style={box} />
+        <input value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="note" className="border rounded px-2 py-1 text-xs" style={{ ...box, width: 220 }} />
+        <button onClick={() => void add()} disabled={busy || !f.amount || !f.expected_on} className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: f.amount && f.expected_on ? ORANGE : "#D5D2C9", color: "#fff" }}>+ Add</button>
+      </div>
+      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 720, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+            <th className="px-2 py-2 text-left">Expected on</th>{kinds.length > 1 && <th className="px-2 py-2 text-left">Kind</th>}
+            <th className="px-2 py-2 text-left">From</th><th className="px-2 py-2 text-left">Note</th>
+            <th className="px-2 py-2 text-right">Amount</th><th className="px-2 py-2 text-left">Received</th><th />
+          </tr></thead>
+          <tbody>
+            {rows === null && <tr><td colSpan={7} className="px-3 py-3" style={{ color: MUTED }}>reading…</td></tr>}
+            {rows !== null && !rows.length && <tr><td colSpan={7} className="px-3 py-3" style={{ color: MUTED }}>Nothing expected yet — the first entry starts it.</td></tr>}
+            {(rows || []).map((r, i) => (
+              <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: r.received ? "#F2F2EE" : i % 2 ? "#FAF9F5" : "#fff", color: r.received ? MUTED : INK }}>
+                <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.expected_on)}</td>
+                {kinds.length > 1 && <td className="px-2 py-1">{KIND_WORDS[r.kind] || r.kind}</td>}
+                <td className="px-2 py-1 font-semibold">{r.party || "—"}</td>
+                <td className="px-2 py-1" style={{ color: MUTED }}>{r.note || ""}</td>
+                <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
+                <td className="px-2 py-1">
+                  <button onClick={() => void post({ action: "update", id: r.id, row: { received: !r.received, received_on: r.received ? null : new Date().toISOString().slice(0, 10) } })}
+                    className="rounded px-2 py-0.5 text-xs font-bold" style={r.received ? { background: "#E6F4EA", color: "#0D7A3F" } : { border: `1px solid ${BORDER}`, background: "#fff", color: MUTED }}>
+                    {r.received ? `✓ ${fmtD(r.received_on)}` : "mark received"}
+                  </button>
+                </td>
+                <td className="px-2 py-1 text-right"><button onClick={() => { if (confirm("Remove this entry?")) void post({ action: "delete", id: r.id }); }} style={{ color: MUTED }}>✕</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** a filtered view of the payment plan — other payments, or the requests awaiting approval */
+function PlanTab({ filter, title, addPurpose, approve, onChanged }: {
+  filter: (r: PlanRow) => boolean; title: string; addPurpose?: string; approve?: boolean; onChanged: () => void;
+}) {
+  const [rows, setRows] = useState<PlanRow[] | null>(null);
+  const { fmt: fmtMoney } = useMoneyFmt();
+  const [f, setF] = useState({ party: "", amount: "", plan_date: "", note: "" });
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    fetch("/api/kuber/register?kind=payplan", { cache: "no-store" }).then((r) => r.json())
+      .then((j: { rows?: PlanRow[] }) => setRows((j.rows || []).filter(filter))).catch(() => setRows([]));
+  }, [filter]);
+  useEffect(load, [load]);
+  const post = async (body: Record<string, unknown>) => {
+    setBusy(true);
+    try { await fetch("/api/kuber/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "payplan", ...body }) }); load(); onChanged(); }
+    finally { setBusy(false); }
+  };
+  const box = { borderColor: BORDER } as React.CSSProperties;
+  const tone: Record<string, { bg: string; fg: string }> = { planned: { bg: "#FFF3E8", fg: "#8A5B00" }, approved: { bg: "#E6F4EA", fg: "#0D7A3F" }, paid: { bg: "#EDF2F7", fg: "#46545F" }, dropped: { bg: "#F2F2EE", fg: "#8A8A8A" } };
+  return (
+    <div>
+      <div className="text-sm font-bold mb-1" style={{ color: INK }}>{title}</div>
+      {addPurpose && (
+        <div className="rounded p-2 mb-2 flex items-end gap-2 flex-wrap" style={{ background: "#F7F5EF", border: `1px solid ${BORDER}` }}>
+          <input value={f.party} onChange={(e) => setF({ ...f, party: e.target.value })} placeholder="to whom" className="border rounded px-2 py-1 text-xs" style={{ ...box, width: 200 }} />
+          <input value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} placeholder="₹" className="border rounded px-2 py-1 text-xs tnum" style={{ ...box, width: 120 }} />
+          <input type="date" value={f.plan_date} onChange={(e) => setF({ ...f, plan_date: e.target.value })} className="border rounded px-2 py-1 text-xs" style={box} />
+          <input value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="what for" className="border rounded px-2 py-1 text-xs" style={{ ...box, width: 240 }} />
+          <button onClick={() => { if (f.amount && f.plan_date) { void post({ action: "add", row: { party: f.party, amount: Number(f.amount.replace(/,/g, "")) || 0, plan_date: f.plan_date, purpose: addPurpose, bill_ref: "", status: "planned", note: f.note } }); setF({ party: "", amount: "", plan_date: "", note: "" }); } }}
+            disabled={busy || !f.amount || !f.plan_date} className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: f.amount && f.plan_date ? ORANGE : "#D5D2C9", color: "#fff" }}>+ Add</button>
+        </div>
+      )}
+      <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 760, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+            <th className="px-2 py-2 text-left">Pay on</th><th className="px-2 py-2 text-left">Party</th><th className="px-2 py-2 text-left">Purpose</th>
+            <th className="px-2 py-2 text-left">Bill ref</th><th className="px-2 py-2 text-right">Amount</th><th className="px-2 py-2 text-left">Status</th>{approve && <th />}
+          </tr></thead>
+          <tbody>
+            {rows === null && <tr><td colSpan={7} className="px-3 py-3" style={{ color: MUTED }}>reading…</td></tr>}
+            {rows !== null && !rows.length && <tr><td colSpan={7} className="px-3 py-3" style={{ color: MUTED }}>Nothing here.</td></tr>}
+            {(rows || []).map((r, i) => (
+              <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.plan_date)}</td>
+                <td className="px-2 py-1 font-semibold">{r.party}</td>
+                <td className="px-2 py-1" style={{ color: MUTED }}>{r.purpose || ""}{r.note ? ` · ${r.note}` : ""}</td>
+                <td className="px-2 py-1 whitespace-nowrap" style={{ color: MUTED }}>{r.bill_ref || "—"}</td>
+                <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
+                <td className="px-2 py-1"><b className="rounded px-1.5 py-0.5" style={{ fontSize: 11, ...(tone[r.status] || tone.planned) }}>{r.status}</b></td>
+                {approve && (
+                  <td className="px-2 py-1 text-right whitespace-nowrap">
+                    <button onClick={() => void post({ action: "update", id: r.id, row: { status: "approved" } })} disabled={busy} className="rounded px-2 py-0.5 text-xs font-bold mr-1" style={{ background: GREEN, color: "#fff" }}>approve</button>
+                    <button onClick={() => void post({ action: "update", id: r.id, row: { status: "dropped" } })} disabled={busy} className="rounded px-2 py-0.5 text-xs font-bold" style={{ border: `1px solid ${BORDER}`, background: "#fff", color: MUTED }}>drop</button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }

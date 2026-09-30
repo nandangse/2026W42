@@ -18,7 +18,7 @@ import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
 import StockRegister from "@/components/kuber/StockRegister";
-import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen, CfoNoteScreen, VoucherRegister, RulesScreen, BillsReceivable } from "@/components/kuber/Books";
+import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen, CfoNoteScreen, VoucherRegister, RulesScreen, BillsReceivable, CashPlanScreen, PaymentHub } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
 import ComplianceCalendar from "@/components/kuber/Compliance";
@@ -29,7 +29,7 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
   {
     items: [
       { key: "dashboard", label: "Dashboard", icon: "◧" },
-      { key: "cashflow", label: "13-Week Cash Flow", icon: "〰" },
+      { key: "cashflow", label: "13-Week Cash Flow Plan", icon: "〰" },
     ],
   },
   {
@@ -213,7 +213,7 @@ export default function Accounts({
         {/* ═══════════════════ pane ═══════════════════ */}
         <main className="flex-1 p-5" style={{ minWidth: 0 }}>
           {openKey === "dashboard" && <KuberDashboard go={go} />}
-          {openKey === "cashflow" && <CashFlowScreen go={go} />}
+          {openKey === "cashflow" && <CashPlanScreen go={go} />}
           {openKey === "receivables" && <AgeingScreen kind="receivable" />}
           {openKey === "payables" && <AgeingScreen kind="payable" />}
           {openKey === "reportcard" && <ReportCardScreen />}
@@ -238,7 +238,8 @@ export default function Accounts({
           {openKey === "cfonote" && <CfoNoteScreen go={go} />}
           {openKey === "salesreg" && <VoucherRegister kind="sales" key="s" />}
           {openKey === "purchreg" && <VoucherRegister kind="purchase" key="p" />}
-          {["bg", "fd", "insurance", "payplan", "cashitem", "loan", "bounce", "release"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
+          {openKey === "payplan" && <PaymentHub />}
+          {["bg", "fd", "insurance", "cashitem", "loan", "bounce", "release"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
           {openKey in STUBS && (
             <div className="bg-white rounded-lg border p-6" style={{ borderColor: "var(--line)", maxWidth: 720 }}>
               <div className="text-sm" style={{ color: "var(--dim)", lineHeight: 1.6 }}>{STUBS[openKey]}</div>
