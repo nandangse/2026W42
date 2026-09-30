@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.5.0",
+    date: "2026-09-30",
+    module: "The board report, made in Genie and kept",
+    items: [
+      "<b>A Board report button on the CFO Note.</b> <i>\u201cThen pdf u made put it here in the CFO note \u2014 as a button \u2014 and keep it in bottom as archieve.\u201d</i> Eleven A4 pages with page numbers on every one, built from the books as they stand when it is pressed: sales, purchases and overheads month by month with each as a share of sales; overheads to twenty-two heads; the order book by delivery month; next month by customer and by job; receivables and payables ranked with ageing; advances held and paid, shown whole.",
+      "<b>It is kept, and it does not change afterwards.</b> Each report stores the figures it was built from, so opening October\u2019s in December shows <b>what the Board was actually given</b> rather than a recomputation against later books \u2014 the one document whose whole value is that it can be referred back to would otherwise be the one that cannot. The archive sits at the bottom of the Note with who made it and when. <b>Needs migration 0180.</b>",
+      "<b>Every rule that made the first draft wrong is written into it.</b> Proformas out of sales <i>and</i> out of the bills \u2014 twenty-three of them carrying \u20b918.97 Cr had ridden in as receivables and overstated the net by \u20b916.75 Cr. Advances netted per party and never across parties. And <b>a part-posted month is found rather than assumed</b>: a month whose purchase vouchers fall under 40% of the median has its column marked and is left out of every ratio, because a month with its sales in and its bills out flatters all of them.",
+      "<b>The delivery page the board never had.</b> Nothing shows past due because planning moves the target date; the <b>OTD does not move</b>. Setting the two side by side is the only honest measure of delivery this company has \u2014 and it says 74 of 92 live jobs, \u20b925.09 Cr, now sit beyond the date the customer was given.",
+      "<b>It says what it cannot prove.</b> Where the stock has no date, the report states the margin is indicative and why; where a month is half posted, it marks the column instead of averaging over the hole. A report that quietly fills a gap is worse than one that points at it.",
+    ],
+  },
+  {
     v: "5.9.4.0",
     date: "2026-09-30",
     module: "An advance comes off that party\u2019s own bills, and stock gets a register",

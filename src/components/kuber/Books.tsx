@@ -1563,6 +1563,28 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
   const [d, setD] = useState<CfoData | null>(null);
   const [s, setS] = useState<Summary | null>(null);
   const { fmt: fmtMoney } = useMoneyFmt();
+  /* THE BOARD REPORT — made here, kept below (Dr Raghu, 30 Sep 2026:
+     "as a button", "and keep it in bottom as archieve"). */
+  const [archive, setArchive] = useState<{ id: string; on_date: string; title: string; by: string; at: string }[] | null>(null);
+  const [making, setMaking] = useState(false);
+  const [boardMsg, setBoardMsg] = useState("");
+  const loadArchive = useCallback(() => {
+    fetch("/api/board-report", { cache: "no-store" }).then((r) => r.json())
+      .then((j) => setArchive(j.rows || [])).catch(() => setArchive([]));
+  }, []);
+  const makeReport = async () => {
+    setMaking(true); setBoardMsg("Reading the books — this takes a moment…");
+    try {
+      const r = await fetch("/api/board-report", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || "the report could not be built");
+      setBoardMsg("");
+      loadArchive();
+      window.open(`/board-report/print?id=${encodeURIComponent(j.id)}`, "_blank");
+    } catch (e) { setBoardMsg(e instanceof Error ? e.message : String(e)); }
+    finally { setMaking(false); }
+  };
+  useEffect(() => { loadArchive(); }, [loadArchive]);
   useEffect(() => {
     fetch("/api/kuber/books?view=cfonote", { cache: "no-store" }).then((r) => r.json()).then(setD).catch(() => setD(null));
     fetch("/api/kuber/books?view=summary&period=30", { cache: "no-store" }).then((r) => r.json()).then(setS).catch(() => setS(null));
@@ -1586,13 +1608,27 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
 
   return (
     <div style={{ maxWidth: 980 }}>
-      <div className="mb-3">
-        <div className="text-lg font-bold" style={{ color: INK }}>The CFO Note</div>
-        <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 700 }}>
-          The Saturday read — computed fresh from the books each time it opens, nothing typed.
-          Trends first, then the things to do. It will grow sharper as the books grow cleaner.
+      <div className="mb-3 flex items-start gap-3 flex-wrap">
+        <div style={{ flex: 1, minWidth: 320 }}>
+          <div className="text-lg font-bold" style={{ color: INK }}>The CFO Note</div>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 700 }}>
+            The Saturday read — computed fresh from the books each time it opens, nothing typed.
+            Trends first, then the things to do. It will grow sharper as the books grow cleaner.
+          </div>
         </div>
+        {/* A BOARD PAPER IS A DIFFERENT DOCUMENT FROM A SATURDAY READ. This
+            one is eleven A4 pages with page numbers, and it is KEPT — the
+            archive below holds what the Board was actually given. */}
+        <button onClick={makeReport} disabled={making}
+          className="rounded px-3 py-2 text-sm font-bold text-white"
+          style={{ background: making ? MUTED : "var(--blue)", whiteSpace: "nowrap" }}
+          title="Eleven A4 pages, page-numbered, from today's books — and kept in the archive below">
+          {making ? "Building…" : "📄 Board report"}
+        </button>
       </div>
+      {!!boardMsg && (
+        <div className="text-xs rounded px-2.5 py-2 mb-3" style={{ background: "#FDF8EC", color: "#7A5B00" }}>{boardMsg}</div>
+      )}
 
       {s && (
         <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
@@ -1635,6 +1671,34 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
         Every line above is computed — a rule firing on the books, never an opinion. As the registers fill (loans,
         compliance, payment plans) the list sharpens by itself. Tell Bernie what Saturday should also ask, and it grows.
       </p>
+
+      {/* ───────────── the archive ───────────── */}
+      <div className="bg-white rounded-lg border p-3 mt-4" style={{ borderColor: BORDER }}>
+        <div className="text-xs font-bold mb-1" style={{ color: "var(--blue)", letterSpacing: 0.8 }}>
+          BOARD REPORTS — THE ARCHIVE
+        </div>
+        <div className="text-xs mb-2" style={{ color: MUTED, lineHeight: 1.55, maxWidth: "80ch" }}>
+          Each report keeps the figures it was built from, so opening an old one shows <b>what the Board was actually
+          given</b> — never a recomputation against later books. Two reports drawn a week apart will differ, and they should.
+        </div>
+        {archive === null && <div className="text-xs" style={{ color: MUTED }}>reading the archive…</div>}
+        {archive?.length === 0 && (
+          <div className="text-xs" style={{ color: MUTED }}>
+            Nothing yet. <b>Board report</b> above makes the first one.
+          </div>
+        )}
+        {archive?.map((r) => (
+          <div key={r.id} className="flex items-baseline gap-2 border-t py-1.5 flex-wrap" style={{ borderColor: "var(--line-soft)" }}>
+            <span className="text-sm font-bold" style={{ color: INK }}>{fmtD(r.on_date)}</span>
+            <span className="text-xs" style={{ color: MUTED }}>
+              generated {new Date(r.at).toLocaleString("en-GB", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}
+              {r.by ? ` by ${String(r.by).split("@")[0]}` : ""}
+            </span>
+            <a href={`/board-report/print?id=${encodeURIComponent(r.id)}`} target="_blank" rel="noreferrer"
+              className="text-xs font-bold" style={{ color: ORANGE, marginLeft: "auto" }}>open →</a>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
