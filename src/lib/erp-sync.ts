@@ -514,6 +514,12 @@ export async function erpSync(
     start_date: D(j.job_start_date),
     proj: S(j.project),
     stat: S(j.job_status),
+    /* THE ERP'S OWN CLASSIFIER (0175). Six values, and the one that says
+       whether a job is in process, at installation, delivered or cancelled.
+       Genie had only ever used it as a filter when ASKING the ERP and never
+       wrote it down — which is why every screen downstream had to guess the
+       classification from the stage and the active flag. */
+    status: S(j.status),
     own: S(j.planning_owner),
     gst: j.custom_gst_rate == null || j.custom_gst_rate === "" ? null : N(j.custom_gst_rate),
     /* The vehicle, straight off the Jobmaster row. keepFilled() below is what
@@ -642,6 +648,12 @@ export async function erpSync(
     start_date: D(j.job_start_date),
     proj: S(j.project),
     stat: S(j.job_status),
+    /* THE ERP'S OWN CLASSIFIER (0175). Six values, and the one that says
+       whether a job is in process, at installation, delivered or cancelled.
+       Genie had only ever used it as a filter when ASKING the ERP and never
+       wrote it down — which is why every screen downstream had to guess the
+       classification from the stage and the active flag. */
+    status: S(j.status),
     own: S(j.planning_owner),
   })).filter((d) => d.id);
   const undated = delRows.filter((d) => !d.delivered_on).length;

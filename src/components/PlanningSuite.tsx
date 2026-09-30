@@ -716,7 +716,7 @@ export default function PlanningSuite({
             screen to say something nobody was reading there. */}
       </div>
 
-      <QuoteOfDay trigger={quoteTrigger} />
+      <QuoteOfDay trigger={quoteTrigger} board={board} me={me} />
 
       {workspace === "suite" && tab === "home" && <MyWeek board={board} me={me} V={V} onOpen={openJobPlan} reload={reload} goTasks={() => setWorkspace("tasking")} goGoals={() => setWorkspace("goals")} goalsAccess={!!goalsAccess} goLms={() => setWorkspace("lms")} isAdmin={isAdmin} isStrat={canSeeForward} />}
       {/* Kept MOUNTED and merely hidden, so its filters, search, sort and view

@@ -153,10 +153,19 @@ export async function GET() {
        * standing at a customer's site is exactly a job that is no longer on
        * the floor.
        */
-      const { data: instJobs } = await adminClient()
-        .from("jobs")
-        .select("id, tag, cust, proj, client_update, pay_on_delivery, val, delivered_on")
-        .eq("stat", "Installation Stage");
+      /* The ERP's own status once 0175 is in; the stage until then, so the
+         tab keeps working through the migration rather than emptying again. */
+      const base = adminClient().from("jobs")
+        .select("id, tag, cust, proj, client_update, pay_on_delivery, val, delivered_on");
+      let instJobs: Record<string, unknown>[] | null = null;
+      const byStatus = await base.eq("status", "Installation Stage");
+      instJobs = byStatus.error ? null : byStatus.data;
+      if (instJobs === null) {
+        const byStage = await adminClient().from("jobs")
+          .select("id, tag, cust, proj, client_update, pay_on_delivery, val, delivered_on")
+          .eq("stat", "Installation Stage");
+        instJobs = byStage.data || [];
+      }
       const ledger = new Map(rows.map((r) => [String(r.id), r]));
       installation = (instJobs || []).map((j) => {
         const r = ledger.get(String(j.id)) || ({} as Record<string, unknown>);

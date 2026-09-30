@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.1.0",
+    date: "2026-09-30",
+    module: "The ERP\u2019s status, and a morning box worth reading",
+    items: [
+      "<b>Genie now stores the ERP\u2019s STATUS</b> \u2014 the six-value one: <i>Jobs in Process \u00b7 Partially Delivered \u00b7 Delivered \u00b7 Status Quo \u00b7 Cancelled \u00b7 Installation Stage</i>. It had only ever been used as a filter when <b>asking</b> the ERP and was thrown away on arrival, which is why every screen downstream had to guess the classification from the finer stage and the active flag. <b>That is the root of the empty Installation tab</b>, not the symptom I fixed an hour ago.",
+      "<b>The two fields are different and both are kept.</b> <code>job_status</code> is the stage \u2014 twenty-two of them, \u201cS: Order Received\u201d through \u201cP: Assembly Fabrication - 75%\u201d \u2014 and lives in <code>stat</code>. <code>status</code> is the classifier and now lives in <code>status</code>. Same job, same number, same data; the status decides which screen it belongs on and what matters about it there.",
+      "<b>The morning box is now a morning brief.</b> Under the quote: <b>whose birthday it is</b>, <b>jobs for delivery today</b> \u2014 which includes everything already past its date, because a machine due on the 24th and still here is more today\u2019s problem than one due this afternoon \u2014 <b>jobs for tomorrow</b>, and your open tasks split into <b>on jobs</b> and <b>everything else</b>, because those two are chased in different places.",
+      "<b>Job numbers and customer tags are listed, not just counted</b>, with anything overdue carrying its date in red.",
+      "<b>Needs migration 0175.</b> Until it runs, Installation falls back to reading the stage, so the tab keeps working through the change rather than emptying again.",
+    ],
+  },
+  {
     v: "5.9.0.1",
     date: "2026-09-30",
     module: "Installation Jobs was asking the wrong table",
