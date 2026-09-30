@@ -200,11 +200,21 @@ function DeliveryBoard({ jobs, board, onOpen, V, reload, canEdit, isStrat }: {
    */
   const [peekId, setPeekId] = useState<string | null>(null);
   const [allLate, setAllLate] = useState(false);
+  /**
+   * HOW FAR AHEAD THE BOARD LOOKS (Dr Raghu, 30 Sep 2026: "make a button on
+   * the right 'next week' and add to the right if needed by the guy").
+   *
+   * Seven days is the right default — it is the week somebody is actually
+   * working — but a planner chasing a gap needs to see past it, and being
+   * able to widen the board beats a second screen that shows the same jobs
+   * differently.
+   */
+  const [weeks, setWeeks] = useState(1);
 
   const dated = jobs.filter((j) => !!j.tdd);
   const past = dated.filter((j) => (j.tdd as string) < TODAY)
     .sort((a, b) => ((a.tdd as string) < (b.tdd as string) ? -1 : 1));
-  const days = nextDays(TODAY, 7);
+  const days = nextDays(TODAY, 7 * weeks);
   const horizon = days[days.length - 1];
   /* The twenty is spent on what is COMING — the overdue column is complete
      on its own and must not eat the allowance. */
@@ -244,17 +254,41 @@ function DeliveryBoard({ jobs, board, onOpen, V, reload, canEdit, isStrat }: {
             * the money held up in it out of Genie and into a chat — which is
             * the point, and also the reason it is not a button everybody has.
             */}
+          {/* One more week, as many times as the day needs it. */}
+          <button onClick={() => setWeeks((w) => Math.min(6, w + 1))}
+            className="rounded px-2 py-1 font-bold" style={{ fontSize: 11, background: "#fff", border: "1px solid var(--line)", color: "var(--navy)" }}
+            title="Show another seven days">+ next week</button>
+          {weeks > 1 && (
+            <button onClick={() => setWeeks(1)} className="rounded px-2 py-1" style={{ fontSize: 11, color: "var(--muted)" }}
+              title="Back to the coming seven days">{weeks} weeks · reset</button>
+          )}
           {isStrat && (
             <button onClick={async () => {
               const toRun = (j: Job): RunJob => ({
-                id: jobNo(j.id), tag: j.tag, pct: j.pct, tdd: j.tdd, otd: j.otd,
+                id: jobNo(j.id), tag: j.tag, pct: j.pct, kit: j.kit || 0, tdd: j.tdd, otd: j.otd,
                 owner: ownerOf(j), colour: ownerColour(ownerOf(j)),
                 lateDays: j.tdd && j.tdd < TODAY ? Math.abs(daysBetween(TODAY, j.tdd)) : 0,
               });
-              const url = runJpg(
+              const url = await runJpg(
                 TODAY,
                 past.map(toRun),
-                days.map((d) => ({ date: d, label: dayHead(d).day, weekday: dayHead(d).weekday, jobs: onDay(d).map(toRun) })),
+                /* THE PICTURE ALWAYS CARRIES TWENTY (Dr Raghu, 30 Sep 2026:
+                   "always show the next 20. this fits into one page jpeg"),
+                   whatever the board on screen happens to be showing — the
+                   two are answering different questions. */
+                (() => {
+                  const horizon = nextDays(TODAY, 28);
+                  const out: { date: string; label: string; weekday: string; jobs: ReturnType<typeof toRun>[] }[] = [];
+                  let left = 20;
+                  for (const d of horizon) {
+                    if (left <= 0) break;
+                    const on = jobs.filter((j) => j.tdd === d).slice(0, left);
+                    if (!on.length) continue;
+                    left -= on.length;
+                    out.push({ date: d, label: dayHead(d).day, weekday: dayHead(d).weekday, jobs: on.map(toRun) });
+                  }
+                  return out;
+                })(),
                 totalTp / 1e7,
                 /* The whole board, and the next twenty going out — the size
                    of the book and the size of the next bite of it. */
@@ -300,7 +334,7 @@ function DeliveryBoard({ jobs, board, onOpen, V, reload, canEdit, isStrat }: {
           last day of the week is exactly the one somebody scrolls to find.
           The columns share what there is and the tag gives up the points. */}
       <div className="grid gap-1.5" style={{
-        gridTemplateColumns: `minmax(0,1.9fr) repeat(7, minmax(0,1fr))`,
+        gridTemplateColumns: `minmax(0,1.9fr) repeat(${days.length}, minmax(0,1fr))`,
       }}>
         {/* ---- past due: ONE heading, two columns under it ---- */}
         <div style={{ minWidth: 0 }}>

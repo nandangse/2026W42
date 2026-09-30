@@ -18,8 +18,10 @@
  * that is the thing a delivery message is really about.
  */
 
+import { BREAKTHROUGH } from "./breakthrough-logo";
+
 export interface RunJob {
-  id: string; tag: string; pct: number;
+  id: string; tag: string; pct: number; kit: number;
   tdd: string | null; otd: string | null;
   owner: string; colour: string; lateDays: number;
 }
@@ -66,8 +68,10 @@ export function clocks(today: string): Clock[] {
        thing that did not say so, and a bar marked "YEAR" beside a calendar
        date invites exactly the wrong reading. */
     { label: `FY ${fy}`, done: span(fyStart, t), total: span(fyStart, fyEnd), from: iso(fyStart), to: iso(fyEnd) },
-    { label: "Quarter", done: span(qStart, t), total: span(qStart, qEnd), from: iso(qStart), to: iso(qEnd) },
-    { label: "Month", done: span(mStart, t), total: span(mStart, mEnd), from: iso(mStart), to: iso(mEnd) },
+    /* NAMED, NOT "QUARTER" (Dr Raghu, 30 Sep 2026). A picture that gets
+       forwarded has nobody standing beside it to say which quarter. */
+    { label: `${fy} Q${qi + 1}`, done: span(qStart, t), total: span(qStart, qEnd), from: iso(qStart), to: iso(qEnd) },
+    { label: `${LONG_MON[m]} ${y}`, done: span(mStart, t), total: span(mStart, mEnd), from: iso(mStart), to: iso(mEnd) },
   ];
 }
 
@@ -95,10 +99,10 @@ export interface RunTotals {
  */
 export interface DeliveredRow { on: string; val: number; tp: number }
 
-export function runJpg(
+export async function runJpg(
   today: string, past: RunJob[], week: RunDay[], heldCr: number, tot: RunTotals,
   delivered: DeliveredRow[] = [],
-): string {
+): Promise<string> {
   /**
    * TALLER, AND THE ROWS TIGHTER — because twenty must actually appear.
    *
@@ -121,13 +125,32 @@ export function runJpg(
 
   x.fillStyle = C.paper; x.fillRect(0, 0, W, H);
 
+  /**
+   * THE BREAKTHROUGH BANNER (Dr Raghu, 30 Sep 2026: "put Nandan Breakthrough
+   * Image in the top"). On its own white strip, because the artwork carries a
+   * white ground and would print as a white block on the navy.
+   *
+   * Drawn from a data URI held in the source: an <img> fetched at draw time
+   * that has not finished loading draws as nothing at all, and a banner that
+   * is sometimes there is worse than one that always is.
+   */
+  let bannerH = 0;
+  try {
+    const img = await loadImage(BREAKTHROUGH);
+    if (img) {
+      const bw = Math.min(560, W - PAD * 2);
+      bannerH = Math.round((img.height / img.width) * bw) + 14;
+      x.drawImage(img, (W - bw) / 2, 8, bw, bannerH - 14);
+    }
+  } catch { /* the picture stands without it */ }
+
   // ---- the header band -----------------------------------------------
-  x.fillStyle = C.navy; x.fillRect(0, 0, W, 300);
+  x.fillStyle = C.navy; x.fillRect(0, bannerH, W, 300);
   const t = d0(today);
   x.fillStyle = "#8FA1B3"; x.font = F(19, "700");
-  x.fillText("NANDAN GSE · DELIVERY RUN", PAD, 46);
+  x.fillText("NANDAN GSE · DELIVERY RUN", PAD, bannerH + 32);
   x.fillStyle = "#fff"; x.font = F(40, "700");
-  x.fillText(`${LONG_DAY[t.getDay()]}, ${t.getDate()} ${LONG_MON[t.getMonth()]} ${t.getFullYear()}`, PAD, 92);
+  x.fillText(`${LONG_DAY[t.getDay()]}, ${t.getDate()} ${LONG_MON[t.getMonth()]} ${t.getFullYear()}`, PAD, bannerH + 78);
 
   /**
    * THE THREE CLOCKS — how much of the period is gone, what went out in it,
@@ -146,7 +169,7 @@ export function runJpg(
   const cl = clocks(today);
   const cw = (W - PAD * 2 - 24) / 3;
   cl.forEach((c, i) => {
-    const cx = PAD + i * (cw + 12), cy = 108;
+    const cx = PAD + i * (cw + 12), cy = bannerH + 94;
     const left = c.total - c.done;
     x.fillStyle = "rgba(255,255,255,.08)"; roundRect(x, cx, cy, cw, 176, 8); x.fill();
     x.fillStyle = "#8FA1B3"; x.font = F(15, "700");
@@ -168,19 +191,20 @@ export function runJpg(
     const tp = inPeriod.reduce((a, d) => a + d.tp, 0);
 
     x.fillStyle = "#6E8298"; x.font = F(11);
-    x.fillText("DELIVERED", cx + 14, cy + 86);
+    x.fillText("DELIVERED", cx + 14, cy + 88);
+    /* One line, his shape: Jobs | V: XX Cr | T: YY Cr. */
+    let px = cx + 14;
     x.fillStyle = "#fff"; x.font = F(19, "700");
-    x.fillText(`${n}`, cx + 14, cy + 108);
-    const nw3 = x.measureText(`${n}`).width;
+    x.fillText(`${n}`, px, cy + 112); px += x.measureText(`${n}`).width + 5;
     x.fillStyle = "#8FA1B3"; x.font = F(13);
-    x.fillText(n === 1 ? "job" : "jobs", cx + 20 + nw3, cy + 108);
-
-    x.fillStyle = "#F0A02A"; x.font = F(16, "700");
-    const vs = `₹${(v / 1e7).toFixed(2)} Cr`;
-    x.fillText(vs, cx + 14, cy + 130);
-    const vw = x.measureText(vs).width;
-    x.fillStyle = "#7BC67E"; x.font = F(16, "700");
-    x.fillText(`₹${(tp / 1e7).toFixed(2)} Cr`, cx + 14 + vw + 12, cy + 130);
+    x.fillText(n === 1 ? "Job" : "Jobs", px, cy + 112); px += x.measureText(n === 1 ? "Job" : "Jobs").width + 7;
+    x.fillStyle = "#4E6377"; x.fillText("|", px, cy + 112); px += 10;
+    x.fillStyle = "#F0A02A"; x.font = F(15, "700");
+    const vs = `V: ₹${(v / 1e7).toFixed(2)} Cr`;
+    x.fillText(vs, px, cy + 112); px += x.measureText(vs).width + 7;
+    x.fillStyle = "#4E6377"; x.font = F(13); x.fillText("|", px, cy + 112); px += 10;
+    x.fillStyle = "#7BC67E"; x.font = F(15, "700");
+    x.fillText(`T: ₹${(tp / 1e7).toFixed(2)} Cr`, px, cy + 112);
 
     /* The rate that produced it, in the unit the year report already uses. */
     const perMonth = c.done > 0 ? 30.44 / c.done : 0;
@@ -198,7 +222,7 @@ export function runJpg(
   /* Dr Raghu, 28 Sep 2026: "Total Jobs: <> | Value | Throughput. Next 20
      Jobs <> | Value | Throughput." The two together say the size of the book
      and the size of the next bite of it — a count on its own says neither. */
-  let y = 322;
+  let y = bannerH + 308;
   const money = (r: number) => `₹${(r / 1e7).toFixed(2)} Cr`;
   const sumLine = (label: string, n: number, val: number, tp: number, tone: string) => {
     x.fillStyle = C.band; roundRect(x, PAD, y, W - PAD * 2, 42, 6); x.fill();
@@ -224,7 +248,7 @@ export function runJpg(
     x.fillText(t, W - PAD - 14 - x.measureText(t).width, y + 27);
     y += 48;
   };
-  sumLine("Total jobs", tot.jobs, tot.val, tot.tp, C.navy);
+  sumLine("Pending Jobs in progress", tot.jobs, tot.val, tot.tp, C.navy);
   sumLine("Next 20 going out", tot.nextJobs, tot.nextVal, tot.nextTp, C.accent);
 
   // ---- the headline number --------------------------------------------
@@ -298,10 +322,16 @@ export function runJpg(
       x.fillStyle = C.faint; x.font = F(13);
       x.fillText(j.owner, PAD + 300, y + 36);
       // per cent, right-aligned
-      x.font = F(18, "700");
+      /* K AND P, BOTH (Dr Raghu, 30 Sep 2026: "on the right side show K: XX %
+         P: YY%"). Production alone says how far the building has got;
+         kitting says whether it can go further. */
+      const pTxt = `P: ${j.pct}%`, kTxt = `K: ${j.kit}%`;
+      x.font = F(16, "700");
       x.fillStyle = j.pct >= 100 ? C.green : j.pct >= 60 ? C.amber : C.red;
-      const p = `${j.pct}%`;
-      x.fillText(p, W - PAD - 16 - x.measureText(p).width, y + 20);
+      const pw = x.measureText(pTxt).width;
+      x.fillText(pTxt, W - PAD - 16 - pw, y + 20);
+      x.fillStyle = j.kit >= 80 ? C.green : j.kit >= 40 ? C.amber : C.red;
+      x.fillText(kTxt, W - PAD - 26 - pw - x.measureText(kTxt).width, y + 20);
       if (j.lateDays > 0) {
         x.font = F(13, "700"); x.fillStyle = C.red;
         const l = `${j.lateDays}d late`;
@@ -337,6 +367,17 @@ export function runJpg(
   }
 
   return cv.toDataURL("image/jpeg", 0.92);
+}
+
+/** A data URI into a drawable image. Resolves to null rather than throwing:
+ *  the picture is worth more without its banner than not at all. */
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((res) => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = () => res(null);
+    im.src = src;
+  });
 }
 
 const dm = (s: string) => `${s.slice(8)}-${s.slice(5, 7)}`;

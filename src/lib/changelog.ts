@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.2.0",
+    date: "2026-09-30",
+    module: "The delivery picture, as it should read",
+    items: [
+      "<b>The Breakthrough 2027 banner sits at the top</b>, on its own white strip \u2014 the artwork carries a white ground and would have printed as a white block on the navy. It is embedded in the code rather than fetched, because a banner that is <i>sometimes</i> there is worse than one that always is.",
+      "<b>The quarter and the month are named:</b> <i>2026-27 Q2</i> and <i>September 2026</i>. A picture that gets forwarded has nobody standing beside it to say which quarter it meant.",
+      "<b>Each clock reads on one line: <i>98 Jobs | V: \u20b929.97 Cr | T: \u20b912.47 Cr</i></b>, and \u201cTotal jobs\u201d becomes <b>Pending Jobs in progress</b>, which is what the number actually is.",
+      "<b>Every job carries K and P</b> \u2014 kitting beside production. Production alone says how far the building has got; kitting says whether it can go any further, and the pair is the whole story of a job on one line.",
+      "<b>The picture always carries twenty</b>, looking as far ahead as it needs to find them \u2014 independent of what the board on screen is showing, because the two answer different questions.",
+      "<b>And the board gains a <i>+ next week</i> button.</b> Seven days is the week somebody is working, but a planner chasing a gap needs to see past it \u2014 pressed again it keeps widening, up to six weeks, and one click puts it back.",
+    ],
+  },
+  {
     v: "5.9.1.0",
     date: "2026-09-30",
     module: "The ERP\u2019s status, and a morning box worth reading",
