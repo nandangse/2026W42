@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.0.1",
+    date: "2026-09-30",
+    module: "Installation Jobs was asking the wrong table",
+    items: [
+      "<b>It said \u201cnothing stands at installation\u201d while three machines stood at site.</b> The tab was filtering the DELIVERED LEDGER for a stage of <i>Installation Stage</i> \u2014 and every row in that ledger carries <i>D: Delivered</i>, because that is the status the ERP hands over with a delivery. The filter matched nothing, every time, and said so confidently.",
+      "<b>The stage is kept on the job, and those jobs are archived</b> off the live board the moment the ERP stops calling them in process \u2014 which is exactly what a machine standing at a customer\u2019s site is. So the question is now asked of the jobs table <b>without the active filter</b>, and the ledger is used only to fill in the delivery date.",
+      "<b>Three jobs appear</b>: a Binwa deer ramp and two of the three Fixo mobile scissor lifts, all delivered at the end of July and standing at site since.",
+    ],
+  },
+  {
     v: "5.9.0.0",
     date: "2026-09-30",
     module: "The CRM funnel \u2014 five stages, one person, thirty days",

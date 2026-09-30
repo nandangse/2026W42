@@ -137,25 +137,41 @@ export async function GET() {
     // project, status and the money still to come.
     let installation: Record<string, unknown>[] = [];
     try {
-      const inst = rows.filter((r) => String(r.stat || "") === "Installation Stage");
-      const ids = inst.map((r) => String(r.id));
-      const { data: live } = ids.length
-        ? await adminClient().from("jobs").select("id, proj, client_update, pay_on_delivery, val").in("id", ids)
-        : { data: [] as Record<string, unknown>[] };
-      const liveBy = new Map((live || []).map((j) => [String(j.id), j]));
-      installation = inst.map((r) => {
-        const j = liveBy.get(String(r.id));
-        const val = Number(j?.val ?? r.val) || 0;
-        const pending = j?.pay_on_delivery != null ? Number(j.pay_on_delivery) || 0 : null;
+      /**
+       * ASKED OF THE RIGHT TABLE (Dr Raghu, 30 Sep 2026: "installation is
+       * very much there. there is a stage called installation stage!").
+       *
+       * It was filtering the DELIVERED LEDGER for stat = "Installation
+       * Stage" — and every row in that ledger carries "D: Delivered",
+       * because that is the status the ERP hands over with a delivery. So
+       * the filter matched nothing and the tab said "nothing stands at
+       * installation" while three machines stood at site.
+       *
+       * The stage is kept on the JOB, and those jobs are archived off the
+       * live board the moment the ERP stops calling them in process — so the
+       * question has to be asked of `jobs` WITHOUT the active filter. A job
+       * standing at a customer's site is exactly a job that is no longer on
+       * the floor.
+       */
+      const { data: instJobs } = await adminClient()
+        .from("jobs")
+        .select("id, tag, cust, proj, client_update, pay_on_delivery, val, delivered_on")
+        .eq("stat", "Installation Stage");
+      const ledger = new Map(rows.map((r) => [String(r.id), r]));
+      installation = (instJobs || []).map((j) => {
+        const r = ledger.get(String(j.id)) || ({} as Record<string, unknown>);
+        const val = Number(j.val ?? r.val) || 0;
+        const pending = j.pay_on_delivery != null ? Number(j.pay_on_delivery) || 0 : null;
         return {
-          id: r.id, tag: r.tag, cust: r.cust, delivered_on: r.delivered_on,
-          proj: String(j?.proj || r.proj || "") || null,
+          id: j.id, tag: j.tag ?? r.tag, cust: j.cust ?? r.cust,
+          delivered_on: j.delivered_on ?? r.delivered_on,
+          proj: String(j.proj || r.proj || "") || null,
           val,
           pending,
           billed: pending != null && val > 1 ? Math.max(0, val - pending) : null,
-          status: String(j?.client_update || "").replace(/[#*|]/g, " ").replace(/\s+/g, " ").trim().slice(0, 220) || null,
+          status: String(j.client_update || "").replace(/[#*|]/g, " ").replace(/\s+/g, " ").trim().slice(0, 220) || null,
         };
-      });
+      }).sort((a, b) => String(b.delivered_on || "").localeCompare(String(a.delivered_on || "")));
     } catch (e) { swallow("delivered", e); /* the board is optional context here */ }
 
     // the monthly TARGET the run-rate box measures against — from settings
