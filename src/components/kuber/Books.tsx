@@ -1051,6 +1051,41 @@ function DrillTree({ secs, abs, fmtMoney, onLedger }: { secs: TreeSec[]; abs?: b
 }
 
 /** The YTD · QTD · MTD chips with free dates — every statement's head. */
+/* ---------- the period, chosen by month (Dr Raghu, 30 Sep 2026: "for the
+   date show month year as dropdown"). A management statement is drawn to a
+   month end, never to the 17th, and a day picker invites exactly that
+   mistake. Picking a month for `from` takes its first day; picking one for
+   `to` takes its last. ---------- */
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthEndIso = (y: number, m: number) => `${y}-${String(m).padStart(2, "0")}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
+/** "Apr 26 – Sep 26" — the period named by its months, not by "Period" */
+export const periodLabel = (from: string, to: string) => {
+  const a = `${MON[Number(from.slice(5, 7)) - 1]} ${from.slice(2, 4)}`;
+  const b = `${MON[Number(to.slice(5, 7)) - 1]} ${to.slice(2, 4)}`;
+  return a === b ? a : `${a} – ${b}`;
+};
+
+function MonthPick({ value, onChange, end }: { value: string; onChange: (v: string) => void; end?: boolean }) {
+  const y = Number(value.slice(0, 4)) || new Date().getFullYear();
+  const m = Number(value.slice(5, 7)) || 1;
+  const thisY = new Date().getFullYear();
+  const years: number[] = [];
+  for (let k = thisY + 1; k >= thisY - 7; k--) years.push(k);
+  if (!years.includes(y)) years.push(y);
+  const set = (yy: number, mm: number) => onChange(end ? monthEndIso(yy, mm) : `${yy}-${String(mm).padStart(2, "0")}-01`);
+  const sty = { borderColor: BORDER, background: "#fff", color: INK } as React.CSSProperties;
+  return (
+    <span className="inline-flex gap-1">
+      <select value={m} onChange={(e) => set(y, Number(e.target.value))} className="border rounded px-1.5 py-1 text-xs font-semibold" style={sty}>
+        {MON.map((n, i) => <option key={n} value={i + 1}>{n}</option>)}
+      </select>
+      <select value={y} onChange={(e) => set(Number(e.target.value), m)} className="border rounded px-1.5 py-1 text-xs font-semibold" style={sty}>
+        {years.sort((a, b) => b - a).map((k) => <option key={k} value={k}>{k}</option>)}
+      </select>
+    </span>
+  );
+}
+
 function PeriodBar({ from, to, setFrom, setTo }: { from: string; to: string; setFrom: (v: string) => void; setTo: (v: string) => void }) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
@@ -1068,8 +1103,8 @@ function PeriodBar({ from, to, setFrom, setTo }: { from: string; to: string; set
           {lbl}
         </button>
       ))}
-      from <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
-      to <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="border rounded px-2 py-1" style={{ borderColor: BORDER }} />
+      from <MonthPick value={from} onChange={setFrom} />
+      to <MonthPick value={to} onChange={setTo} end />
     </div>
   );
 }
@@ -1114,11 +1149,15 @@ function FinSection({ s, flip, fmtMoney }: { s: FinSec; flip: boolean; fmtMoney:
   );
 }
 
-interface MisLine { key: string; label: string; amount: number; pct: number | null; avg: number; tree?: TreeSec[] }
+interface MisLine { key: string; label: string; amount: number; pct: number | null; avg: number;
+  /** the same head over the same months a year back, and its own monthly average */
+  ly?: number | null; lyPct?: number | null; lyAvg?: number | null; tree?: TreeSec[] }
 interface MisRatio { key: string; label: string; value: number | null; unit: string; formula: string; target: string }
 interface MisData { empty?: boolean; from: string; to: string; months: number; stocksTyped: boolean;
   /** where the two stock figures came from, and whether the closing one is older than the period (0179) */
   stock?: { from: "register" | "typed" | "none"; openingAt: string | null; closingAt: string | null; stale: boolean };
+  /** the comparative period, present only when last year is in the books (0182) */
+  ly?: { from: string; to: string; months: number; openingAt: string | null; closingAt: string | null; stocked: boolean } | null;
   lines: MisLine[]; ratios: MisRatio[] }
 
 const lastMonthEndIso = () => {
@@ -1156,8 +1195,8 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>Statement of Profit &amp; Loss</div>
           <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 640 }}>
-            The MIS shape — upto <b>{data ? fmtD(data.to) : "…"}</b> (last month&apos;s last day by default), {data?.months ?? "…"} months.
-            Every head opens to its ledgers and their vouchers.
+            The MIS shape — <b>{data ? periodLabel(data.from, data.to) : "…"}</b>, {data?.months ?? "…"} months to {data ? fmtD(data.to) : "…"}.
+            {data?.ly ? <> Last year&apos;s same months stand beside it.</> : null} Every head opens to its ledgers and their vouchers.
           </div>
         </div>
         <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
@@ -1202,12 +1241,24 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
         <>
           <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER }}>
-            <table className="w-full text-xs genie-table" style={{ minWidth: 760, borderCollapse: "separate", borderSpacing: 0 }}>
+            <table className="w-full text-xs genie-table" style={{ minWidth: data?.ly ? 980 : 760, borderCollapse: "separate", borderSpacing: 0 }}>
               <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
                 <th className="px-3 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Particulars</th>
-                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Period</th>
+                {/* THE PERIOD IS NAMED, NOT CALLED "Period" (Dr Raghu,
+                    30 Sep 2026: "Instead of period show the April 26 to Sept
+                    26"). A column headed by its own months needs no caption
+                    underneath to say which months it is. */}
+                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{periodLabel(data.from, data.to)}</th>
                 <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>% of Sales</th>
                 <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Avg Monthly</th>
+                {/* LAST YEAR, THE SAME MONTHS (his ask, same day: "can we see
+                    last years data in the side on the like to like basis?
+                    same months?") — with its own monthly average in italics,
+                    beside this year's. */}
+                {!!data.ly && <>
+                  <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#3D4A5C" }}>{periodLabel(data.ly.from, data.ly.to)}</th>
+                  <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#3D4A5C", fontStyle: "italic", fontWeight: 500 }}>Avg Monthly</th>
+                </>}
               </tr></thead>
               <tbody>
                 {data.lines.map((l) => {
@@ -1230,9 +1281,17 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
                         </td>
                         <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{l.pct == null ? "—" : `${l.pct.toFixed(2)}%`}</td>
                         <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{stock ? "—" : fmtMoney(l.avg)}</td>
+                        {!!data.ly && <>
+                          <td className="px-2 py-1.5 text-right tnum" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: l.ly == null ? MUTED : "var(--dim)", borderLeft: `1px solid ${BORDER}` }}>
+                            {l.ly == null ? "—" : fmtMoney(l.ly)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED, fontStyle: "italic" }}>
+                            {stock || l.lyAvg == null ? "—" : fmtMoney(l.lyAvg)}
+                          </td>
+                        </>}
                       </tr>
                       {openLines[l.key] && l.tree && (
-                        <tr><td colSpan={4} style={{ background: "#FAF9F5", padding: "0 0 0 20px" }}>
+                        <tr><td colSpan={data.ly ? 6 : 4} style={{ background: "#FAF9F5", padding: "0 0 0 20px" }}>
                           <DrillTree secs={l.tree} abs fmtMoney={fmtMoney} onLedger={setDrill} />
                         </td></tr>
                       )}
@@ -1246,6 +1305,9 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
             Computed from every voucher line by the group tree — finance charges, depreciation and tax step out of the
             indirect lump by their group names. Opening and closing stock are typed (the sheet types them too); TVC =
             purchases + opening − closing. The books are as current as the last upload.
+            {data.ly && !data.ly.stocked && <> <b style={{ color: "#B45309" }}>Last year&apos;s column carries no stock</b> — the
+            register does not reach back to {periodLabel(data.ly.from, data.ly.to)}, so its TVC is purchases alone and its
+            gross profit is not comparable. Every line above gross profit is.</>}
           </p>
         </>
       )}

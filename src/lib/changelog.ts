@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.6.7",
+    date: "2026-09-30",
+    module: "The P&L stops reading double",
+    items: [
+      "THE WHOLE P&L WAS DOUBLED. Sales read Rs 63.98 Cr where the books say Rs 31.99 Cr — and every head below it, purchases, manufacturing, indirect, finance, the lot, read exactly twice. Loading 2025-26 beside 2026-27 wrote a SECOND masters row for each of the 3,620 ledgers that exist in both years, and every statement walks the ledger list asking what that NAME moved. A ledger listed twice was answered twice. Nothing about the vouchers was ever wrong. The newest year's row now wins and the older one is dropped — the same rule the bill-wise outstanding already follows — and there is no longer any way to read that table raw.",
+      "LAST YEAR, THE SAME MONTHS, BESIDE IT. The P&L now carries a second pair of columns: the identical heads over the identical months a year back, with their own monthly average in italics. It is the same function called twice, so the comparative cannot drift from the statement. It appears only when last year is actually in the books, and it says so when the stock register does not reach back that far.",
+      "THE PERIOD IS NAMED. The column headed \"Period\" now reads \"Apr 26 \u2013 Sep 26\", and the day pickers are month-and-year dropdowns \u2014 a management statement is drawn to a month end, never to the 17th.",
+      "OPERATING EXPENSES IN ELEVEN HEADS. Labour Salaries, Staff Salaries, Consultant Salaries, Consultancies, Finance Costs, Bank Charges, Utilities, Rent & Others, Marketing Expenses, Sales Promotion, Other OE \u2014 in place of Tally's thirty-six groups. Every ledger falls through the ladder until one rung takes it, so the eleven add back to the OE total exactly, and each still opens to its Tally group and its vouchers.",
+      "Opening stock is dated the day the period starts, not the night before.",
+    ],
+  },
+  {
     v: "5.9.6.6",
     date: "2026-09-30",
     module: "Two years, one position",

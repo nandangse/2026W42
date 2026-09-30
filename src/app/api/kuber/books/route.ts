@@ -5,6 +5,8 @@ import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireKuber } from "@/lib/accounts";
 import { addDays } from "@/lib/fmt";
+import { newestByName } from "@/lib/kuber-fy";
+import { OE_HEADS, oeHead } from "@/lib/oe-heads";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -105,12 +107,15 @@ async function loadWorld(admin: ReturnType<typeof adminClient>) {
     }
     return out;
   };
-  const [groups, ledgers, vouchersAll, linesAll] = await Promise.all([
+  const [groups, ledgersAll, vouchersAll, linesAll] = await Promise.all([
     pageAllW((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
-    pageAllW((a, b) => admin.from("kuber_ledger").select("name, parent, opening").order("name").range(a, b)),
+    pageAllW((a, b) => admin.from("kuber_ledger").select("name, parent, opening, fy").order("name").range(a, b)),
     pageAllW((a, b) => admin.from("kuber_voucher").select("id, date, vtype, vno, amount").order("id").range(a, b)),
     pageAllW((a, b) => admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").order("id").range(a, b)),
   ]);
+  // one row per ledger — two years' masters describe the same chart of
+  // accounts twice (see newestByName; it is why the P&L read double)
+  const ledgers = newestByName(ledgersAll as { name?: unknown; fy?: unknown }[]) as RR[];
   // proformas out, everywhere at once — every statement rides this world
   const vouchers = vouchersAll.filter((v) => !isProforma(v.vtype, v.vno));
   const kept = new Set(vouchers.map((v) => String(v.id)));
@@ -434,7 +439,7 @@ export async function GET(req: Request) {
       const months: { key: string; label: string; purchases: number | null; payments: number | null;
                       balance: number | null; invoices: number | null; pos: number | null }[] = [];
       try {
-        const { data: led } = await admin.from("kuber_ledger").select("opening").eq("name", party).maybeSingle();
+        const { data: led } = await admin.from("kuber_ledger").select("opening").eq("name", party).order("fy", { ascending: false }).limit(1).maybeSingle();
         const opening = Number(led?.opening) || 0;
         const { data: vs } = await admin.from("kuber_voucher").select("id, date, vtype").eq("party", party).limit(5000);
         const vlist = (vs || []) as { id: string; date: string; vtype: string }[];
@@ -694,13 +699,14 @@ export async function GET(req: Request) {
         }
         return out;
       };
-      const [groups, ledgers, vouchers, lines, clsRows] = await Promise.all([
+      const [groups, ledgersRaw, vouchers, lines, clsRows] = await Promise.all([
         pageAllE((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
-        pageAllE((a, b) => admin.from("kuber_ledger").select("name, parent").order("name").range(a, b)),
+        pageAllE((a, b) => admin.from("kuber_ledger").select("name, parent, fy").order("name").range(a, b)),
         pageAllE((a, b) => admin.from("kuber_voucher").select("id, date, vtype, vno").order("id").range(a, b)),
         pageAllE((a, b) => admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").order("id").range(a, b)),
         pageAllE((a, b) => admin.from("kuber_expense_class").select("ledger, cls").order("ledger").range(a, b)),
       ]);
+      const ledgers = newestByName(ledgersRaw);
       if (!ledgers.length) return NextResponse.json({ empty: true });
 
       const parentOf = new Map(groups.map((g) => [String(g.name).toLowerCase(), String(g.parent || "")]));
@@ -903,31 +909,74 @@ export async function GET(req: Request) {
       const inputs = new Map(((inpRes.data as RR[]) || []).map((x) => [String(x.key), Number(x.value) || 0]));
       const targets = Object.fromEntries(((tgtRes.data as RR[]) || []).map((x) => [String(x.key), String(x.target)]));
 
-      // period movement and closing-to-date per ledger
-      const period = new Map<string, number>();
+      // closing-to-date per ledger — the balance-sheet side the ratio pack
+      // stands on. The P&L period itself is computed by computePnl below,
+      // which runs twice: once for this period, once for the same months a
+      // year back.
       const toDate = new Map<string, number>();
       for (const l of w.lines) {
         const d = w.dateOf.get(String(l.voucher_id)) || "";
-        if (!d) continue;
-        const amt = Number(l.amount) || 0;
+        if (!d || d > to) continue;
         const name = String(l.ledger);
-        if (d >= from && d <= to) period.set(name, (period.get(name) || 0) + amt);
-        if (d <= to) toDate.set(name, (toDate.get(name) || 0) + amt);
+        toDate.set(name, (toDate.get(name) || 0) + (Number(l.amount) || 0));
       }
 
       type Ent = { ledger: string; group: string; root: string; amount: number };
-      const ents: Record<string, Ent[]> = { sales: [], purchases: [], manuf: [], indirect: [], finance: [], depreciation: [], tax: [], otherIncome: [] };
-      let profitToDate = 0;
-      const closingOfRoot = new Map<string, number>();
-      for (const l of w.ledgers) {
-        const name = String(l.name), grp = String(l.parent || "");
-        if (!grp) { profitToDate += 0; continue; }
-        const root = w.rootOf(grp);
-        const amt = period.get(name) || 0;
-        const isPnlM = /income|expense|^\S*\.?\s*sales|purchase|manufacturing/i.test(root) && !/asset/i.test(root);
-        if (isPnlM) {
-          profitToDate += toDate.get(name) || 0;
+      const sum = (a: Ent[]) => a.reduce((s2, e) => s2 + e.amount, 0);
+
+      /**
+       * STOCK COMES FROM THE DATED REGISTER (0179), NOT FROM TWO BOXES.
+       *
+       * Opening is the value carried into the period; closing is the LATEST
+       * entry on or before the period's end. So a statement drawn to 31 May
+       * uses May's stock and one drawn to 30 September uses September's, with
+       * nothing re-typed — which the two undated boxes could never do. Read
+       * once here, resolved per period inside computePnl, so last year's
+       * comparative stands on last year's own stock.
+       */
+      let stockRows: { as_on: string; amount: number }[] = [];
+      try {
+        const { data: st } = await admin.from("kuber_stock").select("as_on, amount").order("as_on");
+        stockRows = ((st || []) as { as_on: string; amount: number }[]);
+      } catch (e) { swallow("kuber/pnl-stock", e); /* 0179 not run yet */ }
+
+      /** the same months, a year back — 29 Feb clamps to 28 Feb */
+      const shiftYear = (d: string, n: number) => {
+        const y = Number(d.slice(0, 4)) - n, m = Number(d.slice(5, 7)), day = Number(d.slice(8, 10));
+        const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+        return `${y}-${String(m).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
+      };
+
+      /**
+       * ONE PERIOD, COMPUTED ONCE — SO IT CAN BE COMPUTED TWICE.
+       *
+       * Dr Raghu, 30 Sep 2026: "using last years data when we see P&L can we
+       * see last years data in the side on the like to like basis? same
+       * months?" A comparative is only worth having if it is struck by the
+       * SAME rules — the same group tree, the same indirect/manufacturing
+       * split, the same stock register. So the whole statement moved into one
+       * function of (from, to) and last year is that function called again.
+       * Nothing is duplicated, so nothing can drift apart.
+       */
+      const computePnl = (a: string, b: string) => {
+        const per = new Map<string, number>();
+        let touched = 0;
+        for (const l of w.lines) {
+          const d = w.dateOf.get(String(l.voucher_id)) || "";
+          if (!d || d < a || d > b) continue;
+          touched++;
+          const name = String(l.ledger);
+          per.set(name, (per.get(name) || 0) + (Number(l.amount) || 0));
+        }
+        const ents: Record<string, Ent[]> = { sales: [], purchases: [], manuf: [], indirect: [], finance: [], depreciation: [], tax: [], otherIncome: [] };
+        for (const l of w.ledgers) {
+          const name = String(l.name), grp = String(l.parent || "");
+          if (!grp) continue;
+          const root = w.rootOf(grp);
+          const amt = per.get(name) || 0;
           if (!amt) continue;
+          const isPnlM = /income|expense|^\S*\.?\s*sales|purchase|manufacturing/i.test(root) && !/asset/i.test(root);
+          if (!isPnlM) continue;
           const e = { ledger: name, group: grp, root, amount: amt };
           const rootN = stripNo(root);
           /**
@@ -960,102 +1009,107 @@ export async function GET(req: Request) {
             else if (/current tax|deferred tax|income tax/.test(hay)) ents.tax.push({ ...e, amount: -amt });
             else ents.indirect.push({ ...e, amount: -amt });
           }
-        } else {
-          // balance-sheet closing per root, for the ratio pack
-          const closing = (Number(l.opening) || 0) + (toDate.get(name) || 0);
-          closingOfRoot.set(root, (closingOfRoot.get(root) || 0) + closing);
-          // the debtor/creditor chains, held separately
-          const chainHas = (want: RegExp) => {
-            let cur = grp.toLowerCase();
-            for (let i = 0; i < 25; i++) {
-              if (want.test(cur)) return true;
-              const nx = (w.groups.find((g) => String(g.name).toLowerCase() === cur) ? String(w.groups.find((g) => String(g.name).toLowerCase() === cur)!.parent || "").toLowerCase() : "");
-              if (!nx || nx === cur) return false;
-              cur = nx;
-            }
-            return false;
-          };
-          if (chainHas(/sundry debtor/)) closingOfRoot.set("__debtors", (closingOfRoot.get("__debtors") || 0) + closing);
-          if (chainHas(/sundry creditor/)) closingOfRoot.set("__creditors", (closingOfRoot.get("__creditors") || 0) + closing);
         }
-      }
 
-      const sum = (a: Ent[]) => a.reduce((s2, e) => s2 + e.amount, 0);
-      const sales = sum(ents.sales);
-      const otherIncome = sum(ents.otherIncome);
-      const revenue = sales;
-      const purchases = sum(ents.purchases);
-      /**
-       * STOCK COMES FROM THE DATED REGISTER (0179), NOT FROM TWO BOXES.
-       *
-       * Opening is the value at the financial year's first day; closing is
-       * the LATEST entry on or before the period's end. So a statement drawn
-       * to 31 May uses May's stock and one drawn to 30 September uses
-       * September's, with nothing re-typed — which the two undated boxes
-       * could never do.
-       *
-       * IT SAYS WHICH DATES IT USED. Falling back to an earlier month's
-       * value is reasonable; doing it silently is not, because a gross profit
-       * struck against a stock figure four months stale is a fiction nobody
-       * can see. The dates ride back with the statement.
-       */
-      let openingStock = 0, closingStock = 0;
-      let openingAt: string | null = null, closingAt: string | null = null;
-      let stockFrom: "register" | "typed" | "none" = "none";
-      try {
-        const { data: st } = await admin.from("kuber_stock").select("as_on, amount").order("as_on");
-        const rows = (st || []) as { as_on: string; amount: number }[];
-        if (rows.length) {
+        /* IT SAYS WHICH DATES IT USED. Falling back to an earlier month's
+           value is reasonable; doing it silently is not, because a gross
+           profit struck against a stock figure four months stale is a fiction
+           nobody can see. The dates ride back with the statement. */
+        let openingStock = 0, closingStock = 0;
+        let openingAt: string | null = null, closingAt: string | null = null;
+        let stockFrom: "register" | "typed" | "none" = "none";
+        if (stockRows.length) {
           stockFrom = "register";
-          /* the year's first day: the earliest entry on or before `from` */
-          const open = [...rows].filter((r) => String(r.as_on) <= from).pop() ?? rows[0];
-          const close = [...rows].filter((r) => String(r.as_on) <= to).pop();
+          const open = stockRows.filter((r) => String(r.as_on) < a).pop() ?? null;
+          const close = stockRows.filter((r) => String(r.as_on) <= b).pop() ?? null;
           if (open) { openingStock = Number(open.amount) || 0; openingAt = String(open.as_on); }
           if (close) { closingStock = Number(close.amount) || 0; closingAt = String(close.as_on); }
         }
-      } catch (e) { swallow("kuber/pnl-stock", e); /* 0179 not run yet */ }
-      /* Until the register has a row, the two old typed values still stand,
-         so nothing breaks on the day the migration runs. */
-      if (stockFrom === "none" && (inputs.has("opening_stock") || inputs.has("closing_stock"))) {
-        openingStock = inputs.get("opening_stock") ?? 0;
-        closingStock = inputs.get("closing_stock") ?? 0;
-        stockFrom = "typed";
-      }
-      const stocksTyped = stockFrom !== "none";
-      const tvc = purchases + openingStock - closingStock;
-      const throughput = revenue - tvc;
-      const manuf = sum(ents.manuf);
-      const grossProfit = throughput - manuf;
-      const indirect = sum(ents.indirect);
-      const ebitda = grossProfit - indirect;
-      const finance = sum(ents.finance);
-      const depreciation = sum(ents.depreciation);
-      /**
-       * OPERATING EXPENSES — EVERY COST OF RUNNING THE PLACE, IN ONE LINE.
-       *
-       * Dr Raghu, 30 Sep 2026: "show OE here before depreciation which is all
-       * costs including wages and bonus, utilities, welfare expenses, all
-       * indirect expenses including finance charges, including directors
-       * remuneration."
-       *
-       * Indirect expenses and finance charges are separated above so EBITDA
-       * can be struck — that is what EBITDA means. But separating them leaves
-       * no line anywhere that answers "what does it cost to run this company
-       * for a month", and that is the number a managing director actually
-       * carries in his head. So it is added back as its own subtotal, below
-       * the pieces it is made of and above depreciation, which is not a cost
-       * of running anything.
-       *
-       * Salaries, welfare, directors' remuneration, rent, utilities and
-       * professional fees all sit inside the indirect root already; the only
-       * thing that had to be brought in was finance.
-       */
-      const operatingExpenses = indirect + finance;
-      const netOperating = ebitda - finance - depreciation;
-      const npbt = netOperating + otherIncome;
-      const tax = sum(ents.tax);
-      const npat = npbt - tax;
+        /* Until the register has a row, the two old typed values still stand,
+           so nothing breaks on the day the migration runs. */
+        if (stockFrom === "none" && (inputs.has("opening_stock") || inputs.has("closing_stock"))) {
+          openingStock = inputs.get("opening_stock") ?? 0;
+          closingStock = inputs.get("closing_stock") ?? 0;
+          stockFrom = "typed";
+        }
+        const stocksTyped = stockFrom !== "none";
 
+        const sales = sum(ents.sales);
+        const otherIncome = sum(ents.otherIncome);
+        const revenue = sales;
+        const purchases = sum(ents.purchases);
+        const tvc = purchases + openingStock - closingStock;
+        const throughput = revenue - tvc;
+        const manuf = sum(ents.manuf);
+        const grossProfit = throughput - manuf;
+        const indirect = sum(ents.indirect);
+        const ebitda = grossProfit - indirect;
+        const finance = sum(ents.finance);
+        const depreciation = sum(ents.depreciation);
+        /**
+         * OPERATING EXPENSES — EVERY COST OF RUNNING THE PLACE, IN ONE LINE.
+         *
+         * Dr Raghu, 30 Sep 2026: "show OE here before depreciation which is
+         * all costs including wages and bonus, utilities, welfare expenses,
+         * all indirect expenses including finance charges, including
+         * directors remuneration."
+         *
+         * Indirect expenses and finance charges are separated above so EBITDA
+         * can be struck — that is what EBITDA means. But separating them
+         * leaves no line anywhere that answers "what does it cost to run this
+         * company for a month", and that is the number a managing director
+         * actually carries in his head. So it is added back as its own
+         * subtotal, below the pieces it is made of and above depreciation,
+         * which is not a cost of running anything.
+         */
+        const operatingExpenses = indirect + finance;
+        const netOperating = ebitda - finance - depreciation;
+        const npbt = netOperating + otherIncome;
+        const tax = sum(ents.tax);
+        const npat = npbt - tax;
+        const months = Math.max(1, (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + (Number(b.slice(5, 7)) - Number(a.slice(5, 7))) + 1);
+        return { from: a, to: b, touched, ents, sales, otherIncome, revenue, purchases, openingStock, closingStock,
+          openingAt, closingAt, stockFrom, stocksTyped, tvc, throughput, manuf, grossProfit, indirect, ebitda,
+          finance, depreciation, operatingExpenses, netOperating, npbt, tax, npat, months };
+      };
+
+      const cur = computePnl(from, to);
+      /* last year is shown only when last year is actually in the books */
+      const lyRaw = computePnl(shiftYear(from, 1), shiftYear(to, 1));
+      const ly = lyRaw.touched ? lyRaw : null;
+
+      const { ents, sales, otherIncome, revenue, purchases, openingStock, closingStock, openingAt, closingAt,
+        stockFrom, stocksTyped, tvc, throughput, manuf, grossProfit, indirect, ebitda, finance, depreciation,
+        operatingExpenses, netOperating, npbt, tax, npat } = cur;
+
+      // the P&L to date (for equity) and the balance-sheet closings the
+      // ratio pack needs — both are as-at `to`, not period movements
+      let profitToDate = 0;
+      const closingOfRoot = new Map<string, number>();
+      for (const l of w.ledgers) {
+        const name = String(l.name), grp = String(l.parent || "");
+        if (!grp) continue;
+        const root = w.rootOf(grp);
+        const isPnlM = /income|expense|^\S*\.?\s*sales|purchase|manufacturing/i.test(root) && !/asset/i.test(root);
+        if (isPnlM) { profitToDate += toDate.get(name) || 0; continue; }
+        // balance-sheet closing per root, for the ratio pack
+        const closing = (Number(l.opening) || 0) + (toDate.get(name) || 0);
+        closingOfRoot.set(root, (closingOfRoot.get(root) || 0) + closing);
+        // the debtor/creditor chains, held separately
+        const chainHas = (want: RegExp) => {
+          let cur2 = grp.toLowerCase();
+          for (let i = 0; i < 25; i++) {
+            if (want.test(cur2)) return true;
+            const g2 = w.groups.find((g) => String(g.name).toLowerCase() === cur2);
+            const nx = g2 ? String(g2.parent || "").toLowerCase() : "";
+            if (!nx || nx === cur2) return false;
+            cur2 = nx;
+          }
+          return false;
+        };
+        if (chainHas(/sundry debtor/)) closingOfRoot.set("__debtors", (closingOfRoot.get("__debtors") || 0) + closing);
+        if (chainHas(/sundry creditor/)) closingOfRoot.set("__creditors", (closingOfRoot.get("__creditors") || 0) + closing);
+      }
       const months = Math.max(1, (Number(to.slice(0, 4)) - Number(from.slice(0, 4))) * 12 + (Number(to.slice(5, 7)) - Number(from.slice(5, 7))) + 1);
       const days = Math.max(1, daysBetween(from, to) + 1);
 
@@ -1104,35 +1158,70 @@ export async function GET(req: Request) {
       const cD = ratios.find((r) => r.key === "creditor_days")?.value;
       ratios.push(R("ccc", "Cash Conversion Cycle (days)", dD != null && iD != null && cD != null ? dD + iD - cD : null, "days", "debtor days + inventory days − creditor days"));
 
-      const line = (key: string, label: string, amount: number, treeEnts?: Ent[]) => ({
-        key, label, amount,
-        pct: revenue ? (amount / revenue) * 100 : null,
-        avg: amount / months,
-        tree: treeEnts ? treeOf(treeEnts) : undefined,
-      });
+      /**
+       * EVERY LINE CARRIES ITS OWN TWIN.
+       *
+       * `ly` is the same head over the same months a year back, `lyAvg` its
+       * own monthly average — last year's months, not this year's, because
+       * a five-month period compared against a twelve-month one is not a
+       * comparison. Both are null until last year is actually in the books.
+       */
+      const K = (o: ReturnType<typeof computePnl>, key: string): number => (o as unknown as Record<string, number>)[key];
+      const line = (key: string, label: string, pick: string | number, treeEnts?: Ent[]) => {
+        const amount = typeof pick === "number" ? pick : K(cur, pick);
+        const lyAmt = typeof pick === "number" || !ly ? null : K(ly, pick);
+        return {
+          key, label, amount,
+          pct: revenue ? (amount / revenue) * 100 : null,
+          avg: amount / months,
+          ly: lyAmt,
+          lyPct: lyAmt != null && ly && ly.revenue ? (lyAmt / ly.revenue) * 100 : null,
+          lyAvg: lyAmt == null || !ly ? null : lyAmt / ly.months,
+          tree: treeEnts ? treeOf(treeEnts) : undefined,
+        };
+      };
+      /* the eleven read in HIS order, not in size order */
+      const inHisOrder = (t?: { root: string }[]) => t && t.slice().sort((a, b) =>
+        OE_HEADS.indexOf(a.root as typeof OE_HEADS[number]) - OE_HEADS.indexOf(b.root as typeof OE_HEADS[number]));
       return NextResponse.json({
         from, to, months, stocksTyped,
+        ly: ly ? { from: ly.from, to: ly.to, months: ly.months, openingAt: ly.openingAt, closingAt: ly.closingAt,
+              /* last year's stock stands on last year's own valuations — if the
+                 register does not reach back that far the comparative says so
+                 rather than borrowing this year's figure */
+              stocked: ly.closingAt != null && ly.openingAt != null } : null,
         stock: { from: stockFrom, openingAt, closingAt, stale: !!(closingAt && closingAt < to) },
         lines: [
-          line("sales", "Sales", sales, ents.sales),
-          line("revenue", "Revenue", revenue),
-          line("purchases", "Purchases during the Period", purchases, ents.purchases),
-          line("opening_stock", openingAt ? `Opening Stock — as at ${openingAt.split("-").reverse().join("-")}` : "Opening Stock", openingStock),
-          line("closing_stock", closingAt ? `Closing Stock — as at ${closingAt.split("-").reverse().join("-")}` : "Closing Stock — not valued", closingStock),
-          line("tvc", "TVC (COGS)", tvc),
-          line("throughput", "THROUGHPUT", throughput),
-          line("manuf", "Manufacturing Expenses", manuf, ents.manuf),
-          line("gross_profit", "GROSS PROFIT for the Period", grossProfit),
-          line("indirect", "Indirect Expenses — except finance charges", indirect, ents.indirect),
-          line("ebitda", "EBITDA — Operating Profit before Interest, Depreciation & Tax", ebitda),
-          line("finance", "Finance Charges", finance, ents.finance),
-          line("oe", "OPERATING EXPENSES — all indirect including finance & directors", operatingExpenses, [...ents.indirect, ...ents.finance]),
-          line("depreciation", "Depreciation", depreciation, ents.depreciation),
-          line("net_operating", "Net Operating Profit", netOperating),
-          line("other_income", "Other Income", otherIncome, ents.otherIncome),
-          line("npbt", "Net Profit Before Tax", npbt),
-          line("tax", "Tax Expense", tax, ents.tax),
-          line("npat", "NET PROFIT AFTER TAX", npat),
+          line("sales", "Sales", "sales", ents.sales),
+          line("revenue", "Revenue", "revenue"),
+          line("purchases", "Purchases during the Period", "purchases", ents.purchases),
+          /* OPENING IS THE VALUE CARRIED IN (Dr Raghu, 30 Sep 2026: "opening
+             stock at 1-04-2026"). The register holds it dated the night
+             before — 31 March — which is the same instant read the other way
+             round; the statement says the day the period starts. */
+          line("opening_stock", `Opening Stock — as at ${from.split("-").reverse().join("-")}`, "openingStock"),
+          line("closing_stock", closingAt ? `Closing Stock — as at ${closingAt.split("-").reverse().join("-")}` : "Closing Stock — not valued", "closingStock"),
+          line("tvc", "TVC (COGS)", "tvc"),
+          line("throughput", "THROUGHPUT", "throughput"),
+          line("manuf", "Manufacturing Expenses", "manuf", ents.manuf),
+          line("gross_profit", "GROSS PROFIT for the Period", "grossProfit"),
+          line("indirect", "Indirect Expenses — except finance charges", "indirect", ents.indirect),
+          line("ebitda", "EBITDA — Operating Profit before Interest, Depreciation & Tax", "ebitda"),
+          line("finance", "Finance Charges", "finance", ents.finance),
+          /* OE opens in HIS eleven heads, not Tally's thirty-six groups
+             (see oe-heads.ts). Each head still opens to the Tally group and
+             the ledger beneath it, so the drill never loses the trail. */
+          (() => {
+            const l = line("oe", "OPERATING EXPENSES — all indirect including finance & directors", "operatingExpenses",
+              [...ents.indirect, ...ents.finance].map((e) => ({ ...e, root: oeHead(e.group, e.ledger) })));
+            return { ...l, tree: inHisOrder(l.tree) };
+          })(),
+          line("depreciation", "Depreciation", "depreciation", ents.depreciation),
+          line("net_operating", "Net Operating Profit", "netOperating"),
+          line("other_income", "Other Income", "otherIncome", ents.otherIncome),
+          line("npbt", "Net Profit Before Tax", "npbt"),
+          line("tax", "Tax Expense", "tax", ents.tax),
+          line("npat", "NET PROFIT AFTER TAX", "npat"),
         ],
         ratios,
       });
@@ -1158,12 +1247,13 @@ export async function GET(req: Request) {
         return out;
       };
 
-      const [groups, ledgers, vouchers, lines] = await Promise.all([
+      const [groups, ledgersRawF, vouchers, lines] = await Promise.all([
         pageAllF((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
-        pageAllF((a, b) => admin.from("kuber_ledger").select("name, parent, opening").order("name").range(a, b)),
+        pageAllF((a, b) => admin.from("kuber_ledger").select("name, parent, opening, fy").order("name").range(a, b)),
         pageAllF((a, b) => admin.from("kuber_voucher").select("id, date, vtype, vno").order("id").range(a, b)),
         pageAllF((a, b) => admin.from("kuber_voucher_line").select("voucher_id, ledger, amount").order("id").range(a, b)),
       ]);
+      const ledgers = newestByName(ledgersRawF);
       if (!ledgers.length) return NextResponse.json({ empty: true });
 
       const parentOf = new Map(groups.map((g) => [String(g.name).toLowerCase(), String(g.parent || "")]));
@@ -1383,11 +1473,12 @@ export async function GET(req: Request) {
 
     if (view === "ledgers") {
       const q = (url.searchParams.get("q") || "").trim();
-      let query = admin.from("kuber_ledger").select("name, parent, opening, closing, loaded_at").order("name").limit(500);
+      let query = admin.from("kuber_ledger").select("name, parent, opening, closing, loaded_at, fy").order("name").limit(500);
       if (q) query = query.ilike("name", `%${q}%`);
       const { data, error } = await query;
       if (error) return NextResponse.json({ rows: [] });
-      return NextResponse.json({ rows: data || [] });
+      /* the register lists a ledger once, not once per year loaded */
+      return NextResponse.json({ rows: newestByName(data || []) });
     }
 
     if (view === "vouchers") {
