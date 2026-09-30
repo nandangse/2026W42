@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.6.8",
+    date: "2026-09-30",
+    module: "How the books are read",
+    items: [
+      "EVERY RULE, ON ONE PAGE, RUNNING. \"Why is this confusing \u2014 cant u make the rules and keep it properly?\" He is right, and the reason is that the rules lived as regular expressions buried in a 1,600-line route file: readable by the machine, by nobody else. Three separate errors this month came out of exactly that. Kuber \u2192 How the books are read now states every rule the statements stand on \u2014 the standing rules, the ladder that decides which line of the P&L a ledger lands on, and the ladder that splits operating expenses into the eleven heads \u2014 each with what it actually caught this period, openable to the ledgers. It does not describe the rules; it runs the same ladder the statement imports, so it cannot go stale. There is now exactly one file that classifies a ledger.",
+      "Search any ledger and it names the rung that takes it and the line it lands on.",
+      "LAST YEAR NOW CARRIES ITS SHARE OF SALES TOO, and opening any head shows every root, group and ledger inside with the same six columns \u2014 this period, its share, its monthly average, and the same three for last year. Opening a head that moved now answers which ledger moved it.",
+      "THE UNIT IS SAID ONCE, not a hundred and fourteen times: figures are bare, in whatever lakhs or crores was chosen at the top. Percentages size themselves \u2014 none below 10%, one decimal below that, two below 2%, because the difference between 1.2% and 1.8% of sales is half a crore.",
+      "DEPRECIATION SAYS WHY IT IS ZERO. Tally carries one year-end journal, not a monthly charge \u2014 the last posting is 31 March 2026. The line now names it instead of printing a nought that could mean either thing.",
+      "The particulars column stops at the longest name instead of pushing last year off the right edge.",
+    ],
+  },
+  {
     v: "5.9.6.7",
     date: "2026-09-30",
     module: "The P&L stops reading double",

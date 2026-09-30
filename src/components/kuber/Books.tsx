@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fmtD } from "./Registers";
-import { useMoneyFmt } from "./money";
+import { useMoneyFmt, fmtPct } from "./money";
 
 const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", RED = "var(--red)", GREEN = "var(--green)", ORANGE = "var(--accent)";
 
@@ -1016,7 +1016,7 @@ function DrillModal({ ledger, from, to, onClose }: { ledger: string; from: strin
 
 /** root → group → ledger, each rung opening on click, the ledger opening
  *  its vouchers. Every statement wears the same tree. */
-interface TreeSec { root: string; total: number; groups: { name: string; total: number; ledgers: { name: string; amount: number }[] }[] }
+interface TreeSec { root: string; total: number; ly?: number; groups: { name: string; total: number; ly?: number; ledgers: { name: string; amount: number; ly?: number }[] }[] }
 function DrillTree({ secs, abs, fmtMoney, onLedger }: { secs: TreeSec[]; abs?: boolean; fmtMoney: (n: number) => string; onLedger: (l: string) => void }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const v = (n: number) => fmtMoney(abs ? Math.abs(n) : n);
@@ -1047,6 +1047,76 @@ function DrillTree({ secs, abs, fmtMoney, onLedger }: { secs: TreeSec[]; abs?: b
         </div>
       ))}
     </>
+  );
+}
+
+/**
+ * THE SAME COLUMNS, ALL THE WAY DOWN (Dr Raghu, 30 Sep 2026: "show the
+ * details for each of the inside members on expanding also").
+ *
+ * The statement's own drill, rendered as a table that inherits the parent's
+ * column widths, so a root, a group and a ledger each read across exactly
+ * where the head above them reads: this period, its share of sales, its
+ * monthly average, and the same three for last year. Opening a head that
+ * moved now answers WHICH ledger moved it, without leaving the page.
+ */
+function PnlDrill({ secs, cols, bare, months, revenue, ly, onLedger }: {
+  secs: TreeSec[]; cols: number; bare: (n: number) => string; months: number; revenue: number;
+  ly: { months: number; revenue: number } | null; onLedger: (l: string) => void;
+}) {
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const cells = (amount: number, lyAmt: number | undefined, dim: boolean) => (
+    <>
+      <td className="px-2 py-1 text-right tnum" style={{ color: dim ? MUTED : INK }}>{bare(amount)}</td>
+      <td className="px-2 py-1 text-right tnum" style={{ color: MUTED }}>{fmtPct(revenue ? (amount / revenue) * 100 : null)}</td>
+      <td className="px-2 py-1 text-right tnum" style={{ color: MUTED }}>{bare(amount / months)}</td>
+      {!!ly && <>
+        <td className="px-2 py-1 text-right tnum" style={{ color: "var(--dim)", borderLeft: `1px solid ${BORDER}` }}>{bare(lyAmt || 0)}</td>
+        <td className="px-2 py-1 text-right tnum" style={{ color: MUTED, fontStyle: "italic" }}>{fmtPct(ly.revenue ? ((lyAmt || 0) / ly.revenue) * 100 : null)}</td>
+        <td className="px-2 py-1 text-right tnum" style={{ color: MUTED, fontStyle: "italic" }}>{bare((lyAmt || 0) / ly.months)}</td>
+      </>}
+    </>
+  );
+  return (
+    <table className="w-full text-xs" style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: 0 }}>
+      <colgroup>
+        <col style={{ width: 310 }} />
+        {Array.from({ length: cols }, (_, i) => <col key={i} style={{ width: 102 }} />)}
+      </colgroup>
+      <tbody>
+        {secs.map((s2) => (
+          <FragRow key={s2.root}>
+            <tr className="border-t" style={{ borderColor: "var(--line-soft)", cursor: "pointer" }}
+              onClick={() => setOpen((o) => ({ ...o, [s2.root]: !o[s2.root] }))}>
+              <td className="px-3 py-1" style={{ fontWeight: 700, color: INK }}>
+                <span style={{ display: "inline-block", width: 13 }}>{open[s2.root] ? "▾" : "▸"}</span>{s2.root}
+              </td>
+              {cells(s2.total, s2.ly, false)}
+            </tr>
+            {open[s2.root] && s2.groups.map((g) => {
+              const gk = s2.root + "|" + g.name;
+              return (
+                <FragRow key={gk}>
+                  <tr className="border-t" style={{ borderColor: "var(--line-soft)", cursor: "pointer" }}
+                    onClick={() => setOpen((o) => ({ ...o, [gk]: !o[gk] }))}>
+                    <td className="px-3 py-1" style={{ paddingLeft: 26, color: "var(--dim)", fontWeight: 600 }}>
+                      <span style={{ display: "inline-block", width: 13 }}>{open[gk] ? "▾" : "▸"}</span>{g.name}
+                    </td>
+                    {cells(g.total, g.ly, true)}
+                  </tr>
+                  {open[gk] && g.ledgers.map((l) => (
+                    <tr key={gk + l.name} onClick={() => onLedger(l.name)} style={{ cursor: "pointer" }}>
+                      <td className="px-3 py-0.5" style={{ paddingLeft: 46, color: "#2C5B82", textDecoration: "underline", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</td>
+                      {cells(l.amount, l.ly, true)}
+                    </tr>
+                  ))}
+                </FragRow>
+              );
+            })}
+          </FragRow>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -1154,6 +1224,8 @@ interface MisLine { key: string; label: string; amount: number; pct: number | nu
   ly?: number | null; lyPct?: number | null; lyAvg?: number | null; tree?: TreeSec[] }
 interface MisRatio { key: string; label: string; value: number | null; unit: string; formula: string; target: string }
 interface MisData { empty?: boolean; from: string; to: string; months: number; stocksTyped: boolean;
+  /** the last depreciation posting anywhere in the books — Tally carries one a year, not one a month */
+  depNote?: { at: string; amount: number } | null;
   /** where the two stock figures came from, and whether the closing one is older than the period (0179) */
   stock?: { from: "register" | "typed" | "none"; openingAt: string | null; closingAt: string | null; stale: boolean };
   /** the comparative period, present only when last year is in the books (0182) */
@@ -1178,7 +1250,12 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
   const [from, setFrom] = useState(fyStart);
   const [to, setTo] = useState(lme >= fyStart ? lme : today);
   const [data, reload] = useBooks<MisData>("mis", `&from=${from}&to=${to}`);
-  const { fmt: fmtMoney } = useMoneyFmt();
+  /* THE UNIT IS SAID ONCE (Dr Raghu, 30 Sep 2026: "in this u dont need to
+     write cr everywhere. just write all figures in lakhs or crores depending
+     on what was chosen"). Nineteen rows x six columns of "Cr" is 114
+     repetitions of a fact that belongs in the caption. The drill underneath
+     keeps the full string, because there the figures stand alone. */
+  const { fmt: fmtMoney, num: bare, label: unitLabel } = useMoneyFmt();
   const [drill, setDrill] = useState<string | null>(null);
   /* EXPAND ALL / COLLAPSE ALL (Dr Raghu, 30 Sep 2026). One head at a time
      meant closing the one you were comparing against to open the next. */
@@ -1227,6 +1304,10 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
               📦 Stock entry
             </button>
           )}
+          <span className="text-xs font-bold rounded px-2 py-1" style={{ background: "#EEF1FA", color: INK }}
+            title="Change it on the Lakhs / Crores picker at the top of Kuber">
+            figures in {unitLabel}
+          </span>
           {data.stock?.from === "register" ? (
             <span className="text-xs" style={{ color: data.stock.stale ? "#B45309" : MUTED }}>
               Stock read from the register{data.stock.stale ? ` — the latest valuation is ${fmtD(data.stock.closingAt || "")}, before this period ends. Enter ${fmtD(data.to)}'s closing and this statement corrects itself.` : "."}
@@ -1241,23 +1322,33 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
       {!data ? <div className="text-sm" style={{ color: MUTED }}>computing…</div> : (
         <>
           <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER }}>
-            <table className="w-full text-xs genie-table" style={{ minWidth: data?.ly ? 980 : 760, borderCollapse: "separate", borderSpacing: 0 }}>
+            {/* THE NAMES STOP WHERE THE LONGEST ONE DOES (Dr Raghu, 30 Sep
+                2026: "make the width till maybe where its showing except
+                finance charges"). A particulars column that stretches to fill
+                the page pushes last year's figures off the right edge, which
+                is the one place they need to be. */}
+            <table className="w-full text-xs genie-table" style={{ minWidth: data?.ly ? 940 : 700, borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: 330 }} />
+                {(data?.ly ? [0, 1, 2, 3, 4, 5] : [0, 1, 2]).map((i) => <col key={i} style={{ width: 102 }} />)}
+              </colgroup>
               <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
                 <th className="px-3 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Particulars</th>
                 {/* THE PERIOD IS NAMED, NOT CALLED "Period" (Dr Raghu,
                     30 Sep 2026: "Instead of period show the April 26 to Sept
                     26"). A column headed by its own months needs no caption
                     underneath to say which months it is. */}
-                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>{periodLabel(data.from, data.to)}</th>
-                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>% of Sales</th>
-                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Avg Monthly</th>
+                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)", whiteSpace: "nowrap" }}>{periodLabel(data.from, data.to)}</th>
+                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)", whiteSpace: "nowrap" }}>% of Sales</th>
+                <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)", whiteSpace: "nowrap" }}>Avg Monthly</th>
                 {/* LAST YEAR, THE SAME MONTHS (his ask, same day: "can we see
                     last years data in the side on the like to like basis?
                     same months?") — with its own monthly average in italics,
                     beside this year's. */}
                 {!!data.ly && <>
-                  <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#3D4A5C" }}>{periodLabel(data.ly.from, data.ly.to)}</th>
-                  <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#3D4A5C", fontStyle: "italic", fontWeight: 500 }}>Avg Monthly</th>
+                  <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#3D4A5C", whiteSpace: "nowrap" }}>{periodLabel(data.ly.from, data.ly.to)}</th>
+                  <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#3D4A5C", whiteSpace: "nowrap", fontStyle: "italic", fontWeight: 500 }}>% of Sales</th>
+                  <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#3D4A5C", whiteSpace: "nowrap", fontStyle: "italic", fontWeight: 500 }}>Avg Monthly</th>
                 </>}
               </tr></thead>
               <tbody>
@@ -1272,27 +1363,39 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
                           {openable && <span style={{ display: "inline-block", width: 14 }}>{openLines[l.key] ? "▾" : "▸"}</span>}
                           {l.label}
                           {stock && !data.stocksTyped && <span style={{ color: "#B45309", fontWeight: 400 }}> — nothing valued yet</span>}
+                          {/* A zero that means "nobody has written it yet" and
+                              a zero that means "there is none" look the same
+                              on a statement, so this one says which. */}
+                          {l.key === "depreciation" && !l.amount && data.depNote && (
+                            <span style={{ color: "#B45309", fontWeight: 400 }}> — nothing posted in this period; the last entry in the books is {fmtD(data.depNote.at)} ({fmtMoney(data.depNote.amount)}), a year-end journal</span>
+                          )}
                         </td>
                         <td className="px-2 py-1.5 text-right tnum" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: /profit|throughput|ebitda|npat/.test(l.key) && l.amount < 0 ? RED : INK }}>
                           {/* NO ENTRIES INSIDE IN LINE (his instruction, 30 Sep
                               2026). A statement is an output; the stock values
                               are typed in the register and read here. */}
-                          {fmtMoney(l.amount)}
+                          {bare(l.amount)}
                         </td>
-                        <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{l.pct == null ? "—" : `${l.pct.toFixed(2)}%`}</td>
-                        <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{stock ? "—" : fmtMoney(l.avg)}</td>
+                        <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{fmtPct(l.pct)}</td>
+                        <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>{stock ? "—" : bare(l.avg)}</td>
                         {!!data.ly && <>
                           <td className="px-2 py-1.5 text-right tnum" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: l.ly == null ? MUTED : "var(--dim)", borderLeft: `1px solid ${BORDER}` }}>
-                            {l.ly == null ? "—" : fmtMoney(l.ly)}
+                            {l.ly == null ? "—" : bare(l.ly)}
                           </td>
+                          {/* last year's share of last year's sales — the
+                              only way a like-for-like reads as a trend */}
+                          <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED, fontStyle: "italic" }}>{fmtPct(l.lyPct)}</td>
                           <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED, fontStyle: "italic" }}>
-                            {stock || l.lyAvg == null ? "—" : fmtMoney(l.lyAvg)}
+                            {stock || l.lyAvg == null ? "—" : bare(l.lyAvg)}
                           </td>
                         </>}
                       </tr>
                       {openLines[l.key] && l.tree && (
-                        <tr><td colSpan={data.ly ? 6 : 4} style={{ background: "#FAF9F5", padding: "0 0 0 20px" }}>
-                          <DrillTree secs={l.tree} abs fmtMoney={fmtMoney} onLedger={setDrill} />
+                        <tr><td colSpan={data.ly ? 7 : 4} style={{ background: "#FAF9F5", padding: "0 0 0 20px" }}>
+                          <PnlDrill secs={l.tree} cols={data.ly ? 6 : 3} bare={bare} months={data.months}
+                            revenue={data.lines.find((x) => x.key === "revenue")?.amount || 0}
+                            ly={data.ly ? { months: data.ly.months, revenue: data.lines.find((x) => x.key === "revenue")?.ly || 0 } : null}
+                            onLedger={setDrill} />
                         </td></tr>
                       )}
                     </FragRow>
@@ -1316,6 +1419,165 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
   );
 }
 const FragRow = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+
+/* ------------------------------------------------------------------ *
+ *  HOW THE BOOKS ARE READ
+ * ------------------------------------------------------------------ */
+
+interface RuleRow { id: string; lands: string; says: string; why: string | null; sign: number; ledgers: number; moved: number; amount: number; sample: { ledger: string; group: string; root: string; amount: number }[] }
+interface RulesData {
+  empty?: boolean; from: string; to: string;
+  book: { id: string; title: string; says: string; why: string }[];
+  pnl: RuleRow[]; oe: RuleRow[];
+  index: { ledger: string; group: string; root: string; lands: string; rule: string; head: string | null; amount: number }[];
+  counts: { ledgers: number; vouchers: number; lines: number };
+}
+
+/**
+ * THE RULES, AS A PAGE (Dr Raghu, 30 Sep 2026: "why is this confusing. cant u
+ * make the rules and keep it properly? if needed make all the rules. in a
+ * page.")
+ *
+ * He is right that it was confusing, and the reason is that the rules lived
+ * as regular expressions buried in the middle of a route file — readable by
+ * the machine, by nobody else. Three separate errors this month came out of
+ * exactly that: indirect expenses landing above the gross profit line, the
+ * receivables doubling, the whole P&L doubling.
+ *
+ * So this page does not describe the rules. It RUNS them — the same array the
+ * statement imports — and prints beside each one how many ledgers it caught
+ * and what they came to. A rule that stops working shows up here as a count
+ * that fell to zero, before it shows up as a number he has to disbelieve.
+ */
+export function RulesScreen() {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const fyStart = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+  const lme = lastMonthEndIso();
+  const [from, setFrom] = useState(fyStart);
+  const [to, setTo] = useState(lme >= fyStart ? lme : today);
+  const [data] = useBooks<RulesData>("rules", `&from=${from}&to=${to}`);
+  const { num: bare, label: unitLabel } = useMoneyFmt();
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [q, setQ] = useState("");
+  if (data?.empty) return <div className="text-sm" style={{ color: MUTED }}>No books yet — upload the Tally masters and transactions first.</div>;
+
+  const hits = !data || q.trim().length < 2 ? [] :
+    data.index.filter((r) => r.ledger.toLowerCase().includes(q.toLowerCase()) || r.group.toLowerCase().includes(q.toLowerCase())).slice(0, 40);
+
+  const Ladder = ({ title, blurb, rows, kind }: { title: string; blurb: string; rows: RuleRow[]; kind: string }) => (
+    <div className="mb-6">
+      <div className="font-bold text-sm mb-1" style={{ color: INK }}>{title}</div>
+      <p className="text-xs mb-2" style={{ color: MUTED, maxWidth: "80ch", lineHeight: 1.6 }}>{blurb}</p>
+      <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: BORDER }}>
+        {rows.map((r, i) => {
+          const k = kind + r.id;
+          const dead = r.moved === 0;
+          return (
+            <div key={k} className="border-t" style={{ borderColor: "var(--line-soft)" }}>
+              <div onClick={() => r.moved && setOpen((o) => ({ ...o, [k]: !o[k] }))}
+                className="flex items-start gap-3 px-3 py-2" style={{ cursor: r.moved ? "pointer" : "default" }}>
+                <span className="tnum font-bold text-xs mt-0.5" style={{ color: MUTED, width: 18 }}>{i + 1}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="text-xs font-bold" style={{ color: INK }}>
+                    {r.moved ? <span style={{ display: "inline-block", width: 14, color: MUTED }}>{open[k] ? "▾" : "▸"}</span> : <span style={{ display: "inline-block", width: 14 }} />}
+                    {r.lands}
+                  </div>
+                  <div className="text-xs mt-0.5" style={{ color: "var(--dim)", paddingLeft: 14, lineHeight: 1.55 }}>{r.says}</div>
+                  {r.why && (
+                    <div className="text-xs mt-1" style={{ color: "#8A6D3B", background: "#FBF3E4", padding: "6px 8px", borderRadius: 4, marginLeft: 14, lineHeight: 1.55 }}>
+                      <b>Why it is written that way.</b> {r.why}
+                    </div>
+                  )}
+                </div>
+                <div className="text-right" style={{ minWidth: 118 }}>
+                  <div className="tnum text-xs font-bold" style={{ color: dead ? MUTED : INK }}>{dead ? "—" : bare(r.amount)}</div>
+                  <div className="text-xs" style={{ color: MUTED }}>{r.moved} of {r.ledgers} ledgers</div>
+                </div>
+              </div>
+              {open[k] && (
+                <div style={{ background: "#FAF9F5", padding: "4px 12px 8px 46px" }}>
+                  {r.sample.map((c) => (
+                    <div key={c.ledger} className="flex items-center justify-between text-xs py-0.5" style={{ color: MUTED }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.ledger} <span style={{ opacity: 0.6 }}>· {c.group}</span></span>
+                      <span className="tnum" style={{ paddingLeft: 10 }}>{bare(c.amount)}</span>
+                    </div>
+                  ))}
+                  {r.moved > r.sample.length && <div className="text-xs mt-1" style={{ color: MUTED }}>… and {r.moved - r.sample.length} more</div>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: 940 }}>
+      <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <div className="text-lg font-bold" style={{ color: INK }}>How the books are read</div>
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 680 }}>
+            Every rule the statements stand on, in the order it fires — and what each one actually caught
+            in this period. This page does not describe the rules; it runs them, so it cannot go stale.
+          </div>
+        </div>
+        <PeriodBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+      </div>
+
+      {!data ? <div className="text-sm" style={{ color: MUTED }}>reading…</div> : (
+        <>
+          <div className="mb-4">
+            <input value={q} onChange={(e) => setQ(e.target.value)}
+              placeholder="Find a ledger — and see exactly which rule takes it"
+              className="border rounded px-3 py-2 text-sm w-full" style={{ borderColor: BORDER, maxWidth: 520 }} />
+            {q.trim().length >= 2 && (
+              <div className="bg-white rounded-lg border mt-2 overflow-hidden" style={{ borderColor: BORDER }}>
+                {!hits.length && <div className="px-3 py-2 text-xs" style={{ color: MUTED }}>Nothing moved under that name in this period.</div>}
+                {hits.map((h) => (
+                  <div key={h.ledger} className="border-t px-3 py-1.5 text-xs flex items-center gap-2" style={{ borderColor: "var(--line-soft)" }}>
+                    <span style={{ flex: 1, color: INK, fontWeight: 600 }}>{h.ledger}</span>
+                    <span style={{ color: MUTED }}>{h.group}</span>
+                    <span className="font-bold rounded px-1.5 py-0.5" style={{ background: "#EEF1FA", color: INK }}>{h.lands}</span>
+                    {h.head && <span className="rounded px-1.5 py-0.5" style={{ background: "#F3F0FA", color: INK }}>{h.head}</span>}
+                    <span className="tnum" style={{ color: MUTED, minWidth: 70, textAlign: "right" }}>{bare(h.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-lg border p-3 mb-6" style={{ borderColor: BORDER }}>
+            <div className="font-bold text-sm mb-2" style={{ color: INK }}>The standing rules</div>
+            {data.book.map((b) => (
+              <div key={b.id} className="border-t py-2" style={{ borderColor: "var(--line-soft)" }}>
+                <div className="text-xs font-bold" style={{ color: INK }}>{b.title}</div>
+                <div className="text-xs mt-0.5" style={{ color: "var(--dim)", lineHeight: 1.55 }}>{b.says}</div>
+                <div className="text-xs mt-1" style={{ color: MUTED, lineHeight: 1.55 }}><i>{b.why}</i></div>
+              </div>
+            ))}
+          </div>
+
+          <Ladder kind="p" title="Which line of the P&amp;L a ledger lands on"
+            blurb={`First match wins, and one always does. The rungs are tested top to bottom, so the narrow tests come before the wide ones. Figures in ${unitLabel}, for ${periodLabel(data.from, data.to)}. The last rung should always read zero — if it does not, a new root has been opened in Tally and the ladder needs a rung.`}
+            rows={data.pnl} />
+
+          <Ladder kind="o" title="Which of the eleven operating-expense heads"
+            blurb={`Applied to everything that landed on Indirect Expenses or Finance Charges above. The last head is a catch, so the eleven always add back to the operating-expense total exactly — whatever new ledgers get opened next month. Figures in ${unitLabel}.`}
+            rows={data.oe} />
+
+          <p className="text-xs" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
+            Read from {data.counts.ledgers.toLocaleString("en-IN")} ledgers, {data.counts.vouchers.toLocaleString("en-IN")} vouchers
+            and {data.counts.lines.toLocaleString("en-IN")} voucher lines. These rules live in one file — <b>src/lib/kuber-rules.ts</b> —
+            and nothing else in Kuber classifies a ledger. The P&amp;L, the balance sheet, the ratio pack and this page
+            all read that one ladder.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 
 /** RATIO ANALYSIS — its own sheet (Dr Raghu, 28 Aug 2026): every ratio with
  *  its value, HIS target beside it, and the formula it stands on. */

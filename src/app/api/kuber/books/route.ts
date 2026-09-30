@@ -6,7 +6,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { requireKuber } from "@/lib/accounts";
 import { addDays } from "@/lib/fmt";
 import { newestByName } from "@/lib/kuber-fy";
-import { OE_HEADS, oeHead } from "@/lib/oe-heads";
+import { OE_HEADS, oeHead, classifyLedger, PNL_RULES, OE_RULES, BOOK_RULES, BUCKET_LABEL, oeRuleOf, type Bucket } from "@/lib/kuber-rules";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -153,6 +153,45 @@ async function loadWorld(admin: ReturnType<typeof adminClient>) {
 }
 
 /** root → group → ledger tree with amounts; every statement wears it. */
+/**
+ * THE DRILL CARRIES THE SAME COLUMNS AS THE LINE ABOVE IT.
+ *
+ * Dr Raghu, 30 Sep 2026: "show the details for each of the inside members on
+ * expanding also." A head that reads 5.48 against 5.82 last year is only
+ * useful if opening it says WHICH group moved — so every root, group and
+ * ledger inside carries its own last-year figure, matched by name. A node
+ * present in one period and not the other reads zero on the side it is
+ * missing from, which is itself the answer.
+ */
+function treeOfPair(
+  cur: { ledger: string; group: string; root: string; amount: number }[],
+  ly: { ledger: string; group: string; root: string; amount: number }[],
+) {
+  const base = treeOf(cur);
+  if (!ly.length) return base;
+  const lyTree = treeOf(ly);
+  const lyRoot = new Map(lyTree.map((r) => [r.root, r]));
+  const seen = new Set(base.map((r) => r.root));
+  const merge = (r: ReturnType<typeof treeOf>[number], l?: ReturnType<typeof treeOf>[number]) => {
+    const lyGrp = new Map((l?.groups || []).map((g) => [g.name, g]));
+    const groups = r.groups.map((g) => {
+      const lg = lyGrp.get(g.name);
+      const lyLed = new Map((lg?.ledgers || []).map((x) => [x.name, x.amount]));
+      const ledgers = g.ledgers.map((x) => ({ ...x, ly: lyLed.get(x.name) ?? 0 }));
+      const extra = [...lyLed.entries()].filter(([n]) => !g.ledgers.some((x) => x.name === n))
+        .map(([name, amount]) => ({ name, amount: 0, ly: amount }));
+      lyGrp.delete(g.name);
+      return { ...g, ly: lg?.total ?? 0, ledgers: [...ledgers, ...extra].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 300) };
+    });
+    // a group that spent last year and nothing this year still has to show
+    for (const [name, lg] of lyGrp) groups.push({ name, total: 0, ly: lg.total, ledgers: lg.ledgers.map((x) => ({ ...x, amount: 0, ly: x.amount })) });
+    return { ...r, ly: l?.total ?? 0, groups };
+  };
+  const out = base.map((r) => merge(r, lyRoot.get(r.root)));
+  for (const l of lyTree) if (!seen.has(l.root)) out.push(merge({ root: l.root, total: 0, groups: [] }, l));
+  return out;
+}
+
 function treeOf(entries: { ledger: string; group: string; root: string; amount: number }[]) {
   const roots = new Map<string, { root: string; total: number; groups: Map<string, { total: number; ledgers: Map<string, number> }> }>();
   for (const e of entries) {
@@ -968,6 +1007,9 @@ export async function GET(req: Request) {
           const name = String(l.ledger);
           per.set(name, (per.get(name) || 0) + (Number(l.amount) || 0));
         }
+        /* EVERY LEDGER GOES THROUGH THE ONE LADDER (kuber-rules.ts).
+           There is no second copy of these rules anywhere, and the "How the
+           books are read" page renders the same array. */
         const ents: Record<string, Ent[]> = { sales: [], purchases: [], manuf: [], indirect: [], finance: [], depreciation: [], tax: [], otherIncome: [] };
         for (const l of w.ledgers) {
           const name = String(l.name), grp = String(l.parent || "");
@@ -975,40 +1017,9 @@ export async function GET(req: Request) {
           const root = w.rootOf(grp);
           const amt = per.get(name) || 0;
           if (!amt) continue;
-          const isPnlM = /income|expense|^\S*\.?\s*sales|purchase|manufacturing/i.test(root) && !/asset/i.test(root);
-          if (!isPnlM) continue;
-          const e = { ledger: name, group: grp, root, amount: amt };
-          const rootN = stripNo(root);
-          /**
-           * "INDIRECT EXPENSES" CONTAINS "DIRECT EXPENSE".
-           *
-           * Dr Raghu, 30 Sep 2026: "indirect expense should be coming below
-           * gross profit." It was not, and the reason was a substring: the
-           * manufacturing test read /manufacturing|direct expense/, and
-           * In-DIRECT EXPENSE-s matches it. Every indirect cost — Rs 6.41 Cr
-           * of salaries, rent, professional fees — was swept above the gross
-           * profit line into Manufacturing, and the Indirect Expenses line
-           * below it showed zero.
-           *
-           * The totals still reached the same EBITDA, which is exactly why it
-           * survived: the only two figures it broke were Gross Profit and
-           * Throughput, and both looked plausible.
-           *
-           * INDIRECT IS NOW TESTED FIRST, and "direct expenses" is anchored
-           * so it can only match a root that IS direct expenses.
-           */
-          if (/sales|direct income/i.test(rootN) && !/purchase|indirect/i.test(rootN)) ents.sales.push(e);
-          else if (/purchase/i.test(rootN)) ents.purchases.push({ ...e, amount: -amt });
-          else if (/indirect income/i.test(rootN)) ents.otherIncome.push(e);
-          else if (/manufacturing/i.test(rootN) || /^direct expenses?$/i.test(rootN.trim())) ents.manuf.push({ ...e, amount: -amt });
-          else if (/indirect expense|expense/i.test(rootN)) {
-            // finance, depreciation and tax step out of the indirect lump
-            const hay = (grp + " " + name).toLowerCase();
-            if (/deprecia/.test(hay)) ents.depreciation.push({ ...e, amount: -amt });
-            else if (/finance|interest|bank charg/.test(hay)) ents.finance.push({ ...e, amount: -amt });
-            else if (/current tax|deferred tax|income tax/.test(hay)) ents.tax.push({ ...e, amount: -amt });
-            else ents.indirect.push({ ...e, amount: -amt });
-          }
+          const { bucket, rule } = classifyLedger({ ledger: name, group: grp, root, rootN: stripNo(root) });
+          if (bucket === "balance") continue;
+          ents[bucket].push({ ledger: name, group: grp, root, amount: amt * rule.sign });
         }
 
         /* IT SAYS WHICH DATES IT USED. Falling back to an earlier month's
@@ -1078,6 +1089,36 @@ export async function GET(req: Request) {
       const lyRaw = computePnl(shiftYear(from, 1), shiftYear(to, 1));
       const ly = lyRaw.touched ? lyRaw : null;
 
+      /**
+       * DEPRECIATION IS A YEAR-END JOURNAL HERE, NOT A MONTHLY CHARGE.
+       *
+       * Dr Raghu, 30 Sep 2026: "is depreciation not there? I will make them
+       * write in depreciation too." The line is not broken and nothing is
+       * missing from the ladder — Tally simply carries one posting a year.
+       * A zero that means "nobody has written it yet" and a zero that means
+       * "there is none" look identical, so the statement says which, and
+       * names the last posting it can find.
+       */
+      let depNote: { at: string; amount: number } | null = null;
+      {
+        const depLed = new Set<string>();
+        for (const l of w.ledgers) {
+          const grp = String(l.parent || "");
+          if (!grp) continue;
+          const root = w.rootOf(grp);
+          if (classifyLedger({ ledger: String(l.name), group: grp, root, rootN: stripNo(root) }).bucket === "depreciation") depLed.add(String(l.name));
+        }
+        const byDate = new Map<string, number>();
+        for (const l of w.lines) {
+          if (!depLed.has(String(l.ledger))) continue;
+          const d = w.dateOf.get(String(l.voucher_id)) || "";
+          if (!d) continue;
+          byDate.set(d, (byDate.get(d) || 0) - (Number(l.amount) || 0));
+        }
+        const last = [...byDate.keys()].sort().pop();
+        if (last) depNote = { at: last, amount: byDate.get(last) || 0 };
+      }
+
       const { ents, sales, otherIncome, revenue, purchases, openingStock, closingStock, openingAt, closingAt,
         stockFrom, stocksTyped, tvc, throughput, manuf, grossProfit, indirect, ebitda, finance, depreciation,
         operatingExpenses, netOperating, npbt, tax, npat } = cur;
@@ -1090,8 +1131,11 @@ export async function GET(req: Request) {
         const name = String(l.name), grp = String(l.parent || "");
         if (!grp) continue;
         const root = w.rootOf(grp);
-        const isPnlM = /income|expense|^\S*\.?\s*sales|purchase|manufacturing/i.test(root) && !/asset/i.test(root);
-        if (isPnlM) { profitToDate += toDate.get(name) || 0; continue; }
+        /* the same ladder decides this too — a head cannot be a P&L head
+           for the statement and a balance-sheet head for the ratios */
+        if (classifyLedger({ ledger: name, group: grp, root, rootN: stripNo(root) }).bucket !== "balance") {
+          profitToDate += toDate.get(name) || 0; continue;
+        }
         // balance-sheet closing per root, for the ratio pack
         const closing = (Number(l.opening) || 0) + (toDate.get(name) || 0);
         closingOfRoot.set(root, (closingOfRoot.get(root) || 0) + closing);
@@ -1167,7 +1211,8 @@ export async function GET(req: Request) {
        * comparison. Both are null until last year is actually in the books.
        */
       const K = (o: ReturnType<typeof computePnl>, key: string): number => (o as unknown as Record<string, number>)[key];
-      const line = (key: string, label: string, pick: string | number, treeEnts?: Ent[]) => {
+      type EntsOf = (o: ReturnType<typeof computePnl>) => Ent[];
+      const line = (key: string, label: string, pick: string | number, entsOf?: EntsOf) => {
         const amount = typeof pick === "number" ? pick : K(cur, pick);
         const lyAmt = typeof pick === "number" || !ly ? null : K(ly, pick);
         return {
@@ -1177,14 +1222,15 @@ export async function GET(req: Request) {
           ly: lyAmt,
           lyPct: lyAmt != null && ly && ly.revenue ? (lyAmt / ly.revenue) * 100 : null,
           lyAvg: lyAmt == null || !ly ? null : lyAmt / ly.months,
-          tree: treeEnts ? treeOf(treeEnts) : undefined,
+          tree: entsOf ? treeOfPair(entsOf(cur), ly ? entsOf(ly) : []) : undefined,
         };
       };
+      const E = (k: keyof typeof ents): EntsOf => (o) => o.ents[k as string];
       /* the eleven read in HIS order, not in size order */
       const inHisOrder = (t?: { root: string }[]) => t && t.slice().sort((a, b) =>
         OE_HEADS.indexOf(a.root as typeof OE_HEADS[number]) - OE_HEADS.indexOf(b.root as typeof OE_HEADS[number]));
       return NextResponse.json({
-        from, to, months, stocksTyped,
+        from, to, months, stocksTyped, depNote,
         ly: ly ? { from: ly.from, to: ly.to, months: ly.months, openingAt: ly.openingAt, closingAt: ly.closingAt,
               /* last year's stock stands on last year's own valuations — if the
                  register does not reach back that far the comparative says so
@@ -1192,9 +1238,9 @@ export async function GET(req: Request) {
               stocked: ly.closingAt != null && ly.openingAt != null } : null,
         stock: { from: stockFrom, openingAt, closingAt, stale: !!(closingAt && closingAt < to) },
         lines: [
-          line("sales", "Sales", "sales", ents.sales),
+          line("sales", "Sales", "sales", E("sales")),
           line("revenue", "Revenue", "revenue"),
-          line("purchases", "Purchases during the Period", "purchases", ents.purchases),
+          line("purchases", "Purchases during the Period", "purchases", E("purchases")),
           /* OPENING IS THE VALUE CARRIED IN (Dr Raghu, 30 Sep 2026: "opening
              stock at 1-04-2026"). The register holds it dated the night
              before — 31 March — which is the same instant read the other way
@@ -1203,27 +1249,100 @@ export async function GET(req: Request) {
           line("closing_stock", closingAt ? `Closing Stock — as at ${closingAt.split("-").reverse().join("-")}` : "Closing Stock — not valued", "closingStock"),
           line("tvc", "TVC (COGS)", "tvc"),
           line("throughput", "THROUGHPUT", "throughput"),
-          line("manuf", "Manufacturing Expenses", "manuf", ents.manuf),
+          line("manuf", "Manufacturing Expenses", "manuf", E("manuf")),
           line("gross_profit", "GROSS PROFIT for the Period", "grossProfit"),
-          line("indirect", "Indirect Expenses — except finance charges", "indirect", ents.indirect),
+          line("indirect", "Indirect Expenses — except finance charges", "indirect", E("indirect")),
           line("ebitda", "EBITDA — Operating Profit before Interest, Depreciation & Tax", "ebitda"),
-          line("finance", "Finance Charges", "finance", ents.finance),
+          line("finance", "Finance Charges", "finance", E("finance")),
           /* OE opens in HIS eleven heads, not Tally's thirty-six groups
              (see oe-heads.ts). Each head still opens to the Tally group and
              the ledger beneath it, so the drill never loses the trail. */
           (() => {
             const l = line("oe", "OPERATING EXPENSES — all indirect including finance & directors", "operatingExpenses",
-              [...ents.indirect, ...ents.finance].map((e) => ({ ...e, root: oeHead(e.group, e.ledger) })));
+              (o) => [...o.ents.indirect, ...o.ents.finance].map((e) => ({ ...e, root: oeHead(e.group, e.ledger) })));
             return { ...l, tree: inHisOrder(l.tree) };
           })(),
-          line("depreciation", "Depreciation", "depreciation", ents.depreciation),
+          line("depreciation", "Depreciation", "depreciation", E("depreciation")),
           line("net_operating", "Net Operating Profit", "netOperating"),
-          line("other_income", "Other Income", "otherIncome", ents.otherIncome),
+          line("other_income", "Other Income", "otherIncome", E("otherIncome")),
           line("npbt", "Net Profit Before Tax", "npbt"),
-          line("tax", "Tax Expense", "tax", ents.tax),
+          line("tax", "Tax Expense", "tax", E("tax")),
           line("npat", "NET PROFIT AFTER TAX", "npat"),
         ],
         ratios,
+      });
+    }
+
+    /**
+     * HOW THE BOOKS ARE READ — the rules, with what each one actually caught.
+     *
+     * Dr Raghu, 30 Sep 2026: "cant u make the rules and keep it properly? if
+     * needed make all the rules. in a page."
+     *
+     * This does not DESCRIBE the rules; it runs them. The ladder it walks is
+     * the same array the statement imports, so the page cannot drift from the
+     * P&L — if a rung changes, both change together, and if a rung stops
+     * catching anything the count says so.
+     */
+    if (view === "rules") {
+      const fyStartR = today.slice(5, 7) >= "04" ? today.slice(0, 4) + "-04-01" : String(Number(today.slice(0, 4)) - 1) + "-04-01";
+      const lastMonthEndR = (() => { const t = new Date(today + "T00:00:00Z"); t.setUTCDate(0); return t.toISOString().slice(0, 10); })();
+      const from = url.searchParams.get("from") || fyStartR;
+      const to = url.searchParams.get("to") || (lastMonthEndR >= fyStartR ? lastMonthEndR : today);
+      const w = await loadWorld(admin);
+      if (!w.ledgers.length) return NextResponse.json({ empty: true });
+
+      const per = new Map<string, number>();
+      for (const l of w.lines) {
+        const d = w.dateOf.get(String(l.voucher_id)) || "";
+        if (!d || d < from || d > to) continue;
+        const n = String(l.ledger);
+        per.set(n, (per.get(n) || 0) + (Number(l.amount) || 0));
+      }
+
+      type Caught = { ledger: string; group: string; root: string; amount: number };
+      const byRule = new Map<string, { ledgers: number; moved: number; amount: number; sample: Caught[] }>();
+      const byOe = new Map<string, { ledgers: number; moved: number; amount: number; sample: Caught[] }>();
+      const bump = (m: typeof byRule, k: string, c: Caught, moved: boolean) => {
+        const r = m.get(k) ?? m.set(k, { ledgers: 0, moved: 0, amount: 0, sample: [] }).get(k)!;
+        r.ledgers++;
+        if (moved) { r.moved++; r.amount += c.amount; r.sample.push(c); }
+      };
+      /** every ledger and the rung that took it — the search index */
+      const index: { ledger: string; group: string; root: string; lands: string; rule: string; head: string | null; amount: number }[] = [];
+
+      for (const l of w.ledgers) {
+        const name = String(l.name), grp = String(l.parent || "");
+        if (!grp) continue;
+        const root = w.rootOf(grp);
+        const amt = per.get(name) || 0;
+        const { bucket, rule } = classifyLedger({ ledger: name, group: grp, root, rootN: stripNo(root) });
+        const signed = amt * rule.sign;
+        const c: Caught = { ledger: name, group: grp, root, amount: signed };
+        bump(byRule, rule.id, c, !!amt);
+        let head: string | null = null;
+        if (bucket === "indirect" || bucket === "finance") {
+          const oe = oeRuleOf(grp, name);
+          head = oe.head;
+          bump(byOe, oe.id, c, !!amt);
+        }
+        if (amt) index.push({ ledger: name, group: grp, root, lands: BUCKET_LABEL[bucket], rule: rule.id, head, amount: signed });
+      }
+      const pack = (m: typeof byRule, k: string) => {
+        const r = m.get(k) ?? { ledgers: 0, moved: 0, amount: 0, sample: [] as Caught[] };
+        return {
+          ledgers: r.ledgers, moved: r.moved, amount: r.amount,
+          sample: r.sample.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 120),
+        };
+      };
+      index.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+      return NextResponse.json({
+        from, to,
+        book: BOOK_RULES,
+        pnl: PNL_RULES.map((r) => ({ id: r.id, lands: r.lands, says: r.says, why: r.why || null, sign: r.sign, ...pack(byRule, r.id) })),
+        oe: OE_RULES.map((r) => ({ id: r.id, lands: r.head, says: r.says, why: r.why || null, sign: -1, ...pack(byOe, r.id) })),
+        index: index.slice(0, 2500),
+        counts: { ledgers: w.ledgers.length, vouchers: w.dateOf.size, lines: w.lines.length },
       });
     }
 

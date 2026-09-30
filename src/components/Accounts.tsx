@@ -18,7 +18,7 @@ import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
 import StockRegister from "@/components/kuber/StockRegister";
-import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen, CfoNoteScreen, VoucherRegister } from "@/components/kuber/Books";
+import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen, CfoNoteScreen, VoucherRegister, RulesScreen } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
 import ComplianceCalendar from "@/components/kuber/Compliance";
@@ -68,6 +68,7 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
     items: [
       { key: "cfonote", label: "CFO Note", icon: "✎" },
       { key: "pnl", label: "Profit & Loss", icon: "∑" },
+      { key: "rules", label: "How the books are read", icon: "§" },
       /* The one number the books cannot supply — typed here, read by the P&L (0179). */
       { key: "stock", label: "Stock register", icon: "📦" },
       { key: "bs", label: "Balance Sheet", icon: "⚖" },
@@ -218,6 +219,7 @@ export default function Accounts({
           {openKey === "ledgers" && <LedgerBrowser />}
           {openKey === "vouchers" && <VoucherBrowser />}
           {openKey === "pnl" && <PnLScreen go={go} />}
+          {openKey === "rules" && <RulesScreen />}
           {openKey === "stock" && <StockRegister />}
           {openKey === "bs" && <BalanceSheetScreen />}
           {openKey === "playbook" && <PlaybookScreen kind="finance" email={email} />}

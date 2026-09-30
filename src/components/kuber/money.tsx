@@ -51,6 +51,21 @@ export function useMoneyFmt() {
   return { unit, setUnit, fmt, num, label };
 }
 
+/**
+ * PERCENTAGES, SIZED TO WHAT THEY MEAN (Dr Raghu, 30 Sep 2026: "% keep it as
+ * a 0 decimal till 10%, below 10% use 1 decimal and below 2% show 2
+ * decimals").
+ *
+ * A big share needs no decimals — 48% says it. A small one does, because
+ * the difference between 1.2% and 1.8% of sales is half a crore, and
+ * "1%" beside "2%" hides it.
+ */
+export function fmtPct(v: number | null | undefined): string {
+  if (v == null || !isFinite(v)) return "\u2014";
+  const a = Math.abs(v);
+  return `${v.toFixed(a >= 10 ? 0 : a >= 2 ? 1 : 2)}%`;
+}
+
 /** The three chips worn on Kuber's header. */
 export function UnitPicker() {
   const { unit, setUnit } = useMoneyFmt();
