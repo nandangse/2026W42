@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.9.3",
+    date: "2026-09-30",
+    module: "Type the family",
+    items: [
+      "THE PRODUCT FAMILY IS TYPED, NOT PICKED \u2014 on the Sales Register's bulk bar, on Bills Receivable's, and in the invoice lightbox. Twenty-five families is too many to scroll and too few to search; a field that offers as you type is both. Enter applies it.",
+    ],
+  },
+  {
     v: "5.9.9.2",
     date: "2026-09-30",
     module: "Where the money came from, in his heads \u2014 and a Drive bug found by a screenshot",
