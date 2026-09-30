@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.8.4",
+    date: "2026-09-30",
+    module: "Bills Receivable becomes the collection desk",
+    items: [
+      "A TICK-BOX BEFORE EVERY PARTY, AND A BAR THAT SETS THINGS ON WHAT IS TICKED: the expected date, the product, the salesperson, a collection remark. Each press writes only the field pressed, so dating forty bills cannot blank a remark somebody wrote on one of them this morning.",
+      "EXPECTED DATE AFTER THE AMOUNT, AND COLLECTION REMARKS AFTER THAT. Both are beliefs \u2014 what somebody thinks after a phone call \u2014 so they live in Genie's own table keyed on the bill and a Tally upload cannot touch them. An expected date already past reads red.",
+      "AGE CAME OFF; OVERDUE STAYED. They looked like the same column and were not: age counts from the bill, overdue from the day it was promised, and only one of those is an argument you can put to a customer. Overdue reads in years and months past twelve.",
+      "Every header sorts. The age bands are bigger and bolder and carry the count in brackets, because the number of bills is the workload and the money is only the prize. Product and Salesperson are the Sales Register's own two fields \u2014 set here, set there.",
+      "Calls and e-mails from this screen come next.",
+    ],
+  },
+  {
     v: "5.9.8.3",
     date: "2026-09-30",
     module: "A column that says what it means",

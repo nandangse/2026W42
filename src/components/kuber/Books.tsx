@@ -2743,6 +2743,7 @@ interface BillRow {
   bill_date: string | null; due_date: string | null;
   amount: number; age: number | null; overdue: number;
   fam: string | null; salesman: string | null; scan: string | null;
+  expected_on: string | null; remarks: string | null;
 }
 interface BillsData {
   kind: string; today: string; rows: BillRow[]; count: number; total: number;
@@ -2752,15 +2753,24 @@ interface BillsData {
 }
 
 /**
- * Dr Raghu, 30 Sep 2026: "add the Bills Receivable. Show all the bills which
- * have the status as 'Unpaid'. this may be as old as 5 years also! See the
- * status in tally. show me these."
+ * BILLS RECEIVABLE — the collection desk.
  *
- * Tally's status IS this list — a bill sits in the bill-wise outstanding
- * until it is knocked off. The ageing screen gathers this money by party;
- * this one shows the bills themselves, oldest first, nothing netted and
- * nothing summarised away. A bill that has been out for four years should
- * have to be looked at.
+ * Dr Raghu, 30 Sep 2026: "make header sortable · show number of bills in
+ * brackets and bold · make a box before the party name · Then Expected Date
+ * after amount, this will be used for ticking · You can choose multiple and
+ * edit, then sales person, Product, then Expected Date · showing age is not
+ * relevant · Collection Remarks. Later I will make the collection Calls and
+ * also emails from here."
+ *
+ * AGE CAME OFF AND OVERDUE STAYED. They looked like the same column and were
+ * not: age counts from the bill, overdue from the day it was promised. Only
+ * one of those is an argument you can put to a customer.
+ *
+ * THE EXPECTED DATE AND THE REMARK ARE BELIEFS, not facts — what somebody
+ * thinks after a phone call. They live in Genie's own table keyed on the
+ * bill, never in Tally, so a re-upload cannot wipe them. The salesman and
+ * the product family are the same two fields the Sales Register holds, so
+ * setting them here sets them there.
  */
 export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" | "payable" }) {
   const [data, reload] = useBooks<BillsData>("billsdue", `&kind=${kind}`);
@@ -2769,45 +2779,62 @@ export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" |
   const [party, setParty] = useState("");
   const [band, setBand] = useState("");
   const [minAmt, setMinAmt] = useState("");
-  const [sortK, setSortK] = useState<"age" | "amount" | "party" | "bill_date">("age");
+  const [sortK, setSortK] = useState<SortK>("overdue");
   const [dir, setDir] = useState<1 | -1>(-1);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [remarkDraft, setRemarkDraft] = useState("");
   const rec = kind === "receivable";
 
   if (!data) return <div className="text-sm" style={{ color: MUTED }}>reading the bills…</div>;
   const needle = q.trim().toLowerCase();
   const floor = Number(minAmt) || 0;
-  const bandOf = data.bands.find((b) => b.key === band);
   const LO: Record<string, [number, number]> = { "0-90": [0, 90], "90-180": [90, 180], "180-365": [180, 365], "1-2y": [365, 730], "2-3y": [730, 1095], "3y+": [1095, 99999] };
   const rows = data.rows
     .filter((r) => !needle || r.party.toLowerCase().includes(needle) || r.bill.toLowerCase().includes(needle))
     .filter((r) => !party || r.party === party)
     .filter((r) => !band || ((r.age ?? 0) >= LO[band][0] && (r.age ?? 0) < LO[band][1]))
     .filter((r) => !floor || r.amount >= floor)
-    .sort((a, b) => {
-      const v = sortK === "amount" ? a.amount - b.amount
-        : sortK === "age" ? (a.age ?? 0) - (b.age ?? 0)
-        : String(a[sortK] ?? "").localeCompare(String(b[sortK] ?? ""));
-      return v * dir;
-    });
+    .sort((a, b) => cmp(a, b, sortK) * dir);
   const shown = rows.reduce((s2, r) => s2 + r.amount, 0);
-  const years = (d: string | null) => (d ? Math.floor(daysSince(d, data.today) / 365) : 0);
+  const key = (r: BillRow) => `${r.party}|${r.bill}`;
+  const allOn = rows.length > 0 && rows.every((r) => sel.has(key(r)));
+  const toggleAll = () => setSel(allOn ? new Set() : new Set(rows.map(key)));
+  const toggle = (k: string) => setSel((s2) => { const n = new Set(s2); if (n.has(k)) n.delete(k); else n.add(k); return n; });
 
-  const Hd = ({ k, children, right }: { k: typeof sortK; children: React.ReactNode; right?: boolean }) => (
+  const apply = async (patch: Record<string, unknown>) => {
+    if (!sel.size) return;
+    setBusy(true);
+    try {
+      const bills = rows.filter((r) => sel.has(key(r))).map((r) => ({ party: r.party, bill: r.bill }));
+      await fetch("/api/kuber/books", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "collection", bills, ...patch }),
+      });
+      setSel(new Set()); setRemarkDraft(""); reload();
+    } finally { setBusy(false); }
+  };
+
+  const fams = [...new Set(data.rows.map((r) => r.fam).filter(Boolean) as string[])].sort();
+  const salesmen = [...new Set(data.rows.map((r) => r.salesman).filter(Boolean) as string[])].sort();
+
+  const Hd = ({ k, children, right }: { k: SortK; children: React.ReactNode; right?: boolean }) => (
     <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`}
-      onClick={() => { if (sortK === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSortK(k); setDir(k === "party" ? 1 : -1); } }}
+      onClick={() => { if (sortK === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSortK(k); setDir(k === "party" || k === "bill" || k === "fam" || k === "salesman" || k === "remarks" ? 1 : -1); } }}
       style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }}>
       {children}{sortK === k ? (dir === 1 ? " ▲" : " ▼") : ""}
     </th>
   );
+  const sel1 = sel.size;
 
   return (
-    <div style={{ maxWidth: 1120 }}>
+    <div style={{ maxWidth: 1280 }}>
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>{rec ? "Bills Receivable" : "Bills Payable"}</div>
-          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 720 }}>
-            Every bill still unpaid, one line each, oldest first — Tally&apos;s own bill-wise outstanding, which is where
-            a bill sits until it is knocked off. Nothing is netted and nothing is summarised away.
+          <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 760 }}>
+            Every bill still unpaid, one line each — Tally&apos;s own bill-wise outstanding, which is where a bill sits
+            until it is knocked off. Tick the ones you have chased, set who owns them and when the money is expected.
             {data.oldest && <> The oldest is <b>{fmtD(data.oldest)}</b>.</>}
           </div>
         </div>
@@ -2824,14 +2851,17 @@ export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" |
           sub={`${data.bands.filter((b) => ["1-2y", "2-3y", "3y+"].includes(b.key)).reduce((s2, b) => s2 + b.count, 0)} bills`} color={RED} />
       </div>
 
-      {/* the age bands, as buttons — pressing one filters the list */}
-      <div className="flex gap-1.5 mb-2 flex-wrap">
+      {/* the age bands — the count in brackets, bold, because the number of
+          bills is the workload and the money is only the prize */}
+      <div className="flex gap-2 mb-2 flex-wrap">
         {data.bands.map((b) => (
           <button key={b.key} onClick={() => setBand(band === b.key ? "" : b.key)}
-            className="rounded border px-2.5 py-1 text-left"
+            className="rounded border px-3 py-2 text-left"
             style={band === b.key ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" } : { background: "#fff", borderColor: BORDER, color: INK }}>
-            <div className="text-xs font-bold">{b.label}</div>
-            <div className="text-xs tnum">{fmtMoney(b.amount)} <span style={{ opacity: 0.65 }}>· {b.count}</span></div>
+            <div className="text-sm font-bold">{b.label}</div>
+            <div className="text-base font-bold tnum">
+              {fmtMoney(b.amount)} <b style={{ opacity: band === b.key ? 0.9 : 0.75 }}>({b.count})</b>
+            </div>
           </button>
         ))}
         {band && <button onClick={() => setBand("")} className="text-xs font-bold self-center" style={{ color: MUTED }}>clear</button>}
@@ -2849,38 +2879,70 @@ export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" |
         <span className="text-xs ml-auto" style={{ color: MUTED }}>{rows.length} shown · {fmtMoney(shown)}</span>
       </div>
 
+      {/* TICK, THEN SET. Each press writes only the field pressed. */}
+      {sel1 > 0 && (
+        <div className="rounded p-2 mb-2 flex items-center gap-2 flex-wrap" style={{ background: "#EEF1FA", border: `1px solid ${BORDER}` }}>
+          <b className="text-xs" style={{ color: INK }}>{sel1} ticked · {fmtMoney(rows.filter((r) => sel.has(key(r))).reduce((s2, r) => s2 + r.amount, 0))}</b>
+          <input type="date" disabled={busy} onChange={(e) => { if (e.target.value) void apply({ expected_on: e.target.value }); }}
+            title="Expected date" className="border rounded px-2 py-1 text-xs" style={{ borderColor: BORDER }} />
+          <select defaultValue="" disabled={busy} onChange={(e) => { if (e.target.value) { void apply({ fam: e.target.value }); e.target.value = ""; } }}
+            className="border rounded px-2 py-1 text-xs" style={{ borderColor: BORDER }}>
+            <option value="">set product…</option>
+            {fams.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+          <input placeholder="salesperson + Enter" disabled={busy} list="br-sales"
+            onKeyDown={(e) => { if (e.key === "Enter") { const v = (e.target as HTMLInputElement).value.trim(); if (v) { void apply({ salesman: v }); (e.target as HTMLInputElement).value = ""; } } }}
+            className="border rounded px-2 py-1 text-xs" style={{ borderColor: BORDER, width: 160 }} />
+          <datalist id="br-sales">{salesmen.map((x) => <option key={x} value={x} />)}</datalist>
+          <input value={remarkDraft} onChange={(e) => setRemarkDraft(e.target.value)} placeholder="collection remark…"
+            onKeyDown={(e) => { if (e.key === "Enter" && remarkDraft.trim()) void apply({ remarks: remarkDraft.trim() }); }}
+            disabled={busy} className="border rounded px-2 py-1 text-xs" style={{ borderColor: BORDER, width: 260 }} />
+          <span className="text-xs" style={{ color: MUTED }}>{busy ? "writing…" : "Enter to apply"}</span>
+          <button onClick={() => setSel(new Set())} className="text-xs font-bold ml-auto" style={{ color: MUTED }}>clear</button>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg border overflow-auto" style={{ borderColor: BORDER, maxHeight: "62vh" }}>
-        <table className="w-full text-xs genie-table" style={{ minWidth: 940, borderCollapse: "separate", borderSpacing: 0 }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 1180, borderCollapse: "separate", borderSpacing: 0 }}>
           <thead>
             <tr style={{ background: "var(--ink)", color: "#fff" }}>
+              <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)", width: 30 }}>
+                <input type="checkbox" checked={allOn} onChange={toggleAll} title="Tick everything shown" />
+              </th>
               <Hd k="party">Party</Hd>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Bill</th>
+              <Hd k="bill">Bill</Hd>
               <Hd k="bill_date">Bill date</Hd>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Due</th>
-              <Hd k="age" right>Age</Hd>
-              <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Overdue</th>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Family</th>
-              <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Salesman</th>
+              <Hd k="due_date">Due</Hd>
+              <Hd k="overdue" right>Overdue</Hd>
+              <Hd k="fam">Product</Hd>
+              <Hd k="salesman">Salesperson</Hd>
               <Hd k="amount" right>Amount</Hd>
+              <Hd k="expected_on">Expected</Hd>
+              <Hd k="remarks">Collection remarks</Hd>
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && <tr><td colSpan={9} className="px-3 py-4 text-center" style={{ color: MUTED }}>Nothing matches.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={11} className="px-3 py-4 text-center" style={{ color: MUTED }}>Nothing matches.</td></tr>}
             {rows.slice(0, 1500).map((r, i) => {
-              const y = years(r.bill_date);
+              const k = key(r);
+              const on = sel.has(k);
               return (
-                <tr key={r.party + r.bill + i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
-                  <td className="px-2 py-1 font-semibold" style={{ maxWidth: 210, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.party}>{r.party}</td>
+                <tr key={k + i} className="border-t" style={{ borderColor: "var(--line-soft)", background: on ? "#EEF1FA" : i % 2 ? "#FAF9F5" : "#fff" }}>
+                  <td className="px-2 py-1"><input type="checkbox" checked={on} onChange={() => toggle(k)} /></td>
+                  <td className="px-2 py-1 font-semibold" style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.party}>{r.party}</td>
                   <td className="px-2 py-1 whitespace-nowrap">{r.bill}{r.scan && <span title={r.scan} style={{ marginLeft: 4 }}>&#128196;</span>}</td>
                   <td className="px-2 py-1 tnum whitespace-nowrap">{fmtD(r.bill_date)}</td>
                   <td className="px-2 py-1 tnum whitespace-nowrap" style={{ color: MUTED }}>{fmtD(r.due_date)}</td>
-                  <td className="px-2 py-1 text-right tnum whitespace-nowrap" style={{ color: y >= 1 ? RED : (r.age ?? 0) > 90 ? "#B45309" : MUTED, fontWeight: y >= 1 ? 700 : 400 }}>
-                    {r.age == null ? "—" : y >= 1 ? `${y}y ${Math.floor(((r.age % 365)) / 30)}m` : `${r.age}d`}
+                  <td className="px-2 py-1 text-right tnum whitespace-nowrap" style={{ color: r.overdue > 365 ? RED : r.overdue > 90 ? "#B45309" : r.overdue > 0 ? INK : MUTED, fontWeight: r.overdue > 365 ? 700 : 400 }}>
+                    {r.overdue > 0 ? (r.overdue >= 365 ? `${Math.floor(r.overdue / 365)}y ${Math.floor((r.overdue % 365) / 30)}m` : `${r.overdue}d`) : "—"}
                   </td>
-                  <td className="px-2 py-1 text-right tnum" style={{ color: r.overdue > 0 ? RED : MUTED }}>{r.overdue > 0 ? `${r.overdue}d` : "—"}</td>
-                  <td className="px-2 py-1" style={{ color: r.fam ? INK : "#D5D2C9", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.fam || "—"}</td>
+                  <td className="px-2 py-1" style={{ color: r.fam ? INK : "#D5D2C9", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.fam || ""}>{r.fam || "—"}</td>
                   <td className="px-2 py-1" style={{ color: r.salesman ? INK : "#D5D2C9", whiteSpace: "nowrap" }}>{r.salesman || "—"}</td>
                   <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
+                  <td className="px-2 py-1 tnum whitespace-nowrap" style={{ color: r.expected_on ? (r.expected_on < data.today ? RED : "#0D7A3F") : "#D5D2C9", fontWeight: r.expected_on ? 700 : 400 }}>
+                    {r.expected_on ? fmtD(r.expected_on) : "—"}
+                  </td>
+                  <td className="px-2 py-1" style={{ color: r.remarks ? INK : "#D5D2C9", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.remarks || ""}>{r.remarks || "—"}</td>
                 </tr>
               );
             })}
@@ -2888,14 +2950,23 @@ export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" |
         </table>
       </div>
       {rows.length > 1500 && <p className="text-xs mt-1" style={{ color: "#8A6D1A" }}>Showing the first 1,500 of {rows.length} — narrow it with a filter.</p>}
-      <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "84ch", lineHeight: 1.6 }}>
-        Family and Salesman come from the Sales Register, where they have been filled in — so a four-year-old bill
-        can be handed to whoever owns it without opening a second screen. Tell me what else belongs here and it goes in.
+      <p className="text-xs mt-2" style={{ color: MUTED, maxWidth: "88ch", lineHeight: 1.6 }}>
+        <b>Overdue counts from the day it was promised</b>, not from the bill — it is the only one of the two you can put
+        to a customer. Product and Salesperson are the Sales Register&apos;s own two fields, so setting them here sets
+        them there. Expected date and the remark are Genie&apos;s alone and a Tally upload cannot touch them.
+        Calls and e-mails from this screen come next.
       </p>
     </div>
   );
 }
 
-/** whole days between two ISO dates */
-const daysSince = (a: string, b: string) =>
-  Math.max(0, Math.round((new Date(b + "T00:00:00Z").getTime() - new Date(a + "T00:00:00Z").getTime()) / 86400000));
+type SortK = "party" | "bill" | "bill_date" | "due_date" | "overdue" | "fam" | "salesman" | "amount" | "expected_on" | "remarks";
+/** one comparison for every column, so every header can be pressed */
+function cmp(a: BillRow, b: BillRow, k: SortK): number {
+  if (k === "amount") return a.amount - b.amount;
+  if (k === "overdue") return a.overdue - b.overdue;
+  /* a bill with no expected date sorts last whichever way it is read —
+     an empty cell is not "the first of January" */
+  if (k === "expected_on") return String(a.expected_on || "9999").localeCompare(String(b.expected_on || "9999"));
+  return String(a[k] ?? "").localeCompare(String(b[k] ?? ""));
+}

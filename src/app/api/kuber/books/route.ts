@@ -1776,6 +1776,27 @@ export async function GET(req: Request) {
         meta = new Map(got.map((m) => [String(m.bill), m]));
       } catch (e) { swallow("kuber/billsdue-meta", e); /* pre-0184 */ }
 
+      /**
+       * WHEN THE MONEY IS EXPECTED, AND WHAT IS IN THE WAY.
+       *
+       * Dr Raghu, 30 Sep 2026: "Then Expected Date after amount. this will be
+       * used for ticking ... Collection Remarks. Later I will make the
+       * collection Calls and also emails from here."
+       *
+       * Neither belongs in Tally and neither can be derived: they are what a
+       * person believes after speaking to the customer. They live in
+       * collection_followup (0183), keyed on the bill, so a Tally re-upload
+       * cannot wipe them.
+       */
+      let fup = new Map<string, RR>();
+      try {
+        const got = await pageAll<RR>(async (a, b) => {
+          const r = await admin.from("collection_followup").select("party, bill, expected_on, challenge").range(a, b);
+          return { data: r.data as RR[] | null, error: r.error };
+        }, "the follow-ups");
+        fup = new Map(got.map((m) => [`${String(m.party)}|${String(m.bill)}`, m]));
+      } catch (e) { swallow("kuber/billsdue-fup", e); /* pre-0183 */ }
+
       /* the credit a party holds, kept beside his bills rather than netted
          into them — one customer's advance is not another bill's payment */
       const credit = new Map<string, number>();
@@ -1793,6 +1814,8 @@ export async function GET(req: Request) {
           amount: b.amount, age, overdue: over != null && over > 0 ? over : 0,
           fam: m?.fam ?? null, salesman: m?.salesman ?? null,
           scan: m?.scan_path ? String(m.scan_name || "scan") : null,
+          expected_on: (fup.get(`${b.party}|${b.bill}`)?.expected_on as string) ?? null,
+          remarks: (fup.get(`${b.party}|${b.bill}`)?.challenge as string) ?? null,
         };
       }).sort((a, b) => (b.age ?? 0) - (a.age ?? 0));
 
@@ -2154,6 +2177,57 @@ export async function POST(req: Request) {
      * fields actually sent, so setting the salesman on two hundred invoices
      * cannot wipe the product family somebody set on one of them yesterday.
      */
+    /**
+     * TICKING OFF A COLLECTION (0183 + 0184).
+     *
+     * One press can carry three different kinds of fact to two different
+     * tables: the expected date and the collection remark are a belief about
+     * this BILL, the salesman and the product family are facts about the
+     * INVOICE. Both are written, and only the fields actually sent — so
+     * setting an expected date on forty bills cannot blank the remarks
+     * somebody wrote on one of them this morning.
+     */
+    if (String(body.action) === "collection") {
+      const list = (Array.isArray(body.bills) ? body.bills : []) as { party: string; bill: string }[];
+      const rows = list.map((x) => ({ party: String(x?.party || "").trim(), bill: String(x?.bill || "").trim() }))
+        .filter((x) => x.party && x.bill).slice(0, 2000);
+      if (!rows.length) throw new HttpError(400, "No bill named.");
+      const db = adminClient();
+      const now = new Date().toISOString();
+
+      /* the belief about the bill */
+      const fu: Record<string, unknown> = {};
+      if ("expected_on" in body) fu.expected_on = body.expected_on ? String(body.expected_on).slice(0, 10) : null;
+      if ("remarks" in body) fu.challenge = body.remarks === null || body.remarks === "" ? null : String(body.remarks).slice(0, 2000);
+      if (Object.keys(fu).length) {
+        const { error } = await db.from("collection_followup")
+          .upsert(rows.map((r) => ({ ...r, ...fu, by_email: user.email, at: now })), { onConflict: "party,bill" });
+        if (error) {
+          if (/does not exist|schema cache/i.test(error.message))
+            throw new HttpError(503, "Run migration 0183 first — the follow-ups have nowhere to live yet.");
+          throw new Error(error.message);
+        }
+      }
+
+      /* the facts about the invoice, shared with the Sales Register */
+      const meta: Record<string, unknown> = {};
+      if ("fam" in body) meta.fam = body.fam ? String(body.fam).slice(0, 200) : null;
+      if ("salesman" in body) meta.salesman = body.salesman ? String(body.salesman).slice(0, 200) : null;
+      if (Object.keys(meta).length) {
+        const { error } = await db.from("sales_invoice_meta").upsert(
+          rows.map((r) => ({ kind: "sales", bill: r.bill, party: r.party, ...meta, by_email: user.email, at: now })),
+          { onConflict: "kind,bill" },
+        );
+        if (error) {
+          if (/does not exist|schema cache/i.test(error.message))
+            throw new HttpError(503, "Run migrations 0184 and 0185 first.");
+          throw new Error(error.message);
+        }
+      }
+      if (!Object.keys(fu).length && !Object.keys(meta).length) throw new HttpError(400, "Nothing to change.");
+      return NextResponse.json({ ok: true, wrote: rows.length });
+    }
+
     if (String(body.action) === "invoice_meta") {
       const bills = (Array.isArray(body.bills) ? body.bills : [body.bill])
         .map((b) => String(b || "").trim()).filter(Boolean).slice(0, 2000);
