@@ -1313,7 +1313,9 @@ function FinSection({ s, flip, fmtMoney }: { s: FinSec; flip: boolean; fmtMoney:
 
 interface MisLine { key: string; label: string; amount: number; pct: number | null; avg: number;
   /** the same head over the same months a year back, and its own monthly average */
-  ly?: number | null; lyPct?: number | null; lyAvg?: number | null; tree?: TreeSec[] }
+  ly?: number | null; lyPct?: number | null; lyAvg?: number | null;
+  /** the whole previous financial year as a monthly run-rate, and its share of that year's sales */
+  fyAvg?: number | null; fyPct?: number | null; tree?: TreeSec[] }
 interface MisRatio { key: string; label: string; value: number | null; ly?: number | null; unit: string; formula: string; target: string }
 
 /**
@@ -1354,6 +1356,8 @@ interface MisData { empty?: boolean; from: string; to: string; months: number; s
   stock?: { from: "register" | "typed" | "none"; openingAt: string | null; closingAt: string | null; stale: boolean };
   /** the comparative period, present only when last year is in the books (0182) */
   ly?: { from: string; to: string; months: number; openingAt: string | null; closingAt: string | null; stocked: boolean } | null;
+  /** the previous financial year, whole, for the run-rate column (1 Oct 2026) */
+  pfy?: { from: string; to: string; months: number; label: string; stocked: boolean } | null;
   lines: MisLine[]; ratios: MisRatio[] }
 
 const lastMonthEndIso = () => {
@@ -1391,7 +1395,7 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
   const TINT: Record<string, string> = { throughput: "#EEF1FA", gross_profit: "#FBF3E4", ebitda: "#E7F5EC", oe: "#F3F0FA", npat: "#E7F5EC" };
 
   return (
-    <div style={{ maxWidth: 940 }}>
+    <div style={{ maxWidth: data?.pfy ? 1300 : 940 }}>
       <div className="flex items-end justify-between gap-3 mb-3 flex-wrap">
         <div>
           <div className="text-lg font-bold" style={{ color: INK }}>Statement of Profit &amp; Loss</div>
@@ -1451,10 +1455,10 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
                 finance charges"). A particulars column that stretches to fill
                 the page pushes last year's figures off the right edge, which
                 is the one place they need to be. */}
-            <table className="w-full text-xs genie-table" style={{ minWidth: data?.ly ? 940 : 700, borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
+            <table className="w-full text-xs genie-table" style={{ minWidth: 330 + 108 * (3 + (data?.ly ? 3 : 0) + (data?.pfy ? 2 : 0)), borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
               <colgroup>
                 <col style={{ width: 330 }} />
-                {(data?.ly ? [0, 1, 2, 3, 4, 5] : [0, 1, 2]).map((i) => <col key={i} style={{ width: 102 }} />)}
+                {Array.from({ length: 3 + (data?.ly ? 3 : 0) + (data?.pfy ? 2 : 0) }, (_, i) => <col key={i} style={{ width: 108 }} />)}
               </colgroup>
               <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
                 <th className="px-3 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Particulars</th>
@@ -1473,6 +1477,13 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
                   <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#3D4A5C", whiteSpace: "nowrap" }}>{periodLabel(data.ly.from, data.ly.to)}</th>
                   <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#3D4A5C", whiteSpace: "nowrap", fontStyle: "italic", fontWeight: 500 }}>% of Sales</th>
                   <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#3D4A5C", whiteSpace: "nowrap", fontStyle: "italic", fontWeight: 500 }}>Avg Monthly</th>
+                </>}
+                {/* THE WHOLE OF LAST YEAR AS A RUN-RATE (Dr Raghu, 1 Oct 2026):
+                    what a normal month looked like over all twelve, beside
+                    what this period is doing per month. */}
+                {!!data.pfy && <>
+                  <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#5B4A2E", whiteSpace: "nowrap" }}>{data.pfy.label} Avg</th>
+                  <th className="px-2 py-2 text-right" style={{ position: "sticky", top: 0, background: "#5B4A2E", whiteSpace: "nowrap", fontStyle: "italic", fontWeight: 500 }}>% of Sales</th>
                 </>}
               </tr></thead>
               <tbody>
@@ -1515,9 +1526,17 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
                             {stock || l.lyAvg == null ? "—" : bare(l.lyAvg)}
                           </td>
                         </>}
+                        {!!data.pfy && <>
+                          <td className="px-2 py-1.5 text-right tnum" style={{ fontWeight: BOLD.has(l.key) ? 800 : 500, color: l.fyAvg == null ? MUTED : "#5B4A2E", borderLeft: `1px solid ${BORDER}` }}>
+                            {stock || l.fyAvg == null ? "—" : bare(l.fyAvg)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED, fontStyle: "italic", whiteSpace: "nowrap" }}>
+                            {fmtPct(l.fyPct)}<Arrow now={l.pct} before={l.fyPct} k={l.key} />
+                          </td>
+                        </>}
                       </tr>
                       {openLines[l.key] && l.tree && (
-                        <tr><td colSpan={data.ly ? 7 : 4} style={{ background: "#FAF9F5", padding: "0 0 0 20px" }}>
+                        <tr><td colSpan={4 + (data.ly ? 3 : 0) + (data.pfy ? 2 : 0)} style={{ background: "#FAF9F5", padding: "0 0 0 20px" }}>
                           <PnlDrill secs={l.tree} cols={data.ly ? 6 : 3} bare={bare} months={data.months}
                             revenue={data.lines.find((x) => x.key === "revenue")?.amount || 0}
                             ly={data.ly ? { months: data.ly.months, revenue: data.lines.find((x) => x.key === "revenue")?.ly || 0 } : null}
@@ -1534,6 +1553,7 @@ export function PnLScreen({ go }: { go?: (k: string) => void }) {
             Computed from every voucher line by the group tree — finance charges, depreciation and tax step out of the
             indirect lump by their group names. Opening and closing stock are typed (the sheet types them too); TVC =
             purchases + opening − closing. The books are as current as the last upload.
+            {data.pfy && <> <b>{data.pfy.label} Avg</b> is the whole of that year divided by twelve — what a normal month looked like — with its share of that year&apos;s sales; the arrow beside it reads this period&apos;s share against it.{!data.pfy.stocked ? " That year carries no stock in the register, so its TVC and gross profit stand on purchases alone." : ""}</>}
             {data.ly && !data.ly.stocked && <> <b style={{ color: "#B45309" }}>Last year&apos;s column carries no stock</b> — the
             register does not reach back to {periodLabel(data.ly.from, data.ly.to)}, so its TVC is purchases alone and its
             gross profit is not comparable. Every line above gross profit is.</>}

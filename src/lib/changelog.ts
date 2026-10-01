@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.10.1",
+    date: "2026-10-01",
+    module: "Last year as a run-rate, and a stock register that reads like one",
+    items: [
+      "THE WHOLE OF LAST YEAR AS A MONTHLY RUN-RATE, ON THE P&L. Two more columns after the like-for-like block: FY 2025-26 Avg \u2014 the whole year divided by twelve, what a normal month looked like \u2014 and its share of that year's sales, with an arrow reading this period's share against it. Dr Raghu, 1 Oct 2026: \"so that I can correlate the same with respect to what I did.\" The like-for-like column answers the same months; this one answers a normal month, so a seasonal lump in either cannot flatter the comparison.",
+      "THE STOCK REGISTER IS READ-ONLY NUMBERS, WITH ONE BUTTON. Seven editable boxes in a column looked like a form waiting to be filled, and a stray keystroke in one restated the gross profit. \"+ Add closing stock\" opens a box: month, year, the closing value and how it was arrived at; a month not yet valued says so and offers the same box; a pencil corrects one. Latest month on top; the movement is still struck in date order.",
+    ],
+  },
+  {
     v: "5.9.10.0",
     date: "2026-10-01",
     module: "Freeze the columns",

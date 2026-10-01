@@ -1543,6 +1543,20 @@ export async function GET(req: Request) {
       /* last year is shown only when last year is actually in the books */
       const lyRaw = computePnl(shiftYear(from, 1), shiftYear(to, 1));
       const ly = lyRaw.touched ? lyRaw : null;
+      /**
+       * THE WHOLE OF LAST YEAR, AS A MONTHLY RUN-RATE (Dr Raghu, 1 Oct 2026:
+       * "add another column 2025-26 Avg Monthly (%) against each entry so
+       * that I can correlate the same with respect to what I did").
+       *
+       * The like-for-like column answers "the same months last year"; this
+       * one answers "what a normal month looked like over the whole of last
+       * year" — twelve months, so a seasonal lump in either period cannot
+       * flatter the comparison. It is the previous FINANCIAL year to the
+       * period's own, whatever months the period covers.
+       */
+      const pfyStart = shiftYear(fyStartM, 1), pfyEnd = addDays(fyStartM, -1);
+      const pfyRaw = computePnl(pfyStart, pfyEnd);
+      const pfy = pfyRaw.touched ? pfyRaw : null;
 
       /**
        * DEPRECIATION IS A YEAR-END JOURNAL HERE, NOT A MONTHLY CHARGE.
@@ -1767,6 +1781,8 @@ export async function GET(req: Request) {
           ly: lyAmt,
           lyPct: lyAmt != null && ly && ly.revenue ? (lyAmt / ly.revenue) * 100 : null,
           lyAvg: lyAmt == null || !ly ? null : lyAmt / ly.months,
+          fyAvg: typeof pick === "number" || !pfy ? null : K(pfy, pick) / pfy.months,
+          fyPct: typeof pick === "number" || !pfy || !pfy.revenue ? null : (K(pfy, pick) / pfy.revenue) * 100,
           tree: entsOf ? treeOfPair(entsOf(cur), ly ? entsOf(ly) : []) : undefined,
         };
       };
@@ -1776,6 +1792,7 @@ export async function GET(req: Request) {
         OE_HEADS.indexOf(a.root as typeof OE_HEADS[number]) - OE_HEADS.indexOf(b.root as typeof OE_HEADS[number]));
       return NextResponse.json({
         from, to, months, stocksTyped, depNote,
+        pfy: pfy ? { from: pfy.from, to: pfy.to, months: pfy.months, label: `FY ${pfyStart.slice(0, 4)}-${pfyEnd.slice(2, 4)}`, stocked: pfy.openingAt != null && pfy.closingAt != null } : null,
         ly: ly ? { from: ly.from, to: ly.to, months: ly.months, openingAt: ly.openingAt, closingAt: ly.closingAt,
               /* last year's stock stands on last year's own valuations — if the
                  register does not reach back that far the comparative says so

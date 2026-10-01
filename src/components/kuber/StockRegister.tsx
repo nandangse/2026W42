@@ -36,10 +36,15 @@ const monthName = (s: string) =>
 export default function StockRegister() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [installed, setInstalled] = useState(true);
-  const [draft, setDraft] = useState<Record<string, string>>({});
-  const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  /* READ-ONLY NUMBERS, ONE BUTTON TO ADD (Dr Raghu, 1 Oct 2026: "make this
+     read only numbers. Have a button — Add closing stock — in that put month
+     and year and closing stock"). Seven editable boxes in a column looked
+     like a form waiting to be filled, and a stray keystroke in one of them
+     restated the gross profit. The register now reads like a register; the
+     entry is a deliberate act in a box of its own. */
+  const [adding, setAdding] = useState<null | { y: number; m: number; amount: string; note: string }>(null);
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +74,14 @@ export default function StockRegister() {
   };
 
   if (!rows) return <div className="text-sm" style={{ color: MUTED }}>Reading the register…</div>;
+  const today = new Date();
+  const openAdd = (as_on?: string) => {
+    const d = as_on ? new Date(`${as_on}T00:00:00`) : new Date(today.getFullYear(), today.getMonth(), 0);
+    const have = as_on ? rows.find((r) => r.as_on === as_on) : undefined;
+    setAdding({ y: d.getFullYear(), m: d.getMonth() + 1, amount: have?.amount != null ? String(have.amount) : "", note: have?.note ?? "" });
+  };
+  const monthEndOf = (y: number, m: number) => `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+  const inr = (n: number) => n.toLocaleString("en-IN");
 
   const filled = rows.filter((r) => r.amount != null);
   const latest = filled[filled.length - 1];
@@ -96,6 +109,12 @@ export default function StockRegister() {
         </div>
       )}
 
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <button onClick={() => openAdd()} className="rounded px-3 py-2 text-sm font-bold text-white" style={{ background: "var(--accent)" }}>
+          + Add closing stock
+        </button>
+        <span className="text-xs" style={{ color: MUTED }}>month, year and the closing value — the rest of the register is read from the books</span>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
         <Card label="MONTHS VALUED" value={`${filled.length} of ${rows.length}`} sub="31 March, then each month end" />
         <Card label="LATEST VALUATION" value={latest?.amount != null ? `₹${(latest.amount / CR).toFixed(2)} Cr` : "—"}
@@ -118,8 +137,10 @@ export default function StockRegister() {
             <th className="px-3 py-2 text-left">How it was arrived at</th>
           </tr></thead>
           <tbody>
-            {rows.map((r, i) => {
-              const m = move(i);
+            {/* NEWEST ON TOP (Dr Raghu, 1 Oct 2026: "show this reverse, latest on
+                top"). The movement is struck in date order — each month against
+                the one before it — and only the reading is turned round. */}
+            {rows.map((r, i) => ({ r, m: move(i) })).reverse().map(({ r, m }) => {
               const key = r.as_on;
               return (
                 <tr key={key} className="border-t" style={{ borderColor: "var(--line-soft)", background: r.opening ? "#F7F5EF" : "#fff" }}>
@@ -132,20 +153,10 @@ export default function StockRegister() {
                       {r.opening ? " \u00b7 opens the year" : ` \u00b7 ${monthName(r.as_on)}`}
                     </span>
                   </td>
-                  <td className="px-2 py-1.5 text-right">
-                    <input
-                      inputMode="numeric"
-                      value={draft[key] ?? (r.amount == null ? "" : String(r.amount))}
-                      placeholder="not valued"
-                      disabled={busy === key}
-                      onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value.replace(/[^0-9.]/g, "") }))}
-                      onBlur={(e) => {
-                        const now = e.target.value.replace(/[, ]/g, "");
-                        const was = r.amount == null ? "" : String(r.amount);
-                        if (now !== was) void save(key, now, noteDraft[key] ?? r.note ?? "");
-                      }}
-                      className="border rounded px-2 py-1 text-right tnum w-full"
-                      style={{ borderColor: r.amount == null ? "var(--accent)" : BORDER }} />
+                  <td className="px-2 py-1.5 text-right tnum" style={{ fontWeight: 700, color: r.amount == null ? MUTED : INK }}>
+                    {r.amount == null
+                      ? <button onClick={() => openAdd(key)} className="text-xs font-bold" style={{ color: "var(--accent)" }}>not valued — add</button>
+                      : <span title="Change it through + Add closing stock">{inr(r.amount)}</span>}
                   </td>
                   <td className="px-2 py-1.5 text-right tnum" style={{ color: MUTED }}>
                     {r.amount == null ? "—" : (r.amount / CR).toFixed(2)}
@@ -167,14 +178,13 @@ export default function StockRegister() {
                     title="Opening stock + purchases − closing stock">
                     {r.cogs == null ? "—" : (r.cogs / CR).toFixed(2)}
                   </td>
-                  <td className="px-3 py-1.5">
-                    <input
-                      value={noteDraft[key] ?? r.note ?? ""}
-                      placeholder={r.amount == null ? "" : "physical count · valuation basis · who"}
-                      disabled={busy === key || r.amount == null}
-                      onChange={(e) => setNoteDraft((d) => ({ ...d, [key]: e.target.value }))}
-                      onBlur={(e) => { if (r.amount != null && e.target.value !== (r.note ?? "")) void save(key, String(r.amount), e.target.value); }}
-                      className="border rounded px-2 py-1 text-xs w-full" style={{ borderColor: BORDER }} />
+                  <td className="px-3 py-1.5 text-xs" style={{ color: r.note ? "var(--dim)" : MUTED }}>
+                    {r.note || (r.amount == null ? "" : "—")}
+                    {r.amount != null && (
+                      <button onClick={() => openAdd(key)} title="Correct this month" className="ml-2 rounded"
+                        style={{ border: `1px solid ${BORDER}`, background: "#fff", color: INK, padding: "0 5px", fontSize: 11 }}>&#9998;</button>
+                    )}
+                    {r.by && <div style={{ color: MUTED, fontSize: 10 }}>{String(r.by).split("@")[0]}{r.at ? ` · ${dmy(String(r.at).slice(0, 10))}` : ""}</div>}
                   </td>
                 </tr>
               );
@@ -194,8 +204,47 @@ export default function StockRegister() {
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6, maxWidth: 760 }}>
         A month left blank falls back to the last month that has a figure, and the P&amp;L says which date it used —
         a gross profit struck against a stock value four months stale is a fiction nobody can see unless the statement
-        admits it. Clear a value by emptying the box.
+        admits it. To clear a month, open it with the pencil and save it empty.
       </div>
+
+      {adding && (
+        <div onClick={() => setAdding(null)} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)", zIndex: 70 }}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg" style={{ width: "min(440px,100%)" }}>
+            <div className="px-4 py-3 flex items-center" style={{ background: "var(--navy)", borderRadius: "8px 8px 0 0" }}>
+              <b className="text-white" style={{ fontSize: 14 }}>Add closing stock</b>
+              <div className="flex-1" />
+              <button onClick={() => setAdding(null)} className="font-bold" style={{ color: "#8FA1B3" }}>✕</button>
+            </div>
+            <div className="p-4">
+              <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>MONTH · YEAR</div>
+              <div className="flex gap-2 mb-3">
+                <select value={adding.m} onChange={(e) => setAdding({ ...adding, m: Number(e.target.value) })} className="border rounded px-2 py-1.5 text-sm" style={{ borderColor: BORDER }}>
+                  {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((n, i) => <option key={n} value={i + 1}>{n}</option>)}
+                </select>
+                <select value={adding.y} onChange={(e) => setAdding({ ...adding, y: Number(e.target.value) })} className="border rounded px-2 py-1.5 text-sm" style={{ borderColor: BORDER }}>
+                  {Array.from({ length: 6 }, (_, i) => today.getFullYear() + 1 - i).map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <span className="text-xs self-center" style={{ color: MUTED }}>closes on {dmy(monthEndOf(adding.y, adding.m))}</span>
+              </div>
+              <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>CLOSING STOCK ₹</div>
+              <input inputMode="numeric" autoFocus value={adding.amount ? inr(Number(adding.amount)) : ""}
+                onChange={(e) => setAdding({ ...adding, amount: e.target.value.replace(/[^0-9]/g, "") })}
+                placeholder="as valued, in rupees" className="border rounded px-2 py-1.5 text-sm text-right tnum w-full mb-1" style={{ borderColor: BORDER }} />
+              <div className="text-xs mb-3" style={{ color: MUTED }}>{adding.amount ? `₹${(Number(adding.amount) / CR).toFixed(2)} Cr` : "\u00a0"}</div>
+              <div className="text-xs font-bold mb-1" style={{ color: MUTED }}>HOW IT WAS ARRIVED AT</div>
+              <input value={adding.note} onChange={(e) => setAdding({ ...adding, note: e.target.value })} placeholder="physical count · valuation basis · who"
+                className="border rounded px-2 py-1.5 text-sm w-full mb-3" style={{ borderColor: BORDER }} />
+              <div className="flex gap-2">
+                <button onClick={() => { const k = monthEndOf(adding.y, adding.m); void save(k, adding.amount, adding.note).then(() => setAdding(null)); }}
+                  disabled={!!busy} className="rounded px-4 py-2 text-sm font-bold text-white" style={{ background: "var(--green)" }}>
+                  {busy ? "Saving…" : adding.amount ? "Save" : "Save empty (clears the month)"}
+                </button>
+                <button onClick={() => setAdding(null)} className="rounded px-3 py-2 text-sm" style={{ color: MUTED }}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
