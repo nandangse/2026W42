@@ -11,7 +11,7 @@ import { api, Avatar, btn, Card, dmy, input, K, label, monthYear, pill, serif, t
  */
 interface Checkin { id: string; member_id: string; period: string; meeting_id: string | null; submitted_at: string; prof_rating: number | null; pers_rating: number | null; prof_notes: string | null; pers_notes: string | null; learning: string | null; challenge: string | null; sounding: string | null; one_to_one: string | null; update_note: string | null; suggestions: string | null; new_goals: string | null; source: string }
 interface Update { id: string; goal_id: string; checkin_id: string | null; member_id: string; period: string; note: string | null; status: string | null; progress: number | null }
-interface Goal { id: string; set_id: string; member_id: string; kind: string; seq: number; title: string; status: string; progress: number }
+interface Goal { id: string; set_id: string; member_id: string; kind: string; seq: number; title: string; measure?: string | null; actions?: string[]; status: string; progress: number }
 interface GoalSet { id: string; member_id: string; year_label: string; created_at: string }
 interface Data { checkins: Checkin[]; updates: Update[]; goals: Goal[]; sets: GoalSet[] }
 
@@ -74,7 +74,7 @@ function CheckinCard({ c, data, boot, big = false }: { c: Checkin; data: Data; b
           <div style={{ display: "grid", gap: 6, marginTop: 4 }}>
             {ups.sort((a, b) => { const ga = goalOf(a.goal_id), gb = goalOf(b.goal_id); return (ga?.kind === "personal" ? 1 : 0) - (gb?.kind === "personal" ? 1 : 0) || (ga?.seq || 0) - (gb?.seq || 0); }).map((u) => { const g = goalOf(u.goal_id); return (
               <div key={u.id} style={{ background: K.soft, borderRadius: 8, padding: "6px 10px", fontSize: fs - 1 }}>
-                <div style={{ color: K.dim, fontSize: 11 }}>{g ? `${g.kind === "personal" ? "Personal" : "Professional"} ${g.seq}: ${g.title}` : "Goal"}</div>
+                <div style={{ color: K.dim, fontSize: 11 }}>{g ? `${g.kind === "personal" ? "Personal" : "Professional"} ${g.seq}: ${g.title}` : "Goal"}{g?.measure ? <span style={{ marginLeft: 6, color: K.emberDark, fontWeight: 700 }}>· {g.measure}</span> : ""}</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}><span style={{ flex: 1, whiteSpace: "pre-wrap" }}>{u.note}</span>{u.status && <span style={pill(STATUS[u.status]?.[1] || K.muted)}>{STATUS[u.status]?.[0] || u.status}</span>}</div>
               </div>); })}
           </div>
@@ -252,7 +252,8 @@ function MyForm({ boot, data, period, onSaved }: { boot: Boot; data: Data; perio
           <div style={{ display: "grid", gap: 10 }}>
             {myGoals.map((x) => (
               <div key={x.id} style={{ background: K.soft, borderRadius: 10, padding: 10 }}>
-                <div style={{ fontSize: 12, color: K.dim, marginBottom: 4 }}><b>{x.kind === "personal" ? "Personal" : "Professional"} {x.seq}</b> · {x.title}</div>
+                <div style={{ fontSize: 12, color: K.dim, marginBottom: 4, display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}><span><b>{x.kind === "personal" ? "Personal" : "Professional"} {x.seq}</b> · {x.title}</span>{x.measure && <span style={{ ...serif, fontSize: 16, color: K.emberDark }}>{x.measure}</span>}</div>
+                {(x.actions || []).length > 0 && <div style={{ fontSize: 11, color: K.muted, marginBottom: 4 }}>{(x.actions || []).map((a, i) => `${i + 1}. ${a}`).join("  ·  ")}</div>}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 8 }}>
                   <textarea style={{ ...input, minHeight: 48 }} value={g[x.id]?.note || ""} onChange={(e) => setG({ ...g, [x.id]: { ...g[x.id], note: e.target.value } })} placeholder="This month…" />
                   <select style={input} value={g[x.id]?.status || "on_track"} onChange={(e) => setG({ ...g, [x.id]: { ...g[x.id], status: e.target.value } })}>{Object.entries(STATUS).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}</select>

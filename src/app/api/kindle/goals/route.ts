@@ -28,9 +28,11 @@ export async function POST(req: Request) {
       const member_id = b.member_id && isKindleAdmin(k) ? String(b.member_id) : k.id;
       const year_label = String(b.year_label || "").trim();
       if (!/^\d{4}-\d{2}$/.test(year_label)) throw new HttpError(400, "A year like 2026-27.");
-      const prof = (Array.isArray(b.professional) ? b.professional : []).map((x) => String(x || "").trim());
-      const pers = (Array.isArray(b.personal) ? b.personal : []).map((x) => String(x || "").trim());
-      if (!prof.some(Boolean) && !pers.some(Boolean)) throw new HttpError(400, "At least one goal.");
+      type GIn = { title: string; measure: string | null; actions: string[] };
+      const shape = (x: unknown): GIn => typeof x === "string" ? { title: x.trim(), measure: null, actions: [] } : (() => { const o = (x || {}) as Record<string, unknown>; return { title: String(o.title || "").trim(), measure: String(o.measure || "").trim() || null, actions: (Array.isArray(o.actions) ? o.actions : []).map((a) => String(a || "").trim()).filter(Boolean).slice(0, 3) }; })();
+      const prof = (Array.isArray(b.professional) ? b.professional : []).map(shape);
+      const pers = (Array.isArray(b.personal) ? b.personal : []).map(shape);
+      if (!prof.some((g) => g.title) && !pers.some((g) => g.title)) throw new HttpError(400, "At least one goal.");
       const r = (b.reflections || {}) as Record<string, unknown>;
       const txt = (key: string) => { const s = String(r[key] ?? "").trim(); return s || null; };
       const { data: set, error } = await admin.from("kindle_goal_set").upsert({ member_id, year_label, failed_last: txt("failed_last"), start_doing: txt("start_doing"), stop_doing: txt("stop_doing"), one_thing: txt("one_thing"), accountable_to: txt("accountable_to"), support_needed: txt("support_needed"), notes: txt("notes"), updated_at: new Date().toISOString() }, { onConflict: "member_id,year_label" }).select("id").single();
@@ -38,11 +40,11 @@ export async function POST(req: Request) {
       const { data: existing } = await admin.from("kindle_goal").select("id,kind,seq").eq("set_id", set.id);
       for (const [kind, list] of [["professional", prof], ["personal", pers]] as const) {
         for (let i = 0; i < Math.max(3, list.length); i++) {
-          const title = list[i] || "";
-          const have = (existing || []).find((g) => g.kind === kind && g.seq === i + 1);
-          if (have && title) await admin.from("kindle_goal").update({ title, updated_at: new Date().toISOString() }).eq("id", have.id);
-          else if (have && !title) { const { count } = await admin.from("kindle_goal_update").select("id", { count: "exact", head: true }).eq("goal_id", have.id); if (!count) await admin.from("kindle_goal").delete().eq("id", have.id); else await admin.from("kindle_goal").update({ status: "dropped" }).eq("id", have.id); }
-          else if (!have && title) await admin.from("kindle_goal").insert({ set_id: set.id, member_id, kind, seq: i + 1, title });
+          const g = list[i] || { title: "", measure: null, actions: [] };
+          const have = (existing || []).find((x) => x.kind === kind && x.seq === i + 1);
+          if (have && g.title) await admin.from("kindle_goal").update({ title: g.title, measure: g.measure, actions: g.actions, updated_at: new Date().toISOString() }).eq("id", have.id);
+          else if (have && !g.title) { const { count } = await admin.from("kindle_goal_update").select("id", { count: "exact", head: true }).eq("goal_id", have.id); if (!count) await admin.from("kindle_goal").delete().eq("id", have.id); else await admin.from("kindle_goal").update({ status: "dropped" }).eq("id", have.id); }
+          else if (!have && g.title) await admin.from("kindle_goal").insert({ set_id: set.id, member_id, kind, seq: i + 1, title: g.title, measure: g.measure, actions: g.actions });
         }
       }
       await kindleAudit(k, "goals_saved", { member_id, year_label });

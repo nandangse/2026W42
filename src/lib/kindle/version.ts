@@ -9,6 +9,12 @@
  */
 export const KINDLE_UPDATES: { v: string; date: string; items: string[] }[] = [
   {
+    v: "1.3.1", date: "2026-10-01",
+    items: [
+      "Every goal carries its Number — the measure it is judged by — beside the title, and three action points under it; both on the Goals page and on the check-in form (migration 0191).",
+    ],
+  },
+  {
     v: "1.3.0", date: "2026-10-01",
     items: [
       "Genie summarises a member's goals: the set, every month's word on each goal, and a short reading of where he stands — on request, kept with the set (migration 0190).",
