@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, Avatar, btn, Card, dmy, input, K, label, monthYear, pill, serif, type Boot } from "./shared";
 
 interface Goal { id: string; set_id: string; member_id: string; kind: string; seq: number; title: string; status: string; progress: number }
-interface GoalSet { id: string; member_id: string; year_label: string; created_at: string; failed_last?: string | null; start_doing?: string | null; stop_doing?: string | null; one_thing?: string | null; accountable_to?: string | null; support_needed?: string | null }
+interface GoalSet { id: string; member_id: string; year_label: string; created_at: string; failed_last?: string | null; start_doing?: string | null; stop_doing?: string | null; one_thing?: string | null; accountable_to?: string | null; support_needed?: string | null; ai_summary?: string | null; ai_summary_at?: string | null }
 interface Update { id: string; goal_id: string; checkin_id: string | null; member_id: string; period: string; note: string | null; status: string | null }
 interface Data { goals: Goal[]; sets: GoalSet[]; updates: Update[] }
 const STATUS: Record<string, [string, string]> = { on_track: ["On track", K.green], behind: ["Behind", K.ember], done: ["Done", K.blue], dropped: ["Dropped", K.muted] };
@@ -15,6 +15,8 @@ export default function Goals({ boot, arg, go }: { boot: Boot; arg: string | nul
   const [who, setWho] = useState(arg || boot.me.id);
   const [year, setYear] = useState(thisYear());
   const [editing, setEditing] = useState(false);
+  const [summarising, setSummarising] = useState(false);
+  const summarise = async (set_id: string) => { setSummarising(true); try { await api("/api/kindle/goals", { action: "summarise", set_id }); await load(); } catch (e) { alert(String((e as Error).message || e)); } setSummarising(false); };
   const load = () => api<{ goals: Goal[]; sets: (GoalSet & Record<string, unknown>)[]; updates: Update[] }>("/api/kindle/checkins").then((r) => setD({ goals: r.goals, sets: r.sets as GoalSet[], updates: r.updates })).catch(() => setD({ goals: [], sets: [], updates: [] }));
   useEffect(() => { load(); }, []);
   const years = useMemo(() => { const s = new Set<string>((d?.sets || []).map((x) => x.year_label)); s.add(thisYear()); return [...s].sort().reverse(); }, [d]);
@@ -39,6 +41,10 @@ export default function Goals({ boot, arg, go }: { boot: Boot; arg: string | nul
           {!set && <Card><span style={{ color: K.muted }}>{m?.short_name || "—"} has no goals on record for {year}.{mayEdit ? " Set them above; they then appear in every check-in." : ""}</span></Card>}
           {set && (
             <div style={{ display: "grid", gap: 12 }}>
+              <Card title="Genie's reading" right={set.ai_summary_at ? `as of ${dmy(set.ai_summary_at)}` : "from the goals and every month's check-in"} style={{ background: "#fff8ee", borderColor: "#f5d9b8" }}>
+                {set.ai_summary ? <p style={{ margin: 0, lineHeight: 1.6, fontSize: 15, ...serif }}>{set.ai_summary}</p> : <span style={{ color: K.muted, fontSize: 13 }}>Not written yet.</span>}
+                <div style={{ marginTop: 10 }}><button onClick={() => summarise(set.id)} disabled={summarising} style={btn(set.ai_summary ? "ghost" : "primary")}>{summarising ? "Genie is reading…" : set.ai_summary ? "Read again" : "Ask Genie to summarise"}</button></div>
+              </Card>
               {(["professional", "personal"] as const).map((kind) => (
                 <Card key={kind} title={kind === "professional" ? "Professional" : "Personal"}>
                   <div style={{ display: "grid", gap: 10 }}>

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { errJson, HttpError } from "@/lib/auth";
 import { isKindleAdmin, kindleAudit, requireKindler } from "@/lib/kindle/auth";
+import { AI, anthropicClient } from "@/lib/ai";
+import { assertAiOn } from "@/lib/ai-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,9 @@ export const dynamic = "force-dynamic";
  * check-in form carries the current set's goals as its sections.
  * POST save_set { year_label, professional[3], personal[3], reflections{} } — mine (or the facilitator's, with member_id)
  *      status   { goal_id, status, progress }                                — mine
+ *      summarise { set_id }  — Genie reads the set and every month's word on each goal and writes a short
+ *                              reading of where the member stands (Dr Raghu, 1 Oct 2026: "the Genie can be
+ *                              built in to summarise it"); kept on the set; obeys the AI master switch.
  */
 export async function POST(req: Request) {
   try {
@@ -52,6 +57,32 @@ export async function POST(req: Request) {
       if (Number.isFinite(Number(b.progress))) patch.progress = Math.max(0, Math.min(100, Number(b.progress)));
       await admin.from("kindle_goal").update(patch).eq("id", goal_id);
       return NextResponse.json({ ok: true });
+    }
+    if (action === "summarise") {
+      await assertAiOn();
+      const set_id = String(b.set_id || "");
+      const { data: set } = await admin.from("kindle_goal_set").select("id,member_id,year_label,failed_last,start_doing,stop_doing,one_thing,accountable_to,support_needed").eq("id", set_id).maybeSingle();
+      if (!set) throw new HttpError(404, "No such goal set.");
+      const [{ data: member }, { data: goals }, { data: ups }] = await Promise.all([
+        admin.from("kindle_member").select("name,short_name").eq("id", set.member_id).maybeSingle(),
+        admin.from("kindle_goal").select("id,kind,seq,title,status").eq("set_id", set_id).order("kind").order("seq"),
+        admin.from("kindle_goal_update").select("goal_id,period,note,status").eq("member_id", set.member_id).order("period"),
+      ]);
+      const lines: string[] = [];
+      for (const g of goals || []) {
+        lines.push(`\n${g.kind === "personal" ? "PERSONAL" : "PROFESSIONAL"} GOAL ${g.seq}: ${g.title} (status now: ${g.status})`);
+        for (const u of (ups || []).filter((u) => u.goal_id === g.id)) lines.push(`  ${String(u.period).slice(0, 7)}: ${u.note || ""}${u.status ? ` [${u.status}]` : ""}`);
+      }
+      const refl = [["Failed last year", set.failed_last], ["Start doing", set.start_doing], ["Stop doing", set.stop_doing], ["The one thing", set.one_thing], ["Accountable to", set.accountable_to], ["Support needed", set.support_needed]].filter(([, v]) => v).map(([k2, v]) => `${k2}: ${v}`).join("\n");
+      const who = member?.short_name || member?.name || "the member";
+      const prompt = `You are Genie, the quiet secretary of Kindle, a trust group of ten entrepreneurs in Mumbai. Below are ${who}'s goals for ${set.year_label} and the word he gave on each at every monthly check-in.\n\nWrite a short reading for the group, in plain English, 120 to 180 words, no headings, no bullet points, no flattery: where each goal stands and the direction of travel; which one has gone quiet; what he keeps saying he will do; the one question the room should ask him. Refer to him by first name. If the record is thin, say so in a sentence rather than inventing.\n\nREFLECTION\n${refl || "(none)"}\n\nGOALS AND MONTHLY UPDATES${lines.join("\n") || "\n(no updates yet)"}`;
+      const ai = anthropicClient();
+      const msg = await ai.messages.create({ model: AI.FRONT, max_tokens: 500, messages: [{ role: "user", content: prompt }] });
+      const text = msg.content.map((c) => ("text" in c ? c.text : "")).join("").trim();
+      if (!text) throw new HttpError(502, "Genie had nothing to say.");
+      await admin.from("kindle_goal_set").update({ ai_summary: text, ai_summary_at: new Date().toISOString() }).eq("id", set_id);
+      await kindleAudit(k, "goals_summarised", { set_id });
+      return NextResponse.json({ ok: true, summary: text });
     }
     throw new HttpError(400, "Unknown action.");
   } catch (e) { return errJson(e); }

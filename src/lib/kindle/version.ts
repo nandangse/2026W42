@@ -9,6 +9,16 @@
  */
 export const KINDLE_UPDATES: { v: string; date: string; items: string[] }[] = [
   {
+    v: "1.3.0", date: "2026-10-01",
+    items: [
+      "Genie summarises a member's goals: the set, every month's word on each goal, and a short reading of where he stands — on request, kept with the set (migration 0190).",
+      "Finances: the ledger month by month, fines due and paid (the treasurer marks paid and the collection books itself), waivers, the year's budget by head against spend. Placeholders until Niraj enters the opening balance.",
+      "Exercises: a member writes the questions, the others answer in writing; answers per person, private if wanted; the author and facilitator read all.",
+      "The daily job at 7 am IST: birthday mails for members and their legal spouses and children, check-in reminders four and three days before the meeting, 1-2-1 reminders on the 10th and 25th. Each send goes once.",
+      "Every section of the action plan is now open; nothing says \"soon\" any more.",
+    ],
+  },
+  {
     v: "1.2.0", date: "2026-10-01",
     items: [
       "Goals: each member's three professional and three personal goals for the year with the reflection answers, the status on each, and every month's word from the check-ins under it; set or edit your own.",

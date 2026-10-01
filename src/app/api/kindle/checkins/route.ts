@@ -22,7 +22,7 @@ export async function GET() {
       admin.from("kindle_checkin").select(COLS).order("period", { ascending: false }).order("submitted_at", { ascending: false }).limit(2000),
       admin.from("kindle_goal_update").select("id,goal_id,checkin_id,member_id,period,note,status,progress").limit(5000),
       admin.from("kindle_goal").select("id,set_id,member_id,kind,seq,title,status,progress"),
-      admin.from("kindle_goal_set").select("id,member_id,year_label,created_at"),
+      admin.from("kindle_goal_set").select("id,member_id,year_label,created_at,failed_last,start_doing,stop_doing,one_thing,accountable_to,support_needed,ai_summary,ai_summary_at"),
     ]);
     const err = [ck, gu, g, gs].find((r) => r.error)?.error; if (err) throw err;
     return NextResponse.json({ checkins: ck.data || [], updates: gu.data || [], goals: g.data || [], sets: gs.data || [] });
