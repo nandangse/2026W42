@@ -12,6 +12,13 @@ const Meetings = dynamic(() => import("./Meetings"));
 const Profile = dynamic(() => import("./Profile"));
 const Settings = dynamic(() => import("./Settings"));
 const Soon = dynamic(() => import("./Soon"));
+const Polls = dynamic(() => import("./Polls"));
+const Checkins = dynamic(() => import("./Checkins"));
+const Issues = dynamic(() => import("./Issues"));
+const Board = dynamic(() => import("./Board"));
+const Gallery = dynamic(() => import("./Gallery"));
+const Goals = dynamic(() => import("./Goals"));
+const One21 = dynamic(() => import("./One21"));
 
 /**
  * THE KINDLE SHELL. Left navigation of thirteen sections, the flame on top,
@@ -23,16 +30,16 @@ export const SECTIONS: { key: string; label: string; icon: string; phase: number
   { key: "home", label: "Home", icon: "🔥", phase: 1 },
   { key: "constitution", label: "Constitution", icon: "📜", phase: 1 },
   { key: "directory", label: "Directory", icon: "👥", phase: 1 },
-  { key: "checkins", label: "Check-ins", icon: "✅", phase: 2 },
-  { key: "goals", label: "Goals", icon: "🎯", phase: 2 },
-  { key: "meetings", label: "Meetings", icon: "📅", phase: 1 },
-  { key: "one21", label: "1-2-1s", icon: "🤝", phase: 3 },
-  { key: "issues", label: "Burning issues", icon: "🧯", phase: 3 },
-  { key: "polls", label: "Polls", icon: "🗳", phase: 4 },
-  { key: "board", label: "Message board", icon: "💬", phase: 4 },
+  { key: "checkins", label: "Check-ins", icon: "✅", phase: 1 },
+  { key: "goals", label: "Goals", icon: "🎯", phase: 1 },
+  { key: "meetings", label: "TG Meetings", icon: "📅", phase: 1 },
+  { key: "one21", label: "1-2-1s", icon: "🤝", phase: 1 },
+  { key: "issues", label: "Burning issues", icon: "🧯", phase: 1 },
+  { key: "polls", label: "Polls", icon: "🗳", phase: 1 },
+  { key: "board", label: "Message board", icon: "💬", phase: 1 },
   { key: "finances", label: "Finances", icon: "💰", phase: 4 },
   { key: "exercises", label: "Exercises", icon: "🧭", phase: 4 },
-  { key: "gallery", label: "Gallery", icon: "📷", phase: 4 },
+  { key: "gallery", label: "Gallery", icon: "📷", phase: 1 },
 ];
 
 export default function KindleApp({ initialSection, initialArg }: { initialSection: string; initialArg: string | null }) {
@@ -78,8 +85,15 @@ export default function KindleApp({ initialSection, initialArg }: { initialSecti
     switch (section) {
       case "home": return <Home boot={boot} go={go} />;
       case "constitution": return <Constitution boot={boot} reload={reload} />;
-      case "directory": return <Directory boot={boot} arg={arg} go={go} />;
+      case "directory": return <Directory boot={boot} arg={arg} go={go} reload={reload} />;
       case "meetings": return <Meetings boot={boot} arg={arg} go={go} reload={reload} />;
+      case "polls": return <Polls boot={boot} />;
+      case "checkins": return <Checkins boot={boot} arg={arg} go={go} />;
+      case "issues": return <Issues boot={boot} />;
+      case "goals": return <Goals boot={boot} arg={arg} go={go} />;
+      case "one21": return <One21 boot={boot} />;
+      case "board": return <Board boot={boot} arg={arg} go={go} />;
+      case "gallery": return <Gallery boot={boot} arg={arg} go={go} />;
       case "profile": return <Profile boot={boot} reload={reload} />;
       case "settings": return me.admin ? <Settings boot={boot} reload={reload} /> : <Soon section="settings" />;
       default: return <Soon section={section} />;

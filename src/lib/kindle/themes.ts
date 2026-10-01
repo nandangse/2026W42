@@ -1,0 +1,2 @@
+/** The nine themes of the June 2026 reading of 114 sounding-board statements — the facilitator files each burning issue under one. */
+export const THEMES = ["Alignment at the top", "Family business, property & accounting", "Talent, hiring & retention", "Letting go — delegation & founder's grip", "Growth, sales & new customers", "Brand & differentiation", "New factory & expansion", "AI, IT tools & data", "Focus, health & self-discipline"];

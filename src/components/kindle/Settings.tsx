@@ -14,6 +14,15 @@ export default function Settings({ boot, reload }: { boot: Boot; reload: () => v
   const [msg, setMsg] = useState<string | null>(null);
   const [adding, setAdding] = useState(false); const [nm, setNm] = useState(""); const [em, setEm] = useState("");
   const saveSettings = async () => { try { await api("/api/kindle/settings", { values: vals }); setMsg("Settings saved."); reload(); } catch (e) { setMsg(String((e as Error).message || e)); } };
+  const [mailing, setMailing] = useState(false); const [mailResult, setMailResult] = useState<{ name: string; email: string; result: string }[] | null>(null);
+  const mailAll = async (ids?: string[]) => {
+    const who = ids ? boot.members.filter((m) => ids.includes(m.id)).map((m) => m.short_name || m.name).join(", ") : "everyone who has not signed in yet";
+    if (!confirm(`Send the welcome mail from raghu@nandan.co.in to ${who}? Each gets a fresh 72-hour link.`)) return;
+    setMailing(true); setMailResult(null);
+    try { const r = await api<{ results: { name: string; email: string; result: string }[] }>("/api/kindle/mail", { action: "welcome", ids }); setMailResult(r.results); reload(); }
+    catch (e) { setMsg(String((e as Error).message || e)); }
+    setMailing(false);
+  };
   const add = async () => { try { await api("/api/kindle/members", { action: "add", name: nm, email: em }); setAdding(false); setNm(""); setEm(""); reload(); } catch (e) { setMsg(String((e as Error).message || e)); } };
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -27,9 +36,14 @@ export default function Settings({ boot, reload }: { boot: Boot; reload: () => v
           </div>
         )}
         <div style={{ display: "grid", gap: 8 }}>
-          {boot.members.map((m) => <MemberRow key={m.id} m={m} boot={boot} reload={reload} setMsg={setMsg} />)}
+          {boot.members.map((m) => <MemberRow key={m.id} m={m} boot={boot} reload={reload} setMsg={setMsg} mailOne={mailAll} />)}
         </div>
-        <div style={{ fontSize: 12, color: K.muted, marginTop: 10 }}>An invite link opens the site once, within 72 hours, and then insists on a password. Until the welcome mails are switched on (phase 5), copy the link and send it yourself.</div>
+        <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={() => mailAll()} disabled={mailing} style={btn("primary")}>{mailing ? "Sending…" : "Send welcome mails"}</button>
+          <span style={{ fontSize: 12, color: K.muted }}>From raghu@nandan.co.in, to every active member who has never signed in; a fresh 72-hour link each. Nothing goes out until this is pressed.</span>
+        </div>
+        {mailResult && <div style={{ marginTop: 8, fontSize: 12, display: "grid", gap: 2 }}>{mailResult.map((r) => <div key={r.email}><b>{r.name}</b> · {r.email} · <span style={{ color: r.result === "sent" ? K.green : r.result.startsWith("skipped") || r.result === "already" ? K.muted : K.red }}>{r.result}</span></div>)}</div>}
+        <div style={{ fontSize: 12, color: K.muted, marginTop: 10 }}>An invite link opens the site once, within 72 hours, and then insists on a password. "Invite link" makes one to copy; "Mail invite" sends it from your Gmail.</div>
       </Card>
       <Card title="The group's settings">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10 }}>
@@ -48,7 +62,7 @@ export default function Settings({ boot, reload }: { boot: Boot; reload: () => v
   );
 }
 
-function MemberRow({ m, boot, reload, setMsg }: { m: Member; boot: Boot; reload: () => void; setMsg: (s: string) => void }) {
+function MemberRow({ m, boot, reload, setMsg, mailOne }: { m: Member; boot: Boot; reload: () => void; setMsg: (s: string) => void; mailOne: (ids: string[]) => void }) {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ name: m.name, email: m.email, short_name: m.short_name || "", company: m.company || "", phone: m.phone || "", joined_on: m.joined_on || "", sort_order: String(m.sort_order) });
   const [roles, setRoles] = useState<string[]>(m.roles);
@@ -67,6 +81,7 @@ function MemberRow({ m, boot, reload, setMsg }: { m: Member; boot: Boot; reload:
         </div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{m.roles.map((r) => <span key={r} style={pill(K.amber, K.ink)}>{ROLE_LABEL[r]}</span>)}{m.is_admin && <span style={pill(K.charcoal, K.amber)}>Admin</span>}</div>
         <button onClick={invite} style={{ ...btn("ghost", { padding: "5px 10px", fontSize: 12 }) }}>Invite link</button>
+        <button onClick={() => mailOne([m.id])} style={{ ...btn("ghost", { padding: "5px 10px", fontSize: 12 }) }}>Mail invite</button>
         <button onClick={() => setOpen(!open)} style={{ ...btn("ghost", { padding: "5px 10px", fontSize: 12 }) }}>{open ? "Close" : "Edit"}</button>
       </div>
       {link && <div style={{ marginTop: 8, fontSize: 12, background: K.soft, borderRadius: 8, padding: 8, wordBreak: "break-all" }}>Send to {m.name}: <a href={link} style={{ color: K.blue }}>{link}</a> <span style={{ color: K.muted }}>(valid 72 hours, opens once)</span></div>}

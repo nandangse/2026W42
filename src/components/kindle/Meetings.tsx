@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, Avatar, btn, Card, dayName, dmy, input, K, label, Markdown, pill, serif, type Boot, type Meeting } from "./shared";
+import Feedback from "./Feedback";
 
 /**
  * Meetings: the calendar since 2023; one meeting's page with agenda,
@@ -17,7 +18,7 @@ export default function Meetings({ boot, arg, go, reload }: { boot: Boot; arg: s
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-        <h1 style={{ ...serif, fontSize: 26, margin: 0 }}>Meetings</h1>
+        <h1 style={{ ...serif, fontSize: 26, margin: 0 }}>TG Meetings</h1>
         <span style={{ color: K.muted, fontSize: 13 }}>{boot.settings.meeting_day || "First Thursday, 3 pm to 7 pm"}</span>
         <div style={{ flex: 1 }} />
         {boot.me.admin && <button onClick={() => setAdding(!adding)} style={btn("ghost")}>{adding ? "Close" : "+ Add a meeting"}</button>}
@@ -90,7 +91,7 @@ function MeetingPage({ boot, m, back, reload }: { boot: Boot; m: Meeting; back: 
   const present = [...att.values()].filter((a) => a.status !== "absent" && a.status !== "excused").length;
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <button onClick={back} style={{ background: "none", border: "none", color: K.emberDark, fontWeight: 700, cursor: "pointer", textAlign: "left", padding: 0, fontSize: 13 }}>← Meetings</button>
+      <button onClick={back} style={{ background: "none", border: "none", color: K.emberDark, fontWeight: 700, cursor: "pointer", textAlign: "left", padding: 0, fontSize: 13 }}>← TG Meetings</button>
       <Card>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
           <h1 style={{ ...serif, fontSize: 26, margin: 0 }}>{m.title || (m.kind === "monthly" ? "Monthly meeting" : m.kind)}</h1>
@@ -128,6 +129,7 @@ function MeetingPage({ boot, m, back, reload }: { boot: Boot; m: Meeting; back: 
           </div>
         </Card>
       </div>
+      <Feedback boot={boot} meetingId={m.id} meetingOn={m.meeting_on} />
       <style>{`@media (max-width: 820px){ .kindle-two { grid-template-columns: 1fr !important; } }`}</style>
     </div>
   );

@@ -9,6 +9,25 @@
  */
 export const KINDLE_UPDATES: { v: string; date: string; items: string[] }[] = [
   {
+    v: "1.2.0", date: "2026-10-01",
+    items: [
+      "Goals: each member's three professional and three personal goals for the year with the reflection answers, the status on each, and every month's word from the check-ins under it; set or edit your own.",
+      "1-2-1s: the 2026 pairing plan from the sheet (45 pairs, February to October), who is owed this month, mark done with a note from each side, the year's tally per member.",
+      "Burning issues: the sounding board with its five questions, the nine themes as filters, and the facilitator filing each under a theme, a meeting and an outcome; 140 entries since 2023 imported.",
+      "Message board: topics, threaded replies, pins and closing by the facilitator.",
+      "Gallery: albums per meeting or off-site, photos from the phone into the private bucket, a lightbox.",
+      "Change attendance on the Directory matrix for the facilitator and scribe, with one Submit; the matrix headers read as months.",
+      "Send welcome mails from raghu@nandan.co.in in Settings, to everyone who has not signed in or to one member; nothing goes out until pressed.",
+      "Raghu and Jigar are both facilitators.",
+      "TG Meetings is the section's name, and today's meeting sits on top of Home.",
+      "Feedback on every meeting: a 1-10 rating, what went well, what to improve, a takeaway and a topic for next time; the facilitator sees who has not written.",
+      "Polls: any member asks, one vote each, changeable until the poll closes, results as bars with names unless the poll is anonymous.",
+      "I Accept on the constitution, recorded per member and version; the facilitator sees who has and who has not.",
+      "Check-ins: this month one at a time with Previous and Next, a timer with its own ringer, every member's history scrolling sideways, and the check-in form itself with your goals as its sections.",
+      "The check-in history imported: 225 check-ins from both Google Forms since January 2023, with goal updates, learnings and sounding-board entries attached (migration 0188 + the import).",
+    ],
+  },
+  {
     v: "1.0.0", date: "2026-10-01",
     items: [
       "The site, under genie.nandan.co.in/kindle, with its own login for the ten members and a one-time invite link that forces a password on first use.",

@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Avatar, Card, dmy, inr, K, monthYear, pill, ROLE_LABEL, serif, type Boot, type Member } from "./shared";
+import { api, Avatar, btn, Card, dmy, inr, K, monthYear, pill, ROLE_LABEL, serif, type Boot, type Member } from "./shared";
 
 /**
  * The Directory: the ten as cards; one member's page with company, phones,
@@ -8,7 +8,7 @@ import { Avatar, Card, dmy, inr, K, monthYear, pill, ROLE_LABEL, serif, type Boo
  * and the matrix — every member against every meeting — the sheet's own
  * Directory tab, computed from the record.
  */
-export default function Directory({ boot, arg, go }: { boot: Boot; arg: string | null; go: (k: string, a?: string | null) => void }) {
+export default function Directory({ boot, arg, go, reload }: { boot: Boot; arg: string | null; go: (k: string, a?: string | null) => void; reload?: () => void }) {
   const [view, setView] = useState<"cards" | "matrix">("cards");
   const members = boot.members.filter((m) => m.active);
   const open = arg ? boot.members.find((m) => m.id === arg) : null;
@@ -45,7 +45,7 @@ export default function Directory({ boot, arg, go }: { boot: Boot; arg: string |
             </button>
           ); })}
         </div>
-      ) : <Matrix boot={boot} members={members} go={go} />}
+      ) : <Matrix boot={boot} members={members} go={go} reload={reload} />}
     </div>
   );
 }
@@ -53,20 +53,43 @@ export default function Directory({ boot, arg, go }: { boot: Boot; arg: string |
 const mark = (s?: string, late?: number) => s === "present" ? (late ? "L" : "P") : s === "zoom" ? "Z" : s === "absent" ? "A" : s === "excused" ? "E" : "·";
 const colour = (c: string) => c === "P" ? K.green : c === "Z" ? K.blue : c === "L" ? K.ember : c === "A" ? K.red : c === "E" ? K.muted : K.line;
 
-function Matrix({ boot, members, go }: { boot: Boot; members: Member[]; go: (k: string, a?: string | null) => void }) {
+function Matrix({ boot, members, go, reload }: { boot: Boot; members: Member[]; go: (k: string, a?: string | null) => void; reload?: () => void }) {
   const held = boot.meetings.filter((m) => m.meeting_on <= boot.today && m.status !== "cancelled");
   const att = useMemo(() => { const x = new Map<string, { status: string; late_min: number }>(); for (const a of boot.attendance) x.set(`${a.meeting_id}:${a.member_id}`, a); return x; }, [boot.attendance]);
+  const mayEdit = boot.me.admin || boot.me.roles.includes("scribe");
+  const [editing, setEditing] = useState(false);
+  const [changes, setChanges] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const CYCLE = ["present", "absent", "zoom", "excused", ""];
+  const cellStatus = (mid: string, memid: string) => { const key = `${mid}:${memid}`; return key in changes ? changes[key] : (att.get(key)?.status || ""); };
+  const click = (mid: string, memid: string) => { if (!editing) return; const key = `${mid}:${memid}`; const cur = cellStatus(mid, memid); const next = CYCLE[(CYCLE.indexOf(cur) + 1) % CYCLE.length]; setChanges({ ...changes, [key]: next }); };
+  const submit = async () => {
+    setBusy(true);
+    try {
+      for (const [key, status] of Object.entries(changes)) {
+        const [meeting_id, member_id] = key.split(":");
+        const before = att.get(key)?.status || "";
+        if (status === before) continue;
+        if (!status) continue; /* clearing a mark is not offered; set excused instead */
+        await api("/api/kindle/meetings", { action: "mark", meeting_id, member_id, status, late_min: att.get(key)?.late_min || 0 });
+      }
+      setChanges({}); setEditing(false); reload?.();
+    } catch (e) { alert(String((e as Error).message || e)); }
+    setBusy(false);
+  };
+  const short = (d: string) => { const [y, m] = d.split("-"); return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m) - 1]} ${y.slice(2)}`; };
   return (
-    <Card title="Every member, every meeting" right="P present · Z on Zoom · L late · A absent · E excused · dot: no record">
+    <Card title="Every member, every meeting" right={<span style={{ display: "flex", gap: 8, alignItems: "center" }}><span>P present · Z Zoom · L late · A absent · E excused · dot: no record</span>{mayEdit && !editing && <button onClick={() => setEditing(true)} style={btn("ghost", { padding: "4px 10px" })}>Change attendance</button>}{editing && <><button onClick={submit} disabled={busy || !Object.keys(changes).length} style={btn("primary", { padding: "4px 12px" })}>{busy ? "Saving…" : `Submit ${Object.keys(changes).length || ""}`}</button><button onClick={() => { setEditing(false); setChanges({}); }} style={btn("ghost", { padding: "4px 10px" })}>Cancel</button></>}</span>}>
+      {editing && <div style={{ fontSize: 12, color: K.emberDark, marginBottom: 8 }}>Tap a cell to cycle present → absent → Zoom → excused; Submit writes the changes and strikes nothing else. Late minutes are set on the meeting's own page.</div>}
       <div className="genie-scroll" style={{ maxHeight: "70vh" }}>
         <table className="genie-table nowrap" style={{ fontSize: 12 }}>
-          <thead><tr><th style={{ position: "sticky", left: 0, zIndex: 3, background: K.charcoal }}>Member</th><th className="num" style={{ background: K.charcoal }}>P / A</th>{held.map((m) => <th key={m.id} style={{ background: K.charcoal, writingMode: "vertical-rl", transform: "rotate(180deg)", padding: "8px 4px", fontWeight: 500, fontSize: 11, cursor: "pointer" }} onClick={() => go("meetings", m.id)} title={dmy(m.meeting_on)}>{m.kind === "monthly" ? monthYear(m.meeting_on) : `${m.title || m.kind} ${m.meeting_on.slice(0, 4)}`}</th>)}</tr></thead>
+          <thead><tr><th style={{ position: "sticky", left: 0, zIndex: 3, background: K.charcoal }}>Member</th><th className="num" style={{ background: K.charcoal }}>P / A</th>{held.map((m) => <th key={m.id} style={{ background: K.charcoal, padding: "6px 4px", fontWeight: 500, fontSize: 10, cursor: "pointer", textAlign: "center", lineHeight: 1.1 }} onClick={() => go("meetings", m.id)} title={`${dmy(m.meeting_on)}${m.kind !== "monthly" ? ` · ${m.title || m.kind}` : ""}`}>{short(m.meeting_on)}{m.kind !== "monthly" ? <><br /><span style={{ color: K.amber }}>{m.kind === "outbound" ? "out" : m.kind}</span></> : ""}</th>)}</tr></thead>
           <tbody>
             {members.map((mem) => { const t = boot.tally[mem.id]; return (
               <tr key={mem.id}>
                 <td style={{ position: "sticky", left: 0, background: "#fff", fontWeight: 700, cursor: "pointer" }} onClick={() => go("directory", mem.id)}>{mem.short_name || mem.name}</td>
                 <td className="num">{t ? `${t.present} / ${t.absent}` : "—"}</td>
-                {held.map((m) => { const a = att.get(`${m.id}:${mem.id}`); const c = mark(a?.status, a?.late_min); return <td key={m.id} style={{ textAlign: "center", padding: "4px 2px" }} title={a ? `${a.status}${a.late_min ? `, ${a.late_min} min late` : ""}` : "no record"}><span style={{ display: "inline-block", width: 20, height: 20, lineHeight: "20px", borderRadius: 5, background: c === "·" ? "transparent" : colour(c), color: c === "·" ? K.line : "#fff", fontSize: 11, fontWeight: 700 }}>{c}</span></td>; })}
+                {held.map((m) => { const key = `${m.id}:${mem.id}`; const a = att.get(key); const st = cellStatus(m.id, mem.id); const c = mark(st || undefined, key in changes ? 0 : a?.late_min); const changed = key in changes && changes[key] !== (a?.status || ""); return <td key={m.id} onClick={() => click(m.id, mem.id)} style={{ textAlign: "center", padding: "4px 2px", cursor: editing ? "pointer" : "default", outline: changed ? `2px solid ${K.amber}` : undefined }} title={a ? `${a.status}${a.late_min ? `, ${a.late_min} min late` : ""}` : "no record"}><span style={{ display: "inline-block", width: 20, height: 20, lineHeight: "20px", borderRadius: 5, background: c === "·" ? (editing ? K.soft : "transparent") : colour(c), color: c === "·" ? K.line : "#fff", fontSize: 11, fontWeight: 700 }}>{c}</span></td>; })}
               </tr>
             ); })}
           </tbody>

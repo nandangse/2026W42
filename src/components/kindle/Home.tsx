@@ -27,7 +27,8 @@ export default function Home({ boot, go }: { boot: Boot; go: (k: string, a?: str
               {!next.date_exact && <div style={{ fontSize: 11, color: K.muted, marginTop: 4 }}>Date from the calendar rule; the facilitator confirms it.</div>}
               <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button onClick={() => go("meetings", next.id)} style={lnk}>Agenda and attendance →</button>
-                <button onClick={() => go("checkins")} style={lnk}>My check-in →</button>
+                <button onClick={() => go("checkins", "mine")} style={lnk}>My check-in →</button>
+                <button onClick={() => go("checkins")} style={lnk}>This month's check-ins →</button>
               </div>
             </>
           ) : <div style={{ color: K.muted }}>No meeting planned. The facilitator sets the calendar in January.</div>}

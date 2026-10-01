@@ -9,7 +9,12 @@ export default function Constitution({ boot, reload }: { boot: Boot; reload: () 
   const [v, setV] = useState(""); const [on, setOn] = useState(""); const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null);
   const [history, setHistory] = useState<{ id: string; version: string; revised_on: string | null; created_at: string; is_current: boolean }[]>([]);
-  useEffect(() => { if (boot.me.admin) api<{ versions: typeof history }>("/api/kindle/constitution").then((r) => setHistory(r.versions)).catch(() => undefined); }, [boot.me.admin]);
+  const [accepts, setAccepts] = useState<{ member_id: string; accepted: boolean; accepted_at: string }[]>([]);
+  const [mine, setMine] = useState<{ accepted: boolean; accepted_at: string } | null>(null);
+  const [accepting, setAccepting] = useState(false);
+  const loadAccepts = () => api<{ versions: typeof history; accepts: typeof accepts; mine: typeof mine }>("/api/kindle/constitution").then((r) => { setHistory(r.versions); setAccepts(r.accepts || []); setMine(r.mine || null); }).catch(() => undefined);
+  useEffect(() => { loadAccepts(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const accept = async () => { if (!c) return; setAccepting(true); try { await api("/api/kindle/constitution", { action: "accept", constitution_id: c.id }); await loadAccepts(); } catch (e) { setErr(String((e as Error).message || e)); } setAccepting(false); };
   const start = () => { setV(c ? bump(c.version) : "1.0"); setOn(boot.today); setBody(c?.body || ""); setEdit(true); setErr(null); };
   const save = async () => {
     setBusy(true); setErr(null);
@@ -28,6 +33,22 @@ export default function Constitution({ boot, reload }: { boot: Boot; reload: () 
           {boot.me.admin && !edit && <button onClick={start} style={btn("ghost")}>New version</button>}
         </div>
         <p style={{ color: K.dim, fontSize: 13, margin: "6px 0 0" }}>Passed and agreed by {c.passed_by.join(", ")}. Reviewed every December; amended with a two-third majority.</p>
+        <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", borderTop: `1px solid ${K.soft}`, paddingTop: 12 }}>
+          {mine?.accepted ? (
+            <span style={{ fontSize: 13, color: K.green, fontWeight: 700 }}>✓ You accepted version {c.version} on {dmy(mine.accepted_at)}.</span>
+          ) : (
+            <>
+              <button onClick={accept} disabled={accepting} style={btn("primary", { padding: "10px 18px", fontSize: 14 })}>{accepting ? "Recording…" : "I Accept"}</button>
+              <span style={{ fontSize: 13, color: K.dim }}>I have read version {c.version} and accept it as the constitution of Kindle. Recorded against your name, with the date.</span>
+            </>
+          )}
+          {boot.me.admin && (
+            <div style={{ flexBasis: "100%", fontSize: 12, color: K.dim, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ color: K.muted }}>Accepted {accepts.filter((a) => a.accepted).length} of {boot.members.filter((m) => m.active).length}:</span>
+              {boot.members.filter((m) => m.active).map((m) => { const a = accepts.find((x) => x.member_id === m.id); return <span key={m.id} title={a?.accepted ? `accepted ${dmy(a.accepted_at)}` : "not yet"} style={{ padding: "2px 8px", borderRadius: 999, background: a?.accepted ? "#e3f3e8" : K.soft, color: a?.accepted ? K.green : K.muted, fontWeight: 700 }}>{m.short_name || m.name}{a?.accepted ? " ✓" : ""}</span>; })}
+            </div>
+          )}
+        </div>
       </Card>
       {edit ? (
         <Card title="Save a new version" right="the current one stays on record">
