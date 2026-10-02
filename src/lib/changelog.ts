@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.10.6",
+    date: "2026-10-02",
+    module: "Audit Queries: target three days out, amount as per ledger",
+    items: [
+      "A NEW QUERY\u2019S TARGET IS THREE DAYS FROM TODAY unless written otherwise (Dr Raghu, 2 Oct 2026: \"target date is by default today + 3\"). An old query keeps whatever it had.",
+      "THE AMOUNT FILLS FROM THE LEDGER (\"the ledger amount should be shown as per ledger\"). When the name typed is a ledger in the books, its closing balance goes into the amount, with Dr or Cr said under it. An amount somebody typed by hand is never overwritten.",
+    ],
+  },
+  {
     v: "5.9.10.5",
     date: "2026-10-02",
     module: "Supplier card: one date, one payment",

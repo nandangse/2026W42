@@ -263,9 +263,35 @@ function Sel({ v, on, opts }: { v: string; on: (s: string) => void; opts: [strin
 function QueryBox({ row, busy, onClose, onSave }: {
   row: Partial<AuditRow>; busy: boolean; onClose: () => void; onSave: (r: Partial<AuditRow>) => void;
 }) {
-  const [f, setF] = useState<Partial<AuditRow>>(row);
+  /* TARGET IS THREE DAYS OUT UNLESS SAID OTHERWISE (Dr Raghu, 2 Oct 2026:
+     "target date is by default today + 3"). Only on a new query — an old
+     one keeps whatever was written. */
+  const [f, setF] = useState<Partial<AuditRow>>(() => {
+    if (row.id || row.target_text) return row;
+    const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    d.setDate(d.getDate() + 3);
+    const dd = String(d.getDate()).padStart(2, "0"), mm = String(d.getMonth() + 1).padStart(2, "0");
+    return { ...row, target_text: `${dd}/${mm}/${d.getFullYear()}` };
+  });
   const set = (k: keyof AuditRow, v: string) => setF((x) => ({ ...x, [k]: v }));
   const amt = readAmount(String(f.amount_text || ""));
+  /* THE AMOUNT IS THE LEDGER'S OWN (Dr Raghu, 2 Oct 2026: "the ledger
+     amount should be shown as per ledger"). When the name typed is a ledger
+     in the books, its closing balance fills the amount — unless somebody
+     has already typed one by hand, which is never overwritten. */
+  const autoAmt = useRef<string>("");
+  const [ledgerBal, setLedgerBal] = useState<number | null>(null);
+  const onLedger = (closing: number | null) => {
+    setLedgerBal(closing);
+    if (closing == null) return;
+    const v = String(Math.round(Math.abs(closing)));
+    setF((x) => {
+      const cur = String(x.amount_text || "").trim();
+      if (cur && cur !== autoAmt.current) return x;
+      autoAmt.current = v;
+      return { ...x, amount_text: v };
+    });
+  };
   return (
     <div onClick={onClose} role="button" tabIndex={0}
       style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(22,35,47,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -321,12 +347,12 @@ function QueryBox({ row, busy, onClose, onSave }: {
               books as you type; a datalist offers, it does not insist, so
               "Purchase" or "GST Liabilities" stay possible. */}
           <L label="Ledger or vendor" hint="start typing — the books' own ledger names appear; anything else can still be written">
-            <LedgerInput value={f.related_to || ""} onChange={(v) => set("related_to", v)} />
+            <LedgerInput value={f.related_to || ""} onChange={(v) => set("related_to", v)} onLedger={onLedger} />
           </L>
           <L label="The query"><textarea value={f.instruction || ""} onChange={(e) => set("instruction", e.target.value)} rows={5} style={{ ...box, resize: "vertical", lineHeight: 1.55 }} /></L>
           <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
             <L label="Target" hint="a date, or words"><input value={f.target_text || ""} onChange={(e) => set("target_text", e.target.value)} style={box} /></L>
-            <L label="Amount" hint={amt != null ? `reads as ${cr(amt)}` : f.amount_text ? "kept as words — it will not be totalled" : "80000, or 16.31 lakhs"}>
+            <L label="Amount" hint={ledgerBal != null && String(f.amount_text || "").trim() === autoAmt.current ? `as per ledger — ${cr(Math.abs(ledgerBal))} ${ledgerBal < 0 ? "Dr" : "Cr"}` : amt != null ? `reads as ${cr(amt)}` : f.amount_text ? "kept as words — it will not be totalled" : "80000, or 16.31 lakhs"}>
               <input value={f.amount_text || ""} onChange={(e) => set("amount_text", e.target.value)} style={box} />
             </L>
             <L label="Status">
@@ -610,18 +636,29 @@ function plainText(html: string): string {
  * A ledger name, offered as you type and never insisted upon.
  * The names come from the books; the field stays free text.
  */
-function LedgerInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function LedgerInput({ value, onChange, onLedger }: { value: string; onChange: (v: string) => void; onLedger?: (closing: number | null) => void }) {
   const [names, setNames] = useState<string[]>([]);
+  const bal = useRef(new Map<string, number>());
   useEffect(() => {
     const q = value.trim();
+    /* an exact ledger name hands its closing balance up; anything else, nothing */
+    const hit = bal.current.get(q.toLowerCase());
+    onLedger?.(hit == null ? null : hit);
     if (q.length < 2) { setNames([]); return; }
     const t = window.setTimeout(() => {
       fetch(`/api/kuber/books?view=ledgers&q=${encodeURIComponent(q)}`, { cache: "no-store" })
         .then((r) => r.json())
-        .then((j: { rows?: { name: string }[] }) => setNames((j.rows || []).map((x) => x.name).slice(0, 40)))
+        .then((j: { rows?: { name: string; closing?: number }[] }) => {
+          const rows = (j.rows || []).slice(0, 40);
+          for (const x of rows) bal.current.set(String(x.name).toLowerCase(), Number(x.closing) || 0);
+          setNames(rows.map((x) => x.name));
+          const h = bal.current.get(q.toLowerCase());
+          if (h != null) onLedger?.(h);
+        })
         .catch(() => setNames([]));
     }, 220);
     return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
   return (
     <>
