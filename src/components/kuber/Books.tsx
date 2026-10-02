@@ -2337,13 +2337,14 @@ export function CfoNoteScreen({ go }: { go: (k: string) => void }) {
  */
 interface VregRow {
   id: string; date: string; vno: string; party: string; narration: string; amount: number;
+  tax: number; net: number;
   received: number | null; outstanding: number | null; status: string | null; overridden: boolean;
   paid_on: string | null; days: number | null; interest: number;
   fam: string | null; salesman: string | null; note: string | null;
   scan: { path: string; name: string } | null;
   items: { item: string; qty: string; rate: number; amount: number }[];
 }
-interface VregData { empty?: boolean; kind: string; from: string; to: string; rows: VregRow[]; count: number; total: number; fams: string[]; salesmen: string[] }
+interface VregData { empty?: boolean; kind: string; from: string; to: string; rows: VregRow[]; count: number; total: number; gross: number; tax: number; net: number; advances?: Record<string, number>; fams: string[]; salesmen: string[] }
 
 const STATUS_CHIP: Record<string, { bg: string; fg: string; label: string }> = {
   paid: { bg: "#E6F4EA", fg: "#0D7A3F", label: "Paid" },
@@ -2358,7 +2359,7 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
   const [to, setTo] = useState(today);
   const [data, reload] = useBooks<VregData>("vreg", `&kind=${kind}&from=${from}&to=${to}`);
   const { fmt: fmtMoney } = useMoneyFmt();
-  const [sortK, setSortK] = useState<"date" | "party" | "amount" | "vno" | "days" | "interest">("date");
+  const [sortK, setSortK] = useState<"date" | "party" | "amount" | "net" | "vno" | "days" | "interest">("date");
   const [dir, setDir] = useState<1 | -1>(-1);
   const [q, setQ] = useState("");
   const [fClient, setFClient] = useState("");
@@ -2397,13 +2398,18 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
     .filter((r) => !floor || r.amount >= floor)
     .sort((a, b) => {
       const v = sortK === "amount" ? a.amount - b.amount
+        : sortK === "net" ? a.net - b.net
         : sortK === "days" ? (a.days || 0) - (b.days || 0)
         : sortK === "interest" ? a.interest - b.interest
         : String(a[sortK] ?? "").localeCompare(String(b[sortK] ?? ""));
       return v * dir;
     });
   const shown = rows.reduce((s2, r) => s2 + r.amount, 0);
+  const shownNet = rows.reduce((s2, r) => s2 + (r.net || 0), 0);
   const shownOs = rows.reduce((s2, r) => s2 + (r.outstanding || 0), 0);
+  /* advances held from the customers on screen — by party, once each */
+  const advParties = [...new Set(rows.map((r) => r.party))].filter((p) => (data?.advances?.[p] || 0) > 0);
+  const shownAdv = advParties.reduce((s2, p) => s2 + (data?.advances?.[p] || 0), 0);
   const shownInt = rows.reduce((s2, r) => s2 + r.interest, 0);
   const clients = [...new Set((data?.rows || []).map((r) => r.party).filter(Boolean))].sort();
 
@@ -2431,7 +2437,7 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
     </th>
   );
   const box = { borderColor: BORDER } as React.CSSProperties;
-  const cols = sales ? 13 : 8;
+  const cols = sales ? 14 : 9;
   /* purchase has no tick column, so its frozen columns start one earlier */
   const off = sales ? 0 : 1;
 
@@ -2450,8 +2456,12 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
       {!data ? <div className="text-sm" style={{ color: MUTED }}>reading…</div> : (
         <>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <Card label={`TOTAL — ${data.count} vouchers`} value={fmtMoney(data.total)} color={sales ? GREEN : "#1B6B93"} />
-            {sales && <Card label="OUTSTANDING — SHOWN" value={fmtMoney(shownOs)} sub={`${rows.filter((r) => (r.outstanding || 0) > 1).length} invoices still open`} color="var(--blue)" />}
+            {/* GROSS AND NET (Dr Raghu, 2 Oct 2026: "in this show gross and nett also") */}
+            <Card label={`GROSS — ${data.count} vouchers`} value={fmtMoney(data.gross ?? data.total)} sub="the bills as raised, GST included" color={sales ? GREEN : "#1B6B93"} />
+            <Card label="NET" value={fmtMoney(data.net ?? data.total)} sub="before GST — the value of the goods and work" color={sales ? GREEN : "#1B6B93"} />
+            <Card label="GST" value={fmtMoney(data.tax ?? 0)} sub={`${data.gross ? ((data.tax || 0) / data.gross * 100).toFixed(1) : "0"}% of gross · read off each voucher's tax ledgers`} color={MUTED} />
+            {sales && <Card label="OUTSTANDING — SHOWN" value={fmtMoney(shownOs)} sub={`${rows.filter((r) => (r.outstanding || 0) > 1).length} invoices still open · gross, nothing netted`} color="var(--blue)" />}
+            {sales && <Card label="ADVANCES HELD" value={fmtMoney(shownAdv)} sub={`${advParties.length} of these customers paid ahead · kept apart from the outstanding`} color="#0D7A3F" />}
             {sales && <Card label="INTEREST LOST @ 15%" value={fmtMoney(shownInt)} sub="on what is still out, day by day since the bill" color={RED} />}
           </div>
 
@@ -2544,7 +2554,8 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
                     <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Narration</th>
                     <th className="px-2 py-2 text-left" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Items</th>
                   </>}
-                  <Hd k="amount" right>Amount</Hd>
+                  <Hd k="amount" right>Gross</Hd>
+                  <Hd k="net" right>Net</Hd>
                   {!sales && <>
                     <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)" }}>Bill</th>
                     <th className="px-2 py-2" style={{ position: "sticky", top: 0, background: "var(--ink)" }} />
@@ -2562,6 +2573,7 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
                 <tr style={{ background: "#F3F1EB" }}>
                   <td colSpan={sales ? 6 : 5} className="px-2 py-1.5 font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>SHOWN — {rows.length}</td>
                   <td className="px-2 py-1.5 text-right tnum font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>{fmtMoney(shown)}</td>
+                  <td className="px-2 py-1.5 text-right tnum font-bold" style={{ position: "sticky", top: 33, background: "#F3F1EB" }}>{fmtMoney(shownNet)}</td>
                   {!sales && <td colSpan={2} style={{ position: "sticky", top: 33, background: "#F3F1EB" }} />}
                   {sales && <>
                     <td style={{ position: "sticky", top: 33, background: "#F3F1EB" }} />
@@ -2599,7 +2611,8 @@ export function VoucherRegister({ kind }: { kind: "sales" | "purchase" }) {
                             : <span style={{ color: "#D5D2C9" }}>—</span>}
                         </td>
                       </>}
-                      <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
+                      <td className="px-2 py-1 text-right tnum font-bold" title={r.tax ? `GST ${fmtMoney(r.tax)}` : "no GST line on this voucher"}>{fmtMoney(r.amount)}</td>
+                      <td className="px-2 py-1 text-right tnum" style={{ color: r.tax ? INK : MUTED }}>{fmtMoney(r.net)}</td>
                       {!sales && <>
                         <td className="px-2 py-1 text-center">
                           {r.scan
@@ -2712,7 +2725,7 @@ function InvoiceBox({ row, kind, fams, salesmen, onClose, onSaved }: {
           <div className="rounded p-3 mb-3" style={{ background: "#F4F2EC" }}>
             <div className="font-bold" style={{ color: INK }}>{row.party}</div>
             <div className="text-xs mt-1" style={{ color: MUTED }}>
-              {fmtD(row.date)} · {fmtMoney(row.amount)}
+              {fmtD(row.date)} · gross {fmtMoney(row.amount)} · net {fmtMoney(row.net)}{row.tax ? <> · GST {fmtMoney(row.tax)}</> : null}
               {row.outstanding != null && <> · received {fmtMoney(row.received || 0)} · still out <b style={{ color: (row.outstanding || 0) > 1 ? RED : "#0D7A3F" }}>{fmtMoney(row.outstanding)}</b></>}
               {row.days ? ` · ${row.days} days` : ""}
             </div>

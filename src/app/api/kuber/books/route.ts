@@ -2298,15 +2298,24 @@ export async function GET(req: Request) {
        * books are wrong and somebody has to say so out loud.
        */
       const openOf = new Map<string, number>();
+      /* ADVANCES, BESIDE THE OUTSTANDING, NEVER NETTED (Dr Raghu, 2 Oct 2026:
+         "show outstanding as well as advance, not the nett amount"). A credit
+         sitting on a customer's account is money received before the bill —
+         it says nothing about which bill is still out. So the outstanding
+         stays the gross of open bills, and the advances are counted on their
+         own, by party, for the parties on this register. */
+      const advOf = new Map<string, number>();
       if (kind === "sales") {
         try {
-          const bills = await pageAll<{ bill: string; amount: number; kind: string }>(async (a, b) => {
-            const r = await admin.from("kuber_bill").select("bill, amount, kind").eq("kind", "receivable").range(a, b);
-            return { data: r.data as { bill: string; amount: number; kind: string }[] | null, error: r.error };
+          const bills = await pageAll<{ party: string; bill: string; amount: number; kind: string }>(async (a, b) => {
+            const r = await admin.from("kuber_bill").select("party, bill, amount, kind").eq("kind", "receivable").range(a, b);
+            return { data: r.data as { party: string; bill: string; amount: number; kind: string }[] | null, error: r.error };
           }, "the open bills");
           for (const b of bills) {
+            const amt = Number(b.amount) || 0;
+            if (amt < 0) { advOf.set(b.party, (advOf.get(b.party) || 0) + -amt); continue; }
             const k = String(b.bill || "").trim();
-            if (k) openOf.set(k, (openOf.get(k) || 0) + (Number(b.amount) || 0));
+            if (k) openOf.set(k, (openOf.get(k) || 0) + amt);
           }
         } catch (e) { swallow("kuber/vreg-bills", e); }
       }
@@ -2351,9 +2360,34 @@ export async function GET(req: Request) {
         }
       } catch (e) { swallow("kuber/vreg-items", e); /* pre-0081 */ }
 
+      /**
+       * GROSS AND NET (Dr Raghu, 2 Oct 2026: "in this show gross and nett
+       * also"). The voucher's own amount is the GROSS — what the party owes
+       * or is owed, tax included. The NET is what the sale or purchase was
+       * worth before the government's share: gross less every line booked on
+       * a GST ledger (Output/Input CGST, SGST, IGST, UTGST, cess). Read off
+       * the voucher's own lines, so a bill with transport or round-off on it
+       * still nets correctly — those are not tax and stay in the net.
+       */
+      const TAX_RE = /\b(input|output)\s+(cgst|sgst|igst|utgst)\b|^(cgst|sgst|igst|utgst)\b|\bgst\s*cess\b|\bcess\b.*\bgst\b/i;
+      const taxOf = new Map<string, number>();
+      try {
+        const ids = rows.slice(0, 3000).map((r) => String(r.id));
+        for (let i = 0; i < ids.length; i += 200) {
+          const { data: ln } = await admin.from("kuber_voucher_line")
+            .select("voucher_id, ledger, amount").in("voucher_id", ids.slice(i, i + 200)).limit(5000);
+          for (const x of (ln || []) as RR[]) {
+            if (!TAX_RE.test(String(x.ledger || ""))) continue;
+            const k = String(x.voucher_id);
+            taxOf.set(k, (taxOf.get(k) || 0) + Math.abs(Number(x.amount) || 0));
+          }
+        }
+      } catch (e) { swallow("kuber/vreg-tax", e); }
+
       const out = rows.slice(0, 3000).map((r) => {
         const no = String(r.vno || "").trim();
         const gross = Math.abs(Number(r.amount) || 0);
+        const tax = taxOf.get(String(r.id)) || 0;
         const m = meta.get(no);
         const open = openOf.has(no) ? Math.max(0, openOf.get(no)!) : null;
         /* no open bill against an invoice that IS in the books means it is
@@ -2368,6 +2402,7 @@ export async function GET(req: Request) {
         const interest = days && days > 0 && outstanding ? (outstanding * 0.15 * days) / 365 : 0;
         return {
           id: r.id, date: r.date, vno: no, party: r.party, narration: r.narration, amount: gross,
+          tax, net: Math.max(0, gross - tax),
           received: m?.paid_amount != null ? Number(m.paid_amount) : settled,
           outstanding, status, overridden: !!m?.pay_status,
           paid_on: m?.paid_on ?? null,
@@ -2389,7 +2424,11 @@ export async function GET(req: Request) {
       } catch (e) { swallow("kuber/vreg-fams", e); }
       const salesmen = [...new Set(out.map((r) => r.salesman).filter(Boolean) as string[])].sort();
 
-      return NextResponse.json({ kind, from, to, rows: out, count: rows.length, total, fams, salesmen });
+      const taxAll = out.reduce((s2, r) => s2 + r.tax, 0);
+      const partiesOn = new Set(out.map((r) => String(r.party)));
+      const advances: Record<string, number> = {};
+      for (const [party, amt] of advOf) if (partiesOn.has(party)) advances[party] = amt;
+      return NextResponse.json({ kind, from, to, rows: out, count: rows.length, total, gross: total, tax: taxAll, net: total - taxAll, advances, fams, salesmen });
     }
 
     if (view === "ledgers") {

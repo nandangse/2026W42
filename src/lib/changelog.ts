@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.10.4",
+    date: "2026-10-02",
+    module: "Sales & Purchase Registers: gross, net and the advances",
+    items: [
+      "GROSS, NET AND GST ON THE REGISTER CARDS (Dr Raghu, 2 Oct 2026: \"in this show gross and nett also\"). Gross is the bill as raised, tax included; net is gross less every line booked on a GST ledger (Output/Input CGST, SGST, IGST, UTGST, cess), read off each voucher\u2019s own lines, so transport and round-off stay in the net where they belong. Every row carries a Net column beside Gross, both sortable; the lightbox header says gross, net and GST for that bill.",
+      "ADVANCES HELD, BESIDE THE OUTSTANDING, NEVER NETTED (\"show outstanding as well as advance, not the nett amount\"). The outstanding card is the gross of open bills, nothing knocked off; a new card counts the credits sitting on these customers\u2019 accounts, by party, so money received ahead of a bill is seen on its own and never hides a bill that is still out. Both follow the filters.",
+    ],
+  },
+  {
     v: "5.9.10.3",
     date: "2026-10-02",
     module: "Bills Receivable: the expected date, in the row",
