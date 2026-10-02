@@ -2902,6 +2902,19 @@ export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" |
 
   const fams = [...new Set(data.rows.map((r) => r.fam).filter(Boolean) as string[])].sort();
   const salesmen = [...new Set(data.rows.map((r) => r.salesman).filter(Boolean) as string[])].sort();
+  /* EDITABLE IN THE ROW (Dr Raghu, 2 Oct 2026: "bills receivable should be
+     editable. it should have an Expected date. This date will be the one
+     considered in the cash flow plan"). The tick bar sets forty at once; this
+     sets one without ticking anything. Same table underneath, same date the
+     13-week plan reads — a bill whose expected date is already past sits in
+     week 1, as it did. */
+  const saveRow = async (r: BillRow, patch: Record<string, unknown>) => {
+    await fetch("/api/kuber/books", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "collection", bills: [{ party: r.party, bill: r.bill }], ...patch }),
+    });
+    reload();
+  };
 
   const Hd = ({ k, children, right }: { k: SortK; children: React.ReactNode; right?: boolean }) => (
     <th className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap`}
@@ -2919,7 +2932,8 @@ export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" |
           <div className="text-lg font-bold" style={{ color: INK }}>{rec ? "Bills Receivable" : "Bills Payable"}</div>
           <div className="text-sm" style={{ color: "var(--dim)", maxWidth: 760 }}>
             Every bill still unpaid, one line each — Tally&apos;s own bill-wise outstanding, which is where a bill sits
-            until it is knocked off. Tick the ones you have chased, set who owns them and when the money is expected.
+            until it is knocked off. Set the <b>Expected</b> date on any row — the 13-week cash flow plan reads it; a date already
+            past, or none at all, keeps the bill in week 1. Tick rows to set forty at once.
             {data.oldest && <> The oldest is <b>{fmtD(data.oldest)}</b>.</>}
           </div>
         </div>
@@ -3029,10 +3043,18 @@ export function BillsReceivable({ kind = "receivable" }: { kind?: "receivable" |
                   <td className="px-2 py-1" style={{ color: r.fam ? INK : "#D5D2C9", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.fam || ""}>{r.fam || "—"}</td>
                   <td className="px-2 py-1" style={{ color: r.salesman ? INK : "#D5D2C9", whiteSpace: "nowrap" }}>{r.salesman || "—"}</td>
                   <td className="px-2 py-1 text-right tnum font-bold">{fmtMoney(r.amount)}</td>
-                  <td className="px-2 py-1 tnum whitespace-nowrap" style={{ color: r.expected_on ? (r.expected_on < data.today ? RED : "#0D7A3F") : "#D5D2C9", fontWeight: r.expected_on ? 700 : 400 }}>
-                    {r.expected_on ? fmtD(r.expected_on) : "—"}
+                  <td className="px-2 py-1 whitespace-nowrap">
+                    <input type="date" value={r.expected_on || ""} onChange={(e) => void saveRow(r, { expected_on: e.target.value || null })}
+                      title={r.expected_on ? (r.expected_on < data.today ? "Expected date has passed — the plan carries it in week 1" : "The cash flow plan reads this date") : "When is this money expected? The cash flow plan reads it"}
+                      className="border rounded px-1.5 py-0.5 text-xs tnum"
+                      style={{ borderColor: r.expected_on ? (r.expected_on < data.today ? RED : "#0D7A3F") : BORDER, color: r.expected_on ? (r.expected_on < data.today ? RED : "#0D7A3F") : MUTED, fontWeight: r.expected_on ? 700 : 400, width: 128 }} />
                   </td>
-                  <td className="px-2 py-1" style={{ color: r.remarks ? INK : "#D5D2C9", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.remarks || ""}>{r.remarks || "—"}</td>
+                  <td className="px-2 py-1">
+                    <input defaultValue={r.remarks || ""} placeholder="collection remark…" key={`${k}|${r.remarks || ""}`}
+                      onBlur={(e) => { const v = e.target.value.trim(); if (v !== (r.remarks || "")) void saveRow(r, { remarks: v || null }); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      className="border rounded px-1.5 py-0.5 text-xs" style={{ borderColor: r.remarks ? BORDER : "transparent", background: r.remarks ? "#fff" : "transparent", width: 230 }} title={r.remarks || "type a remark — Enter or click away saves"} />
+                  </td>
                 </tr>
               );
             })}

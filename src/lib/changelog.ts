@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.10.3",
+    date: "2026-10-02",
+    module: "Bills Receivable: the expected date, in the row",
+    items: [
+      "THE EXPECTED DATE IS A DATE BOX ON EVERY ROW, and the collection remark a box beside it \u2014 set one bill without ticking anything; the tick bar still sets forty at once. Dr Raghu, 2 Oct 2026: \"This date will be the one considered in the cash flow plan.\" It is: Follow Up Payment in the 13-week plan reads exactly this date. A date already past, or none at all, keeps the bill in week 1 \u2014 \"for the first week keep the previous dates also\" \u2014 so overdue money is never pushed out of sight by an old promise.",
+    ],
+  },
+  {
     v: "5.9.10.2",
     date: "2026-10-02",
     module: "A password you can actually reset",
