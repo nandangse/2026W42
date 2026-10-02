@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.10.5",
+    date: "2026-10-02",
+    module: "Supplier card: one date, one payment",
+    items: [
+      "THE PLANNED PAYMENTS ON A SUPPLIER\u2019S CARD ARE ONE LINE PER DATE (Dr Raghu, 2 Oct 2026: \"show the total of the payment for one date and just write the bill numbers instead of so many lines. One date one payment\"). Sixteen bills paid on the 10th read as one line: the date, the total, and the sixteen bill numbers against it. A line splits only where the purpose or the status differs, because those are different payments.",
+    ],
+  },
+  {
     v: "5.9.10.4",
     date: "2026-10-02",
     module: "Sales & Purchase Registers: gross, net and the advances",

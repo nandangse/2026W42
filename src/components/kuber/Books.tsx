@@ -779,17 +779,35 @@ function SupplierCard({ party, grade, onClose }: { party: string; grade: string;
                   <div className="text-xs mb-2" style={{ color: MUTED }}>
                     His rows from Payment Planning — the cash flow obeys these over his raw bills. Add and edit them on Kuber → Payment Planning with the party exactly as spelled here.
                   </div>
-                  <MiniTable head={["Pay on", "Purpose", "Bill ref", "Status", "Amount"]}>
+                  {/* ONE DATE, ONE PAYMENT (Dr Raghu, 2 Oct 2026: "show the total
+                      of the payment for one date and just write the bill numbers
+                      instead of so many lines"). A supplier paid on the 10th for
+                      sixteen bills gets one line: the date, the total, and the
+                      sixteen bill numbers against it. Split only where the
+                      purpose or the status differs — those are different payments. */}
+                  <MiniTable head={["Pay on", "Purpose", "Against bills", "Status", "Amount"]}>
                     {d.plans.length === 0 && (<tr><td colSpan={5} className="px-3 py-4" style={{ color: MUTED }}>Nothing planned for this supplier yet.</td></tr>)}
-                    {d.plans.map((x, i) => (
-                      <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
-                        <td className="px-2 py-1 tnum">{fmtD(x.plan_date)}</td>
-                        <td className="px-2 py-1">{x.purpose || "—"}</td>
-                        <td className="px-2 py-1" style={{ color: MUTED }}>{x.bill_ref || "—"}</td>
-                        <td className="px-2 py-1 font-semibold">{x.status}</td>
-                        <td className="px-2 py-1 text-right tnum">{fmtMoney(x.amount)}</td>
-                      </tr>
-                    ))}
+                    {(() => {
+                      const g = new Map<string, { plan_date: string; purpose: string; status: string; refs: string[]; amount: number }>();
+                      for (const x of d.plans) {
+                        const k = `${x.plan_date}|${x.purpose || ""}|${x.status}`;
+                        const row = g.get(k) || { plan_date: x.plan_date, purpose: x.purpose || "", status: x.status, refs: [], amount: 0 };
+                        if (x.bill_ref) row.refs.push(String(x.bill_ref).trim());
+                        row.amount += x.amount;
+                        g.set(k, row);
+                      }
+                      return [...g.values()].sort((p, q) => p.plan_date.localeCompare(q.plan_date)).map((x, i) => (
+                        <tr key={i} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                          <td className="px-2 py-1 tnum whitespace-nowrap align-top">{fmtD(x.plan_date)}</td>
+                          <td className="px-2 py-1 align-top whitespace-nowrap">{x.purpose || "—"}</td>
+                          <td className="px-2 py-1" style={{ color: MUTED, maxWidth: 420 }}>
+                            {x.refs.length ? <>{x.refs.length > 1 && <b style={{ color: INK }}>{x.refs.length} bills · </b>}{x.refs.join(", ")}</> : "—"}
+                          </td>
+                          <td className="px-2 py-1 font-semibold align-top">{x.status}</td>
+                          <td className="px-2 py-1 text-right tnum font-bold align-top whitespace-nowrap">{fmtMoney(x.amount)}</td>
+                        </tr>
+                      ));
+                    })()}
                   </MiniTable>
                 </>
               )}
