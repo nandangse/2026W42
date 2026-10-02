@@ -237,6 +237,7 @@ function Clock() {
 /* ───────────────────────── the account menu ───────────────────────── */
 
 function AccountMenu({ module, user, isAdmin, menu }: { module: ShellModule; user: ShellUser; isAdmin: boolean; menu?: (close: () => void) => React.ReactNode }) {
+  const [pwBox, setPwBox] = useState(false);
   const [open, setOpen] = useState(false);
   const [mods, setMods] = useState(false);
   const [may, setMay] = useState<Record<string, boolean> | null>(null);
@@ -258,7 +259,7 @@ function AccountMenu({ module, user, isAdmin, menu }: { module: ShellModule; use
   const hoverIn = () => { if (closeT.current) clearTimeout(closeT.current); setMods(true); };
   const hoverOut = () => { closeT.current = setTimeout(() => setMods(false), 250); };
 
-  return (
+  return (<>
     <span className="relative flex-shrink-0">
       <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded pl-1 pr-2" aria-haspopup="menu" aria-expanded={open}
         style={{ height: 32, background: NAVY_DARK, border: `1px solid ${LINE_DARK}` }} title={`${who} · ${user.role.replace("_", " ")}`}>
@@ -297,6 +298,10 @@ function AccountMenu({ module, user, isAdmin, menu }: { module: ShellModule; use
               )}
             </div>
             <a href="/idp" className="block px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, textDecoration: "none", borderBottom: "1px solid #EEECE6" }}>🪪 My sheet &amp; IDP</a>
+            {/* CHANGE PASSWORD, SIGNED IN (2 Oct 2026). Until today the only
+                way to a new password was a reset mail nothing could finish —
+                or the SQL editor. */}
+            <button onClick={() => { setOpen(false); setPwBox(true); }} className="block w-full text-left px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, borderBottom: "1px solid #EEECE6" }}>🔐 Change password</button>
             {menu && <div className="genie-menu-extra" style={{ borderBottom: "1px solid #EEECE6" }}>{menu(() => setOpen(false))}</div>}
             {/* PROFILE AND ADMIN ON EVERY APP (Dr Raghu, 8 Sep 2026: "show
                 profile and admin also on every app"). They were passed in by
@@ -329,5 +334,55 @@ function AccountMenu({ module, user, isAdmin, menu }: { module: ShellModule; use
         </>
       )}
     </span>
+      {pwBox && <ChangePasswordBox onClose={() => setPwBox(false)} />}
+  </>);
+}
+
+
+/**
+ * A NEW PASSWORD, FROM INSIDE. Two boxes, a check that they match, and
+ * Supabase's own updateUser — which works because the person is already
+ * signed in. Nothing passes through Genie's servers.
+ */
+function ChangePasswordBox({ onClose }: { onClose: () => void }) {
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    setErr("");
+    if (a.length < 8) { setErr("At least eight characters."); return; }
+    if (a !== b) { setErr("The two do not match."); return; }
+    setBusy(true);
+    const { error } = await supabaseBrowser().auth.updateUser({ password: a });
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    setOk(true);
+  };
+  return (
+    <div onClick={onClose} className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)", zIndex: 90 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg p-5" style={{ width: "min(380px,100%)" }}>
+        <div className="font-bold mb-3" style={{ color: NAVY }}>🔐 Change password</div>
+        {ok ? (
+          <>
+            <div className="text-sm mb-3" style={{ color: "var(--green)", fontWeight: 600 }}>Done — the new password is in force now.</div>
+            <button onClick={onClose} className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: "var(--accent)" }}>Close</button>
+          </>
+        ) : (
+          <>
+            <input type="password" value={a} onChange={(e) => setA(e.target.value)} placeholder="new password" autoComplete="new-password"
+              className="w-full border rounded px-2 py-2 mb-2 text-sm" style={{ borderColor: "#D9D6CD", fontSize: 16 }} />
+            <input type="password" value={b} onChange={(e) => setB(e.target.value)} placeholder="once more" autoComplete="new-password"
+              className="w-full border rounded px-2 py-2 mb-2 text-sm" style={{ borderColor: "#D9D6CD", fontSize: 16 }} />
+            {err && <div className="text-xs mb-2 font-semibold" style={{ color: "var(--red)" }}>{err}</div>}
+            <div className="flex gap-2">
+              <button onClick={() => void go()} disabled={busy} className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: "var(--accent)", opacity: busy ? 0.6 : 1 }}>{busy ? "…" : "Set it"}</button>
+              <button onClick={onClose} className="rounded px-3 py-1.5 text-sm" style={{ color: "var(--muted)" }}>Cancel</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

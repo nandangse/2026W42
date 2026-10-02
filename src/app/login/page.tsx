@@ -9,7 +9,7 @@
  * logins made from the HRMS master sign in the first time. Forgot password
  * mails a reset link. WhatsApp waits for the Meta route.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { LOGO } from "@/lib/logo";
@@ -27,6 +27,53 @@ export default function LoginPage() {
   const [err, setErr] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  /**
+   * THE OTHER END OF "FORGOT PASSWORD?" (Dr Raghu, 2 Oct 2026: "I lost my
+   * password for genie! Please let me know how to reset").
+   *
+   * The button below had mailed a reset link since 6 September, and nothing
+   * in Genie took the new password at the other end — the link signed the
+   * person in and left them exactly where they started, without a password
+   * they knew. He had to set his own by hand in the SQL editor.
+   *
+   * Now the link comes back HERE. Supabase's browser client uses the PKCE
+   * flow, so the link carries ?code=…; that code is exchanged for a session
+   * and the form turns into "choose a new password". A session that arrives
+   * the older way (#…type=recovery) is caught by the auth event instead.
+   */
+  const [recovering, setRecovering] = useState(false);
+  const [newPw, setNewPw] = useState("");
+  const [newPw2, setNewPw2] = useState("");
+  useEffect(() => {
+    const sb = supabaseBrowser();
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    const wantsReset = url.searchParams.get("reset") === "1" || /type=recovery/.test(window.location.hash);
+    if (code) {
+      setBusy(true);
+      sb.auth.exchangeCodeForSession(code).then(({ error }) => {
+        setBusy(false);
+        if (error) { setErr(`That reset link did not work: ${error.message}. Send a new one.`); return; }
+        setRecovering(true);
+        window.history.replaceState(null, "", "/login?reset=1");
+      });
+    } else if (wantsReset) {
+      sb.auth.getSession().then(({ data }) => { if (data.session) setRecovering(true); });
+    }
+    const { data: sub } = sb.auth.onAuthStateChange((event) => { if (event === "PASSWORD_RECOVERY") setRecovering(true); });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+  const setPassword = async () => {
+    setErr(""); setNote("");
+    if (newPw.length < 8) { setErr("Make it at least eight characters."); return; }
+    if (newPw !== newPw2) { setErr("The two do not match."); return; }
+    setBusy(true);
+    const { error } = await supabaseBrowser().auth.updateUser({ password: newPw });
+    setBusy(false);
+    if (error) { setErr(`Supabase refused it: ${error.message}`); return; }
+    setNote("Password set. Opening Genie…");
+    done();
+  };
 
   const addr = () => email.trim().toLowerCase();
   const done = () => { router.replace("/"); router.refresh(); };
@@ -75,10 +122,15 @@ export default function LoginPage() {
   const forgot = async () => {
     if (!addr()) { setErr("Type your email first."); return; }
     setErr(""); setBusy(true);
-    const { error } = await supabaseBrowser().auth.resetPasswordForEmail(addr(), { redirectTo: `${window.location.origin}/` });
+    const { error } = await supabaseBrowser().auth.resetPasswordForEmail(addr(), { redirectTo: `${window.location.origin}/login?reset=1` });
     setBusy(false);
-    if (error) { setErr(error.message); return; }
-    setNote(`A reset link is on its way to ${addr()}.`);
+    if (error) {
+      /* Supabase's own mailer allows a handful of auth mails an hour; say so
+         rather than "error", because the cure is to wait, not to press again */
+      setErr(/rate limit/i.test(error.message) ? "Supabase has sent its hourly quota of mails — wait an hour before trying again, and do not press this more than once." : error.message);
+      return;
+    }
+    setNote(`A reset link is on its way to ${addr()}. It brings you back here to choose a new password.`);
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -110,6 +162,32 @@ export default function LoginPage() {
           <div className="text-sm font-semibold" style={{ color: "var(--amber)" }}>Signing in · opening Genie…</div>
         </div>
       )}
+      {recovering ? (
+        <form onSubmit={(e) => { e.preventDefault(); void setPassword(); }} className="w-full max-w-sm rounded-lg p-6" style={{ background: "#fff", borderTop: "4px solid #E8600A" }}>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="rounded bg-white px-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={LOGO} alt="Nandan GSE" style={{ height: 36 }} />
+            </div>
+            <div>
+              <div className="text-xs tracking-widest font-bold" style={{ color: "var(--accent)" }}>NANDAN GENIE</div>
+              <div className="text-sm font-bold" style={{ color: "var(--navy)" }}>Choose a new password</div>
+            </div>
+          </div>
+          <label className="block text-xs font-semibold mb-1" style={{ color: "var(--dim)" }}>New password</label>
+          <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} autoComplete="new-password"
+            className="w-full border rounded px-2 py-2 mb-3 text-sm" style={{ borderColor: "#D9D6CD", fontSize: 16 }} />
+          <label className="block text-xs font-semibold mb-1" style={{ color: "var(--dim)" }}>Once more</label>
+          <input type="password" value={newPw2} onChange={(e) => setNewPw2(e.target.value)} autoComplete="new-password"
+            className="w-full border rounded px-2 py-2 mb-3 text-sm" style={{ borderColor: "#D9D6CD", fontSize: 16 }} />
+          {err && <div className="text-xs mb-3 font-semibold" style={{ color: "var(--red)" }}>{err}</div>}
+          {note && <div className="text-xs mb-3 font-semibold" style={{ color: "var(--green)" }}>{note}</div>}
+          <button type="submit" disabled={busy} className="w-full rounded py-2.5 font-bold text-sm" style={{ background: "var(--accent)", color: "#fff", opacity: busy ? 0.6 : 1 }}>
+            {busy ? "One moment…" : "Set the password and open Genie"}
+          </button>
+          <div className="text-xs mt-4 text-center" style={{ color: "var(--muted)" }}>At least eight characters. It changes the moment you press.</div>
+        </form>
+      ) : (
       <form onSubmit={submit} className="w-full max-w-sm rounded-lg p-6" style={{ background: "#fff", borderTop: "4px solid #E8600A" }}>
         <div className="flex items-center gap-3 mb-5">
           <div className="rounded bg-white px-1">
@@ -166,6 +244,7 @@ export default function LoginPage() {
         )}
         <div className="text-xs mt-4 text-center" style={{ color: "var(--muted)" }}>🔒 Nandan GSE people only</div>
       </form>
+      )}
     </div>
   );
 }

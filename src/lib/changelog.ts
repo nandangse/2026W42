@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.10.2",
+    date: "2026-10-02",
+    module: "A password you can actually reset",
+    items: [
+      "FORGOT PASSWORD? NOW FINISHES. Since 6 September the button mailed a reset link and nothing in Genie took the new password at the other end \u2014 the link signed you in and left you where you started. Dr Raghu, 2 Oct 2026: \"I lost my password for genie! Please let me know how to reset\" \u2014 and the honest answer was the SQL editor. The link now comes back to the login page, which turns into \"Choose a new password\".",
+      "CHANGE PASSWORD FROM THE ACCOUNT MENU, signed in \u2014 two boxes, a match check, done. Nothing passes through Genie's servers; it is Supabase's own call.",
+      "When Supabase's mailer has sent its hourly quota, the button says so and says to wait, instead of \"error\" \u2014 because the cure is patience, and every extra press extends it. Until SMTP is pointed at Resend, auth mail is capped at a handful an hour.",
+    ],
+  },
+  {
     v: "5.9.10.1",
     date: "2026-10-01",
     module: "Last year as a run-rate, and a stock register that reads like one",
