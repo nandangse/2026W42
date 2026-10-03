@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.16.1",
+    date: "2026-10-03",
+    module: "Locations: the real map of India",
+    items: [
+      "THE MAP IS THE SURVEY OF INDIA\u2019S BOUNDARY (Dr Raghu, 3 Oct 2026: \"use actual map of india\") \u2014 the datameet india-soi outline, mainland and islands, simplified to 940 points and drawn to India\u2019s own proportions. One label on the map, for the biggest dot; the rest read on hover and in the table beside it, so Mumbai, Navi Mumbai and Thane no longer write over one another.",
+    ],
+  },
+  {
     v: "5.9.16.0",
     date: "2026-10-03",
     module: "Seva: Locations on a map, Discussion points, the AMC register sharpened",

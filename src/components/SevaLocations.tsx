@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { dmy as fmtD, rupee } from "@/lib/fmt";
-import { INDIA_OUTLINE } from "@/lib/seva-geo";
+import { INDIA_RINGS } from "@/lib/india-outline";
 
 const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANGE = "var(--accent)", RED = "var(--red)";
 const BLUE = "#1F6FB2";
@@ -25,10 +25,11 @@ interface Data {
 }
 type SortKey = keyof LocRow;
 
-/* equirectangular, India only — lon 68…97.5, lat 6…37.5 */
-const W = 440, H = 470;
-const px = (lon: number) => ((lon - 68) / (97.5 - 68)) * W;
-const py = (lat: number) => ((37.5 - lat) / (37.5 - 6)) * H;
+/* a plate carrée scaled for India's latitude (cos 22°), so the country keeps its shape — lon 68…97.5, lat 6.5…37.5 */
+const W = 440, SX = W / 29.5, SY = SX / Math.cos((22 * Math.PI) / 180), H = Math.round(31 * SY);
+const px = (lon: number) => (lon - 68) * SX;
+const py = (lat: number) => (37.5 - lat) * SY;
+const INDIA_PATH = INDIA_RINGS.map((ring) => ring.map(([lon, lat], i) => `${i ? "L" : "M"}${px(lon).toFixed(1)} ${py(lat).toFixed(1)}`).join(" ") + " Z").join(" ");
 
 export default function SevaLocations() {
   const [from, setFrom] = useState("2026-04-01");
@@ -96,7 +97,7 @@ export default function SevaLocations() {
         <div className="grid gap-3 mb-3" style={{ gridTemplateColumns: "minmax(300px, 460px) 1fr" }}>
           <div className="bg-white rounded-lg border p-2" style={{ borderColor: BORDER }}>
             <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="customers across India">
-              <path d={INDIA_OUTLINE.map(([lon, lat], i) => `${i ? "L" : "M"}${px(lon).toFixed(1)} ${py(lat).toFixed(1)}`).join(" ") + " Z"} fill="#F3F1EB" stroke="#B8B5AC" strokeWidth={1} />
+              <path d={INDIA_PATH} fill="#F3F1EB" stroke="#9C9A92" strokeWidth={0.8} fillRule="evenodd" />
               {dots.map((d) => {
                 const r = 4 + 18 * Math.sqrt(d.customers / maxCust);
                 const on = place === d.place;
@@ -105,7 +106,8 @@ export default function SevaLocations() {
                     <circle cx={px(d.lon)} cy={py(d.lat)} r={r} fill={on ? ORANGE : BLUE} fillOpacity={0.75} stroke="#fff" strokeWidth={1.5}>
                       <title>{`${d.place}${d.state ? `, ${d.state}` : ""}: ${d.customers} customer${d.customers === 1 ? "" : "s"} · ${d.issues} tickets · ${lakh(d.cost)} spent · ${d.assets} assets`}</title>
                     </circle>
-                    {d.customers >= maxCust / 4 && <text x={px(d.lon) + r + 2} y={py(d.lat) + 3} fontSize={9} fill="#22283A" fontWeight={700}>{d.place} {d.customers}</text>}
+                    {/* one label, for the biggest dot — the rest read on hover and in the table beside, so Mumbai, Navi Mumbai and Thane do not write over one another */}
+                    {d.customers === maxCust && <text x={px(d.lon) + r + 3} y={py(d.lat) + 3} fontSize={9} fill="#22283A" fontWeight={700}>{d.place} {d.customers}</text>}
                   </g>
                 );
               })}
