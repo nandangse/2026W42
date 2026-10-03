@@ -31,10 +31,20 @@ export async function GET(req: Request) {
   try {
     await requireSeva();
     const admin = adminClient();
-    const kind = String(new URL(req.url).searchParams.get("kind") || "");
+    const url = new URL(req.url);
+    const kind = String(url.searchParams.get("kind") || "");
     const k = spec(kind);
-    const { data, error } = await admin
-      .from(k.table).select("*")
+    /* TWELVE THOUSAND TICKETS do not travel to a browser: the search and the
+       status run here (3 Oct 2026), newest first, two thousand at most. */
+    const q = String(url.searchParams.get("q") || "").trim().replace(/[%,()"]/g, " ");
+    const status = String(url.searchParams.get("status") || "").trim();
+    let query = admin.from(k.table).select("*");
+    if (kind === "issue") {
+      if (q) query = query.or(`title.ilike.%${q}%,customer.ilike.%${q}%,machine.ilike.%${q}%,serial_no.ilike.%${q}%,owner.ilike.%${q}%,job_number.ilike.%${q}%,location.ilike.%${q}%,erp_name.ilike.%${q}%,description.ilike.%${q}%`);
+      if (status === "open") query = query.not("status", "ilike", "%closed%").not("status", "ilike", "%resolved%");
+      else if (status && status !== "all") query = query.eq("status", status);
+    }
+    const { data, error } = await query
       .order(k.order, { ascending: !k.desc, nullsFirst: false })
       .limit(2000);
     if (error) {

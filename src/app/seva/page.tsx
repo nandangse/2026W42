@@ -25,6 +25,7 @@ export default async function SevaPage() {
       displayName={user.displayName}
       initials={user.initials ?? null}
       role={user.role ?? "user"}
+      isOwner={user.isOwner}
     />
   );
 }

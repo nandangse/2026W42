@@ -3,6 +3,8 @@ import { swallow } from "@/lib/swallow";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { beat } from "@/lib/cron-beat";
+import { adminClient } from "@/lib/supabase/admin";
+import { pullIssues, pullIssueFiles, copyFrfToDrive } from "@/lib/seva-issues";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -189,9 +191,30 @@ export async function GET(req: Request) {
       }
     } catch (e) { swallow("cron/erp-pull", e); /* the ledger sync is best-effort — the pull above still stands */ }
 
-    // move both cursors only past what we actually walked
-    await db.from("integration_setting").update({ config: { ...cfg, last_pull: maxCreation, jm_cursor: jmCursorNew } }).eq("key", "erpnext");
-    await beat("erp-pull", "done", { last_pull: maxCreation });
+    // ---- PHASE 3 (Dr Raghu, 3 Oct 2026: "support tickets are Issues. Pull
+    // all of them … add this also to the hourly erp pull"): the ERP's Issues
+    // into Seva, every field, from a cursor on `modified`; the files hanging
+    // off them from a cursor on `creation`; and a batch of FRF forms copied
+    // into the Drive. The first hours walk the whole history a dozen pages
+    // at a time; after that an hour brings only what changed.
+    let issueCursor = String(cfg.issue_cursor || ""), issueStart = Number(cfg.issue_start || 0);
+    let fileCursor = String(cfg.issue_file_cursor || ""), fileStart = Number(cfg.issue_file_start || 0);
+    const seva: Record<string, unknown> = {};
+    try {
+      const gadmin = adminClient();
+      const t = await pullIssues(gadmin, { since: issueCursor, start: issueStart, maxPages: 10 });
+      seva.tickets = { read: t.read, written: t.written, done: t.done };
+      if (t.done) { issueCursor = t.maxModified || issueCursor; issueStart = 0; } else { issueStart = t.next_start; }
+      const f = await pullIssueFiles(gadmin, { parent: "Issue", since: fileCursor, start: fileStart, maxPages: 4 });
+      seva.files = { read: f.read, written: f.written, done: f.done };
+      if (f.done) { fileCursor = f.maxModified || fileCursor; fileStart = 0; } else { fileStart = f.next_start; }
+      const d = await copyFrfToDrive(gadmin, { limit: 25, by: "cron@genie" });
+      seva.frf = { copied: d.copied, failed: d.failed, left: d.left };
+    } catch (e) { seva.error = (e instanceof Error ? e.message : String(e)).slice(0, 200); swallow("cron/erp-pull/seva", e); }
+
+    // move the cursors only past what we actually walked
+    await db.from("integration_setting").update({ config: { ...cfg, last_pull: maxCreation, jm_cursor: jmCursorNew, issue_cursor: issueCursor, issue_start: issueStart, issue_file_cursor: fileCursor, issue_file_start: fileStart } }).eq("key", "erpnext");
+    await beat("erp-pull", "done", { last_pull: maxCreation, seva });
     await db.from("crm_audit").insert({
       entity: "opportunity", entity_id: null, action: "erp_pull",
       after: { pulled, skippedExisting, noCompany, cursor: maxCreation }, by_user: null,

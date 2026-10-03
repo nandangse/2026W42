@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.14.0",
+    date: "2026-10-03",
+    module: "Seva: every ERP Issue, every field, every hour \u2014 and the FRF forms into the Drive",
+    items: [
+      "SUPPORT TICKETS ARE THE ERP\u2019S ISSUES (Dr Raghu, 3 Oct 2026: \"support tickets are Issues. Pull all of them please. Make all the fields which are in erp\"). The pull reads fields=[\"*\"]: the whole Issue document lands on the ticket, and the box shows Every field the ERP returned. Twelve thousand tickets back to 2016.",
+      "ON THE HOURLY ERP PULL (\"add this also to the hourly erp pull\"): a third phase walks Issues by modified from a cursor, ten pages an hour until the history is in, then only what changed; the files hanging off them follow by creation. Nothing is typed again; a ticket changed on the ERP changes here within the hour.",
+      "TAGGED (\"issue - tagged to a job - customer - location - product. then we can do the issue by type, resolution, etc\"): the list reads Ticket, Customer, Job, Site, Machine, Type of support, Problem, Owner, Opened; the search runs on the server across all of them and the words of the fault; the status filter carries the ERP\u2019s own statuses.",
+      "THE FRF FORMS INTO THE DRIVE (\"Pull the FRF forms also and put them in to the google drive connected by raghu\"): the forms attached to Issues are copied off the ERP, FRF-named first, into Seva \u2014 FRF forms as \"<ticket> \u2014 <file>\", twenty-five an hour by the cron or forty a click from the owner\u2019s Pull box. Each attachment remembers its Drive link; a file the ERP will not give up is marked once, not retried forever. Migration 0195. The push back to the ERP comes later, as its own verb.",
+    ],
+  },
+  {
     v: "5.9.13.0",
     date: "2026-10-03",
     module: "Saamaan: the Item master writes back to the ERP",

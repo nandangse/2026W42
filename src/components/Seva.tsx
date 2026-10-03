@@ -42,16 +42,16 @@ const daysTo = (d: unknown) => {
   return Math.round((new Date(s).getTime() - new Date(TODAY()).getTime()) / 86400000);
 };
 
-function useReg(kind: string): [Row[] | null, Master[], boolean, () => void] {
+function useReg(kind: string, extra = ""): [Row[] | null, Master[], boolean, () => void] {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [masters, setMasters] = useState<Master[]>([]);
   const [installed, setInstalled] = useState(true);
   const load = useCallback(() => {
-    fetch(`/api/seva/reg?kind=${kind}`, { cache: "no-store" })
+    fetch(`/api/seva/reg?kind=${kind}${extra}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => { setRows(j.rows || []); setMasters(j.masters || []); setInstalled(j.installed !== false); })
       .catch(() => setRows([]));
-  }, [kind]);
+  }, [kind, extra]);
   useEffect(() => { load(); }, [load]);
   return [rows, masters, installed, load];
 }
@@ -142,63 +142,188 @@ const MasterPick = ({ value, options, onChange }: { value: string; options: stri
 );
 
 // ============================ ISSUES ============================
-function IssuesScreen() {
-  const [rows, masters, installed, load] = useReg("issue");
-  const [open, setOpen] = useState<Row | "new" | null>(null);
+/**
+ * THE TICKETS, TAGGED (Dr Raghu, 3 Oct 2026: "issue - tagged to a job -
+ * customer - location - product. then we can do the issue by type,
+ * resolution, etc"). Every ticket off the ERP carries the job it belongs
+ * to, the customer, the site and the machine; the columns say so, and the
+ * search and status run on the server, because twelve thousand tickets do
+ * not travel to a browser.
+ */
+function IssuesScreen({ isOwner = false }: { isOwner?: boolean }) {
+  const [typed, setTyped] = useState("");
   const [q, setQ] = useState("");
   const [statusF, setStatusF] = useState("open");
+  useEffect(() => { const t = setTimeout(() => setQ(typed.trim()), 350); return () => clearTimeout(t); }, [typed]);
+  const [rows, masters, installed, load] = useReg("issue", `&q=${encodeURIComponent(q)}&status=${encodeURIComponent(statusF)}`);
+  const [open, setOpen] = useState<Row | "new" | null>(null);
+  const [pulling, setPulling] = useState(false);
 
   const closedish = (s: string) => /closed|resolved/i.test(s);
-  const needle = q.trim().toLowerCase();
-  const shown = (rows || []).filter((r) => {
-    if (statusF === "open" && closedish(S(r.status))) return false;
-    if (statusF !== "open" && statusF !== "all" && S(r.status) !== statusF) return false;
-    return !needle || `${S(r.title)} ${S(r.customer)} ${S(r.machine)} ${S(r.serial_no)} ${S(r.owner)}`.toLowerCase().includes(needle);
-  });
+  const shown = rows || [];
+  const erpStatuses = Array.from(new Set(["Open", "Replied", "On Hold", "Resolved", "Closed", ...pick(masters, "issue_status")]));
 
   return (
     <Shell installed={installed} title="Support Tickets" onAdd={() => setOpen("new")} addLabel="+ Log a ticket"
-      blurb="What the customer says is wrong — logged the hour it arrives, owned by a name, and closed only when the resolution is written down."
+      blurb="Every Issue off the ERP, every field, refreshed by the hour — tagged to its job, customer, site and machine. What the customer says is wrong, owned by a name, closed only when the resolution is written down."
       extra={
         <>
           <select value={statusF} onChange={(e) => setStatusF(e.target.value)} className="border rounded px-2 py-1.5 text-sm bg-white font-semibold" style={{ borderColor: statusF === "all" ? BORDER : ORANGE }}>
             <option value="open">Open only</option>
             <option value="all">All statuses</option>
-            {pick(masters, "issue_status").map((s) => (<option key={s}>{s}</option>))}
+            {erpStatuses.map((s) => (<option key={s}>{s}</option>))}
           </select>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 customer, machine, serial…" className="border rounded px-2 py-1.5 text-sm" style={{ borderColor: needle ? ORANGE : BORDER, width: 220 }} />
+          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="🔍 ticket, customer, job, site, machine, words…" className="border rounded px-2 py-1.5 text-sm" style={{ borderColor: q ? ORANGE : BORDER, width: 260 }} />
+          {isOwner && <button onClick={() => setPulling(true)} className="rounded border px-3 py-1.5 text-sm font-bold" style={{ borderColor: "var(--blue)", color: "var(--blue)" }} title="The hour does this by itself — this is for the whole history, now">⇩ Pull from ERP</button>}
         </>
       }>
-      <Box min={1020}>
+      <Box min={1240}>
         <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
-          <Th>Status</Th><Th>Issue</Th><Th>Customer</Th><Th>Machine / serial</Th><Th>Category</Th><Th>Owner</Th><Th>Due</Th><Th>Logged</Th>
+          <Th>Status</Th><Th>Ticket</Th><Th>Customer</Th><Th>Job</Th><Th>Site</Th><Th>Machine</Th><Th>Type</Th><Th>Problem</Th><Th>Owner</Th><Th>Opened</Th>
         </tr></thead>
         <tbody>
-          {rows && shown.length === 0 && (<tr><td colSpan={8} className="px-3 py-5 text-center" style={{ color: MUTED }}>
-            {rows.length ? "Nothing matches the filter." : "No tickets yet — pull them from the ERP, or the first call from a customer belongs here."}</td></tr>)}
-          {!rows && (<tr><td colSpan={8} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
+          {rows && shown.length === 0 && (<tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>
+            {q || statusF !== "all" ? "Nothing matches the filter." : "No tickets yet — the hourly pull brings them from the ERP; the first call from a customer belongs here."}</td></tr>)}
+          {!rows && (<tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
           {shown.map((r, i) => {
             const late = daysTo(r.due);
             const overdue = late != null && late < 0 && !closedish(S(r.status));
             return (
               <tr key={r.id} className="border-t" role="button" tabIndex={0} onClick={() => setOpen(r)} style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff", cursor: "pointer" }}>
                 <td className="px-2 py-1.5"><Chip s={S(r.status)} colour={statusColour(S(r.status))} /></td>
-                <td className="px-2 py-1.5 font-semibold" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.title)}</td>
-                <td className="px-2 py-1.5">{S(r.customer) || "—"}</td>
-                <td className="px-2 py-1.5" style={{ color: MUTED }}>{S(r.machine)}{r.serial_no ? ` · ${S(r.serial_no)}` : ""}</td>
-                <td className="px-2 py-1.5" style={{ color: MUTED }}>{S(r.category) || "—"}</td>
-                <td className="px-2 py-1.5">{S(r.owner) || "—"}</td>
-                <td className="px-2 py-1.5 tnum" style={{ color: overdue ? RED : MUTED, fontWeight: overdue ? 700 : 400 }}>
-                  {fmtD(r.due)}{overdue ? ` · ${-late!}d late` : ""}
+                <td className="px-2 py-1.5" style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {S(r.erp_name) && <span className="tnum text-xs font-bold mr-1" style={{ color: "var(--blue)" }}>{S(r.erp_name)}</span>}
+                  <span className="font-semibold">{S(r.title)}</span>
                 </td>
-                <td className="px-2 py-1.5 tnum" style={{ color: MUTED }}>{fmtD(r.at)}</td>
+                <td className="px-2 py-1.5" style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.customer) || "—"}</td>
+                <td className="px-2 py-1.5 tnum font-semibold">{S(r.job_number) || S(r.job_numbers) || "—"}</td>
+                <td className="px-2 py-1.5" style={{ color: MUTED, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.location) || "—"}</td>
+                <td className="px-2 py-1.5" style={{ color: MUTED, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.machine)}{r.serial_no ? ` · ${S(r.serial_no)}` : ""}</td>
+                <td className="px-2 py-1.5" style={{ color: MUTED }}>{S(r.type_of_support) || "—"}</td>
+                <td className="px-2 py-1.5" style={{ color: MUTED }}>{S(r.problem_type) || S(r.category) || "—"}</td>
+                <td className="px-2 py-1.5">{S(r.owner) || "—"}</td>
+                <td className="px-2 py-1.5 tnum" style={{ color: overdue ? RED : MUTED, fontWeight: overdue ? 700 : 400 }}>{fmtD(r.issue_date || r.at)}{overdue ? ` · ${-late!}d late` : ""}</td>
               </tr>
             );
           })}
         </tbody>
       </Box>
       {open && <IssueBox row={open === "new" ? null : open} masters={masters} onClose={() => setOpen(null)} onSaved={() => { setOpen(null); load(); }} />}
+      {pulling && <TicketPullBox onClose={() => { setPulling(false); load(); }} />}
     </Shell>
+  );
+}
+
+/** The whole history off the ERP, now — tickets, then the files hanging off them, then the FRF forms into the Drive. */
+function TicketPullBox({ onClose }: { onClose: () => void }) {
+  const [lines, setLines] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const say = (l: string) => setLines((x) => [...x, l]);
+  const run = async () => {
+    setBusy(true); setLines([]);
+    const post = async (body: Record<string, unknown>) => {
+      const r = await fetch("/api/seva/erp-tickets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `The server answered ${r.status}.`);
+      return j as Record<string, unknown>;
+    };
+    try {
+      for (let start = 0, n = 0; n < 60; n++) {
+        const j = await post({ action: "tickets", start });
+        say(`tickets: read ${j.read}, written ${j.written}${j.done ? " — done" : ""}`);
+        if (j.done) break; start = Number(j.next_start) || start + 6000;
+      }
+      for (let start = 0, n = 0; n < 60; n++) {
+        const j = await post({ action: "attachments", start });
+        say(`attachments: read ${j.read}, indexed ${j.written}${j.done ? " — done" : ""}`);
+        if (j.done) break; start = Number(j.next_start) || start + 6000;
+      }
+      for (let n = 0; n < 10; n++) {
+        const j = await post({ action: "frf", limit: 40 });
+        say(`FRF forms into the Drive: ${j.copied} copied, ${j.failed} refused, ${j.left ?? "?"} still to go`);
+        if (!Number(j.copied) && !Number(j.failed)) break;
+        if (Number(j.left) === 0) break;
+      }
+      say("Finished. The hour keeps it fresh from here, and copies more FRF forms each time.");
+    } catch (e) { say(`Stopped: ${e instanceof Error ? e.message : String(e)}`); }
+    setBusy(false);
+  };
+  return (
+    <Modal onClose={onClose} width={640}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-bold text-sm" style={{ color: INK }}>Pull the support tickets from the ERP</div>
+        <button onClick={onClose} style={{ color: MUTED }}>✕</button>
+      </div>
+      <div className="text-sm mb-2" style={{ color: MUTED, lineHeight: 1.5 }}>
+        Every Issue, every field, back to 2016 — then the index of what is attached to each, then the FRF forms copied into the Drive, forty at a time. The hourly pull does the same from where it left off; this is for the whole history, now.
+      </div>
+      <button onClick={run} disabled={busy} className="rounded px-4 py-1.5 text-sm font-bold text-white mb-2" style={{ background: busy ? MUTED : ORANGE }}>{busy ? "Pulling…" : "⇩ Pull everything"}</button>
+      <div className="text-xs tnum" style={{ color: MUTED, lineHeight: 1.6, maxHeight: 260, overflowY: "auto" }}>{lines.map((l, i) => <div key={i}>{l}</div>)}</div>
+    </Modal>
+  );
+}
+
+/** The ERP's side of a ticket: the tags, the money, the form, what is attached, and every field verbatim. */
+function ErpTicketPanel({ row }: { row: Row }) {
+  const [files, setFiles] = useState<{ id: string; file_name: string; file_url: string; file_size: number | null; is_private: boolean; drive_url: string | null; drive_at: string | null }[] | null>(null);
+  const [every, setEvery] = useState(false);
+  useEffect(() => {
+    fetch(`/api/seva/erp-tickets?name=${encodeURIComponent(S(row.erp_name))}`, { cache: "no-store" }).then((r) => r.json()).then((j) => setFiles(j.rows || [])).catch(() => setFiles([]));
+  }, [row.erp_name]);
+  const erp = (row.erp ?? {}) as Record<string, unknown>;
+  const money = (v: unknown) => (v === null || v === undefined || v === "" || Number(v) === 0 ? "·" : rupee(v));
+  const T: [string, string][] = [
+    ["job_number", "Job"], ["job_numbers", "Jobs"], ["customer", "Customer"], ["location", "Site"], ["equipment", "Machine"],
+    ["type_of_support", "Type of support"], ["problem_type", "Problem"], ["status", "Status"], ["pending_action_status", "Pending action"],
+    ["raised_by", "Raised by"], ["attended_by", "Attended by"], ["handled_by", "Handled by"], ["finally_showed_to", "Finally showed to"],
+    ["issue_date", "Issue date"], ["opening_date", "Opened"], ["resolved_at", "Resolved"], ["agreement_status", "Agreement"],
+    ["frf_no", "FRF no"], ["frf_date", "FRF date"], ["checklist_used", "Checklist"], ["reading", "Reading"],
+    ["amount_billed", "Billed"], ["cost_spent", "Cost"], ["mandays_invested", "Man-days"], ["closure_rating", "Closure rating"], ["lead", "Lead"],
+  ];
+  const show = (k: string, v: unknown) => (/amount|cost/.test(k) ? money(v) : /date|resolved_at|opening/.test(k) ? fmtD(v) : S(v) || "·");
+  return (
+    <div className="rounded border p-3 mb-2" style={{ borderColor: BORDER, background: "#FBFAF7" }}>
+      <div className="flex items-center gap-2 mb-2 flex-wrap text-xs">
+        <b style={{ color: "var(--blue)" }}>{S(row.erp_name)}</b>
+        <span style={{ color: MUTED }}>off the ERP · modified {S(row.erp_modified).slice(0, 16) || "·"} · pulled {fmtD(row.pulled_at)}</span>
+        {row.raised_as_nc ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#FBEAE8", color: "#B3392E" }}>raised as NC</span> : null}
+        {row.via_portal ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#EEF1FA", color: "var(--blue)" }}>via customer portal</span> : null}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-xs">
+        {T.filter(([k]) => row[k] !== null && row[k] !== undefined && S(row[k]) !== "").map(([k, label]) => (
+          <div key={k} className="flex justify-between gap-2" style={{ borderBottom: `1px dotted ${BORDER}` }}>
+            <span style={{ color: MUTED }}>{label}</span><span className="font-semibold text-right" style={{ color: INK }}>{show(k, row[k])}</span>
+          </div>
+        ))}
+      </div>
+      {S(row.resolution_summary) && (
+        <div className="mt-2 text-xs"><b style={{ color: MUTED }}>Resolution, as the ERP has it · </b><span style={{ whiteSpace: "pre-wrap" }}>{S(row.resolution_summary)}</span></div>
+      )}
+      {S(row.costing_details) && (
+        <div className="mt-1 text-xs"><b style={{ color: MUTED }}>Costing · </b><span style={{ whiteSpace: "pre-wrap" }}>{S(row.costing_details)}</span></div>
+      )}
+      <div className="mt-2 text-xs">
+        <b style={{ color: MUTED }}>Attached on the ERP{files ? ` (${files.length})` : ""} · </b>
+        {!files ? <span style={{ color: MUTED }}>reading…</span> : !files.length ? <span style={{ color: MUTED }}>nothing</span> : files.map((f) => (
+          <span key={f.id} className="inline-block mr-2">
+            {f.drive_url ? <a href={f.drive_url} target="_blank" rel="noreferrer" className="font-semibold hover:underline" style={{ color: "var(--blue)" }} title="the copy in the Drive">📁 {f.file_name}</a>
+              : <span style={{ color: INK }}>{f.file_name}</span>}
+            <span style={{ color: MUTED }}>{f.file_size ? ` ${(f.file_size / 1024).toFixed(0)} KB` : ""}{f.drive_url ? "" : " · on the ERP, not yet in the Drive"}</span>
+          </span>
+        ))}
+      </div>
+      <button onClick={() => setEvery((v) => !v)} className="mt-2 text-xs font-bold" style={{ color: "var(--blue)" }}>{every ? "▾" : "▸"} Every field the ERP returned ({Object.keys(erp).length})</button>
+      {every && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 rounded border p-2 mt-1 text-xs" style={{ borderColor: BORDER, background: "#fff" }}>
+          {Object.entries(erp).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-3" style={{ borderBottom: `1px dotted ${BORDER}`, padding: "2px 0" }}>
+              <span style={{ color: MUTED, fontFamily: "monospace" }}>{k}</span>
+              <span className="text-right" style={{ color: v === null || v === "" ? MUTED : INK, wordBreak: "break-all", maxWidth: 300 }}>{v === null || v === "" ? "·" : typeof v === "object" ? JSON.stringify(v) : S(v).replace(/<[^>]+>/g, " ").slice(0, 300)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -226,6 +351,7 @@ function IssueBox({ row, masters, onClose, onSaved }: { row: Row | null; masters
         <div className="font-bold text-sm" style={{ color: INK }}>{row ? "The ticket" : "Log a ticket"}</div>
         <button onClick={onClose} style={{ color: MUTED }}>✕</button>
       </div>
+      {row && S(row.erp_name) && <ErpTicketPanel row={row} />}
       <div className="space-y-2">
         <div><L>What is wrong, in one line</L>
           <input value={f.title} onChange={(e) => set({ title: e.target.value })} className="w-full border rounded px-2 py-1.5 text-sm" style={inputCss} /></div>
@@ -1025,9 +1151,9 @@ function SevaDashboard({ go }: { go: (k: string) => void }) {
 
 // ============================ THE SHELL ============================
 export default function Seva({
-  email, displayName, initials, role,
+  email, displayName, initials, role, isOwner = false,
 }: {
-  email: string; displayName: string | null; initials: string | null; role: string;
+  email: string; displayName: string | null; initials: string | null; role: string; isOwner?: boolean;
 }) {
   const [openKey, setOpenKey] = useState("dashboard");
   const [navOpen, setNavOpen] = useState(true);
@@ -1074,7 +1200,7 @@ export default function Seva({
         </nav>
         <main className="flex-1 p-5" style={{ minWidth: 0 }}>
           {openKey === "dashboard" && <SevaDashboard go={go} />}
-          {openKey === "issues" && <IssuesScreen />}
+          {openKey === "issues" && <IssuesScreen isOwner={isOwner} />}
           {openKey === "amc" && <AmcScreen />}
           {openKey === "push" && <PushScreen />}
           {openKey === "settings" && <SettingsScreen />}

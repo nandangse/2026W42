@@ -42,6 +42,8 @@ export const FOLDERS = {
   purchase_bill: "Bills \u2014 Purchase",
   /* screenshots pasted into an audit query's Details (30 Sep 2026) */
   audit: "Audit queries",
+  /* the Field Report Forms off the ERP's Issues (Dr Raghu, 3 Oct 2026: "Pull the FRF forms also and put them in to the google drive") */
+  seva_frf: "Seva \u2014 FRF forms",
 } as const;
 export type FileKind = keyof typeof FOLDERS;
 
