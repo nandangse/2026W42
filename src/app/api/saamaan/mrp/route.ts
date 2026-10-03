@@ -48,7 +48,7 @@ const N = (v: unknown) => (v === null || v === undefined || v === "" ? null : Nu
 const notInstalled = (m: string) => /does not exist|schema cache/i.test(m);
 
 async function liveJobs(admin: ReturnType<typeof adminClient>): Promise<Doc[]> {
-  const { data, error } = await admin.from("jobs").select("id, tag, cust, fam, proj, tdd, val, stat, kitting_owner")
+  const { data, error } = await admin.from("jobs").select("id, tag, cust, fam, proj, tdd, val, stat, kit, kitting_owner")
     .eq("active", true).eq("delivered", false).is("archived_at", null).order("id").limit(5000);
   if (error) throw new Error(error.message);
   return (data ?? []) as Doc[];
@@ -156,6 +156,8 @@ async function grid(admin: ReturnType<typeof adminClient>, mrpId: string) {
     return {
       job_no: no, live: !!j, project_id: proj, project_name: projName.get(proj) ?? "", tag: S(j?.tag), cust: S(j?.cust), fam: S(j?.fam),
       tdd: (j?.tdd as string | null) ?? null, val: N(j?.val), stat: S(j?.stat), rbom_id: rb ? S(rb.rbom_id) : "",
+      /* the ERP's own kitting % and the kitting owner, as the board carries them */
+      kit: N(j?.kit), kitting_owner: S(j?.kitting_owner),
     };
   }).sort((a, b) => a.project_id.localeCompare(b.project_id, undefined, { numeric: true }) || a.job_no.localeCompare(b.job_no));
 
@@ -204,6 +206,30 @@ async function grid(admin: ReturnType<typeof adminClient>, mrpId: string) {
   return { run, jobs, items: withPlan, issues: issues.length, stockLive: stock !== null };
 }
 
+/** One tick: what the RBOM owes this job for this item, less what has gone, up to `asked`. */
+async function issueOne(admin: ReturnType<typeof adminClient>, mrpId: string, job_no: string, item_code: string, asked: number | null, by: string) {
+  const { data: j } = await admin.from("jobs").select("proj").eq("id", job_no).maybeSingle();
+  const { data: rb } = j?.proj ? await admin.from("material_rbom").select("rbom_id").eq("project_id", String(j.proj)).maybeSingle() : { data: null };
+  if (!rb) throw new HttpError(400, `No RBOM for job ${job_no}'s project.`);
+  const { data: line } = await admin.from("material_rbom_item").select("id, item_name, qty, uom, rate").eq("rbom_id", String(rb.rbom_id)).eq("item_code", item_code).limit(1).maybeSingle();
+  if (!line) throw new HttpError(400, `${item_code} is not on ${rb.rbom_id}.`);
+  const { data: gone } = await admin.from("material_issue").select("qty").eq("job_no", job_no).eq("item_code", item_code);
+  const issued = (gone ?? []).reduce((a, x) => a + (Number(x.qty) || 0), 0);
+  const owed = (Number(line.qty) || 0) - issued;
+  if (owed <= 0) throw new HttpError(400, "Nothing left to issue — the RBOM quantity has gone already.");
+  const qty = asked === null ? owed : Math.min(owed, asked);
+  if (qty <= 0) throw new HttpError(400, "The quantity has to be more than nothing.");
+  const rate = N(line.rate);
+  const { error } = await admin.from("material_issue").insert({
+    job_no, warehouse: `WIP_${job_no}`, item_code, item_name: S(line.item_name), qty, uom: S(line.uom), rate,
+    amount: rate === null ? null : qty * rate, rbom_id: String(rb.rbom_id), rbom_item_id: line.id, mrp_id: mrpId, issued_by: by,
+  });
+  if (error) throw error;
+  return { qty, remaining: owed - qty };
+}
+/** A cell that cannot be ticked (no RBOM line, nothing owed) is skipped, not fatal, in the kit-all walk. */
+function swallowIssue(e: unknown) { void e; }
+
 export async function GET(req: Request) {
   try {
     await requireSaamaan();
@@ -214,7 +240,11 @@ export async function GET(req: Request) {
       if (mode === "run") {
         const id = S(p.get("id"));
         if (!id) throw new HttpError(400, "id required");
-        return NextResponse.json({ ok: true, ...(await grid(admin, id)) });
+        const g = await grid(admin, id);
+        /* every GENERATE on record — who, when, why (3 Oct 2026); pre-0192 the list is simply empty */
+        let gens: Doc[] = [];
+        try { const { data } = await admin.from("material_mrp_gen").select("at, by, note").eq("mrp_id", id).order("at", { ascending: false }).limit(20); gens = (data ?? []) as Doc[]; } catch { /* pre-0192 */ }
+        return NextResponse.json({ ok: true, ...g, gens });
       }
       const [runs, board, counts, plans, kitted] = await Promise.all([
         admin.from("material_mrp").select("*").order("created_at", { ascending: false }).limit(200),
@@ -288,9 +318,19 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, added: add.length, dropped: drop.length });
       }
       if (action === "generate") {
-        const { error } = await admin.from("material_mrp").update({ generated_at: new Date().toISOString() }).eq("id", id);
+        /* WHO, WHEN, WHY — on the run and in the log (Dr Raghu, 3 Oct 2026).
+           Pre-0192 the columns are not there: the timestamp still lands. */
+        const at = new Date().toISOString();
+        const note = S(body.note).slice(0, 400);
+        let { error } = await admin.from("material_mrp").update({ generated_at: at, generated_by: me.email, generated_note: note }).eq("id", id);
+        if (error && /generated_by|generated_note|column|schema cache/i.test(error.message))
+          ({ error } = await admin.from("material_mrp").update({ generated_at: at }).eq("id", id));
         if (error) throw error;
-        return NextResponse.json({ ok: true, ...(await grid(admin, id)) });
+        try { await admin.from("material_mrp_gen").insert({ mrp_id: id, at, by: me.email, note }); } catch { /* pre-0192 */ }
+        const g = await grid(admin, id);
+        let gens: Doc[] = [];
+        try { const { data } = await admin.from("material_mrp_gen").select("at, by, note").eq("mrp_id", id).order("at", { ascending: false }).limit(20); gens = (data ?? []) as Doc[]; } catch { /* pre-0192 */ }
+        return NextResponse.json({ ok: true, ...g, gens });
       }
       if (action === "plan") {
         const rowsIn = (Array.isArray(body.rows) ? body.rows : []) as Doc[];
@@ -363,26 +403,40 @@ export async function POST(req: Request) {
       if (action === "issue") {
         const job_no = S(body.job_no), item_code = S(body.item_code);
         if (!job_no || !item_code) throw new HttpError(400, "job_no and item_code required");
-        // What the RBOM owes this job for this item, less what has gone.
-        const { data: j } = await admin.from("jobs").select("proj").eq("id", job_no).maybeSingle();
-        const { data: rb } = j?.proj ? await admin.from("material_rbom").select("rbom_id").eq("project_id", String(j.proj)).maybeSingle() : { data: null };
-        if (!rb) throw new HttpError(400, `No RBOM for job ${job_no}'s project.`);
-        const { data: line } = await admin.from("material_rbom_item").select("id, item_name, qty, uom, rate").eq("rbom_id", String(rb.rbom_id)).eq("item_code", item_code).limit(1).maybeSingle();
-        if (!line) throw new HttpError(400, `${item_code} is not on ${rb.rbom_id}.`);
-        const { data: gone } = await admin.from("material_issue").select("qty").eq("job_no", job_no).eq("item_code", item_code);
-        const issued = (gone ?? []).reduce((a, x) => a + (Number(x.qty) || 0), 0);
-        const owed = (Number(line.qty) || 0) - issued;
-        if (owed <= 0) throw new HttpError(400, "Nothing left to issue — the RBOM quantity has gone already.");
-        const asked = N(body.qty);
-        const qty = asked === null ? owed : Math.min(owed, asked);
-        if (qty <= 0) throw new HttpError(400, "The quantity has to be more than nothing.");
-        const rate = N(line.rate);
-        const { error } = await admin.from("material_issue").insert({
-          job_no, warehouse: `WIP_${job_no}`, item_code, item_name: S(line.item_name), qty, uom: S(line.uom), rate,
-          amount: rate === null ? null : qty * rate, rbom_id: String(rb.rbom_id), rbom_item_id: line.id, mrp_id: id, issued_by: me.email,
-        });
-        if (error) throw error;
-        return NextResponse.json({ ok: true, qty, remaining: owed - qty });
+        return NextResponse.json({ ok: true, ...(await issueOne(admin, id, job_no, item_code, N(body.qty), me.email)) });
+      }
+      /**
+       * ALL AVAILABLE ITEMS → KIT (Dr Raghu, 3 Oct 2026). For every item on
+       * the run, what the Stock warehouses hold today less what the ERP has
+       * blocked is handed out job by job, in the run's order, up to what the
+       * RBOM still owes each job. One item short for three jobs kits the
+       * first two whole rather than three in part — a kit that is whole can
+       * go to the floor; three partial ones cannot. Nothing moves in the ERP
+       * here; these are ticks, un-tickable, until the slip goes to the store.
+       */
+      if (action === "kit_available") {
+        const g = await grid(admin, id);
+        if (!g.stockLive) return NextResponse.json({ ok: true, ticked: 0, items: 0, short: 0, stockLive: false });
+        let ticked = 0, items = 0, short = 0;
+        for (const it of g.items) {
+          if (it.stock === null) continue;
+          let avail = Math.max(0, (Number(it.stock) || 0) - (Number(it.blocked) || 0));
+          let any = false, wanted = false;
+          for (const j of g.jobs) {
+            const c = it.cells[j.job_no];
+            if (!c) continue;
+            const remaining = (Number(c.qty) || 0) - (Number(c.issued) || 0);
+            if (remaining <= 0) continue;
+            wanted = true;
+            const take = Math.min(remaining, avail);
+            if (take <= 0) continue;
+            try { await issueOne(admin, id, j.job_no, it.item_code, take, me.email); ticked++; any = true; avail -= take; }
+            catch (e) { swallowIssue(e); }
+          }
+          if (any) items++;
+          if (wanted && avail <= 0) short++;
+        }
+        return NextResponse.json({ ok: true, ticked, items, short, stockLive: true });
       }
       throw new HttpError(400, "Unknown action.");
     } catch (e) {

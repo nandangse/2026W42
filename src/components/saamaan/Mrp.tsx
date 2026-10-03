@@ -22,6 +22,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { STORE_HANDS, PURCHASE_HANDS } from "@/lib/saamaan-hands";
 import { Screen, Btn, Note, Modal, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, RED, S, fmtD, post } from "@/components/ims/ui";
 import { JobLightbox, type WipJob } from "@/components/JobsInProgress";
 import GenieTable from "@/components/GenieTable";
@@ -31,15 +32,16 @@ import { GroupPicker } from "./Items";
 import { rupee } from "@/lib/fmt";
 const money = (n: number | null) => rupee(n, "·");
 
-interface Run { id: string; mrp_no: string; name: string; run_date: string; by: string | null; created_at: string; generated_at: string | null; jobs?: number; value?: number; kitted_value?: number }
+interface Run { id: string; mrp_no: string; name: string; run_date: string; by: string | null; created_at: string; generated_at: string | null; generated_by?: string | null; generated_note?: string | null; jobs?: number; value?: number; kitted_value?: number }
 interface BoardJob { job_no: string; tag: string; cust: string; fam: string; project_id: string; project_name: string; tdd: string | null; val: number | null; stat: string }
-interface Col extends BoardJob { live: boolean; rbom_id: string }
+interface Col extends BoardJob { live: boolean; rbom_id: string; kit?: number | null; kitting_owner?: string }
+interface Gen { at: string; by: string; note: string }
 interface Cell {
   qty: number; uom: string; rate: number | null; value: number | null; status: string; source: string;
   issued: number; issued_value: number; issues: number; last_by: string; last_at: string;
 }
 interface Item { item_code: string; item_name: string; item_group: string; cells: Record<string, Cell>; stock: number | null; ordered: number | null; blocked: number | null; order_qty: number | null }
-interface Grid { run: Run; jobs: Col[]; items: Item[]; issues: number; stockLive: boolean }
+interface Grid { run: Run; jobs: Col[]; items: Item[]; issues: number; stockLive: boolean; gens?: Gen[] }
 interface Person { email: string; display_name: string | null; initials: string | null }
 
 /**
@@ -197,6 +199,33 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
     await keepPlan(rows);
     await loadRun(runId);
   };
+  /* THE TWO DROPDOWNS CARRY THE NAMED HANDS ONLY (lib/saamaan-hands). A
+     hand without a Genie account yet still appears, by the name in the list,
+     so the slip can be addressed; the display name wins once there is one. */
+  const handsOf = (list: { email: string; name: string }[]) => list.map((h) => {
+    const p = people.find((x) => x.email.toLowerCase() === h.email);
+    return { email: h.email, label: p?.display_name || h.name };
+  });
+  const storeHands = handsOf(STORE_HANDS), purchaseHands = handsOf(PURCHASE_HANDS);
+
+  /* ALL AVAILABLE ITEMS → KIT (Dr Raghu, 3 Oct 2026: "make one more box
+     which says All Available Items Kit. When you do that, whatever is
+     available to be done will be ticked, and all that can then be moved to
+     store for kitting"). The server walks every cell: what the RBOM still
+     owes the job, as far as the Stock warehouses can cover it today, is
+     ticked into the WIP — job by job in the run's order, so one item short
+     for three jobs kits the first two whole rather than all three in part. */
+  const kitAvailable = async () => {
+    if (!grid) return;
+    if (!window.confirm("Tick every item the Stock warehouses can cover today, for every job on this run? You can un-tick any cell afterwards, and nothing moves until it is submitted to the store.")) return;
+    setBusy("kitall"); setMsg("");
+    const r = await post("/api/saamaan/mrp", { action: "kit_available", id: runId });
+    setBusy("");
+    if (!r.ok) { setMsg(r.error || "Could not tick."); return; }
+    setMsg(`${r.ticked} cell${r.ticked === 1 ? "" : "s"} ticked across ${r.items} item${r.items === 1 ? "" : "s"}${r.short ? ` · ${r.short} item${r.short === 1 ? "" : "s"} short in stock, left for the order box` : ""}${r.stockLive === false ? " · the ERP could not be read, so nothing was ticked" : ""}. Now submit to store.`);
+    await loadRun(runId);
+  };
+
   const submit = async (kind: "store" | "purchase") => {
     const to = kind === "store" ? toStore : toPurchase;
     setBusy(kind); setMsg("");
@@ -234,8 +263,12 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
     await loadRun(runId); await loadList();
   };
   const generate = async () => {
+    /* WHY (Dr Raghu, 3 Oct 2026: "who has last run it and why it has been
+       run"). A line, kept on the run and in its log. Escape cancels. */
+    const note = window.prompt("Why is the run being generated? One line — it is kept on record with your name and the time.", grid?.run?.generated_at ? "refresh to the latest stock and RBOMs" : "first generation");
+    if (note === null) return;
     setBusy("generate"); setMsg("");
-    const r = await post("/api/saamaan/mrp", { action: "generate", id: runId });
+    const r = await post("/api/saamaan/mrp", { action: "generate", id: runId, note: note.trim() });
     setBusy("");
     if (!r.ok) { setMsg(r.error || "Could not generate."); return; }
     setGrid(r as unknown as Grid);
@@ -356,7 +389,13 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
             <span className="text-xs" style={{ color: MUTED }}>Valuation <b className="tnum" style={{ color: INK }}>{money(totals.value)}</b></span>
             <span className="text-xs" style={{ color: MUTED }}>Kitted <b className="tnum" style={{ color: totals.issued ? GREEN : INK }}>{money(totals.issued)}</b> · {pct(totals.issued, totals.value)}</span>
             <span className="text-xs" style={{ color: MUTED }}>Value of run <b className="tnum" style={{ color: INK }}>{money(totals.runValue)}</b></span>
-            {run.generated_at && <span className="text-xs" style={{ color: MUTED }}>generated <span className="tnum">{fmtAt(run.generated_at)}</span></span>}
+            {run.generated_at && (
+              <span className="text-xs" style={{ color: MUTED }}>
+                last generated <b className="tnum" style={{ color: INK }}>{fmtAt(run.generated_at)}</b>
+                {run.generated_by ? <> by <b style={{ color: INK }}>{run.generated_by.split("@")[0]}</b></> : null}
+                {run.generated_note ? <> — <i>{run.generated_note}</i></> : null}
+              </span>
+            )}
           </>) : <span className="text-sm" style={{ color: MUTED }}>Reading the run…</span>}
         </div>
         <div className="flex gap-1 mt-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
@@ -377,21 +416,71 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
       {run && tab === "released" && <Released mrp={runId} />}
 
       {run && tab === "jobs" && (<>
-        {/* ---------------------------------------------------- the jobs */}
+        {/* ---------------------------------------------------- the jobs
+            A LIST, NOT CHIPS (Dr Raghu, 3 Oct 2026: "show this to me as a
+            list with the job number, the customer tag, and also show the
+            existing kitting details and the kitting percentage of all of
+            them as per the system. Before he presses Generate, he already
+            knows what's happening there"). Two kitting figures side by
+            side: what this run has ticked into the WIP (Genie), and the
+            ERP's own kitting % on the job (the system). */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <Btn onClick={() => setPicker(true)}>Jobs to add</Btn>
-          {(grid?.jobs ?? []).map((j) => (
-            <button key={j.job_no} onClick={() => setOpenJob(j)}
-              className="rounded px-2 py-1 text-xs font-bold" style={{ background: j.rbom_id ? NAVY_SOFT : "#FEF3C7", color: j.rbom_id ? NAVY : "#92400E", border: `1px solid ${BORDER}` }}
-              title={`${j.tag || "(no tag)"} · ${j.cust}\n${j.project_id.replace(/^NGSE-PROJ-/, "project ")} · TDD ${fmtD(j.tdd)} · ${j.val !== null ? cr(j.val) : "·"}${j.rbom_id ? ` · ${j.rbom_id}` : " · NO RBOM YET — build it on the BOM front"}`}>
-              {j.job_no}
-            </button>
-          ))}
           {grid && grid.jobs.length > 0 && (
-            <Btn kind="primary" onClick={async () => { await generate(); setTab("plan"); }} disabled={busy === "generate"}>{busy === "generate" ? "Generating…" : "GENERATE"}</Btn>
+            <Btn kind="primary" onClick={async () => { await generate(); setTab("plan"); }} disabled={busy === "generate"} title="Re-reads every RBOM and the live stock — do it before planning, every time, so the run never works on old numbers">{busy === "generate" ? "Generating…" : run.generated_at ? "GENERATE AGAIN · latest data" : "GENERATE"}</Btn>
+          )}
+          {run.generated_at && (
+            <span className="text-xs" style={{ color: MUTED }}>
+              Generate again before you plan — the grid is as of <b className="tnum" style={{ color: INK }}>{fmtAt(run.generated_at)}</b>; stock, RBOM lines and the ERP&apos;s kitting move in between.
+            </span>
           )}
         </div>
         {grid && grid.jobs.length === 0 && <Note kind="info">Add jobs to the run, then GENERATE.</Note>}
+        {grid && grid.jobs.length > 0 && (
+          <div className="rounded-lg border overflow-auto mb-3" style={{ borderColor: BORDER, background: "#fff" }}>
+            <table className="w-full text-xs genie-table" style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 900 }}>
+              <thead><tr style={{ background: "#14224F", color: "#fff" }}>
+                <th className="px-2 py-2 text-left">Job</th><th className="px-2 py-2 text-left">Customer · tag</th><th className="px-2 py-2 text-left">Project</th>
+                <th className="px-2 py-2 text-center">TDD</th><th className="px-2 py-2 text-right">Value</th><th className="px-2 py-2 text-left">RBOM</th>
+                <th className="px-2 py-2 text-right" title="items ticked into the WIP on this run · of the RBOM's items">Kitted here (items)</th>
+                <th className="px-2 py-2 text-right" title="value ticked into the WIP · of the RBOM's value">Kitted here (value)</th>
+                <th className="px-2 py-2 text-right" title="the ERP's own Kitting % on the job, as the boards show it">Kitting % (ERP)</th>
+                <th className="px-2 py-2 text-left">Kitting owner</th>
+              </tr></thead>
+              <tbody>
+                {grid.jobs.map((j, i) => {
+                  const o = perJob.get(j.job_no) ?? { cells: 0, done: 0, value: 0, issued: 0 };
+                  const erpKit = j.kit ?? null;
+                  return (
+                    <tr key={j.job_no} className="border-t" style={{ borderColor: BORDER, background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                      <td className="px-2 py-1.5"><button onClick={() => setOpenJob(j)} className="font-bold hover:underline" style={{ color: NAVY }} title="open the job">{j.job_no}</button>{!j.live && <span className="ml-1 text-xs" style={{ color: RED }}>not on the board</span>}</td>
+                      <td className="px-2 py-1.5"><b>{j.cust || "·"}</b>{j.tag ? <span style={{ color: MUTED }}> · {j.tag}</span> : null}{j.fam ? <span className="ml-1 text-xs" style={{ color: MUTED }}>({j.fam})</span> : null}</td>
+                      <td className="px-2 py-1.5" style={{ color: MUTED }}>{j.project_id.replace(/^NGSE-PROJ-/, "")}{j.project_name ? ` · ${j.project_name.slice(0, 30)}` : ""}</td>
+                      <td className="px-2 py-1.5 text-center tnum whitespace-nowrap">{fmtD(j.tdd)}</td>
+                      <td className="px-2 py-1.5 text-right tnum">{j.val !== null ? cr(j.val) : "·"}</td>
+                      <td className="px-2 py-1.5">{j.rbom_id ? <span style={{ color: MUTED }}>{j.rbom_id}</span> : <span className="font-bold" style={{ color: "#92400E" }}>no RBOM yet — build it on the BOM front</span>}</td>
+                      <td className="px-2 py-1.5 text-right tnum"><span style={{ color: o.done ? GREEN : MUTED, fontWeight: 700 }}>{o.done}</span><span style={{ color: MUTED }}> / {o.cells}</span></td>
+                      <td className="px-2 py-1.5 text-right tnum">{o.value ? <>{money(o.issued)} <span style={{ color: MUTED }}>/ {money(o.value)}</span> <b style={{ color: o.issued ? GREEN : MUTED }}>{pct(o.issued, o.value)}</b></> : "·"}</td>
+                      <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: erpKit === null ? MUTED : erpKit >= 100 ? GREEN : erpKit > 0 ? AMBER : RED }}>{erpKit === null ? "·" : `${Math.round(erpKit)}%`}</td>
+                      <td className="px-2 py-1.5" style={{ color: MUTED }}>{j.kitting_owner ? j.kitting_owner.split("@")[0] : "·"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {/* ON RECORD — every generation, who and why */}
+        {!!grid?.gens?.length && (
+          <div className="rounded-lg border p-2" style={{ borderColor: BORDER, background: "#fff" }}>
+            <div className="text-xs font-bold uppercase mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>Generated — on record, newest first</div>
+            {grid.gens.map((g, i) => (
+              <div key={i} className="text-xs py-0.5" style={{ color: MUTED }}>
+                <span className="tnum" style={{ color: INK }}>{fmtAt(g.at)}</span> · <b style={{ color: INK }}>{(g.by || "").split("@")[0] || "·"}</b>{g.note ? <> — <i>{g.note}</i></> : null}
+              </div>
+            ))}
+          </div>
+        )}
       </>)}
 
       {run && tab === "plan" && (<>
@@ -424,14 +513,15 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
             {grid && !grid.stockLive && <span className="text-xs" style={{ color: AMBER }}>the ERP could not be read — stock and in-order show dots</span>}
             {canEdit && (
               <span className="ml-auto flex items-center gap-1 flex-wrap">
-                <select value={toStore} onChange={(e) => setToStore(e.target.value)} className="rounded border px-1.5 py-1 text-xs bg-white" style={{ borderColor: BORDER, maxWidth: 170 }} title="the store keeper — set the default in Masters">
+                <Btn onClick={kitAvailable} disabled={busy === "kitall" || !grid.stockLive} title={grid.stockLive ? "Tick, for every job, everything the Stock warehouses can cover today — then submit to store" : "The ERP could not be read — stock is unknown, so nothing can be ticked by it"}>{busy === "kitall" ? "Ticking…" : "☑ All available items → kit"}</Btn>
+                <select value={toStore} onChange={(e) => setToStore(e.target.value)} className="rounded border px-1.5 py-1 text-xs bg-white" style={{ borderColor: BORDER, maxWidth: 170 }} title="the store keeper — Neeraj, Ulhas or Rameez">
                   <option value="">store keeper → who?</option>
-                  {people.map((p) => <option key={p.email} value={p.email}>{p.display_name || p.email.split("@")[0]}</option>)}
+                  {storeHands.map((p) => <option key={p.email} value={p.email}>{p.label}</option>)}
                 </select>
                 <Btn kind="primary" onClick={() => submit("store")} disabled={busy === "store" || !toStore} title="Kitting: every tick on these jobs not yet on a slip becomes one issue slip to the store">Submit to store · kitting →</Btn>
-                <select value={toPurchase} onChange={(e) => setToPurchase(e.target.value)} className="rounded border px-1.5 py-1 text-xs bg-white" style={{ borderColor: BORDER, maxWidth: 170 }} title="purchase — set the default in Masters">
+                <select value={toPurchase} onChange={(e) => setToPurchase(e.target.value)} className="rounded border px-1.5 py-1 text-xs bg-white" style={{ borderColor: BORDER, maxWidth: 170 }} title="purchase — Mukesh, Pradip, Akshay or Shailaja">
                   <option value="">requisition → who?</option>
-                  {people.map((p) => <option key={p.email} value={p.email}>{p.display_name || p.email.split("@")[0]}</option>)}
+                  {purchaseHands.map((p) => <option key={p.email} value={p.email}>{p.label}</option>)}
                 </select>
                 <Btn kind="primary" onClick={() => submit("purchase")} disabled={busy === "purchase" || !toPurchase} title="Requisition: the order boxes become one purchase requisition">Submit to purchase · requisition →</Btn>
               </span>

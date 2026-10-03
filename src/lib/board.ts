@@ -276,10 +276,20 @@ export async function buildBoard(supabase: SupabaseClient) {
   // Jobs are filtered by Project Owners only. Tasks, by contrast, can be
   // assigned to ANY account that exists — whatever their role. Both lists come
   // only from real accounts, never from raw ERP text.
-  const projectOwners = people.filter((p) => p.role === "project_owner" && p.initials);
+  const allJobs = (jobsRes.data || []).map(mapJob);
+  /* AN ADMIN WHO OWNS JOBS IS A PROJECT OWNER TOO (Dr Raghu, 3 Oct 2026:
+     "pankaj is not just admin he is also the project manager, his name
+     should be seen in that too"). The Jobmaster is the judge: an admin
+     whose e-mail stands as Planning Owner on any job on the board is in the
+     list; one who owns no job is not, so the owner dropdowns stay short. */
+  const ownKey = (v: unknown) => String(v ?? "").trim().toLowerCase().split("@")[0].trim();
+  const ownsJobs = new Set(allJobs.map((j) => ownKey(j.own)).filter(Boolean));
+  const projectOwners = people.filter((p) => p.initials && (
+    p.role === "project_owner" ||
+    (p.role === "admin" && [p.email, p.erpOwner, p.initials, p.name].some((k) => ownKey(k) && ownsJobs.has(ownKey(k))))
+  ));
   const assignableUsers = people;
 
-  const allJobs = (jobsRes.data || []).map(mapJob);
   // ERP owner text → Project Owner account. Returns the names that matched
   // nobody, which Admin surfaces so they can be linked.
   const unlinkedOwners = resolveOwners(allJobs, people);

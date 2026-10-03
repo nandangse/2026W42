@@ -89,6 +89,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.11.1",
+    date: "2026-10-03",
+    module: "Saamaan: the clock pulls the ERP, the MRP run knows its jobs",
+    items: [
+      "THE ERP PULL RUNS BY ITSELF FOUR TIMES A DAY \u2014 6 am, 10 am, 2 pm, 6 pm IST (Dr Raghu, 3 Oct 2026: \"once every 4 hours \u2026 once at 6 am \u2026 stop at 8 pm\"). The 10 pm slot would pass his 8 pm, so the day ends at 6 pm and starts again at 6 am. Same seven phases as the button, same code; every phase lands in the pull ledger as \"cron\" beside the hands\u2019 own, and the cron beats fired/done/failed like every other \u2014 \"keep records of this so that it is happening\". The button stays for a pull in between.",
+      "PANKAJ IS A PROJECT OWNER AS WELL AS AN ADMIN (\"his name should be seen in that too\"): an admin whose e-mail stands as Planning Owner on any job on the board now appears in every project-owner dropdown and filter. Judged by the Jobmaster, not by hand \u2014 an admin who owns no job stays out.",
+      "THE MRP RUN\u2019S JOBS TAB IS A LIST, NOT CHIPS: job number, customer and tag, project, TDD, value, RBOM, what this run has kitted (items and value), the ERP\u2019s own kitting % and the kitting owner \u2014 \"before he presses Generate, he already knows what's happening there\". GENERATE reads \"generate again \u00b7 latest data\" once a run exists, with the as-of time beside it, so Mukesh regenerates before planning rather than working old numbers.",
+      "GENERATE ASKS WHY, AND THE RUN REMEMBERS (\"the last MRP run on this date and time by this person \u2026 who has last run it and why\"): one line typed at Generate, kept on the run \u2014 last generated when, by whom, why \u2014 and in a log under the jobs, every generation, newest first. Migration 0192.",
+      "SUBMIT TO STORE AND SUBMIT TO PURCHASE CARRY THE NAMED HANDS ONLY: the store keeper is Neeraj Yadav, Ulhas or Rameez; the requisition goes to Mukesh, Pradip, Akshay or Shailaja (\"Right now, everybody is in\"). One list in lib/saamaan-hands.",
+      "\u2611 ALL AVAILABLE ITEMS \u2192 KIT: one button ticks, for every job on the run, everything the Stock warehouses can cover today \u2014 job by job in the run\u2019s order, so one item short for three jobs kits the first two whole rather than three in part. Nothing moves until it is submitted to the store; any tick can still be taken back.",
+      "JOB PLAN: MATERIAL YET TO RECEIVE SHOWS ON TOP (Pankaj\u2019s feature request of 2 Oct 2026), earliest receivable date first; QC defective next; received last.",
+    ],
+  },
+  {
     v: "5.9.11.0",
     date: "2026-10-03",
     module: "Saamaan members fill the material dates and run the MRP",

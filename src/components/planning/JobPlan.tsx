@@ -525,7 +525,12 @@ export function JobPlan({
   };
 
   // ---- materials ----
-  const mats = board.materials[dj.id] || [];
+  /* YET TO RECEIVE ON TOP (Pankaj, 2 Oct 2026, feature request: "In job
+     plan, material yet to receive should show on top"). What is still short
+     first — earliest receivable date first among those — then QC defective,
+     then what has come in. */
+  const matRank = (st: string | null | undefined) => (st === "Received" ? 2 : st === "QC Defective" ? 1 : 0);
+  const mats = [...(board.materials[dj.id] || [])].sort((x, y) => matRank(x.status) - matRank(y.status) || String(x.due || "9999").localeCompare(String(y.due || "9999")));
   const ensureMats = async () => {
     if (!canEdit) return; // seeding the default checklist is a write
     if (mats.length || seededMat.current === dj.id) return;

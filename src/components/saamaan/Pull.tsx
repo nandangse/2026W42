@@ -65,7 +65,13 @@ export default function Pull({ summary, isOwner, onDone }: { summary: Summary; i
       title="ERP pull"
       blurb="Reads nandanerp into Saamaan — items, child tables, files, projects, BOMs, then the BOM lines of the jobs in process. Nothing on the ERP is written, ever."
       action={mayPull ? <Btn kind="primary" onClick={run} disabled={busy} title="Seven phases, one after the other">{busy ? "Pulling…" : "⇣ Pull from the ERP"}</Btn> : undefined}>
-      {!mayPull && <Note kind="info">The ERP door is Raghu, Pankaj and Mukesh. The ledger below shows every walk that was made, and when.</Note>}
+      {/* THE CLOCK DOES IT TOO (Dr Raghu, 3 Oct 2026). Four walks a day, by
+          themselves; the ledger shows them as "cron" beside the hands' own. */}
+      <Note kind="info">
+        <b>Pulled by the clock at 6 am, 10 am, 2 pm and 6 pm</b> every day — the same seven phases, logged below as <b>cron</b>.
+        The button is for a pull in between; {mayPull ? "it is yours to press." : "it belongs to Raghu, Pankaj and Mukesh."}
+        {(() => { const last = (summary.pulls || []).find((r) => r.by === "cron@genie"); return last ? <> Last by the clock: <b>{fmtAt(last.at)}</b> ({last.phase}).</> : <> No run by the clock yet.</>; })()}
+      </Note>
       {!summary.erpBase && <Note kind="warn">The ERP&apos;s URL is not saved — CRM → Settings → Integrations holds the ERPNext keys, and Saamaan borrows them from there.</Note>}
 
       <div className="rounded-lg border mb-3" style={{ borderColor: BORDER, background: "#fff" }}>
