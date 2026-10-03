@@ -92,7 +92,7 @@ export default function SaamaanApp({
         </Note>
       );
     switch (here) {
-      case "items": return <Items summary={summary} initialGroup={groupPick} />;
+      case "items": return <Items summary={summary} initialGroup={groupPick} email={email} isOwner={isOwner} />;
       case "projects": return <Projects summary={summary} />;
       case "bom": return <Bom summary={summary} />;
       case "wip": return <Wip erpBase={summary.erpBase} role={role} summary={summary} />;

@@ -17,9 +17,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GenieTable from "@/components/GenieTable";
-import { Screen, Modal, Btn, Note, Chip, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, S, fmtD, statusColour } from "@/components/ims/ui";
+import { Screen, Modal, Btn, Note, Chip, INK, MUTED, BORDER, NAVY, NAVY_SOFT, GREEN, AMBER, RED, ORANGE, S, fmtD, statusColour, post } from "@/components/ims/ui";
 import type { Summary } from "./Dashboard";
 import { rupee, numFmt } from "@/lib/fmt";
+import { mayEditItems, mayMergeItems } from "@/lib/saamaan-hands";
 const money = (n: unknown) => rupee(n, "·", 2);
 const num = (n: unknown) => numFmt(n);
 
@@ -66,7 +67,7 @@ const DrawingLinks = ({ r, base }: { r: Row; base: string }) => {
   );
 };
 
-export default function Items({ summary, initialGroup }: { summary: Summary; initialGroup: string }) {
+export default function Items({ summary, initialGroup, email = "", isOwner = false }: { summary: Summary; initialGroup: string; email?: string; isOwner?: boolean }) {
   const base = summary.erpBase;
   const [q, setQ] = useState("");
   const [typed, setTyped] = useState("");
@@ -78,6 +79,34 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
   const [err, setErr] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const SIZE = 200;
+  /* THE ITEM MASTER, WRITTEN BACK (Dr Raghu, 3 Oct 2026: "add a checkbox at
+     the start so he can choose multiple items … Select All … select
+     multiple items and, at the top, say Class B and Change … move an item
+     to another item group … merge items"). Ticks are on this page of rows;
+     the bar appears once anything is ticked. Writing is Mukesh's and
+     Rameez's (and the owner's); the MERGE button is theirs alone — not even
+     the owner sees it. */
+  const canEdit = mayEditItems(email, isOwner);
+  const canMerge = mayMergeItems(email);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [cls, setCls] = useState("");
+  const [toGroup, setToGroup] = useState("");
+  const [merging, setMerging] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+  const toggleSel = (code: string) => setSel((s) => { const n = new Set(s); if (n.has(code)) n.delete(code); else n.add(code); return n; });
+  const allOnPage = !!rows?.length && rows.every((r) => sel.has(r.item_code));
+  const selectAll = () => setSel((s) => { const n = new Set(s); if (allOnPage) rows?.forEach((r) => n.delete(r.item_code)); else rows?.forEach((r) => n.add(r.item_code)); return n; });
+  const bulk = async (body: Record<string, unknown>, label: string) => {
+    setBusy(label); setMsg("");
+    const r = await post("/api/saamaan/item-edit", { ...body, codes: [...sel] });
+    setBusy("");
+    if (!r.ok) { setMsg(r.error || "The ERP did not take it."); return; }
+    const failed = (r.failed as { code: string; error: string }[]) || [];
+    setMsg(`${r.done} item${r.done === 1 ? "" : "s"} changed on the ERP and here${failed.length ? ` · ${failed.length} refused: ${failed.slice(0, 3).map((f) => `${f.code} (${f.error.slice(0, 80)})`).join("; ")}` : ""}.`);
+    if (!failed.length) setSel(new Set());
+    load();
+  };
 
   useEffect(() => { setGroups(initialGroup ? [initialGroup] : []); setPage(0); }, [initialGroup]);
   /** The search waits for the typing to stop; a query a keystroke is a query too many. */
@@ -142,8 +171,38 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
         <Btn onClick={print} title="Print the rows on screen, with the filters named">Print / PDF</Btn>
       </>}>
       {err && <Note kind="error">{err}</Note>}
+      {msg && <Note kind="warn">{msg}</Note>}
+
+      {/* THE BULK BAR — once anything is ticked */}
+      {canEdit && sel.size > 0 && (
+        <div className="rounded-lg border p-2 mb-2 flex items-center gap-2 flex-wrap" style={{ borderColor: ORANGE, background: "#FFF7F3" }}>
+          <b className="text-sm" style={{ color: INK }}>{sel.size} ticked</b>
+          <button onClick={() => setSel(new Set())} className="text-xs" style={{ color: MUTED }}>clear</button>
+          <span className="text-xs ml-2" style={{ color: MUTED }}>Class</span>
+          <select value={cls} onChange={(e) => setCls(e.target.value)} className="rounded border px-1.5 py-1 text-xs bg-white" style={{ borderColor: BORDER }}>
+            <option value="">— blank —</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
+          </select>
+          <Btn kind="primary" onClick={() => { if (window.confirm(`Set class ${cls || "blank"} on ${sel.size} item${sel.size === 1 ? "" : "s"} — on the ERP, now?`)) void bulk({ action: "bulk_class", cls }, "cls"); }} disabled={!!busy} title="Changes the class on the ERP for every ticked item, then here">{busy === "cls" ? "Changing…" : "Change"}</Btn>
+          <span className="text-xs ml-2" style={{ color: MUTED }}>Move to group</span>
+          <select value={toGroup} onChange={(e) => setToGroup(e.target.value)} className="rounded border px-1.5 py-1 text-xs bg-white" style={{ borderColor: BORDER, maxWidth: 220 }}>
+            <option value="">— choose —</option>
+            {summary.groups.map((g) => <option key={g.item_group} value={g.item_group}>{g.item_group}</option>)}
+          </select>
+          <Btn onClick={() => { if (toGroup && window.confirm(`Move ${sel.size} item${sel.size === 1 ? "" : "s"} to "${toGroup}" — on the ERP, now?`)) void bulk({ action: "group", item_group: toGroup }, "grp"); }} disabled={!!busy || !toGroup} title="Moves every ticked item to that group on the ERP, then here">{busy === "grp" ? "Moving…" : "Move"}</Btn>
+          {canMerge && (
+            <Btn onClick={() => setMerging(true)} disabled={!!busy || sel.size < 2} title="Merge the ticked items into one — pick the master, then Generate. Irreversible on the ERP."
+              >⚠ Merge {sel.size >= 2 ? `${sel.size} items` : ""}</Btn>
+          )}
+          <span className="ml-auto text-xs" style={{ color: MUTED }}>Prices are not changed in bulk — open an item and type its price, one by one.</span>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 mb-2 flex-wrap">
+        {canEdit && (
+          <label className="text-xs flex items-center gap-1 rounded border px-2 py-1.5 bg-white" style={{ borderColor: BORDER, color: INK }} title="Tick every row on this page">
+            <input type="checkbox" checked={allOnPage} onChange={selectAll} style={{ accentColor: NAVY }} /> Select all on page
+          </label>
+        )}
         <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="🔍 code, name, description, drawing no."
           className="px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER, minWidth: 260, flex: "1 1 260px", maxWidth: 420 }} />
         <GroupPicker all={summary.groups} value={groups} onChange={(g) => { setGroups(g); setPage(0); }} />
@@ -162,6 +221,9 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
         minWidth={1100}
         empty={summary.lastPulledAt ? "No item matches — loosen the search, or try another group." : "Nothing here yet — the ERP has not been pulled. Open ERP pull."}
         columns={[
+          ...(canEdit ? [{ key: "tick", label: "☐", align: "center" as const, render: (r: Row) => (
+            <input type="checkbox" checked={sel.has(r.item_code)} onChange={() => toggleSel(r.item_code)} onClick={(e) => e.stopPropagation()} style={{ accentColor: NAVY }} aria-label={`tick ${r.item_code}`} />
+          ) }] : []),
           { key: "code", label: "Code", align: "left", sort: (r) => r.item_code,
             render: (r) => <button onClick={() => setOpen(r.item_code)} className="font-bold hover:underline text-left" style={{ color: NAVY }}>{r.item_code}</button> },
           { key: "name", label: "Name", align: "left", sort: (r) => S(r.item_name),
@@ -187,8 +249,81 @@ export default function Items({ summary, initialGroup }: { summary: Summary; ini
         ]}
       />
 
-      {open && <Detail code={open} base={base} onClose={() => setOpen(null)} />}
+      {open && <Detail code={open} base={base} canEdit={canEdit} onClose={() => { setOpen(null); load(); }} />}
+      {merging && (
+        <MergeBox codes={[...sel]} rows={rows || []} onClose={() => setMerging(false)}
+          onDone={(m) => { setMerging(false); setSel(new Set()); setMsg(m); load(); }} />
+      )}
     </Screen>
+  );
+}
+
+// ============================================================ the merge
+/**
+ * MERGE ITEMS (Dr Raghu, 3 Oct 2026: "choose those four items and have a
+ * button saying Merge … it should ask which one of the four should be the
+ * master. He chooses that, and then he says Generate. All the records of
+ * those, including issue, purchase, BOM, etc., will change all over the
+ * system, and that will again get pushed back into the ERP").
+ *
+ * The ERP merges first, by its own Rename-and-Merge; Genie follows only
+ * when the ERP has said yes. Irreversible — the box says so, twice.
+ */
+function MergeBox({ codes, rows, onClose, onDone }: { codes: string[]; rows: Row[]; onClose: () => void; onDone: (msg: string) => void }) {
+  const [master, setMaster] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [steps, setSteps] = useState<{ loser: string; erp: string; error?: string; genie?: Record<string, unknown> }[] | null>(null);
+  const nameOf = (c: string) => S(rows.find((r) => r.item_code === c)?.item_name);
+  const generate = async () => {
+    if (!master) { setErr("Choose the master first."); return; }
+    const losers = codes.filter((c) => c !== master);
+    if (!window.confirm(`MERGE ${losers.join(", ")} INTO ${master} — on the ERP, now, for good?\n\nEvery stock ledger entry, BOM line, purchase and sales row that carries the ${losers.length === 1 ? "other item" : "other items"} will be rewritten to ${master}, on the ERP and in Genie. This cannot be undone.`)) return;
+    const typed = window.prompt(`Type the master's code to confirm: ${master}`);
+    if (typed !== master) { setErr("The code typed did not match — nothing was done."); return; }
+    setBusy(true); setErr("");
+    const r = await post("/api/saamaan/item-edit", { action: "merge", codes, master, note });
+    setBusy(false);
+    const st = (r.steps as typeof steps) || null;
+    setSteps(st);
+    if (!r.ok && !st) { setErr(r.error || "The merge did not run."); return; }
+    const okN = (st || []).filter((s) => s.erp === "merged").length;
+    const badN = (st || []).length - okN;
+    if (badN === 0) onDone(`Merged ${okN} item${okN === 1 ? "" : "s"} into ${master} — on the ERP and across Genie. The next pull will show it the ERP's way.`);
+    else setErr(`${okN} merged, ${badN} refused by the ERP — see below. The refused ones are untouched on both sides.`);
+  };
+  return (
+    <Modal onClose={onClose} title={`Merge ${codes.length} items into one`} width={760}>
+      <Note kind="warn"><b>Irreversible.</b> The ERP rewrites every record that carries the merged items and keeps only the master. Choose the master with care — its code, name and description survive; the others&apos; do not.</Note>
+      <div className="rounded border mb-3" style={{ borderColor: BORDER, background: "#fff" }}>
+        {codes.map((c) => (
+          <label key={c} className="flex items-center gap-3 px-3 py-2 cursor-pointer" style={{ borderBottom: `1px solid ${BORDER}`, background: master === c ? NAVY_SOFT : undefined }}>
+            <input type="radio" name="master" checked={master === c} onChange={() => setMaster(c)} style={{ accentColor: NAVY }} />
+            <b style={{ color: INK, minWidth: 90 }}>{c}</b>
+            <span className="text-sm" style={{ color: MUTED }}>{nameOf(c) || "·"}</span>
+            <span className="ml-auto text-xs font-bold" style={{ color: master === c ? GREEN : MUTED }}>{master === c ? "MASTER — survives" : "merged away"}</span>
+          </label>
+        ))}
+      </div>
+      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="why these are one item (kept on record)" className="w-full rounded border px-2 py-1.5 text-sm mb-3" style={{ borderColor: BORDER }} />
+      {err && <Note kind="error">{err}</Note>}
+      {steps && (
+        <div className="rounded border p-2 mb-3 text-xs" style={{ borderColor: BORDER, background: "#fff" }}>
+          {steps.map((s) => (
+            <div key={s.loser} className="py-1" style={{ borderBottom: `1px solid ${BORDER}` }}>
+              <b style={{ color: s.erp === "merged" ? GREEN : RED }}>{s.loser} → {s.erp}</b>
+              {s.error ? <span style={{ color: RED }}> — {s.error}</span> : null}
+              {s.genie ? <span style={{ color: MUTED }}> · Genie rows moved: {Object.entries(s.genie).filter(([, v]) => v && v !== 0).map(([k, v]) => `${k.replace(/^material_/, "")} ${String(v)}`).join(", ") || "none"}</span> : null}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Btn kind="primary" onClick={generate} disabled={busy || !master || !!steps}>{busy ? "Merging on the ERP…" : "Generate — merge now"}</Btn>
+        <Btn onClick={onClose}>{steps ? "Close" : "Cancel"}</Btn>
+      </div>
+    </Modal>
   );
 }
 
@@ -463,20 +598,54 @@ function StockRegister({ code, base, data, err }: { code: string; base: string; 
   );
 }
 
-function Detail({ code, base, onClose }: { code: string; base: string; onClose: () => void }) {
+/** The fields a hand may type in the record (the route holds the same list; the UOMs and computed rates are not on it). */
+const EDITABLE = new Set(["custom_item_class", "kittable", "qc_status", "each_blank", "gst_hsn_code", "brand", "country_of_origin", "weight_per_unit", "weight_uom",
+  "safety_stock", "min_order_qty", "lead_time_days", "shelf_life_in_days", "end_of_life", "valuation_method", "default_material_request_type", "warranty_period",
+  "customer_code", "default_item_manufacturer", "default_manufacturer_part_no"]);
+interface EditRow { id: string; field: string; from_value: string | null; to_value: string | null; by: string; at: string; erp_status: string; erp_error: string }
+
+function Detail({ code, base, canEdit = false, onClose }: { code: string; base: string; canEdit?: boolean; onClose: () => void }) {
   const [item, setItem] = useState<Row | null>(null);
   const [files, setFiles] = useState<FileRow[]>([]);
   const [err, setErr] = useState("");
   const [every, setEvery] = useState(false);
   const [tab, setTab] = useState("erp");
   const [stock, stockErr] = useStock(code);
+  const [edits, setEdits] = useState<EditRow[]>([]);
+  const [price, setPrice] = useState("");
+  const [saving, setSaving] = useState("");
+  const [said, setSaid] = useState("");
 
-  useEffect(() => {
+  const loadItem = useCallback(() => {
     fetch(`/api/saamaan/items?mode=one&code=${encodeURIComponent(code)}`, { cache: "no-store" })
       .then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `The server answered ${r.status}.`); return j; })
       .then((j) => { setItem(j.item); setFiles(j.files || []); })
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
-  }, [code]);
+    if (canEdit) fetch(`/api/saamaan/item-edit?code=${encodeURIComponent(code)}`, { cache: "no-store" }).then((r) => r.json()).then((j) => setEdits(j.rows || [])).catch(() => {});
+  }, [code, canEdit]);
+  useEffect(() => { loadItem(); }, [loadItem]);
+
+  /* A CELL, TYPED, PUSHED TO THE ERP (Dr Raghu, 3 Oct 2026: "Rameez or
+     Mukesh can also edit the cells inside this … and then it will be
+     pushed back to the ERP"). ERP first; the record re-reads after. */
+  const saveField = async (field: string, value: string) => {
+    setSaving(field); setSaid("");
+    const r = await post("/api/saamaan/item-edit", { action: "field", code, field, value });
+    setSaving("");
+    setSaid(r.ok ? (r.unchanged ? "" : `${field} written to the ERP.`) : `The ERP refused ${field}: ${r.error || ""}`);
+    loadItem();
+  };
+  const savePrice = async () => {
+    const rate = Number(price.replace(/,/g, ""));
+    if (!price.trim() || !Number.isFinite(rate) || rate < 0) { setSaid("Type a price first."); return; }
+    if (!window.confirm(`Set ${code}'s buying price to ₹${rate.toLocaleString("en-IN")} on the ERP, now?`)) return;
+    setSaving("price"); setSaid("");
+    const r = await post("/api/saamaan/item-edit", { action: "price", code, rate });
+    setSaving("");
+    setSaid(r.ok ? `Price pushed to the ERP — ${String(r.how || "")}.` : `The ERP refused the price: ${r.error || ""}`);
+    if (r.ok) setPrice("");
+    loadItem();
+  };
 
   const erp = (item?.erp ?? {}) as Record<string, unknown>;
   const children = (item?.children ?? {}) as Record<string, Record<string, unknown>[]>;
@@ -588,15 +757,49 @@ function Detail({ code, base, onClose }: { code: string; base: string; onClose: 
           </>)}
 
           {/* ------------------------------------------------ the fields */}
-          <div className="text-xs font-bold uppercase mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>Fields</div>
+          <div className="text-xs font-bold uppercase mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>Fields{canEdit ? <span className="normal-case font-semibold" style={{ letterSpacing: 0 }}> · type in a cell and click away — it goes to the ERP</span> : null}</div>
+          {said && <div className="text-xs mb-1 font-semibold" style={{ color: /refused|first/i.test(said) ? RED : GREEN }}>{said}</div>}
+          {canEdit && (
+            <div className="flex items-center gap-2 mb-2 flex-wrap rounded border p-2" style={{ borderColor: ORANGE, background: "#FFF7F3" }}>
+              <b className="text-xs" style={{ color: INK }}>Price (buying, ₹)</b>
+              <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" placeholder={item.standard_rate ? String(item.standard_rate) : "₹"} onKeyDown={(e) => { if (e.key === "Enter") void savePrice(); }}
+                className="rounded border px-2 py-1 text-xs tnum text-right" style={{ borderColor: BORDER, width: 120 }} />
+              <Btn kind="primary" onClick={savePrice} disabled={saving === "price"}>{saving === "price" ? "Pushing…" : "Set price → ERP"}</Btn>
+              <span className="text-xs" style={{ color: MUTED }}>one item at a time, never in bulk · Standard Buying price list · last set {S(item.date_price_updated) || "·"}</span>
+            </div>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 rounded border p-3 mb-3" style={{ borderColor: BORDER, background: "#fff" }}>
             {KEY_FIELDS.map(([k, label]) => (
-              <div key={k} className="flex justify-between gap-2" style={{ borderBottom: `1px dotted ${BORDER}` }}>
+              <div key={k} className="flex justify-between gap-2 items-center" style={{ borderBottom: `1px dotted ${BORDER}` }}>
                 <span className="text-xs" style={{ color: MUTED }}>{label}</span>
-                <span className="text-xs font-semibold text-right tnum" style={{ color: item[k] === null || item[k] === "" ? MUTED : INK }}>{show(k, item[k])}</span>
+                {canEdit && EDITABLE.has(k) ? (
+                  k === "custom_item_class" ? (
+                    <select value={S(item[k])} onChange={(e) => void saveField(k, e.target.value)} disabled={saving === k} className="text-xs border rounded px-1 py-0.5 bg-white" style={{ borderColor: BORDER }}>
+                      <option value="">·</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
+                    </select>
+                  ) : (
+                    <input defaultValue={item[k] === null || item[k] === undefined ? "" : String(item[k])} key={`${k}|${String(item[k] ?? "")}`} disabled={saving === k}
+                      onBlur={(e) => { if (e.target.value !== (item[k] === null || item[k] === undefined ? "" : String(item[k]))) void saveField(k, e.target.value); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      className="text-xs border rounded px-1 py-0.5 text-right tnum" style={{ borderColor: saving === k ? ORANGE : BORDER, width: 120, color: INK }} />
+                  )
+                ) : (
+                  <span className="text-xs font-semibold text-right tnum" style={{ color: item[k] === null || item[k] === "" ? MUTED : INK }}>{show(k, item[k])}</span>
+                )}
               </div>
             ))}
           </div>
+          {canEdit && edits.length > 0 && (
+            <div className="rounded border p-2 mb-3 text-xs" style={{ borderColor: BORDER, background: "#fff" }}>
+              <div className="font-bold uppercase mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>Changed from Saamaan — on record</div>
+              {edits.slice(0, 12).map((e) => (
+                <div key={e.id} className="py-0.5" style={{ color: MUTED, borderBottom: `1px dotted ${BORDER}` }}>
+                  <span className="tnum" style={{ color: INK }}>{new Date(e.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span> · <b style={{ color: INK }}>{e.by.split("@")[0]}</b> · {e.field}: {e.from_value || "·"} → <b style={{ color: INK }}>{e.to_value || "·"}</b>
+                  <span className="ml-1 font-bold" style={{ color: e.erp_status === "done" ? GREEN : RED }}>{e.erp_status === "done" ? "ERP ✓" : `ERP ✗ ${e.erp_error.slice(0, 80)}`}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex gap-1.5 flex-wrap mb-3">
             {FLAGS.map(([k, label]) => (
               <span key={k} className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: item[k] ? "#E6F4EC" : "#F3F4F6", color: item[k] ? GREEN : MUTED }}>

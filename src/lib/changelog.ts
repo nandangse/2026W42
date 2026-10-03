@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.13.0",
+    date: "2026-10-03",
+    module: "Saamaan: the Item master writes back to the ERP",
+    items: [
+      "SAAMAAN\u2019S FIRST WRITES TO THE ERP (Dr Raghu, 3 Oct 2026: \"go\" \u2014 \"yes add the item changes\"). Until today the mirror was read-only. From today Mukesh and Rameez (and the owner, for everything but the merge) change an item and the ERP changes with it: ERP first, the mirror second, and a write the ERP refuses leaves the mirror as it was. Every change is a row on record \u2014 who, when, from what to what, and the ERP\u2019s answer \u2014 shown under the item\u2019s fields.",
+      "TICK BOXES ON THE ITEM MASTER, Select all on page, and a bar once anything is ticked: Class A/B/C/blank \u2192 Change, Move to group \u2192 Move. Prices are never changed in bulk \u2014 \"Prices have to be added one by one\" \u2014 so the price box lives in the item record: type it, confirm, and it becomes the Standard Buying price on the ERP with the date beside it.",
+      "THE RECORD\u2019S CELLS ARE TYPEABLE (\"Rameez or Mukesh can also edit the cells inside this \u2026 pushed back to the ERP\"): class, kittable, QC status, blank size, HSN, brand, origin, weight, safety stock, min order, lead time, shelf life, end of life, valuation method, MR type, warranty, customer code, manufacturer and part number. Not the UOMs \u2014 the ERP forbids them once there are transactions \u2014 and not the rates the ERP computes.",
+      "MERGE ITEMS \u2014 MUKESH\u2019S AND RAMEEZ\u2019S ALONE, not even the owner sees the button (\"not even Anup and Raghu\"). Tick the items, Merge, choose the master, type its code to confirm, Generate. The ERP merges first by its own Rename-and-Merge, rewriting every stock ledger entry, BOM line, purchase and sales row; only when the ERP has said yes does Genie re-point its RBOM and BOM lines, issues, slips, POs, GRNs, invoices, files, Kanban and MRP plans to the master and retire the loser in the mirror. A loser the ERP refuses is left whole on both sides and named in the record. Migration 0194.",
+    ],
+  },
+  {
     v: "5.9.12.1",
     date: "2026-10-03",
     module: "Saamaan \u2192 Suppliers: Mukesh\u2019s desk",
