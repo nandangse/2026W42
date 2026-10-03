@@ -19,7 +19,7 @@ import { LOGO } from "@/lib/logo";
 import { APP_VERSION } from "@/lib/version";
 import { swallow } from "@/lib/swallow";
 
-export type ShellModule = "main" | "crm" | "marketing" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan" | "lms" | "idp";
+export type ShellModule = "main" | "crm" | "marketing" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan" | "lms" | "idp" | "portal";
 
 export const MODULES: { key: ShellModule; label: string; icon: string; href: string; blurb: string }[] = [
   { key: "main", label: "Planning", icon: "🧞", href: "/", blurb: "jobs, milestones, the floor" },
@@ -37,6 +37,8 @@ export const MODULES: { key: ShellModule; label: string; icon: string; href: str
   { key: "accounts", label: "Kuber", icon: "💰", href: "/kuber", blurb: "books, bank, balances" },
   { key: "vishwakarma", label: "Vishwakarma", icon: "🛠", href: "/vishwakarma", blurb: "design" },
   { key: "saamaan", label: "Saamaan", icon: "📦", href: "/saamaan", blurb: "materials" },
+  /* GENIE 6.0 (Dr Raghu, 3 Oct 2026): the customers' and suppliers' own door. */
+  { key: "portal", label: "Portal", icon: "🚪", href: "/portal", blurb: "customers and suppliers" },
 ];
 
 export interface ShellUser {

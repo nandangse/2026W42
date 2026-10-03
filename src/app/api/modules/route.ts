@@ -9,6 +9,7 @@ import { resolveSevaAccess } from "@/lib/seva";
 import { resolveImsAccess } from "@/ims/auth";
 import { resolveSaamaanAccess } from "@/lib/saamaan";
 import { mayUseMarketing } from "@/lib/marketing";
+import { currentPortalUser, isStaff } from "@/lib/portal/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const u = await currentUser();
   if (!u || u.disabled)
-    return NextResponse.json({ main: false, crm: false, marketing: false, hrms: false, accounts: false, vishwakarma: false, seva: false, ims: false, saamaan: false });
+    return NextResponse.json({ main: false, crm: false, marketing: false, hrms: false, accounts: false, vishwakarma: false, seva: false, ims: false, saamaan: false, portal: false });
 
   const admin = adminClient();
-  const [crm, hrms, accounts, vishwakarma, seva, ims, saamaan, marketing] = await Promise.all([
+  const [crm, hrms, accounts, vishwakarma, seva, ims, saamaan, marketing, portalUser] = await Promise.all([
     mayUseCrm(),
     resolveHrmsAccess(admin, u.email, u.isOwner),
     resolveAccountsAccess(admin, u.email, u.isOwner),
@@ -37,6 +38,9 @@ export async function GET() {
     resolveImsAccess(admin, u.email, u.isOwner),
     resolveSaamaanAccess(admin, u.email, u.isOwner),
     mayUseMarketing(u.email, u.isOwner),
+    /* the Portal: the owner, a Genie admin, or a Genie login named as portal staff (6.0) */
+    currentPortalUser(),
   ]);
-  return NextResponse.json({ main: true, crm, marketing, hrms, accounts, vishwakarma, seva, ims, saamaan });
+  const portal = !!portalUser && isStaff(portalUser);
+  return NextResponse.json({ main: true, crm, marketing, hrms, accounts, vishwakarma, seva, ims, saamaan, portal });
 }

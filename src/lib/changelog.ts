@@ -89,6 +89,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.0.0.0",
+    date: "2026-10-03",
+    module: "Genie 6: the Portal \u2014 the customers\u2019 and suppliers\u2019 own door",
+    items: [
+      "GENIE 6.0 ON DR RAGHU\u2019S WORD (3 Oct 2026: \u201c6.0 \u2014 Portal and Parakh\u201d). The main digit moves because he said so, and because for the first time Genie opens a door to people who are not Nandan\u2019s: genie.nandan.co.in/portal. Parakh is the second half of 6.0 and follows.",
+      "THE PORTAL (\u201cMake a new app currently in genie.nandan.co.in/portal \u2026 a login ID and password separately for portal customer as well as portal supplier \u2026 /portal/veda, for example, or /taj\u201d). Every organisation has a slug and a page of its own; what Nandan writes on it is theirs to read. A separate login realm on the /kindle pattern \u2014 a portal_user row with a scrypt hash and a signed cookie, five wrong tries lock the address for fifteen minutes, a one-time 72-hour invite link that insists on a password \u2014 so a customer\u2019s purchase manager never becomes a Genie user. The owner and Genie admins walk in on their Genie session as portal admins.",
+      "ORDERS & JOBS, HIS TABLE: PO number \u00b7 Project \u00b7 Job \u00b7 Engine \u00b7 Chassis \u00b7 Model \u00b7 Vehicle type \u00b7 Target delivery \u00b7 See details. Nothing is re-typed: the rows are the jobmaster\u2019s, the PO number is read off the CRM\u2019s sales order through the project, the model is the ERP\u2019s chassis model, the type is the job family. Under delivery first (on the floor or in progress), orders not yet started under it, the last deliveries below. A supplier sees Nandan\u2019s purchase orders on them instead, with every line and what has been received.",
+      "THE OTHER TABS: Query solver (ask on a job or in general; the thread under it; open \u2192 answered \u2192 closed; Nandan\u2019s people may leave an internal note the customer never sees) \u00b7 Commercials (\u201conly a few people in the organisation can see\u201d \u2014 the admin and whoever holds the tick: order value, SO amount, advance, terms, due on delivery) \u00b7 Previous jobs (Job number \u00b7 Customer \u00b7 Vehicle number \u00b7 Type \u00b7 Date of delivery \u00b7 Invoice number \u00b7 Remarks, the whole bank of deliveries) \u00b7 Service calls & issues (Seva\u2019s tickets on their machines, open first) \u00b7 FAQs \u00b7 Newsletters \u00b7 Advisories & bulletins (written in markdown by the admin, for everyone, for customers or suppliers, or for one organisation; drafts until published) \u00b7 Settings & admin.",
+      "FIVE TYPES OF USER, AS ASKED: Customer and Supplier (their own organisation only), Admin (everything and Settings), National manager (everything), Location manager and Location technician (\u201conly a few locations will be given, and all the jobs tagged to that location only will be seen by them\u201d \u2014 the locations master in Settings, each job tagged beside it, the tickets matched on Seva\u2019s own location text).",
+      "BESIDE THE JOB (portal_job): what the ERP cannot know and his table needs \u2014 vehicle number, invoice number, location, remarks, a PO number when the CRM has none, a vehicle type when the family is not it. Typed once by the admin or national manager from the job\u2019s drawer; everything else on the row stays the jobmaster\u2019s.",
+      "Migration 0198 (every table wears portal_, private bucket portal). Every page prints to PDF; every table sorts and searches with a frozen header. The Portal is the ninth door on the module menu for the owner, Genie admins and portal staff; customers never see Genie\u2019s chrome at all. Invite mails go from raghu@nandan.co.in\u2019s connected Gmail until the portal has an address of its own.",
+    ],
+  },
+  {
     v: "5.9.16.1",
     date: "2026-10-03",
     module: "Locations: the real map of India",
