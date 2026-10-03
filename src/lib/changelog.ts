@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.11.0",
+    date: "2026-10-03",
+    module: "Saamaan members fill the material dates and run the MRP",
+    items: [
+      "PENDING MATERIAL OPENS TO EVERY SAAMAAN MEMBER for the date, the remark and the status (Dr Raghu, 3 Oct 2026: \"The people who are in the Saamaan app need to also have access to fill in the dates in the material requirement mapping. They can put in a date and a remark.\"). The store and purchase hands hold the Saamaan tick, not the planner role, and it is they who know when the material is coming. Adding and removing lines stays with the planners. The route behind the screen checks the same thing: a planner by role, or a name on Saamaan\u2019s grant.",
+      "THE MRP RUN IS EVERY SAAMAAN MEMBER\u2019S TO WORK (\"In the MRP run also, they should be able to edit as well as put in the order quantity and then move it to kitting, requisition, or purchase orders\"). The order boxes, the ticks into WIP, Submit to store (kitting) and Submit to purchase (requisition) were behind a planner-role check in the screen alone \u2014 the page and every route already sat behind the Saamaan grant. That check is gone; the Jobs in Progress lightbox follows. A requisition becomes a purchase order on the Purchase Orders screen, as before.",
+    ],
+  },
+  {
     v: "5.9.10.6",
     date: "2026-10-02",
     module: "Audit Queries: target three days out, amount as per ledger",

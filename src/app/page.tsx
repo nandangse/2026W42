@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { currentUser, RAGHU_EMAIL } from "@/lib/auth";
+import { resolveSaamaanAccess } from "@/lib/saamaan";
 import PlanningSuite from "@/components/PlanningSuite";
 import MorningUpload from "@/components/MorningUpload";
 import LabourHome from "@/components/LabourHome";
@@ -51,10 +52,13 @@ export default async function Home() {
     } catch { /* pre-0161: Planning is open, as it always was */ }
   }
 
+  /* the Saamaan tick opens the material dates and remarks (3 Oct 2026) */
+  const saamaan = await resolveSaamaanAccess(adminClient(), user.email, user.isOwner).catch(() => false);
   return (
     <PlanningSuite
       email={user.email}
       role={user.role}
+      saamaan={saamaan}
       initials={user.initials}
       displayName={user.displayName}
       erpOwner={user.erpOwner}

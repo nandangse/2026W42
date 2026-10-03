@@ -91,11 +91,15 @@ export function PendingMaterial({
   onOpen,
   reload,
   canEdit,
+  canAdd = canEdit,
 }: {
   board: Board;
   onOpen: (id: string) => void;
   reload: () => Promise<Board | null>;
+  /** may fill the date, the remark and the status — planners and Saamaan members */
   canEdit: boolean;
+  /** may add lines — planners only */
+  canAdd?: boolean;
 }) {
   const HORIZONS: [string, string][] = [
     ["30", "Delivery within 30 days"],
@@ -370,7 +374,7 @@ Showing: ${esc(bits.join(" &middot; "))}</div>
         </button>
         {/* ADD MORE MATERIAL, from the top as well as from a row — whichever
             is nearer the planner's hand at the moment they notice. */}
-        {canEdit && (
+        {canAdd && (
           <button
             onClick={() => setAdding({ jobId: fJob !== "all" ? fJob : "" })}
             className="rounded px-3 py-1.5 text-sm font-bold"
@@ -417,7 +421,7 @@ Showing: ${esc(bits.join(" &middot; "))}</div>
                     >
                       {jobNo(job.id)}
                     </button>
-                    {canEdit && (
+                    {canAdd && (
                       <button
                         onClick={() => setAdding({ jobId: job.id })}
                         className="ml-1.5 rounded px-1.5 font-bold"

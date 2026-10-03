@@ -50,7 +50,11 @@ export default function Wip({ erpBase, role, summary }: { erpBase: string; role:
   const [rbomOpen, setRbomOpen] = useState<Row | null>(null);
   /** "keep the WIP warehouse clickable. Open a lightbox" — what has gone in, when, with what remarks; what is still to go. */
   const [whOpen, setWhOpen] = useState<Row | null>(null);
-  const canEdit = ["admin", "planner", "project_owner"].includes(role);
+  /* the same job lightbox the MRP run opens — every Saamaan member issues
+     from it (Dr Raghu, 3 Oct 2026); the grant is checked on the page and
+     on the route, a role on top of it only shut the store hands out */
+  const canEdit = true;
+  void role;
   const rows = data?.rows ?? [];
   const totals = useMemo(() => ({
     value: rows.reduce((a, r) => a + (Number(r.value) || 0), 0),

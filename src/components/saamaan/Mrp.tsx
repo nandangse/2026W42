@@ -167,7 +167,15 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
   const [routing, setRouting] = useState<Record<string, string>>({});
   const [toStore, setToStore] = useState("");
   const [toPurchase, setToPurchase] = useState("");
-  const canEdit = ["admin", "planner", "project_owner"].includes(role);
+  /* EVERY SAAMAAN MEMBER EDITS THE RUN (Dr Raghu, 3 Oct 2026: "In the MRP
+     run also, they should be able to edit as well as put in the order
+     quantity and then move it to kitting, requisition, or purchase
+     orders"). The page sits behind the Saamaan grant already, and the
+     route behind every button asks for the same grant — so the role check
+     that used to sit here was the only thing shutting the store and
+     purchase hands out of their own screen. */
+  const canEdit = true;
+  void role;
 
   useEffect(() => {
     fetch("/api/saamaan/slip?mode=people", { cache: "no-store" }).then((r) => r.json()).then((j) => {

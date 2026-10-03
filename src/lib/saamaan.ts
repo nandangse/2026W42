@@ -19,3 +19,22 @@ export const resolveSaamaanAccess = (admin: SupabaseClient, email: string, isOwn
 
 /** The one door check every /api/saamaan route uses. */
 export const requireSaamaan = moduleDoor("material_access", "Saamaan");
+
+/**
+ * A MATERIAL HAND: a planner by role, or anyone on Saamaan's grant.
+ *
+ * Dr Raghu, 3 Oct 2026: "The people who are in the Saamaan app need to also
+ * have access to fill in the dates in the material requirement mapping.
+ * They can put in a date and a remark." The store and purchase people hold
+ * the Saamaan tick, not the planner role — and it is they who know when the
+ * material is coming. So the kitting checklist's date, remark and status
+ * open to them; adding and removing lines stays with the planners.
+ */
+export async function requireMaterialHand(): Promise<AuthedUser> {
+  const u = await currentUser();
+  if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
+  if (u.lmsOnly) throw new HttpError(403, "This login opens the training library only.");
+  if (["admin", "planner", "project_owner"].includes(u.role)) return u;
+  if (await hasGrant(adminClient(), "material_access", u.email, u.isOwner)) return u;
+  throw new HttpError(403, "Material dates and remarks are for planners and Saamaan members — the tick on Admin → module access.");
+}

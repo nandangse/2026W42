@@ -60,9 +60,11 @@ export default function PlanningSuite({
   lc,
   stratcom,
   management,
+  saamaan = false,
 }: {
   email: string;
   role: Role;
+  saamaan?: boolean;
   initials: string | null;
   displayName: string | null;
   erpOwner: string | null;
@@ -83,6 +85,10 @@ export default function PlanningSuite({
   const canSeeDelivered = isStratcom(groups);
   const canSeeForward = isStratcom(groups);
   const canEdit = role === "admin" || role === "planner" || role === "project_owner";
+  /* MATERIAL DATES AND REMARKS open to Saamaan members too (Dr Raghu, 3 Oct
+     2026) — the store and purchase hands know when the material is coming.
+     Adding and removing lines stays with the planners (canEdit). */
+  const canFillMaterial = canEdit || saamaan;
   // Upload lives in the account menu now — admins and Shweta only.
   const canUpload = isAdmin || email.toLowerCase() === UPLOADER_EMAIL;
   /* Synchronize to ERP is the hands that actually do it — and not every
@@ -731,7 +737,7 @@ export default function PlanningSuite({
         <div className="p-5"><PlaybookScreen kind="operations" email={me?.email || undefined} /></div>
       )}
       {workspace === "suite" && tab === "floor" && <OnFloor board={board} V={V} onOpen={openJobPlan} reload={reload} canEdit={canEdit} canTask={role !== "viewer"} isStrat={canSeeForward} myName={(displayName || email.split("@")[0]).split(" ")[0]} />}
-      {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canEdit} />}
+      {workspace === "suite" && tab === "material" && <PendingMaterial board={board} onOpen={openJobPlan} reload={reload} canEdit={canFillMaterial} canAdd={canEdit} />}
       {workspace === "suite" && tab === "manpower" && (
         <ManpowerPlan board={board} canEdit={canEdit}
           onOpenJob={(j) => openJobPlan(j.id)} />

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readBody } from "@/lib/validate";
 import { requirePlanner, errJson } from "@/lib/auth";
+import { requireMaterialHand } from "@/lib/saamaan";
 import { assertJobEditable } from "@/lib/job-state";
 import { supabaseServer } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
@@ -55,7 +56,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ counts });
     }
 
-    await requirePlanner();
+    await requireMaterialHand();
     const jobId = url.searchParams.get("job_id");
     if (!jobId) return NextResponse.json({ error: "job_id required" }, { status: 400 });
     const admin = adminClient();
@@ -93,13 +94,16 @@ export async function GET(req: Request) {
   }
 }
 
-// POST /api/materials — planner/admin. The kitting checklist for a job.
+// POST /api/materials — the kitting checklist for a job. Planners do all of
+// it; a Saamaan member may fill in the date, the remark, the status and a
+// comment (Dr Raghu, 3 Oct 2026) — adding and removing lines is a planner's.
 export async function POST(req: Request) {
   try {
-    const user = await requirePlanner();
+    const body = await readBody(req, {});
+    const FILL_ACTIONS = ["update", "status", "comment"];
+    const user = FILL_ACTIONS.includes(String(body.action || "")) ? await requireMaterialHand() : await requirePlanner();
     const supabase = supabaseServer();
     const admin = adminClient();
-    const body = await readBody(req, {});
 
     // add/seed carry job_id; everything else identifies a row instead, so
     // resolve the job from the material itself — otherwise the delivered-job
