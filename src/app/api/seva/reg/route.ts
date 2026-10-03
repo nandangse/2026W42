@@ -12,13 +12,13 @@ export const dynamic = "force-dynamic";
  * every dropdown. The Vishwakarma register pattern, worn by service.
  */
 const KINDS: Record<string, { table: string; fields: string[]; order: string; desc?: boolean }> = {
-  issue: { table: "seva_issue", order: "at", desc: true, fields: ["title", "customer", "machine", "serial_no", "category", "reported_via", "status", "owner", "due", "description", "resolution", "resolved_at"] },
+  issue: { table: "seva_issue", order: "at", desc: true, fields: ["title", "customer", "machine", "serial_no", "category", "reported_via", "status", "owner", "due", "description", "resolution", "resolved_at", "discuss_note", "discussed_at"] },
   amc: { table: "seva_amc", order: "end_date", fields: ["customer", "machine", "serial_no", "contract_no", "location", "start_date", "end_date", "visits_planned", "visits_done", "value", "engineer", "status", "notes", "territory", "billed"] },
   master: { table: "seva_master", order: "sort_order", fields: ["kind", "label", "sort_order"] },
 };
 
 /** The empty string means "no date / no number" on these columns. */
-const NULLABLE = /^(due|resolved_at|start_date|end_date|visits_planned|visits_done|value|billed)$/;
+const NULLABLE = /^(due|resolved_at|discussed_at|start_date|end_date|visits_planned|visits_done|value|billed)$/;
 
 const spec = (kind: string) => {
   const k = KINDS[kind];

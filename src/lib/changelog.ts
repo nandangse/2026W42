@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.16.0",
+    date: "2026-10-03",
+    module: "Seva: Locations on a map, Discussion points, the AMC register sharpened",
+    items: [
+      "LOCATIONS (Dr Raghu, 3 Oct 2026): India | Out of India. In India, the map, a dot per place sized by the customers there over the dates (this financial year by default); click a dot and the table narrows to it. Under it, Customer | Location | No of assets | No of issues | Cost spent | AMCs | AMC value, sortable by any column, with totals. The ERP\u2019s location is free text in 829 spellings; a gazetteer of the places Nandan serves pins 94 in 100 tickets by keyword, suburb before city, title when the location is blank \u2014 the rest are listed as unplaced, never guessed.",
+      "DISCUSSION POINTS (\"a table with Open issues. This is something that they need to discuss with me\"): every open ticket, oldest first, with a line to write the point beside it and a tick when it has been discussed. A ticket leaves the list only when the ERP closes it. Migration 0197.",
+      "ANNUAL MAINTENANCE: Live AMCs and their value, lapsed in the last six months, and what is shown \u2014 four cards. Every column sorts. Filters for status (AMC valid paid by default, as asked), customer, site, and the dates a contract was alive between.",
+    ],
+  },
+  {
     v: "5.9.15.1",
     date: "2026-10-03",
     module: "Ticket Analytics: the ERP\u2019s own clock, the engineer who went, warranty by type",

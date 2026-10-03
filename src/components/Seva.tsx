@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import GenieShell from "@/components/GenieShell";
 import SevaAnalytics from "@/components/SevaAnalytics";
+import SevaLocations from "@/components/SevaLocations";
 import { swallow } from "@/lib/swallow";
 import { dmy as fmtD, rupee } from "@/lib/fmt";
 const money = (n: unknown) => rupee(n);
@@ -25,6 +26,8 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
   { key: "issues", label: "Support Tickets", icon: "⚠" },
   { key: "analytics", label: "Ticket Analytics", icon: "📊" },
+  { key: "locations", label: "Locations", icon: "📍" },
+  { key: "discuss", label: "Discussion points", icon: "🗣" },
   { key: "amc", label: "Annual Maintenance", icon: "📅" },
   { key: "push", label: "Push — 1:1", icon: "⇢" },
   { key: "settings", label: "Settings — masters", icon: "⚙" },
@@ -419,13 +422,56 @@ function AmcScreen() {
   const [importing, setImporting] = useState(false);
   const [pulling, setPulling] = useState(false);
   const [q, setQ] = useState("");
+  /* CARDS, SORTING AND FILTERS (Dr Raghu, 3 Oct 2026: "show No of Live AMC,
+     Value of Live AMC, AMC lapsed in last 6 months. Also make it sortable.
+     Show filters for customer and site. Dates. By default show AMC Valid
+     paid"). Live = today inside start and end. Lapsed in six months = ended
+     in the last 180 days and not live again. The dates narrow the register
+     to contracts alive at any point between them. */
+  const [statusF, setStatusF] = useState("AMC valid paid");
+  const [custF, setCustF] = useState("");
+  const [siteF, setSiteF] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [sort, setSort] = useState<{ k: string; d: 1 | -1 }>({ k: "end_date", d: 1 });
   const needle = q.trim().toLowerCase();
-  const shown = (rows || []).filter((r) => !needle
-    || `${S(r.customer)} ${S(r.machine)} ${S(r.serial_no)} ${S(r.contract_no)} ${S(r.location)} ${S(r.engineer)}`.toLowerCase().includes(needle));
+  const today = TODAY();
+  const all = rows || [];
+  const isLive = (r: Row) => { const s = S(r.start_date).slice(0, 10), e = S(r.end_date).slice(0, 10); return e >= today && (!s || s <= today); };
+  const sixBack = (() => { const d = new Date(today); d.setDate(d.getDate() - 180); return d.toISOString().slice(0, 10); })();
+  const live = all.filter(isLive);
+  const lapsed = all.filter((r) => { const e = S(r.end_date).slice(0, 10); return e && e < today && e >= sixBack; });
+  const customers = [...new Set(all.map((r) => S(r.customer)).filter(Boolean))].sort();
+  const sites = [...new Set(all.map((r) => S(r.location) || S(r.territory)).filter(Boolean))].sort();
+  const statuses = [...new Set(all.map((r) => S(r.status)).filter(Boolean))].sort();
+  const shown = all
+    .filter((r) => statusF === "all" || (statusF === "live" ? isLive(r) : S(r.status) === statusF))
+    .filter((r) => !custF || S(r.customer) === custF)
+    .filter((r) => !siteF || (S(r.location) || S(r.territory)) === siteF)
+    .filter((r) => { if (!from && !to) return true; const s = S(r.start_date).slice(0, 10), e = S(r.end_date).slice(0, 10); return (!to || !s || s <= to) && (!from || !e || e >= from); })
+    .filter((r) => !needle || `${S(r.customer)} ${S(r.machine)} ${S(r.serial_no)} ${S(r.contract_no)} ${S(r.location)} ${S(r.engineer)}`.toLowerCase().includes(needle))
+    .sort((a, b) => {
+      const k = sort.k;
+      const x = k === "value" || k === "visits" ? Number(k === "visits" ? a.visits_done : a.value) || 0 : S(k === "machine" ? `${a.machine} ${a.serial_no}` : a[k]);
+      const y = k === "value" || k === "visits" ? Number(k === "visits" ? b.visits_done : b.value) || 0 : S(k === "machine" ? `${b.machine} ${b.serial_no}` : b[k]);
+      return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * sort.d;
+    });
+  const sortBy = (k: string) => setSort((p) => (p.k === k ? { k, d: p.d === 1 ? -1 : 1 } : { k, d: k === "value" || k === "visits" ? -1 : 1 }));
+  const Hd = ({ k, children, right }: { k: string; children: React.ReactNode; right?: boolean }) => (
+    <th onClick={() => sortBy(k)} className={`px-2 py-2 text-${right ? "right" : "left"} whitespace-nowrap cursor-pointer select-none`} style={{ position: "sticky", top: 0, background: "var(--ink)" }} title="sort">{children}{sort.k === k ? (sort.d === 1 ? " ▲" : " ▼") : ""}</th>
+  );
+  const lakh = (n: number) => (n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(2)} L` : rupee(n));
+  const Card = ({ label, value, sub, colour, onClick }: { label: string; value: string; sub: string; colour: string; onClick?: () => void }) => (
+    <button onClick={onClick} className="bg-white rounded-lg border p-3 text-left" style={{ borderColor: BORDER, cursor: onClick ? "pointer" : "default" }}>
+      <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>{label}</div>
+      <div className="text-xl font-bold tnum" style={{ color: colour }}>{value}</div>
+      <div className="text-xs" style={{ color: MUTED }}>{sub}</div>
+    </button>
+  );
 
   return (
     <Shell installed={installed} title="Annual Maintenance" onAdd={() => setOpen("new")} addLabel="+ Add a contract"
-      blurb="Every AMC on one register — who it covers, from when to when, how many visits are owed and how many have been made. Import the Excel once, then keep it here."
+      blurb="Every AMC on one register — who it covers, from when to when, how many visits are owed and how many have been made. Live means today sits inside the contract's dates; the status word is the ERP's."
       extra={
         <>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 customer, serial, contract…" className="border rounded px-2 py-1.5 text-sm" style={{ borderColor: needle ? ORANGE : BORDER, width: 220 }} />
@@ -434,13 +480,36 @@ function AmcScreen() {
           <button onClick={() => setImporting(true)} className="rounded border px-3 py-1.5 text-sm font-bold" style={{ borderColor: TEAL, color: TEAL }}>⇪ Import</button>
         </>
       }>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+        <Card label="LIVE AMCs" value={String(live.length)} sub={`of ${all.length} on the register · today inside the dates`} colour={GREEN} onClick={() => setStatusF("live")} />
+        <Card label="VALUE OF LIVE AMCs" value={lakh(live.reduce((t, r) => t + (Number(r.value) || 0), 0))} sub="the live contracts, as the register values them" colour={GREEN} onClick={() => setStatusF("live")} />
+        <Card label="LAPSED IN LAST 6 MONTHS" value={String(lapsed.length)} sub={`ended since ${fmtD(sixBack)} · ${lakh(lapsed.reduce((t, r) => t + (Number(r.value) || 0), 0))} a year ago`} colour={lapsed.length ? RED : GREEN} onClick={() => { setStatusF("all"); setFrom(sixBack); setTo(today); }} />
+        <Card label="SHOWN" value={String(shown.length)} sub={`${lakh(shown.reduce((t, r) => t + (Number(r.value) || 0), 0))} · ${new Set(shown.map((r) => S(r.customer))).size} customers`} colour={INK} />
+      </div>
+      <div className="flex items-center gap-2 mb-2 flex-wrap text-xs">
+        <select value={statusF} onChange={(e) => setStatusF(e.target.value)} className="border rounded px-2 py-1.5 bg-white font-semibold" style={{ borderColor: statusF === "all" ? BORDER : ORANGE }}>
+          <option value="all">All statuses</option><option value="live">Live today</option>
+          {statuses.map((x) => <option key={x} value={x}>{x}</option>)}
+        </select>
+        <select value={custF} onChange={(e) => setCustF(e.target.value)} className="border rounded px-2 py-1.5 bg-white" style={{ borderColor: custF ? ORANGE : BORDER, maxWidth: 260 }}>
+          <option value="">every customer</option>{customers.map((x) => <option key={x} value={x}>{x}</option>)}
+        </select>
+        <select value={siteF} onChange={(e) => setSiteF(e.target.value)} className="border rounded px-2 py-1.5 bg-white" style={{ borderColor: siteF ? ORANGE : BORDER, maxWidth: 200 }} title="the site the ERP holds on the contract">
+          <option value="">every site</option>{sites.map((x) => <option key={x} value={x}>{x}</option>)}
+        </select>
+        <span style={{ color: MUTED }}>alive between</span>
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="border rounded px-1.5 py-1 tnum" style={{ borderColor: from ? ORANGE : BORDER }} />
+        <span style={{ color: MUTED }}>and</span>
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="border rounded px-1.5 py-1 tnum" style={{ borderColor: to ? ORANGE : BORDER }} />
+        {(statusF !== "AMC valid paid" || custF || siteF || from || to) && <button onClick={() => { setStatusF("AMC valid paid"); setCustF(""); setSiteF(""); setFrom(""); setTo(""); }} style={{ color: MUTED }}>reset</button>}
+      </div>
       <Box min={1180}>
         <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
-          <Th>Status</Th><Th>Customer</Th><Th>Machine / serial</Th><Th>Contract</Th><Th>From</Th><Th>To</Th><Th right>Visits</Th><Th right>Value</Th><Th>Engineer</Th>
+          <Hd k="status">Status</Hd><Hd k="customer">Customer</Hd><Hd k="machine">Machine / serial</Hd><Hd k="contract_no">Contract</Hd><Hd k="start_date">From</Hd><Hd k="end_date">To</Hd><Hd k="visits" right>Visits</Hd><Hd k="value" right>Value</Hd><Hd k="engineer">Engineer</Hd>
         </tr></thead>
         <tbody>
           {rows && shown.length === 0 && (<tr><td colSpan={9} className="px-3 py-5 text-center" style={{ color: MUTED }}>
-            {rows.length ? "Nothing matches the search." : "The register is empty — ⇪ Import brings the Excel in, or add one contract by hand."}</td></tr>)}
+            {rows.length ? "Nothing matches these filters." : "The register is empty — ⇪ Import brings the Excel in, or add one contract by hand."}</td></tr>)}
           {!rows && (<tr><td colSpan={9} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
           {shown.map((r, i) => {
             const left = daysTo(r.end_date);
@@ -1099,6 +1168,82 @@ function AnalyticsScreen() {
   );
 }
 
+// ============================ DISCUSSION POINTS ============================
+/**
+ * DISCUSSION POINTS (Dr Raghu, 3 Oct 2026: "show discussion points as a
+ * menu item too. It will have a table with Open issues. This is something
+ * that they need to discuss with me"). Every open ticket is a point until
+ * it is closed, oldest first. Beside each, a line the team writes for the
+ * discussion, and a tick when it has been discussed — the ticket itself
+ * stays open until the ERP closes it. Migration 0197.
+ */
+function DiscussScreen() {
+  const [rows, masters, installed, load] = useReg("issue", "&status=open");
+  const [open, setOpen] = useState<Row | null>(null);
+  const [onlyUndiscussed, setOnlyUndiscussed] = useState(true);
+  const [busy, setBusy] = useState("");
+  const today = TODAY();
+  const age = (r: Row) => { const d = (S(r.issue_date) || S(r.at)).slice(0, 10); return d ? Math.round((new Date(today).getTime() - new Date(d).getTime()) / 86400000) : 0; };
+  const list = (rows || []).filter((r) => !onlyUndiscussed || !S(r.discussed_at)).sort((a, b) => age(b) - age(a));
+  const save = async (r: Row, patch: Record<string, unknown>) => {
+    setBusy(r.id);
+    const e = await saveReg("issue", "update", r.id, patch);
+    setBusy("");
+    if (e) window.alert(e); else load();
+  };
+  const cost = list.reduce((t, r) => t + (Number(r.cost_spent) || 0), 0);
+  return (
+    <Shell installed={installed} title="Discussion points"
+      blurb="Every open ticket, oldest first — what the team needs to discuss with Dr Raghu. Write the point beside the ticket; tick it when it has been discussed. A ticket leaves this list only when the ERP closes it."
+      extra={
+        <label className="text-xs flex items-center gap-1" style={{ color: MUTED }}>
+          <input type="checkbox" checked={onlyUndiscussed} onChange={(e) => setOnlyUndiscussed(e.target.checked)} /> not yet discussed only
+        </label>
+      }>
+      <div className="text-sm mb-2" style={{ color: MUTED }}>
+        <b style={{ color: INK }}>{list.length}</b> open ticket{list.length === 1 ? "" : "s"}{onlyUndiscussed ? " not yet discussed" : ""} · {list.filter((r) => age(r) > 90).length} older than ninety days · cost so far {rupee(cost)}
+      </div>
+      <Box min={1240}>
+        <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+          <Th>Age</Th><Th>Ticket</Th><Th>Customer</Th><Th>Site</Th><Th>Machine</Th><Th>Status</Th><Th>Engineer</Th><Th>Pending action</Th><Th>Point to discuss</Th><Th>Discussed</Th>
+        </tr></thead>
+        <tbody>
+          {!rows && (<tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
+          {rows && !list.length && (<tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>Nothing to discuss — every open ticket has been talked through, or none is open.</td></tr>)}
+          {list.map((r, i) => {
+            const a = age(r);
+            return (
+              <tr key={r.id} className="border-t" style={{ borderColor: "var(--line-soft)", background: i % 2 ? "#FAF9F5" : "#fff" }}>
+                <td className="px-2 py-1.5 tnum font-bold" style={{ color: a > 90 ? RED : a > 30 ? "#B26A00" : INK }}>{a}d</td>
+                <td className="px-2 py-1.5" style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <button onClick={() => setOpen(r)} className="text-left hover:underline"><span className="tnum text-xs font-bold mr-1" style={{ color: "var(--blue)" }}>{S(r.erp_name)}</span><span className="font-semibold">{S(r.title)}</span></button>
+                </td>
+                <td className="px-2 py-1.5" style={{ maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.customer) || "—"}</td>
+                <td className="px-2 py-1.5" style={{ color: MUTED, maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.location) || "—"}</td>
+                <td className="px-2 py-1.5" style={{ color: MUTED, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{S(r.equipment) || S(r.machine) || "—"}</td>
+                <td className="px-2 py-1.5"><Chip s={S(r.status)} colour={statusColour(S(r.status))} /></td>
+                <td className="px-2 py-1.5">{(S(r.attended_by) || S(r.handled_by) || S(r.owner)).split("@")[0] || "—"}</td>
+                <td className="px-2 py-1.5" style={{ color: MUTED }}>{S(r.pending_action_status) || "—"}</td>
+                <td className="px-2 py-1.5">
+                  <input defaultValue={S(r.discuss_note)} key={`${r.id}|${S(r.discuss_note)}`} placeholder="the point, in a line…" disabled={busy === r.id}
+                    onBlur={(e) => { if (e.target.value.trim() !== S(r.discuss_note)) void save(r, { discuss_note: e.target.value.trim() }); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                    className="border rounded px-1.5 py-0.5 text-xs" style={{ borderColor: S(r.discuss_note) ? BORDER : "transparent", background: S(r.discuss_note) ? "#fff" : "transparent", width: 240 }} />
+                </td>
+                <td className="px-2 py-1.5 whitespace-nowrap">
+                  {S(r.discussed_at) ? <button onClick={() => void save(r, { discussed_at: "" })} className="text-xs font-bold" style={{ color: GREEN }} title="click to un-tick">✓ {fmtD(r.discussed_at)}</button>
+                    : <button onClick={() => void save(r, { discussed_at: today })} disabled={busy === r.id} className="rounded border px-2 py-0.5 text-xs font-bold" style={{ borderColor: BORDER, color: INK }}>discussed ✓</button>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </Box>
+      {open && <IssueBox row={open} masters={masters} onClose={() => setOpen(null)} onSaved={() => { setOpen(null); load(); }} />}
+    </Shell>
+  );
+}
+
 // ============================ DASHBOARD ============================
 interface SevaStats {
   today: string; fy_start: string;
@@ -1291,6 +1436,8 @@ export default function Seva({
           {openKey === "dashboard" && <SevaDashboard go={go} />}
           {openKey === "issues" && <IssuesScreen isOwner={isOwner} />}
           {openKey === "analytics" && <AnalyticsScreen />}
+          {openKey === "locations" && <SevaLocations />}
+          {openKey === "discuss" && <DiscussScreen />}
           {openKey === "amc" && <AmcScreen />}
           {openKey === "push" && <PushScreen />}
           {openKey === "settings" && <SettingsScreen />}
