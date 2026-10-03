@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.14.1",
+    date: "2026-10-03",
+    module: "Seva dashboard: live AMCs, open issues, the pie by type, the cost of warranty",
+    items: [
+      "FIVE MORE ON THE SEVA DASHBOARD (Dr Raghu, 3 Oct 2026: \"AMC Valid Live - nos, AMC Valid Live - Value, Issues Open, Pie chart of issue by type, Cost incurred in Warranty (nos)\"). Live means today sits between the contract\u2019s start and end \u2014 64 contracts, \u20b91.45 Cr on the day it was built \u2014 not the status word. Issues open and overdue are counted on the server over every ticket, not the page the register shows.",
+      "ISSUES BY TYPE, A PIE with a legend and the counts beside it \u2014 this financial year, open now, or all time, one click apart. Five hues in a fixed order, checked for colour-blind separation; everything past the fifth type folds into Other.",
+      "COST INCURRED IN WARRANTY: tickets whose agreement status on the ERP says warranty \u2014 how many this FY and what they cost (the ERP\u2019s own cost_spent), with all time and still-open beside it. The numbers fill as the hourly pull brings the tickets in.",
+    ],
+  },
+  {
     v: "5.9.14.0",
     date: "2026-10-03",
     module: "Seva: every ERP Issue, every field, every hour \u2014 and the FRF forms into the Drive",

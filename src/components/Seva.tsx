@@ -1078,15 +1078,62 @@ function SettingsScreen() {
 }
 
 // ============================ DASHBOARD ============================
+interface SevaStats {
+  today: string; fy_start: string;
+  amc: { total: number; live: number; live_value: number };
+  issues: { total: number; open: number; overdue: number; this_fy: number; by_type_open: { type: string; n: number }[]; by_type_fy: { type: string; n: number }[]; by_type_all: { type: string; n: number }[] };
+  warranty: { all: number; all_cost: number; fy: number; fy_cost: number; open: number; open_cost: number };
+}
+/** The five hues, in fixed order, validated for colour-blind separation; the sixth slice is always "Other", in gray. */
+const PIE = ["#1F6FB2", "#D97706", "#0D7A3F", "#7C3AED", "#B3392E"];
+function TypePie({ rows, title, sub }: { rows: { type: string; n: number }[]; title: string; sub: string }) {
+  const total = rows.reduce((a, r) => a + r.n, 0);
+  const top = rows.slice(0, 5);
+  const rest = rows.slice(5).reduce((a, r) => a + r.n, 0);
+  const slices = [...top.map((r, i) => ({ label: r.type, n: r.n, colour: PIE[i] })), ...(rest ? [{ label: `Other (${rows.length - 5})`, n: rest, colour: "#8A8A8A" }] : [])];
+  const R = 46, C = 52;
+  let acc = 0;
+  const arcs = slices.map((sl) => {
+    const a0 = (acc / Math.max(1, total)) * 2 * Math.PI, a1 = ((acc + sl.n) / Math.max(1, total)) * 2 * Math.PI;
+    acc += sl.n;
+    const x0 = C + R * Math.sin(a0), y0 = C - R * Math.cos(a0), x1 = C + R * Math.sin(a1), y1 = C - R * Math.cos(a1);
+    const big = a1 - a0 > Math.PI ? 1 : 0;
+    const d = slices.length === 1 ? `M ${C} ${C - R} A ${R} ${R} 0 1 1 ${C - 0.01} ${C - R} Z` : `M ${C} ${C} L ${x0} ${y0} A ${R} ${R} 0 ${big} 1 ${x1} ${y1} Z`;
+    return { ...sl, d, pct: total ? Math.round((sl.n / total) * 100) : 0 };
+  });
+  return (
+    <div className="bg-white rounded-lg border p-3" style={{ borderColor: BORDER }}>
+      <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.8 }}>{title}</div>
+      <div className="text-xs mb-2" style={{ color: MUTED }}>{sub}</div>
+      {!total ? <div className="text-sm" style={{ color: MUTED }}>Nothing to draw yet — the hourly pull is bringing the tickets in.</div> : (
+        <div className="flex items-center gap-3 flex-wrap">
+          <svg width={104} height={104} viewBox="0 0 104 104" role="img" aria-label={`${title}: ${arcs.map((a) => `${a.label} ${a.pct}%`).join(", ")}`}>
+            {arcs.map((a) => <path key={a.label} d={a.d} fill={a.colour} stroke="#fff" strokeWidth={2}><title>{`${a.label}: ${a.n} (${a.pct}%)`}</title></path>)}
+          </svg>
+          <div className="text-xs" style={{ color: INK, lineHeight: 1.7 }}>
+            {arcs.map((a) => (
+              <div key={a.label} className="flex items-center gap-2">
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: a.colour, display: "inline-block" }} />
+                <span style={{ minWidth: 150 }}>{a.label}</span>
+                <b className="tnum">{a.n}</b><span className="tnum" style={{ color: MUTED }}>{a.pct}%</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-2" style={{ color: MUTED }}><span style={{ width: 10 }} /><span style={{ minWidth: 150 }}>total</span><b className="tnum" style={{ color: INK }}>{total}</b></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SevaDashboard({ go }: { go: (k: string) => void }) {
-  const [issues] = useReg("issue");
   const [amcs] = useReg("amc");
   const [pushes] = usePush();
-  const today = TODAY();
+  const [st, setSt] = useState<SevaStats | null>(null);
+  const [pieOf, setPieOf] = useState<"open" | "fy" | "all">("fy");
+  useEffect(() => { fetch("/api/seva/stats", { cache: "no-store" }).then((r) => r.json()).then((j) => setSt(j.ok ? j : null)).catch(() => setSt(null)); }, []);
   const owed = (pushes?.inbox || []).filter((p) => p.status === "sent" || p.status === "seen");
-
-  const openIssues = (issues || []).filter((r) => !/closed|resolved/i.test(S(r.status)));
-  const overdue = openIssues.filter((r) => S(r.due) && S(r.due).slice(0, 10) < today);
+  const lakh = (n: number) => (n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(2)} L` : rupee(n));
   const expiring = (amcs || []).filter((r) => { const d = daysTo(r.end_date); return d != null && d >= 0 && d <= 60; });
   const expired = (amcs || []).filter((r) => { const d = daysTo(r.end_date); return d != null && d < 0; });
   const visitsOwed = (amcs || []).reduce((s, r) => {
@@ -1104,12 +1151,32 @@ function SevaDashboard({ go }: { go: (k: string) => void }) {
 
   return (
     <div style={{ maxWidth: 1100 }}>
+      {/* THE FIVE HE ASKED FOR (3 Oct 2026): AMC valid live by number and by
+          value, issues open, the pie by type, and the cost in warranty — all
+          counted on the server, over every ticket and contract. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+        <Card label="AMC VALID LIVE — NOS" value={st ? String(st.amc.live) : "…"} sub={st ? `of ${st.amc.total} contracts, today inside start and end` : "counting"} colour={GREEN} onClick={() => go("amc")} />
+        <Card label="AMC VALID LIVE — VALUE" value={st ? lakh(st.amc.live_value) : "…"} sub="the live contracts' value, as the register has it" colour={GREEN} onClick={() => go("amc")} />
+        <Card label="ISSUES OPEN" value={st ? String(st.issues.open) : "…"} sub={st ? `${st.issues.overdue} past their due date · ${st.issues.total.toLocaleString("en-IN")} tickets in all` : "counting"} colour={st?.issues.open ? RED : GREEN} onClick={() => go("issues")} />
+        <Card label="COST INCURRED IN WARRANTY" value={st ? `${st.warranty.fy} nos · ${lakh(st.warranty.fy_cost)}` : "…"} sub={st ? `this FY from ${fmtD(st.fy_start)} · all time ${st.warranty.all} nos, ${lakh(st.warranty.all_cost)} · ${st.warranty.open} still open` : "counting"} colour={st?.warranty.fy ? "var(--warn)" : GREEN} onClick={() => go("issues")} />
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
         <Card label="PUSHED TO YOU" value={String(owed.length)} sub="waiting on your answer, by name" colour={owed.length ? RED : GREEN} onClick={() => go("push")} />
-        <Card label="OPEN ISSUES" value={String(openIssues.length)} sub={`${overdue.length} past their due date`} colour={openIssues.length ? RED : GREEN} onClick={() => go("issues")} />
         <Card label="AMC EXPIRING" value={String(expiring.length)} sub="within 60 days — renewal talks start here" colour={expiring.length ? "var(--warn)" : GREEN} onClick={() => go("amc")} />
         <Card label="AMC EXPIRED" value={String(expired.length)} sub="past their end date, not yet closed off" colour={expired.length ? RED : GREEN} onClick={() => go("amc")} />
         <Card label="VISITS OWED" value={String(visitsOwed)} sub={`across ${(amcs || []).length} contracts`} colour={TEAL} onClick={() => go("amc")} />
+        <Card label="TICKETS THIS FY" value={st ? String(st.issues.this_fy) : "…"} sub={st ? `opened since ${fmtD(st.fy_start)}` : "counting"} colour={INK} onClick={() => go("issues")} />
+      </div>
+      <div className="grid md:grid-cols-2 gap-2 mb-3">
+        <div>
+          <div className="flex gap-1 mb-1 text-xs">
+            {([["fy", "this FY"], ["open", "open now"], ["all", "all time"]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setPieOf(k)} className="rounded px-2 py-0.5 font-bold" style={{ background: pieOf === k ? "var(--ink)" : "#F3F1EB", color: pieOf === k ? "#fff" : MUTED }}>{l}</button>
+            ))}
+          </div>
+          <TypePie rows={st ? (pieOf === "open" ? st.issues.by_type_open : pieOf === "fy" ? st.issues.by_type_fy : st.issues.by_type_all) : []}
+            title="ISSUES BY TYPE" sub={pieOf === "open" ? "every ticket still open, by its type of support" : pieOf === "fy" ? "tickets opened this financial year, by type of support" : "every ticket on record, by type of support"} />
+        </div>
       </div>
 
       {expiring.length > 0 && (
