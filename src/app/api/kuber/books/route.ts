@@ -3,7 +3,7 @@ import { readBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { requireKuber } from "@/lib/accounts";
+import { requireKuber, requireKuberOr } from "@/lib/accounts";
 import { addDays } from "@/lib/fmt";
 import { newestByName } from "@/lib/kuber-fy";
 import { pageAll } from "@/lib/page-all";
@@ -239,10 +239,14 @@ const isBankChain = (rootOf: (g: string) => string, parent: string) =>
 
 export async function GET(req: Request) {
   try {
-    await requireKuber();
-    const admin = adminClient();
     const url = new URL(req.url);
     const view = url.searchParams.get("view") || "summary";
+    /* the supplier hand's side door: the payables side only (lib/accounts) */
+    const supplierView =
+      (["ageing", "billsdue"].includes(view) && url.searchParams.get("kind") === "payable") ||
+      ["reportcard", "supplier", "cashplan", "party_contact", "pos"].includes(view);
+    await requireKuberOr(supplierView);
+    const admin = adminClient();
     const today = IST_TODAY();
 
     if (view === "ageing") {
@@ -2601,8 +2605,9 @@ export async function GET(req: Request) {
  *  it outranks the seed from then on. */
 export async function POST(req: Request) {
   try {
-    const user = await requireKuber();
     const body = await readBody(req, {});
+    /* planning supplier bills is the supplier hand's work too */
+    const user = await requireKuberOr(["plan_bills", "collection"].includes(String(body.action)) && String(body.kind || "payable") === "payable");
     if (String(body.action) === "set_mis_input") {
       const key = String(body.key || "");
       if (!["opening_stock", "closing_stock"].includes(key)) throw new HttpError(400, "key must be opening_stock or closing_stock");

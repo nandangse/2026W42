@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { requireKuber } from "@/lib/accounts";
+import { requireKuberOr } from "@/lib/accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -72,8 +72,9 @@ const spec = (kind: string) => {
 /** GET ?kind=bg — the whole register, soonest time frame first. */
 export async function GET(req: Request) {
   try {
-    await requireKuber();
-    const k = spec(String(new URL(req.url).searchParams.get("kind") || ""));
+    const kindQ = String(new URL(req.url).searchParams.get("kind") || "");
+    await requireKuberOr(["payplan", "cashexp"].includes(kindQ));
+    const k = spec(kindQ);
     const { data, error } = await adminClient()
       .from(k.table)
       .select("*")
@@ -93,8 +94,8 @@ export async function GET(req: Request) {
 /** POST { kind, action: add|update|delete, id?, row? } */
 export async function POST(req: Request) {
   try {
-    const user = await requireKuber();
     const body = await readBody(req, {});
+    const user = await requireKuberOr(["payplan", "cashexp"].includes(String(body.kind || "")));
     const k = spec(String(body.kind || ""));
     const admin = adminClient();
 

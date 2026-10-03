@@ -28,6 +28,7 @@ import Masters from "./Masters";
 import Wip from "./Wip";
 import Mrp, { MrpRun } from "./Mrp";
 import Kanban from "./Kanban";
+import SupplierDesk from "./SupplierDesk";
 import Kitting from "./Kitting";
 import Slips from "./Slips";
 import PurchaseOrders from "./PurchaseOrders";
@@ -100,7 +101,8 @@ export default function SaamaanApp({
       case "kitting": return <Kitting />;
       case "slips": return <Slips />;
       case "po": return <PurchaseOrders erpBase={summary.erpBase} />;
-      case "suppliers": return <PurchaseOrders erpBase={summary.erpBase} openOn="suppliers" />;
+      /* Mukesh's desk: the supplier list for everyone; report card, outstanding and the payment plan for the supplier hand (3 Oct 2026) */
+      case "suppliers": return <SupplierDesk erpBase={summary.erpBase} canKuber={isOwner || email.toLowerCase() === "mukesh@nandan.co.in"} />;
       case "grn": return <PurchaseOrders erpBase={summary.erpBase} openOn="grn" />;
       case "pinv": return <PurchaseOrders erpBase={summary.erpBase} openOn="pinv" />;
       case "masters": return <Masters />;

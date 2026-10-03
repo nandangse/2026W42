@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.12.1",
+    date: "2026-10-03",
+    module: "Saamaan \u2192 Suppliers: Mukesh\u2019s desk",
+    items: [
+      "SUPPLIER REPORT CARD, SUPPLIER OUTSTANDING AND THE SUPPLIER PAYMENT PLAN, INSIDE SAAMAAN (Dr Raghu, 3 Oct 2026: \"These are the two things that are there in Kuber, which Mukesh needs to know currently \u2026 the other purchasers will not need to know that right now\"). Three tabs on Saamaan \u2192 Suppliers, each Kuber\u2019s own screen reading Kuber\u2019s own route \u2014 the live figures, never a copy. They open to the supplier hand only: Mukesh, and the owner. Everyone else sees the supplier list, as before.",
+      "A SIDE DOOR, NOT THE KUBER DOOR: Mukesh does not hold the Kuber tick and still does not. Only the payables side of the ageing, the report card, the supplier card and the payment plan answer to a named hand holding the Saamaan tick (lib/accounts). The P&L and everything else stay behind Kuber\u2019s own door.",
+    ],
+  },
+  {
     v: "5.9.12.0",
     date: "2026-10-03",
     module: "Saamaan: MRP as per reorder level \u2014 the Kanban",
