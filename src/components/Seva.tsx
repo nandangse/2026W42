@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import GenieShell from "@/components/GenieShell";
+import SevaAnalytics from "@/components/SevaAnalytics";
 import { swallow } from "@/lib/swallow";
 import { dmy as fmtD, rupee } from "@/lib/fmt";
 const money = (n: unknown) => rupee(n);
@@ -23,6 +24,7 @@ const INK = "var(--navy)", MUTED = "var(--muted)", BORDER = "var(--line)", ORANG
 const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
   { key: "issues", label: "Support Tickets", icon: "⚠" },
+  { key: "analytics", label: "Ticket Analytics", icon: "📊" },
   { key: "amc", label: "Annual Maintenance", icon: "📅" },
   { key: "push", label: "Push — 1:1", icon: "⇢" },
   { key: "settings", label: "Settings — masters", icon: "⚙" },
@@ -1077,6 +1079,26 @@ function SettingsScreen() {
   );
 }
 
+// ============================ ANALYTICS ============================
+/** The analytics page, and the ticket box over it when a row is opened — the full row is read by its ERP name. */
+function AnalyticsScreen() {
+  const [open, setOpen] = useState<Row | null>(null);
+  const [masters, setMasters] = useState<Master[]>([]);
+  const openTicket = async (t: { id: string; erp_name: string }) => {
+    const r = await fetch(`/api/seva/reg?kind=issue&q=${encodeURIComponent(t.erp_name || t.id)}&status=all`, { cache: "no-store" });
+    const j = await r.json().catch(() => ({}));
+    const row = ((j.rows || []) as Row[]).find((x) => x.id === t.id) || ((j.rows || []) as Row[])[0] || null;
+    setMasters(j.masters || []);
+    setOpen(row);
+  };
+  return (
+    <>
+      <SevaAnalytics onOpen={openTicket} />
+      {open && <IssueBox row={open} masters={masters} onClose={() => setOpen(null)} onSaved={() => setOpen(null)} />}
+    </>
+  );
+}
+
 // ============================ DASHBOARD ============================
 interface SevaStats {
   today: string; fy_start: string;
@@ -1268,6 +1290,7 @@ export default function Seva({
         <main className="flex-1 p-5" style={{ minWidth: 0 }}>
           {openKey === "dashboard" && <SevaDashboard go={go} />}
           {openKey === "issues" && <IssuesScreen isOwner={isOwner} />}
+          {openKey === "analytics" && <AnalyticsScreen />}
           {openKey === "amc" && <AmcScreen />}
           {openKey === "push" && <PushScreen />}
           {openKey === "settings" && <SettingsScreen />}

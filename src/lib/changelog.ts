@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.15.0",
+    date: "2026-10-03",
+    module: "Seva: Ticket Analytics \u2014 every number is a filter",
+    items: [
+      "A NEW DOOR ON SEVA, TICKET ANALYTICS (Dr Raghu, 3 Oct 2026: \"make an analytics page for this. Show graphs and tables that make sense of what's happening. We should also be able to drill it down\"). Six headline tiles \u2014 tickets, still open, median days to resolve (with the average and the share closed within a week), cost spent and man-days, under warranty, raised as NC. Opened against closed, month by month, as thin paired bars with a legend.",
+      "BREAKDOWNS ON EVERY TAG THE ERP KEEPS: type of support, problem, customer and engineer up front; machine, site, job, agreement, status, closure rating and pending action under More cuts. Each row carries tickets, open, average days and cost, with a bar beside it. Open tickets by age, in five bands.",
+      "THE DRILL: click a row, a bar, a month, a tile and it becomes a chip at the top \u2014 the whole page re-answers for that slice, chips stack, each has its \u00d7. Under everything, the tickets behind the figures, newest first; click one and the ticket opens with its ERP panel. The counting is done on the server over every ticket; the page only draws.",
+    ],
+  },
+  {
     v: "5.9.14.1",
     date: "2026-10-03",
     module: "Seva dashboard: live AMCs, open issues, the pie by type, the cost of warranty",
