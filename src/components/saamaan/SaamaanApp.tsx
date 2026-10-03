@@ -27,6 +27,7 @@ import Bom from "./Bom";
 import Masters from "./Masters";
 import Wip from "./Wip";
 import Mrp, { MrpRun } from "./Mrp";
+import Kanban from "./Kanban";
 import Kitting from "./Kitting";
 import Slips from "./Slips";
 import PurchaseOrders from "./PurchaseOrders";
@@ -39,6 +40,7 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "bom", label: "BOM", icon: "🧾" },
   { key: "wip", label: "WIP", icon: "🏭" },
   { key: "mrp", label: "MRP", icon: "📐" },
+  { key: "kanban", label: "Kanban · reorder", icon: "♻" },
   { key: "kitting", label: "Kitting register", icon: "✓" },
   { key: "slips", label: "Issue slips", icon: "📨" },
   /* THREE DOORS, NOT ONE (Dr Raghu, 8 Sep 2026: "where r the GRN and PO and
@@ -94,6 +96,7 @@ export default function SaamaanApp({
       case "bom": return <Bom summary={summary} />;
       case "wip": return <Wip erpBase={summary.erpBase} role={role} summary={summary} />;
       case "mrp": return mrpId ? <MrpRun id={mrpId} role={role} email={email} /> : <Mrp />;
+      case "kanban": return <Kanban />;
       case "kitting": return <Kitting />;
       case "slips": return <Slips />;
       case "po": return <PurchaseOrders erpBase={summary.erpBase} />;

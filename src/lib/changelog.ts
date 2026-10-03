@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.12.0",
+    date: "2026-10-03",
+    module: "Saamaan: MRP as per reorder level \u2014 the Kanban",
+    items: [
+      "A SECOND MRP, FOR THE SHELF (Dr Raghu, 3 Oct 2026: \"MRP as per reorder level, which is for a Kanban system and for Class C items, for example bolt, nut, and small small items\"). Saamaan \u2192 Kanban \u00b7 reorder, and a button beside + New run. Seed brings every class C item in the mirror (1,377 today) onto the Kanban; each carries a buffer \u2014 its reorder level \u2014 and stands in a zone: red below a third of it, yellow below two-thirds, green above.",
+      "DBM \u2014 DYNAMIC BUFFER MANAGEMENT, ON THE ERP\u2019S OWN LEDGER (\"based on the consumption of the last 6 months \u2026 it will actually predict in 1 month how much of that item has been consumed. That will then be the reorder level\"). Run DBM reads six months of issues out of the Stock warehouses from the ERP\u2019s stock ledger and today\u2019s stock from Bin. The first buffer is one month\u2019s consumption, or the ERP\u2019s own reorder level if larger. After that the rule: red for two runs running \u2192 the buffer grows by a third; green for three runs with nothing on order \u2192 it shrinks by a third, never below half a month. A buffer typed by hand is never moved; the rule\u2019s number is written beside it. Every run is on record with who, when and why; every buffer change is logged.",
+      "RED ONTO A REQUISITION: one button raises a purchase slip (PR-) for every red item\u2019s to-order quantity \u2014 back up to the buffer, counting what is already on order \u2014 to Mukesh, Pradip, Akshay or Shailaja. The same paper the MRP run raises. A cap on the whole Kanban\u2019s buffer value sits beside the total, \u20b91 Cr to begin with, and says OVER when crossed.",
+      "The BOM still wins for the big draws: a job needing 2,000 bolts shows short on its MRP run as before. The Kanban is for the 200 that must always be there. Migration 0193.",
+    ],
+  },
+  {
     v: "5.9.11.1",
     date: "2026-10-03",
     module: "Saamaan: the clock pulls the ERP, the MRP run knows its jobs",

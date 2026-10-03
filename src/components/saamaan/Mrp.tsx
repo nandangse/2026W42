@@ -110,6 +110,8 @@ export default function Mrp() {
         <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="new run — a name" onKeyDown={(e) => { if (e.key === "Enter") create(); }}
           className="rounded border px-2 py-2 text-sm" style={{ borderColor: BORDER, minWidth: 200 }} />
         <Btn kind="primary" onClick={create} disabled={busy}>+ New run</Btn>
+        {/* THE OTHER MRP (Dr Raghu, 3 Oct 2026: "one more button saying MRP as per reorder level, which is for a Kanban system and for Class C items") */}
+        <Btn onClick={() => { window.location.href = "/saamaan/kanban"; }} title="The class C shelf — buffers from six months' consumption, red items onto a requisition">♻ MRP as per reorder level</Btn>
       </>}>
       {err && <Note kind="error">{err}</Note>}
       {msg && <Note kind="warn">{msg}</Note>}
