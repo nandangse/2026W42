@@ -28,7 +28,7 @@ interface Brk { rows: { key: string; n: number; open: number; avg_days: number |
 interface Ticket { id: string; erp_name: string; title: string; customer: string; machine: string; location: string; job: string; type: string; problem: string; status: string; engineer: string; agreement: string; opened: string; resolved: string | null; days: number; cost: number; billed: number }
 interface Data {
   today: string; total_all: number;
-  head: { n: number; open: number; resolved: number; avg_days: number | null; median_days: number | null; within_7_pct: number | null; cost: number; billed: number; mandays: number; warranty: number; warranty_cost: number; nc: number };
+  head: { n: number; open: number; closed: number; resolved: number; avg_days: number | null; median_days: number | null; within_7_pct: number | null; cost: number; billed: number; mandays: number; warranty: number; warranty_cost: number; nc: number };
   monthly: { month: string; opened: number; closed: number; cost: number; billed: number }[];
   by: Record<string, Brk>;
   ageing: { label: string; n: number; cost: number }[];
@@ -36,7 +36,7 @@ interface Data {
 }
 type Filters = Record<string, string>;
 const DIM_LABEL: Record<string, string> = {
-  type: "Type of support", problem: "Problem", customer: "Customer", machine: "Machine", location: "Site", engineer: "Engineer",
+  type: "Type of support", problem: "Problem", customer: "Customer", machine: "Machine", location: "Site", engineer: "Engineer (attended)", coordinator: "Coordinator (handled)",
   agreement: "Agreement", status: "Status", rating: "Closure rating", job: "Job", pending: "Pending action",
 };
 const PRESETS: [string, () => Filters][] = [
@@ -187,7 +187,7 @@ export default function SevaAnalytics({ onOpen }: { onOpen: (t: Ticket) => void 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 mb-3">
           <Tile label="TICKETS" value={h.n.toLocaleString("en-IN")} sub="in this slice" />
           <Tile label="STILL OPEN" value={String(h.open)} sub={h.n ? `${Math.round((h.open / h.n) * 100)}% of the slice` : ""} colour={h.open ? RED : GREEN} onClick={() => set("open", "1")} />
-          <Tile label="DAYS TO RESOLVE" value={h.median_days === null ? "·" : `${h.median_days}`} sub={h.avg_days === null ? "nothing resolved yet" : `median · average ${h.avg_days} · ${h.within_7_pct}% within a week`} />
+          <Tile label="DAYS TO RESOLVE" value={h.median_days === null ? "·" : `${h.median_days}`} sub={h.avg_days === null ? `the ERP's resolution clock is blank on all ${h.closed} closed here` : `median · average ${h.avg_days} · ${h.within_7_pct}% within a week · the ERP's clock on ${h.resolved} of ${h.closed} closed`} />
           <Tile label="COST SPENT" value={lakh(h.cost)} sub={`${h.mandays.toLocaleString("en-IN")} man-days · billed ${lakh(h.billed)}`} />
           <Tile label="UNDER WARRANTY" value={String(h.warranty)} sub={`cost ${lakh(h.warranty_cost)}`} colour={h.warranty ? AMBER : GREEN} onClick={() => set("warranty", "1")} />
           <Tile label="RAISED AS NC" value={String(h.nc)} sub="non-conformances" colour={h.nc ? RED : GREEN} onClick={() => set("nc", "1")} />
@@ -199,7 +199,7 @@ export default function SevaAnalytics({ onOpen }: { onOpen: (t: Ticket) => void 
           <Panel dim="type" title="By type of support" />
           <Panel dim="problem" title="By problem" />
           <Panel dim="customer" title="By customer" />
-          <Panel dim="engineer" title="By engineer" />
+          <Panel dim="engineer" title="By engineer who attended" />
         </div>
 
         {/* AGEING of what is open in the slice */}
@@ -218,7 +218,7 @@ export default function SevaAnalytics({ onOpen }: { onOpen: (t: Ticket) => void 
           </div>
         )}
 
-        <button onClick={() => setMore((v) => !v)} className="text-xs font-bold mb-2" style={{ color: BLUE }}>{more ? "▾" : "▸"} More cuts — machine, site, job, agreement, status, closure rating, pending action</button>
+        <button onClick={() => setMore((v) => !v)} className="text-xs font-bold mb-2" style={{ color: BLUE }}>{more ? "▾" : "▸"} More cuts — machine, site, job, agreement, status, closure rating, pending action, coordinator</button>
         {more && (
           <div className="grid md:grid-cols-2 gap-2 mb-3">
             <Panel dim="machine" title="By machine" full />
@@ -228,6 +228,7 @@ export default function SevaAnalytics({ onOpen }: { onOpen: (t: Ticket) => void 
             <Panel dim="status" title="By status" full />
             <Panel dim="rating" title="By closure rating" full />
             <Panel dim="pending" title="By pending action" full />
+            <Panel dim="coordinator" title="By coordinator" full />
           </div>
         )}
 

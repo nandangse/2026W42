@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "5.9.15.1",
+    date: "2026-10-03",
+    module: "Ticket Analytics: the ERP\u2019s own clock, the engineer who went, warranty by type",
+    items: [
+      "DAYS TO RESOLVE COMES FROM THE ERP\u2019S OWN CLOCK OR NOT AT ALL. The first pull gave every closed ticket its modified date when the ERP had no resolution date, and the page said the median ticket took 145 days \u2014 it did not; most were closed in bulk long after the visit. Only 78 closed tickets carry a final resolution date on the ERP and 1,641 a resolution time; the rest now carry nothing, and the tile says on how many of the closed the clock exists. Migration 0196 does the same once over what is in.",
+      "THE ENGINEER IS WHO ATTENDED \u2014 the e-mail the ERP keeps on the ticket \u2014 not handled_by, which is the coordinator\u2019s initials (AG on three tickets in four). The coordinator is its own cut under More cuts.",
+      "WARRANTY IS THE WARRANTY CALL TYPE (1,948 on the ERP, \u20b91.29 Cr spent), as well as any ticket whose agreement says so \u2014 the ERP\u2019s agreement field holds SLA words, not warranty, so the earlier count read zero. The dashboard and the analytics agree on this now.",
+    ],
+  },
+  {
     v: "5.9.15.0",
     date: "2026-10-03",
     module: "Seva: Ticket Analytics \u2014 every number is a filter",

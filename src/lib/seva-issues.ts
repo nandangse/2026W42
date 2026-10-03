@@ -59,7 +59,12 @@ export const issueRow = (t: Doc, pulledAt: string) => ({
   finally_showed_to: S(t.finally_showed_to) || null,
   resolution_summary: flat(t.resolution_summary) || null,
   resolution: flat(t.resolution_summary) || "",
-  resolved_at: D(t.resolution_date) || (/closed|resolved/i.test(S(t.status)) ? D(t.modified) : null),
+  /* ONLY THE ERP'S OWN CLOCK (3 Oct 2026). 12,039 closed tickets, 78 with a
+     final_resolution_date, 1,641 with a resolution time — the rest were
+     closed without one. Falling back to `modified` once said the median
+     ticket took 145 days; it did not, it was closed in bulk later. A closed
+     ticket with no resolution date carries none, and the page says how many. */
+  resolved_at: D(t.final_resolution_date) || D(t.resolution_date) || null,
   closure_rating: S(t.custom_closure_ratings) || null,
   raised_as_nc: B(t.custom_raised_as_nc),
   via_portal: B(t.via_customer_portal),

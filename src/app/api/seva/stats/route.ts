@@ -61,7 +61,8 @@ export async function GET() {
       for (const r of rows) { const k = S(r.type_of_support) || "(no type)"; m.set(k, (m.get(k) || 0) + 1); }
       return [...m.entries()].map(([type, n]) => ({ type, n })).sort((a, b) => b.n - a.n);
     };
-    const warranty = (rows: Doc[]) => rows.filter((r) => /warrant/i.test(S(r.agreement_status)));
+    /* a warranty ticket is a Warranty Call by type (1,948 on the ERP), or one whose agreement says so */
+    const warranty = (rows: Doc[]) => rows.filter((r) => /warrant/i.test(S(r.type_of_support)) || /warrant/i.test(S(r.agreement_status)));
     const wAll = warranty(issues), wFy = warranty(thisFy), wOpen = warranty(open);
     const cost = (rows: Doc[]) => rows.reduce((a, r) => a + (Number(r.cost_spent) || 0), 0);
 
