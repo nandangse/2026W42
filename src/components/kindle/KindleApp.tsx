@@ -21,6 +21,7 @@ const Goals = dynamic(() => import("./Goals"));
 const One21 = dynamic(() => import("./One21"));
 const Finances = dynamic(() => import("./Finances"));
 const Exercises = dynamic(() => import("./Exercises"));
+const Presentations = dynamic(() => import("./Presentations"));
 
 /**
  * THE KINDLE SHELL. Left navigation of thirteen sections, the flame on top,
@@ -37,6 +38,7 @@ export const SECTIONS: { key: string; label: string; icon: string; phase: number
   { key: "meetings", label: "TG Meetings", icon: "📅", phase: 1 },
   { key: "one21", label: "1-2-1s", icon: "🤝", phase: 1 },
   { key: "issues", label: "Burning issues", icon: "🧯", phase: 1 },
+  { key: "presentations", label: "Presentations", icon: "🎞", phase: 1 },
   { key: "polls", label: "Polls", icon: "🗳", phase: 1 },
   { key: "board", label: "Message board", icon: "💬", phase: 1 },
   { key: "finances", label: "Finances", icon: "💰", phase: 1 },
@@ -92,6 +94,7 @@ export default function KindleApp({ initialSection, initialArg }: { initialSecti
       case "polls": return <Polls boot={boot} />;
       case "checkins": return <Checkins boot={boot} arg={arg} go={go} />;
       case "issues": return <Issues boot={boot} />;
+      case "presentations": return <Presentations boot={boot} arg={arg} go={go} />;
       case "goals": return <Goals boot={boot} arg={arg} go={go} />;
       case "one21": return <One21 boot={boot} />;
       case "finances": return <Finances boot={boot} />;

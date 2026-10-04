@@ -34,6 +34,9 @@ export async function POST(req: Request) {
     if (error) throw error;
     const origin = new URL(req.url).origin;
     const results: { name: string; email: string; result: string }[] = [];
+    /* one check before the loop, so a dead mailbox fails once with the reason instead of ten times */
+    const { kindleSender } = await import("@/lib/kindle/mail");
+    try { await kindleSender(); } catch (e) { throw new HttpError(503, e instanceof Error ? e.message : String(e)); }
     for (const m of members || []) {
       if (!b.ids?.length && Number(m.login_count) > 0 && !b.force) { results.push({ name: m.name, email: m.email, result: "skipped — already signed in" }); continue; }
       const token = newInviteToken();

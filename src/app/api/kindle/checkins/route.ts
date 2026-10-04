@@ -18,13 +18,18 @@ export async function GET() {
   try {
     await requireKindler();
     const admin = adminClient();
-    const [ck, gu, g, gs] = await Promise.all([
+    let [ck, gu, g, gs] = await Promise.all([
       admin.from("kindle_checkin").select(COLS).order("period", { ascending: false }).order("submitted_at", { ascending: false }).limit(2000),
       admin.from("kindle_goal_update").select("id,goal_id,checkin_id,member_id,period,note,status,progress").limit(5000),
       admin.from("kindle_goal").select("id,set_id,member_id,kind,seq,title,measure,actions,status,progress"),
       admin.from("kindle_goal_set").select("id,member_id,year_label,created_at,failed_last,start_doing,stop_doing,one_thing,accountable_to,support_needed,ai_summary,ai_summary_at"),
     ]);
-    const err = [ck, gu, g, gs].find((r) => r.error)?.error; if (err) throw err;
+    /* 4 Oct 2026: the page went "Internal error" because the deploy read
+       columns a migration had not yet added. Read the older shape instead
+       of failing — the screen works, the new fields arrive when the SQL runs. */
+    if (g.error) g = await admin.from("kindle_goal").select("id,set_id,member_id,kind,seq,title,measure,status,progress") as typeof g;
+    if (gs.error) gs = await admin.from("kindle_goal_set").select("id,member_id,year_label,created_at,failed_last,start_doing,stop_doing,one_thing,accountable_to,support_needed") as typeof gs;
+    const err = [ck, gu, g, gs].find((r) => r.error)?.error; if (err) throw new HttpError(500, `${err.message}${/does not exist/.test(err.message) ? " — a Kindle migration (0187-0199) has not been run in Supabase." : ""}`);
     return NextResponse.json({ checkins: ck.data || [], updates: gu.data || [], goals: g.data || [], sets: gs.data || [] });
   } catch (e) { return errJson(e); }
 }

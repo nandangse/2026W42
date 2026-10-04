@@ -9,6 +9,15 @@
  */
 export const KINDLE_UPDATES: { v: string; date: string; items: string[] }[] = [
   {
+    v: "1.4.0", date: "2026-10-04",
+    items: [
+      "Presentations, after Burning issues: the video in the page (YouTube, Drive, Zoom, Loom), the PPT or PDF in the private bucket with a PDF preview, the presenter's notes, the room's comments, and who has watched it — a view is recorded the first time each member opens it (migration 0199).",
+      "Check-ins and Goals no longer fail with \"Internal error\" when a migration is still to be run; they read the older shape and say which SQL is pending.",
+      "Niraj's 2026-27 goals updated to his 30 May revision from the New Goals tab.",
+      "Send welcome mails checks the Gmail connection once before it starts and says, in the result, exactly what to do when the mailbox needs reconnecting; a failed run no longer burns the day's invite links ten times over.",
+    ],
+  },
+  {
     v: "1.3.1", date: "2026-10-01",
     items: [
       "Every goal carries its Number — the measure it is judged by — beside the title, and three action points under it; both on the Goals page and on the check-in form (migration 0191).",

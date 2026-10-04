@@ -12,8 +12,12 @@ export const KINDLE_FROM_NAME = "Raghu · Kindle";
 export async function kindleSender(): Promise<{ token: string; fromEmail: string; fromName: string }> {
   const { mailboxByAddress, accessTokenFor } = await import("@/crm/gmail");
   const box = await mailboxByAddress(KINDLE_FROM);
-  if (!box) throw new Error(`Kindle mail goes from ${KINDLE_FROM}, and that Gmail is not connected in Genie — open the account menu → Connect Gmail once.`);
-  return { token: await accessTokenFor(String(box.id)), fromEmail: String(box.email_address), fromName: KINDLE_FROM_NAME };
+  if (!box) throw new Error(`Kindle mail goes from ${KINDLE_FROM}, and that Gmail is not connected in Genie — Profile → Connect Gmail once, then press again.`);
+  /* 4 Oct 2026: all ten welcome mails failed with "Gmail auth failed" — his
+     refresh token had been revoked (invalid_grant). Say exactly what to do. */
+  if (box.status === "auth_failed") throw new Error(`Your Gmail (${KINDLE_FROM}) needs reconnecting in Genie — Profile → ✉ Connect Gmail, sign in once — then press Send again. Nothing was sent.`);
+  try { return { token: await accessTokenFor(String(box.id)), fromEmail: String(box.email_address), fromName: KINDLE_FROM_NAME }; }
+  catch (e) { throw new Error(`Your Gmail (${KINDLE_FROM}) refused the send (${e instanceof Error ? e.message : String(e)}). Reconnect it in Genie — Profile → ✉ Connect Gmail — then press Send again.`); }
 }
 
 /** Send once per (kind, to, ref). Returns "sent", "already" or the error text. */
