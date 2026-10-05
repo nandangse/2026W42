@@ -97,7 +97,8 @@ fee(2025, "jigar", 1000, "Late fee Nov 2025"); fee(2025, "valay", 2000, "Late fe
 /* what the statements say is still unpaid (everything else is settled) */
 const UNPAID = [["niraj", "Use of laptop (Jul 2025)"], ["raghu", "Collection 2025 (second levy)"]];
 /* Jigar's 2024 late fees: 10,000 raised, 4,000 received 10 Jan 2025 — the Dec 5,000 is recorded as not pursued, the Nov one as part-paid */
-const SHORT = { "jigar|Late fee Nov 2024": { paid_amount: 4000, paid_on: "2025-01-10" }, "jigar|Late fee Dec 2024": { waived: true, note: "Statement shows 4,000 received against 10,000; the balance was not pursued" } };
+const JIGAR_NOTE = "Raised 10,000 across Nov and Dec 2024; 4,000 received 10 Jan 2025. The 2025 statement carries O/s 2024 as nil, so it is closed here as the statement has it. The 6,000 difference is unexplained, for Niraj to confirm.";
+const SHORT = { "jigar|Late fee Nov 2024": { waived: true, note: JIGAR_NOTE }, "jigar|Late fee Dec 2024": { waived: true, note: JIGAR_NOTE } };
 
 const BUDGET_2026 = [["Venue and snacks", 150000, "MCA ~12–15k a meeting, from 2025"], ["Dinners after meetings", 50000, "2024–25 average"], ["Outbound", 330000, "Alibaug 2025 cost 327,150"], ["Diwali dinner", 60000, "57,800 in 2025"], ["Gifts, speakers and training", 30000, "gifts, Knowledge Guru fee"]];
 

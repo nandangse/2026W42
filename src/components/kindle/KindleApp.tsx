@@ -113,20 +113,25 @@ function Shell({ boot, section, go, menu, setMenu, logout, children }: { boot: B
   const me = boot.me;
   const meRow = boot.members.find((m) => m.id === me.id) || { name: me.name, photo_path: me.photo_path };
   const [acct, setAcct] = useState(false);
-  const nav = (
+  /* the menu folds to an icon strip (Dr Raghu, 5 Oct 2026: "make the side collapsible"); remembered on this browser */
+  const [folded, setFolded] = useState(false);
+  useEffect(() => { try { setFolded(localStorage.getItem("kindle.nav.folded") === "1"); } catch { /* private window: stays open */ } }, []);
+  const fold = (v: boolean) => { setFolded(v); try { localStorage.setItem("kindle.nav.folded", v ? "1" : "0"); } catch { /* ignore */ } };
+  const makeNav = (folded: boolean) => (
     <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {SECTIONS.map((s) => {
         const on = section === s.key;
         return (
-          <button key={s.key} onClick={() => go(s.key)} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", borderRadius: 10, padding: "9px 12px", cursor: "pointer", fontSize: 14, background: on ? K.charcoal : "transparent", color: on ? "#fff7ea" : K.ink, fontWeight: on ? 700 : 500 }}>
-            <span style={{ width: 20, textAlign: "center" }}>{s.icon}</span>
-            <span style={{ flex: 1 }}>{s.label}</span>
-            {s.phase > 1 && <span style={{ fontSize: 10, color: on ? K.amber : K.muted, border: `1px solid ${on ? K.amber : K.line}`, borderRadius: 999, padding: "0 6px" }}>soon</span>}
+          <button key={s.key} onClick={() => go(s.key)} title={s.label} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", border: "none", borderRadius: 10, padding: folded ? "9px 0" : "9px 12px", justifyContent: folded ? "center" : "flex-start", cursor: "pointer", fontSize: 14, background: on ? K.charcoal : "transparent", color: on ? "#fff7ea" : K.ink, fontWeight: on ? 700 : 500 }}>
+            <span style={{ width: 20, textAlign: "center", fontSize: folded ? 18 : undefined }}>{s.icon}</span>
+            {!folded && <span style={{ flex: 1 }}>{s.label}</span>}
+            {!folded && s.phase > 1 && <span style={{ fontSize: 10, color: on ? K.amber : K.muted, border: `1px solid ${on ? K.amber : K.line}`, borderRadius: 999, padding: "0 6px" }}>soon</span>}
           </button>
         );
       })}
     </nav>
   );
+  const nav = makeNav(folded); const navFull = makeNav(false);
   return (
     <div style={{ minHeight: "100vh", background: K.paper, color: K.ink }}>
       <header style={{ position: "sticky", top: 0, zIndex: 20, background: "rgba(250,246,239,.92)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${K.line}` }}>
@@ -154,8 +159,11 @@ function Shell({ boot, section, go, menu, setMenu, logout, children }: { boot: B
         </div>
       </header>
       <div style={{ maxWidth: 1240, margin: "0 auto", padding: 16, display: "flex", gap: 20, alignItems: "flex-start" }}>
-        <aside className="hidden md:block" style={{ width: 210, flex: "none", position: "sticky", top: 70 }}>{nav}</aside>
-        {menu && <div className="md:hidden" onClick={() => setMenu(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 15 }}><div onClick={(e) => e.stopPropagation()} style={{ width: 250, height: "100%", background: K.paper, padding: 16, paddingTop: 70, overflow: "auto" }}>{nav}</div></div>}
+        <aside className="hidden md:block" style={{ width: folded ? 54 : 210, flex: "none", position: "sticky", top: 70, transition: "width .18s ease" }}>
+          <button onClick={() => fold(!folded)} title={folded ? "Open the menu" : "Fold the menu"} aria-label={folded ? "Open the menu" : "Fold the menu"} style={{ display: "flex", alignItems: "center", justifyContent: folded ? "center" : "flex-end", width: "100%", background: "none", border: "none", color: K.muted, cursor: "pointer", fontSize: 12, padding: "2px 8px 8px", gap: 6 }}>{folded ? "»" : <>fold <span style={{ fontSize: 14 }}>«</span></>}</button>
+          {nav}
+        </aside>
+        {menu && <div className="md:hidden" onClick={() => setMenu(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 15 }}><div onClick={(e) => e.stopPropagation()} style={{ width: 250, height: "100%", background: K.paper, padding: 16, paddingTop: 70, overflow: "auto" }}>{navFull}</div></div>}
         <main style={{ flex: 1, minWidth: 0 }}>{children}</main>
       </div>
     </div>

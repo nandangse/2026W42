@@ -51,32 +51,72 @@ function CheckinCard({ c, data, boot, big = false }: { c: Checkin; data: Data; b
   const m = boot.members.find((x) => x.id === c.member_id);
   const ups = data.updates.filter((u) => u.checkin_id === c.id);
   const goalOf = (id: string) => data.goals.find((g) => g.id === id);
-  const fs = big ? 15 : 13;
-  const Sec = ({ t, v }: { t: string; v: string | null }) => v ? <div style={{ marginTop: big ? 12 : 8 }}><div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: K.muted, fontWeight: 700 }}>{t}</div><div style={{ whiteSpace: "pre-wrap", fontSize: fs, lineHeight: 1.5 }}>{v}</div></div> : null;
+  const bySeq = (x: Update, y: Update) => (goalOf(x.goal_id)?.seq || 0) - (goalOf(y.goal_id)?.seq || 0);
+  const fs = big ? 14 : 13;
+  const Sec = ({ t, v }: { t: string; v: string | null }) => v ? <div style={{ marginTop: big ? 6 : 8 }}><div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: K.muted, fontWeight: 700 }}>{t}</div><div style={{ whiteSpace: "pre-wrap", fontSize: fs - (big ? 1 : 0), lineHeight: 1.4 }}>{v}</div></div> : null;
+  const GoalLine = ({ u }: { u: Update }) => { const g = goalOf(u.goal_id); return (
+    <div style={{ background: K.soft, borderRadius: 8, padding: "5px 9px", fontSize: fs - 1 }}>
+      <div style={{ color: K.dim, fontSize: 11, display: "flex", gap: 6, alignItems: "baseline" }}><span style={{ flex: 1 }}>{g ? `${g.seq}. ${g.title}` : "Goal"}</span>{g?.measure && <b style={{ color: K.emberDark, whiteSpace: "nowrap" }}>{g.measure}</b>}</div>
+      <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}><span style={{ flex: 1, whiteSpace: "pre-wrap" }}>{u.note}</span>{u.status && <span style={pill(STATUS[u.status]?.[1] || K.muted)}>{STATUS[u.status]?.[0] || u.status}</span>}</div>
+    </div>); };
+  if (big) {
+    /* ONE SCREEN (Dr Raghu, 5 Oct 2026: "show this on one screen. Show professional left and personal right") */
+    const profUps = ups.filter((u) => goalOf(u.goal_id)?.kind !== "personal").sort(bySeq);
+    const persUps = ups.filter((u) => goalOf(u.goal_id)?.kind === "personal").sort(bySeq);
+    const Col = ({ title, color, score, notes, list }: { title: string; color: string; score: number | null; notes: string | null; list: Update[] }) => (
+      <section style={{ border: `1px solid ${K.line}`, borderTop: `4px solid ${color}`, borderRadius: 12, padding: 12, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <h3 style={{ ...serif, margin: 0, fontSize: 18, flex: 1 }}>{title}</h3>
+          {score != null && <span style={{ ...serif, fontSize: 30, lineHeight: 1, color: score >= 8 ? K.green : score >= 6 ? K.amber : K.red }}>{score}<span style={{ fontSize: 12, color: K.muted }}> /10</span></span>}
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", marginTop: 6, display: "grid", gap: 6, alignContent: "start" }}>
+          {notes ? <div style={{ whiteSpace: "pre-wrap", fontSize: fs, lineHeight: 1.45 }}>{notes}</div> : <div style={{ color: K.muted, fontSize: 13 }}>Nothing written under {title.toLowerCase()} highlights.</div>}
+          {list.length > 0 && <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: K.muted, fontWeight: 700, marginTop: 4 }}>Goals</div>}
+          {list.map((u) => <GoalLine key={u.id} u={u} />)}
+        </div>
+      </section>
+    );
+    const rest: [string, string | null][] = [["Learning", c.learning], ["Leadership challenge", c.challenge], ["Sounding board", c.sounding], ["1-2-1", c.one_to_one], ["New goals", c.new_goals], ["For the group", c.suggestions]];
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {m && <Avatar m={m} size={44} />}
+          <div style={{ flex: 1 }}><div style={{ ...serif, fontSize: 22, lineHeight: 1.1 }}>{m?.name || "—"}</div><div style={{ fontSize: 12, color: K.muted }}>{monthYear(c.period)} · filed {dmy(c.submitted_at)}{c.source !== "site" ? " · from the Google Form" : ""}</div></div>
+        </div>
+        <div className="kindle-split" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, flex: 1, minHeight: 0, marginTop: 10 }}>
+          <Col title="Professional" color={K.ember} score={c.prof_rating} notes={c.prof_notes} list={profUps} />
+          <Col title="Personal" color={K.blue} score={c.pers_rating} notes={c.pers_notes} list={persUps} />
+        </div>
+        {rest.some(([, v]) => v) && (
+          <div className="kindle-rest" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10, marginTop: 10, maxHeight: "24%", overflowY: "auto", borderTop: `1px solid ${K.soft}`, paddingTop: 8 }}>
+            {rest.map(([t, v]) => <Sec key={t} t={t} v={v} />)}
+          </div>
+        )}
+        <style>{`@media (max-width: 760px){ .kindle-split { grid-template-columns: 1fr !important; } .kindle-rest { max-height: none !important; } }`}</style>
+      </div>
+    );
+  }
+  /* the by-person scroller keeps the stacked card */
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {m && <Avatar m={m} size={big ? 48 : 34} />}
+        {m && <Avatar m={m} size={34} />}
         <div style={{ flex: 1 }}>
-          <div style={{ ...serif, fontSize: big ? 22 : 16 }}>{m?.name || "—"}</div>
+          <div style={{ ...serif, fontSize: 16 }}>{m?.name || "—"}</div>
           <div style={{ fontSize: 12, color: K.muted }}>{monthYear(c.period)} · filed {dmy(c.submitted_at)}{c.source !== "site" ? " · from the Google Form" : ""}</div>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          {c.prof_rating != null && <Score n={c.prof_rating} l="Professional" big={big} />}
-          {c.pers_rating != null && <Score n={c.pers_rating} l="Personal" big={big} />}
+          {c.prof_rating != null && <Score n={c.prof_rating} l="Professional" big={false} />}
+          {c.pers_rating != null && <Score n={c.pers_rating} l="Personal" big={false} />}
         </div>
       </div>
       <Sec t="Professional" v={c.prof_notes} />
       <Sec t="Personal" v={c.pers_notes} />
       {ups.length > 0 && (
-        <div style={{ marginTop: big ? 12 : 8 }}>
-          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: K.muted, fontWeight: 700 }}>Goals</div>
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: K.muted, fontWeight: 700 }}>Goals</div>
           <div style={{ display: "grid", gap: 6, marginTop: 4 }}>
-            {ups.sort((a, b) => { const ga = goalOf(a.goal_id), gb = goalOf(b.goal_id); return (ga?.kind === "personal" ? 1 : 0) - (gb?.kind === "personal" ? 1 : 0) || (ga?.seq || 0) - (gb?.seq || 0); }).map((u) => { const g = goalOf(u.goal_id); return (
-              <div key={u.id} style={{ background: K.soft, borderRadius: 8, padding: "6px 10px", fontSize: fs - 1 }}>
-                <div style={{ color: K.dim, fontSize: 11 }}>{g ? `${g.kind === "personal" ? "Personal" : "Professional"} ${g.seq}: ${g.title}` : "Goal"}{g?.measure ? <span style={{ marginLeft: 6, color: K.emberDark, fontWeight: 700 }}>· {g.measure}</span> : ""}</div>
-                <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}><span style={{ flex: 1, whiteSpace: "pre-wrap" }}>{u.note}</span>{u.status && <span style={pill(STATUS[u.status]?.[1] || K.muted)}>{STATUS[u.status]?.[0] || u.status}</span>}</div>
-              </div>); })}
+            {[...ups].sort((x, y) => (goalOf(x.goal_id)?.kind === "personal" ? 1 : 0) - (goalOf(y.goal_id)?.kind === "personal" ? 1 : 0) || bySeq(x, y)).map((u) => <GoalLine key={u.id} u={u} />)}
           </div>
         </div>
       )}
@@ -113,9 +153,9 @@ function MeetingView({ boot, data, period, onWrite }: { boot: Boot; data: Data; 
         {missing.length > 0 && <span style={{ fontSize: 12, color: K.muted, marginLeft: 6 }}>Not yet: {missing.map((m) => m.short_name || m.name).join(", ")}{missing.some((m) => m.id === boot.me.id) && <> · <button onClick={onWrite} style={{ background: "none", border: "none", color: K.emberDark, fontWeight: 700, cursor: "pointer", padding: 0, fontSize: 12 }}>write mine →</button></>}</span>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 260px", gap: 16 }} className="kindle-two">
-        <Card style={{ minHeight: 420 }}>
-          {cur ? <CheckinCard c={cur} data={data} boot={boot} big /> : <div style={{ color: K.muted }}>No check-in for {monthYear(period)} yet.</div>}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18, borderTop: `1px solid ${K.soft}`, paddingTop: 12 }}>
+        <Card style={{ height: "calc(100vh - 225px)", minHeight: 520, display: "flex", flexDirection: "column" }} pad={14}>
+          <div style={{ flex: 1, minHeight: 0 }}>{cur ? <CheckinCard c={cur} data={data} boot={boot} big /> : <div style={{ color: K.muted }}>No check-in for {monthYear(period)} yet.</div>}</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, borderTop: `1px solid ${K.soft}`, paddingTop: 10 }}>
             <button onClick={() => setI(Math.max(0, i - 1))} disabled={i <= 0} style={btn("ghost")}>← Previous</button>
             <span style={{ fontSize: 13, color: K.muted }}>{rows.length ? `${i + 1} of ${rows.length}` : "—"} · ← → keys work</span>
             <button onClick={() => setI(Math.min(rows.length - 1, i + 1))} disabled={i >= rows.length - 1} style={btn("primary")}>Next →</button>
@@ -130,8 +170,8 @@ function MeetingView({ boot, data, period, onWrite }: { boot: Boot; data: Data; 
 
 /* -------------------------------------------------------------- the timer */
 function Timer({ personKey }: { personKey: string }) {
-  const [mins, setMins] = useState(4); const [secs, setSecs] = useState(0);
-  const [left, setLeft] = useState(240); const [running, setRunning] = useState(false); const [rang, setRang] = useState(false);
+  const [mins, setMins] = useState(3); const [secs, setSecs] = useState(0);
+  const [left, setLeft] = useState(180); const [running, setRunning] = useState(false); const [rang, setRang] = useState(false);
   const tick = useRef<number | null>(null); const endAt = useRef<number>(0); const ctx = useRef<AudioContext | null>(null);
   const total = mins * 60 + secs;
   const reset = () => { setRunning(false); setRang(false); setLeft(total); if (tick.current) window.clearInterval(tick.current); };
@@ -163,15 +203,15 @@ function Timer({ personKey }: { personKey: string }) {
       <div style={{ ...serif, fontSize: 64, lineHeight: 1.1, fontVariantNumeric: "tabular-nums", margin: "6px 0" }}>{mm}:{ss}</div>
       {rang && <div style={{ fontWeight: 700, marginBottom: 6 }}>Time. Thank you.</div>}
       <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center", marginBottom: 10, fontSize: 13 }}>
-        <input type="number" min={0} max={60} value={mins} disabled={running} onChange={(e) => setMins(Math.max(0, Number(e.target.value) | 0))} style={{ width: 52, borderRadius: 8, border: "none", padding: "5px 6px", textAlign: "center", fontSize: 14 }} /> min
-        <input type="number" min={0} max={59} value={secs} disabled={running} onChange={(e) => setSecs(Math.max(0, Math.min(59, Number(e.target.value) | 0)))} style={{ width: 52, borderRadius: 8, border: "none", padding: "5px 6px", textAlign: "center", fontSize: 14 }} /> sec
+        <input type="number" min={0} max={60} value={mins} disabled={running} onChange={(e) => setMins(Math.max(0, Number(e.target.value) | 0))} style={{ width: 56, borderRadius: 8, border: "none", padding: "5px 6px", textAlign: "center", fontSize: 16, fontWeight: 700, background: "#fff", color: K.ink }} /> min
+        <input type="number" min={0} max={59} value={secs} disabled={running} onChange={(e) => setSecs(Math.max(0, Math.min(59, Number(e.target.value) | 0)))} style={{ width: 56, borderRadius: 8, border: "none", padding: "5px 6px", textAlign: "center", fontSize: 16, fontWeight: 700, background: "#fff", color: K.ink }} /> sec
       </div>
       <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
         {!running ? <button onClick={start} style={btn("primary", { padding: "9px 18px" })}>{left < total && left > 0 ? "Resume" : "Start"}</button> : <button onClick={pause} style={btn("ghost", { padding: "9px 18px" })}>Pause</button>}
         <button onClick={reset} style={btn("ghost", { padding: "9px 12px" })}>Reset</button>
         <button onClick={ring} title="test the ringer" style={btn("ghost", { padding: "9px 10px" })}>🔔</button>
       </div>
-      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 8 }}>Resets when you move to the next person. The constitution gives 4 + 3 minutes each.</div>
+      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 8 }}>Resets when you move to the next person. The constitution gives 3 minutes a person, and 4 to open (6.2).</div>
       <style>{`@keyframes kindle-flash { from { filter: brightness(1); } to { filter: brightness(1.35); } }`}</style>
     </Card>
   );

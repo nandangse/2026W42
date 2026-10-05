@@ -11,6 +11,8 @@ export const KINDLE_UPDATES: { v: string; date: string; items: string[] }[] = [
   {
     v: "1.4.0", date: "2026-10-04",
     items: [
+      "The left menu folds to an icon strip with one click, and stays that way on your browser; it gives the check-in screen the full width.",
+      "This month's check-in on one screen: Professional on the left, Personal on the right, each with its score and its goals, the other answers in a strip beneath; the timer's minute and second boxes are readable and default to the constitution's 3 minutes a person.",
       "1-2-1s as a grid: names on both sides; each cell shows the date the pair met and what they discussed, or PLANNED in green with the month; tap a cell for both notes.",
       "Finances loaded from the treasurer's statements 2023 to 2026: 120 ledger lines, 94 charges, the opening balance, and the two gaps the statements themselves carry, booked in the open; dues paid from the site book as collections.",
       "Presentations, after Burning issues: the video in the page (YouTube, Drive, Zoom, Loom), the PPT or PDF in the private bucket with a PDF preview, the presenter's notes, the room's comments, and who has watched it — a view is recorded the first time each member opens it (migration 0199).",
