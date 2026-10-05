@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.0.1.1",
+    date: "2026-10-05",
+    module: "The plan PDF: signatures first, the jobs as a calendar, week-wise by product and by client",
+    items: [
+      "THE SIGNATURES ON PAGE ONE (Dr Raghu, 5 Oct 2026: \u201cthis pdf put this on first page\u201d). Who signed off with their jobs and money, who is still in draft, who has not looked \u2014 under the plan\u2019s two lines, the plan as it stands and the realistic read. The month, quarter and year plans and the mail sent on signing all use the one template, so all of them change together.",
+      "THE JOBS AS A CALENDAR (\u201cstart the jobs as a calendar, show the job no and the customer tag in the cell, show 2 lines at least\u201d). Page two is the window drawn Monday to Sunday, a row per ISO week with its job count, and every job on its target delivery date: the job number and the tag, which wraps to two lines and more rather than being cut, and the value for those cleared for money. A thin rule beside each job says the team\u2019s belief \u2014 green at 50% or better, amber below. Jobs carried in from before the window, due after it, or with no date sit in their own strips above and below the calendar, never quietly moved into the nearest week. A year plan draws only the weeks that carry a delivery.",
+      "PRODUCT \u2014 WEEK-WISE DELIVERIES, NOS AND VALUE, and CLIENT \u2014 WEEK-WISE DELIVERIES, NOS AND VALUE: a row per product family or client, a column per week (with Carried in and Later where there are any), a total column and a total row. Busiest first. Without the money permission the cells carry numbers only, as the rest of the document does.",
+      "The full job table with the team\u2019s belief follows as before, from page three or four. The chip tallies by family and customer that used to open the document are replaced by the two week-wise tables.",
+    ],
+  },
+  {
     v: "6.0.1.0",
     date: "2026-10-05",
     module: "Tasking: My Tasks, goals on the Brain Dump, the pending PDF mended, everybody\u2019s tasks for Stratcom",
