@@ -49,6 +49,7 @@ export default function Settings({ boot, reload }: { boot: Boot; reload: () => v
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10 }}>
           <div><label style={label}>WhatsApp group link</label><input style={input} value={vals.whatsapp_link || ""} onChange={(e) => setVals({ ...vals, whatsapp_link: e.target.value })} /></div>
           <div><label style={label}>Meeting venue (default)</label><input style={input} value={vals.meeting_venue || ""} onChange={(e) => setVals({ ...vals, meeting_venue: e.target.value })} /></div>
+          <div><label style={label}>Online join link — Google Meet or Zoom</label><input style={input} value={vals.meeting_join_link || ""} onChange={(e) => setVals({ ...vals, meeting_join_link: e.target.value })} placeholder="https://meet.google.com/…" /></div>
           <div><label style={label}>Meeting day, in words</label><input style={input} value={vals.meeting_day || ""} onChange={(e) => setVals({ ...vals, meeting_day: e.target.value })} /></div>
           <div><label style={label}>Google Drive folder for photos (id or link)</label><input style={input} value={vals.drive_photos_folder || ""} onChange={(e) => setVals({ ...vals, drive_photos_folder: e.target.value })} placeholder="the gallery seeds from here in phase 4" /></div>
         </div>

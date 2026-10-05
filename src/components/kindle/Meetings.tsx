@@ -98,6 +98,7 @@ function MeetingPage({ boot, m, back, reload }: { boot: Boot; m: Meeting; back: 
           <span style={{ color: K.dim }}>{dayName(m.meeting_on)}, {dmy(m.meeting_on)} · {(m.starts_at || "15:00").slice(0, 5)}–{(m.ends_at || "19:00").slice(0, 5)}{m.venue ? ` · ${m.venue}` : ""}</span>
           <div style={{ flex: 1 }} />
           {m.status === "cancelled" && <span style={pill(K.soft, K.muted)}>cancelled</span>}
+          {boot.settings.meeting_join_link && m.meeting_on >= boot.today && <a href={boot.settings.meeting_join_link} target="_blank" rel="noreferrer" style={{ background: K.green, color: "#fff", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: 13, textDecoration: "none" }}>Join online →</a>}
           {boot.me.admin && <button onClick={() => setEdit(!edit)} style={btn("ghost")}>{edit ? "Close" : "Edit"}</button>}
         </div>
         <div style={{ fontSize: 13, color: K.muted, marginTop: 4 }}>{m.guru ? `Knowledge Guru: ${m.guru} · ` : ""}{present} present{!m.date_exact ? " · the date is the calendar rule's; the sheet had only the month" : ""}{m.minutes_url ? <> · <a href={m.minutes_url} target="_blank" rel="noreferrer" style={{ color: K.blue }}>old minutes</a></> : ""}</div>

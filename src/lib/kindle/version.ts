@@ -9,6 +9,12 @@
  */
 export const KINDLE_UPDATES: { v: string; date: string; items: string[] }[] = [
   {
+    v: "1.4.1", date: "2026-10-05",
+    items: [
+      "Online join link: one Google Meet or Zoom link kept in Settings, shown as a green Join online button on Home and on every coming meeting.",
+    ],
+  },
+  {
     v: "1.4.0", date: "2026-10-04",
     items: [
       "The left menu folds to an icon strip with one click, and stays that way on your browser; it gives the check-in screen the full width.",

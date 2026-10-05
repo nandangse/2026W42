@@ -5,7 +5,7 @@ import { kindleAudit, requireKindleAdmin } from "@/lib/kindle/auth";
 
 export const dynamic = "force-dynamic";
 
-const KEYS = ["whatsapp_link", "drive_photos_folder", "meeting_venue", "meeting_day"];
+const KEYS = ["whatsapp_link", "drive_photos_folder", "meeting_venue", "meeting_day", "meeting_join_link"];
 
 /** POST { values: { key: value } } — the facilitator's small named values. */
 export async function POST(req: Request) {
