@@ -11,6 +11,8 @@ export const KINDLE_UPDATES: { v: string; date: string; items: string[] }[] = [
   {
     v: "1.4.0", date: "2026-10-04",
     items: [
+      "1-2-1s as a grid: names on both sides; each cell shows the date the pair met and what they discussed, or PLANNED in green with the month; tap a cell for both notes.",
+      "Finances loaded from the treasurer's statements 2023 to 2026: 120 ledger lines, 94 charges, the opening balance, and the two gaps the statements themselves carry, booked in the open; dues paid from the site book as collections.",
       "Presentations, after Burning issues: the video in the page (YouTube, Drive, Zoom, Loom), the PPT or PDF in the private bucket with a PDF preview, the presenter's notes, the room's comments, and who has watched it — a view is recorded the first time each member opens it (migration 0199).",
       "Check-ins and Goals no longer fail with \"Internal error\" when a migration is still to be run; they read the older shape and say which SQL is pending.",
       "Niraj's 2026-27 goals updated to his 30 May revision from the New Goals tab.",

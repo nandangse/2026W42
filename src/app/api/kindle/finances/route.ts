@@ -59,12 +59,13 @@ export async function POST(req: Request) {
     }
     if (action === "fine_pay") {
       const fine_id = String(b.fine_id || "");
-      const { data: f } = await admin.from("kindle_fine").select("id,member_id,meeting_id,amount,reason,paid_on").eq("id", fine_id).maybeSingle();
+      const { data: f } = await admin.from("kindle_fine").select("id,member_id,meeting_id,amount,reason,paid_on,rule_code").eq("id", fine_id).maybeSingle();
       if (!f) throw new HttpError(404, "No such fine.");
       const paid_on = String(b.paid_on || new Date().toISOString().slice(0, 10)); const paid_amount = num(b.paid_amount) ?? Number(f.amount);
       await admin.from("kindle_fine").update({ paid_on, paid_amount }).eq("id", fine_id);
       await admin.from("kindle_ledger").delete().eq("fine_id", fine_id);
-      await admin.from("kindle_ledger").insert({ entry_on: paid_on, kind: "fine", amount: Math.abs(paid_amount), head: "Fine", note: f.reason, member_id: f.member_id, meeting_id: f.meeting_id, fine_id, created_by: k.email });
+      const isDue = f.rule_code === "due";
+      await admin.from("kindle_ledger").insert({ entry_on: paid_on, kind: isDue ? "collection" : "fine", amount: Math.abs(paid_amount), head: isDue ? "Dues" : "Fine", note: f.reason, member_id: f.member_id, meeting_id: f.meeting_id, fine_id, created_by: k.email });
       await kindleAudit(k, "fine_paid", { fine_id, paid_amount });
       return NextResponse.json({ ok: true });
     }
