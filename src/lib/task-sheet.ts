@@ -65,13 +65,16 @@ export function catCounts(tasks: SheetTask[]): { cat: string; n: number }[] {
     .sort((a, b) => b.n - a.n || TASK_CATS.indexOf(a.cat) - TASK_CATS.indexOf(b.cat));
 }
 
-/** The rows one A4 portrait holds before it stops being one A4. */
-const ROOM = 34;
-
+/**
+ * EVERY OPEN TASK IS PRINTED (Dr Raghu, 5 Oct 2026: "theres some break in
+ * the pdf"). The sheet used to be a fixed 297 mm box holding 34 rows; when
+ * the rows wrapped to two lines the table ran past the bottom of the box and
+ * printed over the next job's page. A job now flows onto as many pages as it
+ * needs, the column heads repeat on each, and a row never splits.
+ */
 function sheet(j: SheetJob, on: string): string {
   const open = sortTasks(j.tasks);
-  const shown = open.slice(0, ROOM);
-  const hidden = open.length - shown.length;
+  const shown = open;
   const cats = catCounts(open);
   const late = j.tdd && j.tdd < on ? days(j.tdd, on) : 0;
 
@@ -119,8 +122,7 @@ function sheet(j: SheetJob, on: string): string {
     ? `<div class="none">Nothing open on this job.</div>`
     : `<table class="t">
     <thead><tr><th class="who">Assigned to</th><th class="task">What is pending</th><th class="cat">Category</th><th class="due">Due</th><th class="age">Late</th></tr></thead>
-    <tbody>${rows}</tbody></table>
-    ${hidden > 0 ? `<div class="more">+ ${hidden} more open on this job &mdash; this page holds ${ROOM}. Open Genie for the rest.</div>` : ""}`}
+    <tbody>${rows}</tbody></table>`}
 
   <footer class="ft">
     <span>Nandan GSE &middot; pending tasks as at ${fmtFull(on)}</span>
@@ -136,12 +138,17 @@ export function taskSheetHtml(jobs: SheetJob[], on: string, title: string): stri
     String(a.tdd || "9999").localeCompare(String(b.tdd || "9999")) || a.id.localeCompare(b.id));
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
-@page { size: A4 portrait; margin: 0; }
+@page { size: A4 portrait; margin: 11mm 12mm 10mm; }
 * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:#16232F; background:#E9E7E0; }
-.pg { width:210mm; height:297mm; background:#fff; padding:11mm 12mm 9mm; page-break-after: always;
-      display:flex; flex-direction:column; }
-.pg:last-child { page-break-after: auto; }
+/* a job starts on a fresh page and takes as many as it needs — never a fixed box */
+.pg { background:#fff; break-after: page; page-break-after: always; }
+.pg:last-child { break-after: auto; page-break-after: auto; }
+@media print { body { background:#fff; } }
+@media screen { .pg { width:210mm; min-height:297mm; margin:6mm auto; padding:11mm 12mm 10mm; box-shadow:0 1px 6px rgba(0,0,0,.15); } }
+.hd, .strip { break-inside: avoid; break-after: avoid; }
+table.t thead { display: table-header-group; }
+table.t tr { break-inside: avoid; page-break-inside: avoid; }
 
 .hd { display:flex; align-items:center; gap:5mm; border-bottom:.8mm solid #16232F; padding-bottom:3mm; }
 .jno { font-size:30pt; font-weight:800; letter-spacing:-.03em; color:#12386B; line-height:1; }
@@ -173,15 +180,16 @@ td.who b { font-size:8.6pt; }
 td.task { line-height:1.3; }
 td.cat, th.cat { width:22mm; }
 td.cat span { display:inline-block; font-size:6.8pt; padding:.5mm 1.6mm; border-radius:1mm; border:.2mm solid; font-weight:700; }
-td.due, th.due { width:17mm; text-align:right; font-variant-numeric:tabular-nums; }
-td.age, th.age { width:14mm; text-align:right; font-variant-numeric:tabular-nums; color:#6B7280; }
+td.due, th.due { width:19mm; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+td.age, th.age { width:14mm; text-align:right; font-variant-numeric:tabular-nums; color:#6B7280; white-space:nowrap; }
+td.cat { white-space:nowrap; }
 .od { color:#B3261E; font-weight:700; }
 i.moved { font-style:normal; font-size:6.8pt; color:#B45309; margin-left:1.5mm; font-weight:700; }
 .more { font-size:8pt; color:#B45309; margin-top:2mm; font-style:italic; }
 .none { font-size:11pt; color:#0D7A3F; font-weight:700; padding:8mm 0; }
 
-.ft { margin-top:auto; border-top:.2mm solid #D8D5CC; padding-top:2mm; display:flex; justify-content:space-between;
-      font-size:7pt; color:#8B8F87; }
+.ft { margin-top:4mm; border-top:.2mm solid #D8D5CC; padding-top:2mm; display:flex; justify-content:space-between;
+      font-size:7pt; color:#8B8F87; break-inside: avoid; }
 </style></head><body>
 ${ordered.map((j) => sheet(j, on)).join("\n")}
 </body></html>`;

@@ -22,9 +22,7 @@ export async function POST(req: Request) {
 
     if (body.action === "create") {
       if (!body.title) return NextResponse.json({ error: "title required" }, { status: 400 });
-      const { data, error } = await supabase
-        .from("manual_tasks")
-        .insert({
+      const row: Record<string, unknown> = {
           job_id: body.job_id || null,
           title: body.title,
           detail: body.detail || "",
@@ -35,13 +33,21 @@ export async function POST(req: Request) {
           esc_why: String(body.esc_why || "").trim() || null,
           done: false,
           created_by: user.email,
+          // the goal and the project it serves (0199) — a bad id is dropped, never guessed
+          goal_id: /^[0-9a-f-]{36}$/i.test(String(body.goal_id || "")) ? String(body.goal_id) : null,
+          project: String(body.project || "").trim() || null,
           // the swimlane it belongs to — Kuber's Tasking and the main one
           // share it (0082); an unknown value is dropped, never guessed
           ...(["job", "goal", "rock", "audit", "strategic"].includes(String(body.related_to)) ? { related_to: String(body.related_to) } : {}),
-        })
-        .select("id")
-        .single();
-      if (error) throw new Error(error.message);
+      };
+      let ins = await supabase.from("manual_tasks").insert(row).select("id").single();
+      /* 0199 not run yet: the task is still raised, without the goal and project */
+      if (ins.error && /goal_id|project|schema cache/i.test(ins.error.message)) {
+        delete row.goal_id; delete row.project;
+        ins = await supabase.from("manual_tasks").insert(row).select("id").single();
+      }
+      const { data, error } = ins;
+      if (error || !data) throw new Error(error?.message || "Could not raise the task");
       // ring the assignee's bell (self-assignment stays silent; failures never
       // break the create itself)
       await notifyTaskAssignment(adminClient(), {
@@ -163,6 +169,8 @@ export async function POST(req: Request) {
       if ("cat" in body) patch.cat = String(body.cat || "General");
       if ("esc" in body) patch.esc = String(body.esc || "None");
       if ("esc_why" in body) patch.esc_why = String(body.esc_why || "").trim() || null;
+      if (body.kind === "manual" && "goal_id" in body) patch.goal_id = /^[0-9a-f-]{36}$/i.test(String(body.goal_id || "")) ? String(body.goal_id) : null;
+      if (body.kind === "manual" && "project" in body) patch.project = String(body.project || "").trim() || null;
       if (!Object.keys(patch).length)
         return NextResponse.json({ error: "nothing to update" }, { status: 400 });
 

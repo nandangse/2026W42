@@ -89,6 +89,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.0.1.0",
+    date: "2026-10-05",
+    module: "Tasking: My Tasks, goals on the Brain Dump, the pending PDF mended, everybody\u2019s tasks for Stratcom",
+    items: [
+      "MY TASKS, FIRST ON THE STRIP (Dr Raghu, 5 Oct 2026: \u201cin this have a tasklist - My Tasks. Show all the open tasks there by default\u201d). Tasking now opens on a plain list of every open task with your name on it, due date first, late ones in red, with the job, the project and the department beside each; tick a box to close it, click the words to open it. The counts say how many are open, late and due this week. \u201cShow done too\u201d brings back what you closed. The view you were on comes back on reload.",
+      "BY PROJECT \u00b7 BY GOALS (\u201cShow options for By Project, By Goals\u201d). The same list grouped by the project a task serves \u2014 its own, or its job\u2019s \u2014 or by the goal. A task can now name a goal or a project of its own (migration 0199: manual_tasks.goal_id and .project), so a task with no job is no longer a task with no home. Under By Goals, the goal work from the Goals workspace with your name on it sits in its own block.",
+      "THE LIGHTBOX (\u201cmake provision to add by lightbox tasks. By default assigned to user and date today +3, can change\u201d). + Add task opens with you on it and the date three days out; who, due, job, project, goal, department and escalation are all there to change. Pick a job and its project fills in.",
+      "SAVE AND ADD ANOTHER, BELOW SAVE (\u201ckeep the previous options selected as default\u201d). The words clear; the person, job, project, goal and department stay for the next one, and are remembered for the rest of the day even after the box is closed. \u201cNext day make the default user as the logged in one\u201d: tomorrow the person is you again and the picks start clean \u2014 only the department, a habit, carries over.",
+      "/api/tasks/goals lists the goals and sub goals not yet done, for the picker and the grouping. Create and update on /api/tasks accept goal_id and project; a malformed id is dropped, never guessed. Until 0199 is run a task is still raised, without the two new links.",
+      "THE LIGHTBOX AND THE BRAIN DUMP CARRY OVER FROM THE LAST SAVE (\u201cthis assignee and due date and escalation/ project/ job/goal will carry over from the last saved!\u201d). Only the words clear. On the Brain Dump pad the picks survive a reload; a due date already past comes back blank rather than as a late task.",
+      "GOALS ON THE BRAIN DUMP (\u201cAlso show the goals also here\u201d): the Goal box was a field for pasting an id; it is now a dropdown of the goals and sub goals, and each line on the pad names its goal. The pad\u2019s goal column pointed at the goals layer before 0019, so no goal from today\u2019s tree could ever be filed there \u2014 0199 points it at goal_item.",
+      "ADD TO BOARD ON EVERY LINE (\u201cwhy isnt it showing add to board?\u201d). It was there but greyed out on any line without a job, because promotion demanded one. A task with no job has been a proper general task since August, so the button is always live now; the task keeps its goal and project and shows in My Tasks.",
+      "THE PENDING PDF NO LONGER PRINTS ONE JOB OVER THE NEXT (\u201ctheres some break in the pdf\u201d). Each job was a fixed A4 box holding 34 rows; when task lines wrapped, the table ran out of the bottom of the box and printed over the following page. A job now runs onto as many pages as it needs, the column heads repeat, no row splits across pages, every open task is printed (the 34-row cap and its \u201cOpen Genie for the rest\u201d line are gone), and dates no longer break in two.",
+      "EVERYBODY\u2019S TASKS ARE FOR STRATCOM AND DR RAGHU (\u201cthe Stratcom can see everybody\u2019s. I can see, of course, also everybody. Others can only see their own tasks\u201d). The All tasks button shows only for them. For everyone else, clearing the ticks no longer opens everybody\u2019s list \u2014 it falls back to the tasks on them and the tasks they raised.",
+    ],
+  },
+  {
     v: "6.0.0.0",
     date: "2026-10-03",
     module: "Genie 6: the Portal \u2014 the customers\u2019 and suppliers\u2019 own door",

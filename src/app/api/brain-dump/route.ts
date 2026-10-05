@@ -101,24 +101,26 @@ export async function POST(req: Request) {
       if (readErr) throw new Error(readErr.message);
       if (!row) throw new HttpError(404, "That line is gone");
       if (row.promoted_task_id) throw new HttpError(409, "Already on the board");
-      if (!row.job_id) throw new HttpError(400, "Pick a job before adding it to the board — the board is organised by job");
-
-      const { data: task, error: insErr } = await db
-        .from("manual_tasks")
-        .insert({
-          job_id: row.job_id,
-          title: row.title,
-          detail: row.detail,
-          who: row.who,
-          due: row.due,
-          cat: row.cat,
-          esc: row.esc || "None",
-          done: false,
-          created_by: user.email,
-        })
-        .select("id")
-        .single();
-      if (insErr) throw new Error(insErr.message);
+      /* A job is no longer required (Dr Raghu, 5 Oct 2026: "why isnt it
+         showing add to board?"). A task with no job is a general task, as
+         Tasking's own New task box has allowed since August; its goal and
+         project travel with it (0199). */
+      const base = {
+        job_id: row.job_id || null,
+        title: row.title,
+        detail: row.detail,
+        who: row.who,
+        due: row.due,
+        cat: row.cat,
+        esc: row.esc || "None",
+        done: false,
+        created_by: user.email,
+      };
+      let ins = await db.from("manual_tasks").insert({ ...base, goal_id: row.goal_id || null, project: row.project || null }).select("id").single();
+      /* 0199 not run yet: the task still goes on the board, without the two new columns */
+      if (ins.error && /goal_id|project|schema cache/i.test(ins.error.message)) ins = await db.from("manual_tasks").insert(base).select("id").single();
+      const { data: task, error: insErr } = ins;
+      if (insErr || !task) throw new Error(insErr?.message || "Could not add it to the board");
 
       const { error: markErr } = await db
         .from("brain_dump")

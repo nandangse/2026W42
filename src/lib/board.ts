@@ -439,6 +439,9 @@ export async function buildBoard(supabase: SupabaseClient) {
       created_at: (t.created_at ?? null) as string | null,
       original_due: t.original_due ?? t.due ?? null,
       push_count: t.push_count ?? 0,
+      // what it serves besides a job (0199) — My Tasks groups on these
+      goal_id: (t.goal_id ?? null) as string | null,
+      project: (t.project ?? null) as string | null,
       comments: commentCounts["manual:" + t.id] || 0,
     })),
   ];

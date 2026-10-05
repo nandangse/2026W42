@@ -10,6 +10,7 @@ import { fmt, fmtFull, jobNo, initials, whoTag, computeSchedule, manDays, isoWee
 
 import { Board, GROUP_ORDER, Job, Person, TODAY, Task, assignees, myHandles, personLabel, taskJobRef, taskLate } from "./shared";
 import { TodayItem } from "./MyWeek";
+import { MyTasks } from "./MyTasks";
 
 // task card used in the Job Plan kanban + Tasking board
 export function TaskCard({ t, onOpen, onDelete }: { t: Task; onOpen: (t: Task) => void; onDelete?: (t: Task) => void }) {
@@ -39,6 +40,8 @@ export function TaskCard({ t, onOpen, onDelete }: { t: Task; onOpen: (t: Task) =
 // ============================ Tasking ============================
 /** The six ways of looking at the same task list. */
 export const TASKING_VIEWS = [
+  /* MY TASKS FIRST (Dr Raghu, 5 Oct 2026): the list a person opens for, before the board */
+  ["my", "✅ My Tasks"],
   ["jobs", "By Jobs"],
   ["projects", "By Projects"],
   ["dept", "By Department"],
@@ -55,16 +58,29 @@ export function Tasking({
   reload,
   me,
   people,
+  seesAll = false,
 }: {
   board: Board;
   onOpen: (id: string) => void;
   reload: () => Promise<Board | null>;
   me: { email: string; initials: string | null; displayName: string | null; erpOwner: string | null; role: string };
   people: Person[];
+  /**
+   * EVERYBODY'S TASKS ARE STRATCOM'S AND THE OWNER'S (Dr Raghu, 5 Oct 2026:
+   * "the Stratcom can see everybody's. I can see, of course, also everybody.
+   * Others can only see their own tasks"). Everyone else is held to their
+   * own three views, and an empty set of ticks no longer means "everybody".
+   */
+  seesAll?: boolean;
 }) {
   /** Deleting a task is admin-only; everyone else closes it. */
   const isAdminHere = me.role === "admin";
-  const [view, setView] = useState<TaskingView>("jobs");
+  /* My Tasks is where Tasking opens; the last view chosen comes back on reload */
+  const [view, setViewState] = useState<TaskingView>(() => {
+    try { const v = localStorage.getItem("genie.tasking.view"); if (v && TASKING_VIEWS.some(([k]) => k === v)) return v as TaskingView; } catch { /* fine */ }
+    return "my";
+  });
+  const setView = (v: TaskingView) => { setViewState(v); try { localStorage.setItem("genie.tasking.view", v); } catch { /* fine */ } };
   const [filterCust, setFilterCust] = useState("all");
   const [filterFam, setFilterFam] = useState("all");
   const [filterOwn, setFilterOwn] = useState("all");
@@ -124,14 +140,17 @@ export function Tasking({
   const anyScope = scope.mine || scope.byMe || scope.reports;
   const inScope = useCallback(
     (t: Task) => {
-      if (!anyScope) return true; // nothing ticked reads as "show me everything"
+      if (!anyScope) {
+        if (seesAll) return true; // nothing ticked reads as "show me everything" — Stratcom and the owner only
+        return mineHandles.has(String(t.who || "").toLowerCase()) || (!!t.by && t.by.toLowerCase() === me.email.toLowerCase());
+      }
       const who = String(t.who || "").toLowerCase();
       if (scope.mine && mineHandles.has(who)) return true;
       if (scope.byMe && t.by && t.by.toLowerCase() === me.email.toLowerCase()) return true;
       if (scope.reports && reportHandles.has(who)) return true;
       return false;
     },
-    [anyScope, scope, mineHandles, reportHandles, me.email],
+    [anyScope, scope, mineHandles, reportHandles, me.email, seesAll],
   );
 
   const custs = useMemo(() => [...new Set(board.jobs.map((j) => j.cust))].sort(), [board]);
@@ -255,7 +274,7 @@ export function Tasking({
       </div>
 
       {/* ---- whose tasks: all three on by default ---- */}
-      {view !== "dump" && (
+      {view !== "dump" && view !== "my" && (
         <div className="flex flex-wrap items-center gap-2 mb-2">
           <span className="text-xs font-bold" style={{ color: "var(--muted)" }}>SHOW</span>
           {([
@@ -284,7 +303,7 @@ export function Tasking({
               is the same state with a name on it. Pressing it again puts the
               three back, because the way out of a filter has to be as obvious
               as the way in. */}
-          <button
+          {seesAll && <button
             onClick={() => setScope(anyScope ? { mine: false, byMe: false, reports: false } : { mine: true, byMe: true, reports: true })}
             className="text-xs px-2 py-1.5 rounded border font-semibold"
             style={anyScope
@@ -295,8 +314,8 @@ export function Tasking({
               : "Back to your own three views"}
           >
             {anyScope ? "All tasks" : "◉ All tasks"}
-          </button>
-          {!anyScope && (
+          </button>}
+          {!anyScope && seesAll && (
             <span className="text-xs" style={{ color: "var(--muted)" }}>
               everybody&apos;s tasks — the three filters above are off
             </span>
@@ -304,7 +323,9 @@ export function Tasking({
         </div>
       )}
 
-      {view === "dump" ? (
+      {view === "my" ? (
+        <MyTasks board={board} me={me} reload={reload} onOpen={onOpen} onOpenTask={setLightbox} onDelete={isAdminHere ? deleteTask : undefined} />
+      ) : view === "dump" ? (
         <BrainDump board={board} reload={reload} />
       ) : (
       <>
@@ -960,6 +981,7 @@ export interface DumpRow {
 }
 
 export const EMPTY_DUMP = { title: "", detail: "", who: "", due: "", cat: "Production", esc: "None", job_id: "", project: "", goal_id: "" };
+const DUMP_LAST_KEY = "genie.braindump.last";
 
 /**
  * The capture pad. Type the thought at the top, add whatever context you have,
@@ -972,7 +994,20 @@ export const EMPTY_DUMP = { title: "", detail: "", who: "", due: "", cat: "Produ
 export function BrainDump({ board, reload }: { board: Board; reload: () => Promise<Board | null> }) {
   const [rows, setRows] = useState<DumpRow[] | null>(null);
   const [installed, setInstalled] = useState(true);
-  const [form, setForm] = useState({ ...EMPTY_DUMP });
+  /* EVERY PICK CARRIES OVER FROM THE LAST SAVE (Dr Raghu, 5 Oct 2026:
+     "this assignee and due date and escalation/ project/ job/goal will carry
+     over from the last saved!") — only the words clear, and the picks survive
+     a reload. A due date already past comes back blank, never as a late task. */
+  const [form, setForm] = useState(() => {
+    try {
+      const raw = localStorage.getItem(DUMP_LAST_KEY);
+      if (raw) { const d = JSON.parse(raw); return { ...EMPTY_DUMP, ...d, title: "", detail: "", due: d.due && d.due >= TODAY ? d.due : "" }; }
+    } catch { /* private window */ }
+    return { ...EMPTY_DUMP };
+  });
+  const [goals, setGoals] = useState<{ id: string; title: string; root: string; scope: string }[]>([]);
+  useEffect(() => { api.get("/api/tasks/goals").then((r) => setGoals(r.goals || [])).catch(() => setGoals([])); }, []);
+  const goalName = useMemo(() => new Map(goals.map((g) => [g.id, g.root ? `${g.root} › ${g.title}` : g.title])), [goals]);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [showDone, setShowDone] = useState(false);
@@ -1003,9 +1038,11 @@ export function BrainDump({ board, reload }: { board: Board; reload: () => Promi
     setBusy(true);
     setMsg("");
     try {
-      await api.post("/api/brain-dump", { action: "create", ...form, due: form.due || null, job_id: form.job_id || null });
-      // keep the category — people dump in runs of the same kind of thing
-      setForm({ ...EMPTY_DUMP, cat: form.cat });
+      await api.post("/api/brain-dump", { action: "create", ...form, due: form.due || null, job_id: form.job_id || null, goal_id: form.goal_id || null });
+      // everything but the words stays for the next line, and for the next visit
+      const { title: _t, detail: _d, ...picks } = form;
+      try { localStorage.setItem(DUMP_LAST_KEY, JSON.stringify(picks)); } catch { /* fine */ }
+      setForm({ ...form, title: "", detail: "" });
       await load();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
@@ -1092,7 +1129,11 @@ export function BrainDump({ board, reload }: { board: Board; reload: () => Promi
           </div>
           <div>
             {label("Goal")}
-            <input value={form.goal_id} onChange={(e) => setForm({ ...form, goal_id: e.target.value })} placeholder="— link later —" className={field} style={{ borderColor: "#D9D6CD", width: 130 }} title="Paste a goal node id to link this to the cascade" />
+            <select value={form.goal_id} onChange={(e) => setForm({ ...form, goal_id: e.target.value })} className={field} style={{ borderColor: "#D9D6CD", maxWidth: 260 }} title="The goal or sub goal this serves">
+              <option value="">— none —</option>
+              {form.goal_id && !goalName.has(form.goal_id) && <option value={form.goal_id}>(a goal no longer listed)</option>}
+              {goals.map((g) => (<option key={g.id} value={g.id}>{g.root ? `${g.root} › ` : ""}{g.title}</option>))}
+            </select>
           </div>
         </div>
         <div className="mb-2">
@@ -1140,6 +1181,7 @@ export function BrainDump({ board, reload }: { board: Board; reload: () => Promi
                     {r.due && <span className="tnum" style={{ color: r.due < TODAY ? "var(--red)" : "var(--muted)" }}>due {fmt(r.due)}</span>}
                     {job && <span>JOB {jobNo(job.id)} · {job.tag}</span>}
                     {r.project && <span>{r.project}</span>}
+                    {r.goal_id && <span style={{ color: "#5B21B6" }}>◎ {goalName.get(r.goal_id) || "goal"}</span>}
                     {r.esc && r.esc !== "None" && <span className="font-bold" style={{ color: "var(--red)" }}>⚠ {r.esc}</span>}
                   </div>
                 </div>
@@ -1154,10 +1196,9 @@ export function BrainDump({ board, reload }: { board: Board; reload: () => Promi
                   </button>
                   <button
                     onClick={() => act({ action: "promote", id: r.id }, reload)}
-                    disabled={!r.job_id}
                     className="rounded px-2 py-1 text-xs font-bold"
-                    style={{ background: r.job_id ? "var(--navy)" : "#F4F2EC", color: r.job_id ? "#fff" : "#B8B5AC", cursor: r.job_id ? "pointer" : "not-allowed" }}
-                    title={r.job_id ? "Make this a real task on the Tasking board" : "Pick a job on this line first — the board is organised by job"}
+                    style={{ background: "var(--navy)", color: "#fff", cursor: "pointer" }}
+                    title={r.job_id ? "Make this a real task on the Tasking board, on its job" : "Make this a real task — with no job it lands as a general task, and in My Tasks"}
                   >
                     ↗ Add to board
                   </button>

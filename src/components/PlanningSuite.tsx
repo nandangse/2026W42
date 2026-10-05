@@ -790,7 +790,7 @@ export default function PlanningSuite({
       )}
       {workspace === "consult" && <ConsultRaghu />}
       {workspace === "principles" && <Principles isOwner={isRaghu} />}
-      {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} me={me} people={board.people || []} />}
+      {workspace === "tasking" && <Tasking board={board} onOpen={openJobPlan} reload={reload} me={me} people={board.people || []} seesAll={stratcom || isRaghu} />}
       {/* same keep-alive pattern as Goals — the playbook iframe loads once */}
 
       {profileOpen && (

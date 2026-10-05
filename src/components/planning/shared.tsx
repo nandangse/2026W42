@@ -245,6 +245,9 @@ export interface Task {
    */
   original_due?: string | null;
   push_count?: number;
+  /** The goal and the project it serves, when it names them (0199). */
+  goal_id?: string | null;
+  project?: string | null;
 }
 
 /**
