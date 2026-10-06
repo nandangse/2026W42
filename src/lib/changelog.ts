@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.1",
+    date: "2026-10-06",
+    module: "Saamaan: a warehouse can be typed Ignore",
+    items: [
+      "IGNORE, A SIXTH WAREHOUSE TYPE (Dr Raghu, 6 Oct 2026: \u201cput a type saying ignore. For the moment, whatever is there in the warehouse that is under ignored should not be considered in valuation, in either raw material stock, WIP, or finished goods, at least in the Genie. Later on, we will find a method to clean this up totally, backload it back into the ERP, and make the data right\u201d). Pick it in Masters like any other type (migration 0202 allows it).",
+      "AN IGNORED WAREHOUSE ADDS TO NOTHING. It was already out of RM, WIP and finished goods, which count only their own type; it is now also out of the total \u2014 on Saamaan\u2019s dashboard (Genie\u2019s total, with the ERP\u2019s own beside it), Inventory\u2019s total, the Warehouses totals and Masters\u2019 live totals \u2014 and never shown as untyped. Its row stays, with its items and value struck through, and every total says how much was left out and where. Ask Genie and the suggestions are told the same. The ERP is not touched.",
+    ],
+  },
+  {
     v: "6.3.0.0",
     date: "2026-10-06",
     module: "Saamaan: the Material Playbook",

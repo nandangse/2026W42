@@ -53,7 +53,7 @@ export async function POST() {
 
     const snapshot = {
       today: new Date().toISOString().slice(0, 10),
-      stock: { rm: dash.rm, wip: dash.wip, total: dash.total, finished_goods_value: dash.finished, vendor_value: dash.vendor, untyped: dash.untyped, classes: dash.classes },
+      stock: { rm: dash.rm, wip: dash.wip, total: dash.total, finished_goods_value: dash.finished, vendor_value: dash.vendor, untyped: dash.untyped, ignored_left_out: dash.ignored, classes: dash.classes },
       warehouses: dash.warehouses.slice(0, 25),
       suspense_open: { lines: open.length, value_abs: open.reduce((a, s) => a + Math.abs(s.open_value), 0), largest: open.slice(0, 15) },
       counts_last_60_days: { sheet_count: (counts.data ?? []).length, by_status: (counts.data ?? []).reduce((m: Record<string, number>, c) => ({ ...m, [c.status]: (m[c.status] || 0) + 1 }), {}), items_counted: counted, items_with_variance: variances, variance_value_abs: varValue, sheets: counts.data ?? [] },

@@ -93,10 +93,18 @@ async function readStockValue(base: string, H: Record<string, string>) {
     .sort((a, b) => b.value - a.value);
   const sumKind = (k: string) => rows.filter((r) => r.kind === k).reduce((a, r) => a + r.value, 0);
   const untyped = rows.filter((r) => !r.kind);
+  /* IGNORE (Dr Raghu, 6 Oct 2026): a warehouse typed Ignore is in none of
+     the parts and out of Genie's total — named, so nothing vanishes silently */
+  const ignored = rows.filter((r) => r.kind === "Ignore");
+  const erpTotal = rows.reduce((a, r) => a + r.value, 0);
+  const ignoredValue = ignored.reduce((a, r) => a + r.value, 0);
   return {
     readAt: new Date().toISOString(),
     mastersReady: kinds !== null,
-    erpTotal: rows.reduce((a, r) => a + r.value, 0),
+    erpTotal,
+    genieTotal: erpTotal - ignoredValue,
+    ignored: ignoredValue,
+    ignoredWarehouses: ignored.map((r) => r.warehouse),
     stock: sumKind("Stock"),
     wip: sumKind("WIP"),
     finished: sumKind("Finished goods"),

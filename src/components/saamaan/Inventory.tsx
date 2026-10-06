@@ -73,7 +73,7 @@ export default function Inventory({ summary, email, isOwner }: { summary: Summar
 
 /* ================================================================ dashboard */
 interface DashData {
-  readAt: string; rm: Agg; wip: Agg; total: Agg; finished: number; vendor: number; untyped: { value: number; warehouses: string[] };
+  readAt: string; rm: Agg; wip: Agg; total: Agg; finished: number; vendor: number; untyped: { value: number; warehouses: string[] }; ignored?: { value: number; warehouses: string[] };
   classes: { cls: string; inClass: number; holding: number; qty: number; value: number }[];
   warehouses: { warehouse: string; kind: string; value: number; qty: number; items: number }[];
 }
@@ -100,12 +100,13 @@ function Dash({ go }: { go: (r: string) => void }) {
       <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
         <Tile label="RM stock as of today" a={d?.rm} tone={GREEN} hint="Stock warehouses only — the closing stock that counts" />
         <Tile label="WIP stock as of today" a={d?.wip} tone={AMBER} hint="Material already issued into the works" />
-        <Tile label="Total inventory up to now" a={d?.total} tone={NAVY} hint="Every warehouse the ERP has, typed or not" />
+        <Tile label="Total inventory up to now" a={d?.total} tone={NAVY} hint={d?.ignored?.warehouses.length ? "Every warehouse but those typed Ignore" : "Every warehouse the ERP has, typed or not"} />
       </div>
       {d && (
         <div className="text-xs mb-4" style={{ color: MUTED, lineHeight: 1.7 }}>
           Of the total, finished goods <b style={{ color: INK }}>{cr(d.finished)}</b> · at vendors <b style={{ color: INK }}>{cr(d.vendor)}</b>
           {d.untyped.warehouses.length > 0 && <> · <b style={{ color: AMBER }}>{cr(d.untyped.value)}</b> sits in {d.untyped.warehouses.length} warehouse{d.untyped.warehouses.length === 1 ? "" : "s"} nobody has typed yet — <button onClick={() => (window.location.href = "/saamaan/masters")} style={{ color: NAVY, textDecoration: "underline" }}>type them in Masters</button></>}
+          {d.ignored && d.ignored.warehouses.length > 0 && <> · <b style={{ color: MUTED }}>{cr(d.ignored.value)}</b> in {d.ignored.warehouses.length} warehouse{d.ignored.warehouses.length === 1 ? "" : "s"} typed Ignore is left out of every figure</>}
           {" "}· read {new Date(d.readAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
         </div>
       )}
@@ -167,7 +168,7 @@ function Warehouses({ wh, go }: { wh: string; go: (r: string) => void }) {
     <Screen title="Warehouses" blurb="Every warehouse holding stock on the ERP: its type (set in Masters), how many items it holds with a non-zero quantity, and their value. Click one for its items."
       action={<Btn onClick={reload} disabled={busy}>↻ Re-read</Btn>}>
       {err && <Note kind="error">{err}</Note>}
-      {rows && <div className="text-sm mb-2" style={{ color: INK }}><b>{rows.reduce((a, w) => a + w.items, 0).toLocaleString("en-IN")}</b> item-locations in stock · <b>{cr(rows.reduce((a, w) => a + w.value, 0))}</b></div>}
+      {rows && <div className="text-sm mb-2" style={{ color: INK }}><b>{rows.filter((w) => w.kind !== "Ignore").reduce((a, w) => a + w.items, 0).toLocaleString("en-IN")}</b> item-locations in stock · <b>{cr(rows.filter((w) => w.kind !== "Ignore").reduce((a, w) => a + w.value, 0))}</b>{rows.some((w) => w.kind === "Ignore") && <span style={{ color: MUTED }}> · warehouses typed Ignore are listed but left out of these totals</span>}</div>}
       <GenieTable rows={rows} minWidth={760} search={(w, q) => `${w.warehouse} ${w.kind}`.toLowerCase().includes(q)} searchPlaceholder="🔍 warehouse or type"
         columns={[
           { key: "w", label: "Warehouse", align: "left", sort: (w) => w.warehouse, render: (w) => <button onClick={() => go(`warehouses/${encodeURIComponent(w.warehouse)}`)} className="font-bold text-left" style={{ color: NAVY }}>{w.warehouse}</button> },

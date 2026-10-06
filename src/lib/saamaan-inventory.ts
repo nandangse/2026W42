@@ -100,6 +100,10 @@ export async function inventoryDashboard(admin: SupabaseClient) {
     const k = kinds.get(w) ?? { kind: "", remarks: "" };
     const row = byWh.get(w) ?? byWh.set(w, { warehouse: w, kind: k.kind, remarks: k.remarks, value: 0, qty: 0, items: 0 }).get(w)!;
     row.value += v; row.qty += q; row.items++;
+    /* IGNORE (Dr Raghu, 6 Oct 2026): "should not be considered in valuation,
+       in either raw material stock, WIP, or finished goods, at least in the
+       Genie" — the warehouse keeps its row, named, and adds to nothing */
+    if (k.kind === "Ignore") continue;
     sum.total.value += v; sum.total.qty += q; sum.total.items.add(code);
     if (k.kind === "Stock") {
       sum.rm.value += v; sum.rm.qty += q; sum.rm.items.add(code);
@@ -111,6 +115,7 @@ export async function inventoryDashboard(admin: SupabaseClient) {
   }
   const pack = (x: { value: number; qty: number; items: Set<string> }) => ({ value: x.value, qty: x.qty, items: x.items.size });
   const untyped = [...byWh.values()].filter((w) => !w.kind);
+  const ignored = [...byWh.values()].filter((w) => w.kind === "Ignore");
   return {
     readAt: new Date().toISOString(),
     erpBase: base,
@@ -118,6 +123,7 @@ export async function inventoryDashboard(admin: SupabaseClient) {
     finished: [...byWh.values()].filter((w) => w.kind === "Finished goods").reduce((a, w) => a + w.value, 0),
     vendor: [...byWh.values()].filter((w) => w.kind === "Vendor").reduce((a, w) => a + w.value, 0),
     untyped: { value: untyped.reduce((a, w) => a + w.value, 0), warehouses: untyped.map((w) => w.warehouse) },
+    ignored: { value: ignored.reduce((a, w) => a + w.value, 0), warehouses: ignored.map((w) => w.warehouse) },
     classes: [...cls.values()].map((c) => ({ cls: c.cls, inClass: c.inClass, holding: c.holding.size, qty: c.qty, value: c.value })),
     warehouses: [...byWh.values()].sort((a, b) => b.value - a.value),
   };

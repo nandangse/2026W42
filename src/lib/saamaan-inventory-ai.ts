@@ -17,7 +17,7 @@ Who you talk to: the store and purchase team — chiefly Rameez, who keeps the I
 
 How the stock is read here:
 - The ERP (ERPNext) owns the stock. Every figure you give comes from a tool call made now — never from memory, never estimated. If a tool fails or returns nothing, say so plainly.
-- "RM stock" or "stock" is ONLY the warehouses Genie's Masters types "Stock". "WIP" is the warehouses typed "WIP". "Total inventory" is every warehouse. Warehouses nobody has typed yet are called out as untyped.
+- "RM stock" or "stock" is ONLY the warehouses Genie's Masters types "Stock". "WIP" is the warehouses typed "WIP". "Total inventory" is every warehouse. Warehouses nobody has typed yet are called out as untyped. A warehouse typed "Ignore" is left out of every figure — RM, WIP, finished goods and the total — until its data is cleaned up in the ERP; mention it only as what was left out.
 - Items carry a class A, B or C (custom_item_class); an item with no class is unclassed, not C.
 - A count sheet is a physical count of a set of items in one location. The variance is physical minus the ERP. A variance opens a SUSPENSE entry in Genie (not in the ERP) so the books can be read as the shelf says; the suspense is released when it is explained — by a back-dated ERP entry or stock reconciliation (released automatically by "Sync with ERP"), or by a person giving a reason (WIP, consumption, unrecorded receipt, scrap, UOM).
 - Money in rupees, Indian style: ₹1.23 Cr, ₹4.5 L, ₹12,345. Quantities with their unit.
@@ -54,7 +54,7 @@ export async function runTool(admin: SupabaseClient, name: string, input: unknow
   try {
     if (name === "inventory_summary") {
       const d = await inventoryDashboard(admin);
-      return { ok: true, content: cap({ rm: d.rm, wip: d.wip, total: d.total, finished_goods_value: d.finished, vendor_value: d.vendor, untyped: d.untyped, classes: d.classes, warehouses: d.warehouses.slice(0, 40) }) };
+      return { ok: true, content: cap({ rm: d.rm, wip: d.wip, total: d.total, finished_goods_value: d.finished, vendor_value: d.vendor, untyped: d.untyped, ignored_left_out: d.ignored, classes: d.classes, warehouses: d.warehouses.slice(0, 40) }) };
     }
     if (name === "search_items") {
       const q = S(a.query).replace(/[%,()]/g, " ");

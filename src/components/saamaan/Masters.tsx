@@ -20,8 +20,9 @@ interface Wh {
   warehouse: string; warehouse_name: string; company: string; parent_warehouse: string; is_group: boolean; disabled: boolean;
   kind: string; remarks: string; kind_by: string | null; kind_at: string | null;
 }
-const KINDS = ["", "Stock", "WIP", "Vendor", "Finished goods"];
-const kindColour = (k: string) => (k === "Stock" ? GREEN : k === "WIP" ? AMBER : k === "Vendor" ? "#1B6B93" : k === "Finished goods" ? "#6D28D9" : MUTED);
+/* Ignore (Dr Raghu, 6 Oct 2026): left out of every figure Genie adds up — RM, WIP, finished goods, total — until the data is cleaned and put right in the ERP */
+const KINDS = ["", "Stock", "WIP", "Vendor", "Finished goods", "Ignore"];
+const kindColour = (k: string) => (k === "Stock" ? GREEN : k === "WIP" ? AMBER : k === "Vendor" ? "#1B6B93" : k === "Finished goods" ? "#6D28D9" : k === "Ignore" ? "#9CA3AF" : MUTED);
 
 /** Who the slips go to, and who sits on the ladder (Dr Raghu, 3 Sep 2026). */
 function Routing() {
@@ -85,6 +86,7 @@ export default function Masters() {
   const cr = (v: number) => (Math.abs(v) >= 1e5 ? `₹${(v / 1e7).toFixed(2)} Cr` : `₹${Math.round(v).toLocaleString("en-IN")}`);
 
   const rows = (data?.rows ?? []).filter((w) => !w.is_group);
+  const ignoredWh = new Set(rows.filter((w) => w.kind === "Ignore").map((w) => w.warehouse));
   const counts = KINDS.map((k) => [k || "not said", rows.filter((w) => w.kind === k).length] as const);
 
   return (
@@ -104,7 +106,7 @@ export default function Masters() {
         ))}
         <span style={{ marginLeft: "auto" }}>
           {liveErr ? <span style={{ color: AMBER }}>stock not read: {liveErr}</span>
-            : live ? <>live from the ERP · {new Date(live.readAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · <b style={{ color: INK }}>{(live.warehouses ?? []).reduce((a, w) => a + w.items, 0).toLocaleString("en-IN")}</b> items in stock · <b style={{ color: INK }}>{cr((live.warehouses ?? []).reduce((a, w) => a + w.value, 0))}</b></>
+            : live ? <>live from the ERP · {new Date(live.readAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · <b style={{ color: INK }}>{(live.warehouses ?? []).filter((w) => !ignoredWh.has(w.warehouse)).reduce((a, w) => a + w.items, 0).toLocaleString("en-IN")}</b> items in stock · <b style={{ color: INK }}>{cr((live.warehouses ?? []).filter((w) => !ignoredWh.has(w.warehouse)).reduce((a, w) => a + w.value, 0))}</b>{ignoredWh.size > 0 && <> · ignored warehouses left out</>}</>
             : "reading stock from the ERP…"}
         </span>
       </div>
@@ -129,10 +131,10 @@ export default function Masters() {
             ) },
           { key: "items", label: "Items in stock", align: "right", sort: (w) => held.get(w.warehouse)?.items ?? -1,
             title: "Items with a non-zero quantity in this warehouse on the ERP, now",
-            render: (w) => <span className="tnum" style={{ color: held.get(w.warehouse)?.items ? INK : MUTED }}>{live ? (held.get(w.warehouse)?.items ?? 0).toLocaleString("en-IN") : "·"}</span> },
+            render: (w) => <span className="tnum" style={{ color: held.get(w.warehouse)?.items && w.kind !== "Ignore" ? INK : MUTED, textDecoration: w.kind === "Ignore" ? "line-through" : undefined }} title={w.kind === "Ignore" ? "Typed Ignore — left out of every figure" : undefined}>{live ? (held.get(w.warehouse)?.items ?? 0).toLocaleString("en-IN") : "·"}</span> },
           { key: "value", label: "Stock value", align: "right", sort: (w) => held.get(w.warehouse)?.value ?? -1,
             title: "The ERP's stock value of those items, now",
-            render: (w) => <span className="tnum font-bold" style={{ color: held.get(w.warehouse)?.value ? INK : MUTED }}>{live ? cr(held.get(w.warehouse)?.value ?? 0) : "·"}</span> },
+            render: (w) => <span className="tnum font-bold" style={{ color: held.get(w.warehouse)?.value && w.kind !== "Ignore" ? INK : MUTED, textDecoration: w.kind === "Ignore" ? "line-through" : undefined }} title={w.kind === "Ignore" ? "Typed Ignore — left out of every figure" : undefined}>{live ? cr(held.get(w.warehouse)?.value ?? 0) : "·"}</span> },
           { key: "counts", label: "Counts as stock", align: "center", sort: (w) => (w.kind === "Stock" ? 1 : 0),
             render: (w) => <span style={{ color: w.kind === "Stock" ? GREEN : MUTED, fontWeight: 700 }}>{w.kind === "Stock" ? "✓" : "–"}</span> },
           { key: "remarks", label: "Remarks", align: "left", sort: (w) => w.remarks,
@@ -147,7 +149,7 @@ export default function Masters() {
       />
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
         Change the type and it saves at once; a remark saves when you leave the box. <b style={{ color: NAVY }}>Only Stock counts</b> towards closing stock on an item —
-        WIP is material already in the works, Vendor is material out at a sub-vendor, Finished goods is delivered items — product, not material. {S(rows.find((w) => /guessed/i.test(w.remarks))?.remarks) ? "Types marked “guessed from the name” were set by the first pull and are yours to correct." : ""}
+        WIP is material already in the works, Vendor is material out at a sub-vendor, Finished goods is delivered items — product, not material. Ignore is left out of every figure Genie adds up — RM, WIP, finished goods and the total — until its data is cleaned up and put right in the ERP. {S(rows.find((w) => /guessed/i.test(w.remarks))?.remarks) ? "Types marked “guessed from the name” were set by the first pull and are yours to correct." : ""}
       </div>
     </Screen>
   );
