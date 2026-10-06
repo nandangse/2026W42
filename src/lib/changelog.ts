@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.0.2.2",
+    date: "2026-10-06",
+    module: "The plan PDF: TDD with value (TP) in one cell, the team\u2019s words wider, the calendar on one page",
+    items: [
+      "TDD, VALUE (TP) IN ONE CELL (Dr Raghu, 6 Oct 2026: \u201ccan the TDD, VALUE (TP) come in one cell? Then the width of the issues can be increased. Also that font size can be reduced by 1\u201d). The date stays large; beneath it the value and, in green, the throughput. Two columns fewer, so the team\u2019s belief column takes the width, its type one point smaller.",
+      "THE CALENDAR ON ONE PAGE (\u201ctry to compress the calendar also into one page. We will print that page later on separately to track. Any rows that are blank can be made smallest\u201d). A week with no delivery is now a thin strip. The height the rest needs is estimated from how many lines each job\u2019s text takes, and the whole calendar is scaled by exactly enough to fit one landscape page \u2014 the carried-in and later strips and the planning-owner key with it. A job\u2019s text is held to three lines at most. Nothing is cut or split across pages, so the page can be pulled out and pinned up on its own.",
+    ],
+  },
+  {
     v: "6.0.2.1",
     date: "2026-10-06",
     module: "The plan PDF: the year so far, both week tables on one page, Raghu\u2019s signature on every page, printing locked",

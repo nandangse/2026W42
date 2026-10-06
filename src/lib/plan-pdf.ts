@@ -213,10 +213,21 @@ function calendar(rows: Record<string, unknown>[], from: string, end: string, mo
   /* a year is too long to draw whole — only the weeks that carry a delivery */
   const show = weeks.length > 16 ? weeks.filter((w) => [0, 1, 2, 3, 4, 5, 6].some((k) => byDay.has(isoOf(new Date(atUtc(w).getTime() + k * DAY))))) : weeks;
   const head = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  /* ONE PAGE, ALWAYS (Dr Raghu, 6 Oct 2026: "try to compress the calendar
+     also into one page. We will print that page later on separately to
+     track. Any rows that are blank can be made smallest"). A week with no
+     delivery is a thin strip. The height the rest will need is estimated
+     from how many lines each job's text takes, and the whole calendar is
+     scaled down by exactly enough to fit — never cut, never split. */
+  const CH = (k: number) => (k === 6 ? 24 : 40);              // characters a line holds (measured on the press), Sunday narrower
+  const chipText = (r: Record<string, unknown>) => `${String(r.id ?? "").slice(-4)} ${String(r.tag ?? "")}${money ? ` · ${cr(Number(r.val) || 0)}` : ""}`;
+  const chipH = (r: Record<string, unknown>, k: number) => Math.min(3, Math.max(1, Math.ceil(chipText(r).length / CH(k)))) * 2.97 + 1.9;
+  let estH = 5 + 6 + 7;                                       // title, header row, legend
   const body = show.map((w) => {
     const days = [0, 1, 2, 3, 4, 5, 6].map((k) => isoOf(new Date(atUtc(w).getTime() + k * DAY)));
     const n = days.reduce((a, d) => a + (byDay.get(d)?.length || 0), 0);
-    return `<tr><td class="cwk"><b>W${isoWeekNo(w)}</b><div class="ws">${n ? `${n} job${n === 1 ? "" : "s"}` : ""}</div></td>${days.map((d, k) => {
+    estH += n ? Math.max(8, ...days.map((d, k) => 3.9 + (byDay.get(d) || []).reduce((a, r) => a + chipH(r, k), 0))) : 4.6;
+    return `<tr${n ? "" : ' class="empty"'}><td class="cwk"><b>W${isoWeekNo(w)}</b><div class="ws">${n ? `${n} job${n === 1 ? "" : "s"}` : ""}</div></td>${days.map((d, k) => {
       const inside = d >= from && d <= end;
       const js = byDay.get(d) || [];
       return `<td class="cd${inside ? "" : " out"}${k === 6 ? " sun" : ""}"><div class="dn">${Number(d.slice(8, 10))}${d.slice(8, 10) === "01" || d === from ? ` ${MON3[Number(d.slice(5, 7)) - 1]}` : ""}</div>${js.map(chip).join("")}</td>`;
@@ -225,10 +236,13 @@ function calendar(rows: Record<string, unknown>[], from: string, end: string, mo
   const before = outside.filter((r) => String(r.tdd || "") && String(r.tdd) < from);
   const after = outside.filter((r) => String(r.tdd || "") > end);
   const none = outside.filter((r) => !String(r.tdd || ""));
+  for (const l of [outside.filter((r) => String(r.tdd || "") && String(r.tdd) < from), outside.filter((r) => String(r.tdd || "") > end), outside.filter((r) => !String(r.tdd || ""))])
+    if (l.length) estH += 6 + Math.ceil(l.length / 5) * 11;
+  const zoom = Math.min(1, 182 / estH);
   const strip = (label: string, list: Record<string, unknown>[]) => list.length
-    ? `<div class="cstrip"><span class="tlabel">${esc(label)} · ${list.length}</span><div class="cflow">${list.map((r) => `<div class="cflowi">${chip(r)}<span class="ws">${esc(dmy(r.tdd))}</span></div>`).join("")}</div></div>` : "";
+    ? `<div class="cstrip"><span class="tlabel">${esc(label)} · ${list.length}</span><div class="cflow">${list.map((r) => `<div class="cflowi">${chip(r)}${r.tdd ? `<span class="ws">${esc(dmy(r.tdd))}</span>` : ""}</div>`).join("")}</div></div>` : "";
   return `
-<div class="cal">
+<div class="cal"${zoom < 1 ? ` style="zoom:${zoom.toFixed(3)}"` : ""}>
   <div class="tlabel">THE JOBS ON THEIR TARGET DELIVERY DATES</div>
   ${strip(`CARRIED IN — DUE BEFORE ${dShort(from).toUpperCase()}`, before)}
   <table class="ct">
@@ -352,8 +366,7 @@ ${row(`If all delivered by ${esc(endWords)}`, y.jobs + i.plan.jobs, y.value + i.
     return `<tr>
 <td class="c">${esc(String(r.id ?? "").slice(-4))}</td>
 <td class="tag">${esc(r.tag)}${r.cust ? `<div class="sub">${esc(r.cust)}</div>` : ""}</td>
-${money ? `<td class="n">${cr(Number(r.val) || 0)}</td><td class="n">${cr(Number(r.tp) || 0)}</td>` : ""}
-<td class="c tdd">${esc(dmy(r.tdd))}</td>
+<td class="c tdd">${esc(dmy(r.tdd))}${money ? `<div class="vtp">${cr(Number(r.val) || 0)} <span>(${cr(Number(r.tp) || 0)})</span></div>` : ""}</td>
 <td class="team">${lines.length ? lines.join("") : '<span class="faint">—</span>'}</td>
 </tr>`;
   }).join("");
@@ -421,8 +434,12 @@ tfoot { display: table-footer-group; }
 td.n { text-align: right; white-space: nowrap; }
 td.c { text-align: center; white-space: nowrap; }
 td.tdd { font-size: 11.5pt; font-weight: 800; }        /* bigger, as asked */
-td.tag { width: 18%; }                                  /* half of what it was */
-td.team { font-size: 8pt; }
+/* TDD, VALUE (TP) IN ONE CELL (Dr Raghu, 6 Oct 2026) — two columns fewer, so
+   the team's words get the width; their type one point smaller. */
+td.tdd .vtp { font-size: 7.6pt; font-weight: 700; color: #46545F; margin-top: .6mm; white-space: nowrap; }
+td.tdd .vtp span { font-weight: 400; color: #0D7A3F; }
+td.tag { width: 17%; }
+td.team { font-size: 7pt; line-height: 1.35; }
 .sub { color: #8A94A0; font-size: 7.5pt; }
 .faint { color: #B8B5AC; }
 
@@ -492,23 +509,27 @@ table.ytd tr.yall td.yn b { color: #E8600A; font-size: 11pt; }
 .sigwrap.first { margin-top: 1.5mm; padding-top: 1.5mm; }
 
 /* the calendar */
-.cal { margin-bottom: 5mm; }
-table.ct { table-layout: fixed; font-size: 7.4pt; }
-table.ct th { text-align: center; padding: 1.2mm 1mm; }
+.cal { margin-bottom: 0; break-inside: avoid; page-break-inside: avoid; }
+table.ct { table-layout: fixed; font-size: 6.9pt; line-height: 1.22; }
+table.ct th { text-align: center; padding: 1mm; }
 table.ct th.cwk, table.ct td.cwk { width: 12mm; text-align: center; }
 table.ct th.sun, table.ct td.sun { width: 9%; }
-table.ct td { padding: 1mm; height: 16mm; }
+table.ct td { padding: .6mm .6mm .4mm; height: auto; }
 table.ct tr:nth-child(even) td { background: transparent; }
+table.ct tr.empty td { padding: .3mm .6mm; height: 4mm; }
+table.ct tr.empty td.cwk .ws { display: none; }
+table.ct tr.empty .dn { margin: 0; }
 td.cd.out { background: #F4F2EC !important; }
 td.cd.out .dn { color: #C9C5BB; }
-.dn { font-size: 7pt; font-weight: 800; color: #8A94A0; margin-bottom: .6mm; }
-.cj { border-left: 1mm solid #0D7A3F; background: #F7F5EF; padding: .6mm 1mm .6mm 1.2mm; margin-bottom: .8mm;
-      line-height: 1.25; min-height: 2.5em; word-break: break-word; break-inside: avoid; }
+.dn { font-size: 6.6pt; font-weight: 800; color: #8A94A0; margin-bottom: .4mm; }
+.cj { border-left: 1mm solid #0D7A3F; background: #F7F5EF; padding: .45mm .8mm .45mm 1mm; margin-bottom: .5mm;
+      word-break: break-word; break-inside: avoid;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .cj b { color: #12386B; }
 .cv { color: #5A6672; }
 .cstrip { margin: 1.5mm 0 2mm; break-inside: avoid; }
 .cflow { display: flex; flex-wrap: wrap; gap: 1.5mm; margin-top: 1mm; }
-.cflowi { width: 46mm; font-size: 7.4pt; }
+.cflowi { width: 46mm; font-size: 6.9pt; }
 .cflowi .ws { display: block; margin-top: -.4mm; }
 .ws { font-size: 6.5pt; color: #8A94A0; font-weight: 400; }
 
@@ -574,10 +595,9 @@ ${weekTable("CLIENT — WEEK-WISE DELIVERIES" + (money ? ", NOS (VALUE)" : ", NO
 <div class="tlabel">EVERY JOB, WITH THE TEAM'S BELIEF</div>
 <table>
 <thead><tr>
-<th style="width:6%">Job</th>
-<th style="width:18%">Tag</th>
-${money ? '<th style="width:8%">Value</th><th style="width:8%">TP</th>' : ""}
-<th style="width:9%">TDD</th>
+<th style="width:5%">Job</th>
+<th style="width:17%">Tag</th>
+<th style="width:11%">TDD${money ? '<div style="font-weight:400;font-size:7pt;color:#B8C2CC">Value (TP)</div>' : ""}</th>
 <th>Team belief — what has to happen</th>
 </tr></thead>
 <tbody>${rows}</tbody>
