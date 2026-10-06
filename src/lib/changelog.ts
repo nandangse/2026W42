@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.8",
+    date: "2026-10-06",
+    module: "Saamaan dashboard: stock value on top, then the pulse — GRNs, counts, purchase follow-up",
+    items: [
+      "STOCK VALUE FIRST (\u201cwe would like to begin by seeing the value of the stock at the top\u201d). The live value of stock now opens the dashboard; the item and drawing counts follow the pulse.",
+      "GRNs TODAY, 7 DAYS, 15 DAYS (\u201cthe number \u2026 the value \u2026 the quantity of the GRNs\u201d), read live off the ERP: submitted Purchase Receipts, returns left out, value before tax. A bar for each of the last fifteen days shows how the receiving is going; hover a bar for the day\u2019s count, value and quantity.",
+      "PHYSICAL COUNTS (\u201cphysical inventory or physical reconciliation done numbers today \u2026 how well the inventory team is working at a glance\u201d): lines counted today, in 7 and in 15 days, with the items and sheets behind them, a bar per day, and who counted how many today. PI from an item counts too.",
+      "PURCHASE FOLLOW-UP: open POs (still short of fully received, at value pending), POs past their required-by date, those overdue more than two months, GRNs received without an invoice (count, quantity, value pending), and those still without one after seven days \u2014 the ERP\u2019s own status and per-cent fields, nothing typed.",
+    ],
+  },
+  {
     v: "6.3.0.7",
     date: "2026-10-06",
     module: "Job lightbox: the actual kitting % beside the typed one",
