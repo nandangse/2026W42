@@ -9,15 +9,15 @@
 -- calls on their machines, their questions and our answers, and whatever
 -- Nandan chooses to put up for them — FAQs, newsletters, advisories.
 --
--- Nothing of Genie is re-typed here. The jobs are the jobmaster's rows, the
--- PO number is read off the CRM's sales order through the project, the
--- service calls are Seva's tickets. This migration holds only what those
+-- Nothing of Genie is re-typed here. The jobs are the jobmaster’s rows, the
+-- PO number is read off the CRM’s sales order through the project, the
+-- service calls are Seva’s tickets. This migration holds only what those
 -- cannot know: who may log in and for whom, the slug on the door, the
 -- things typed beside a job (vehicle number, invoice, location, remarks),
 -- the queries, and the content.
 --
 -- Every table wears the portal_ prefix — the module boundary inside the one
--- database, as Saamaan's material_ does.
+-- database, as Saamaan’s material_ does.
 
 -- ------------------------------------------------- the organisations (doors)
 create table if not exists public.portal_org (
@@ -39,8 +39,8 @@ alter table public.portal_org enable row level security;
 revoke all on public.portal_org from anon, authenticated;
 
 -- ------------------------------------------------------------ the people
--- One table for everybody who signs in at /portal: the customer's people,
--- the supplier's people, and Nandan's own portal staff. The role says which.
+-- One table for everybody who signs in at /portal: the customer’s people,
+-- the supplier’s people, and Nandan’s own portal staff. The role says which.
 --   customer / supplier       — see their own organisation only
 --   admin                     — everything, and Settings
 --   national_manager          — everything, read
@@ -102,7 +102,7 @@ revoke all on public.portal_job from anon, authenticated;
 
 -- ------------------------------------------------------------ the queries
 -- "Query solver, where all the queries and everything regarding this will be
--- showcased." A question from the customer's side or a note from ours, on a
+-- showcased." A question from the customer’s side or a note from ours, on a
 -- job or in general; the thread under it; open until somebody closes it.
 create table if not exists public.portal_query (
   id          uuid primary key default gen_random_uuid(),
@@ -128,7 +128,7 @@ create table if not exists public.portal_query_reply (
   by_user     uuid references public.portal_user(id) on delete set null,
   by_name     text not null default '',
   by_side     text not null default 'us' check (by_side in ('them', 'us')),
-  -- a note between Nandan's own people, never shown to the customer
+  -- a note between Nandan’s own people, never shown to the customer
   internal    boolean not null default false,
   at          timestamptz not null default now()
 );

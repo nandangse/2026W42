@@ -18,6 +18,13 @@ import Anthropic from "@anthropic-ai/sdk";
 export const AI = {
   FRONT: "claude-opus-5",
   BACKGROUND: "claude-sonnet-5",
+  /**
+   * The current Opus, for work written against it from the start — Saamaan's
+   * Inventory chat and suggestions (6 Oct 2026). FRONT stays on Opus 5 until
+   * its routes are moved deliberately: Opus 5.5 rejects disabled thinking and
+   * forced tool choice, so moving them is a migration, not a rename.
+   */
+  NEWEST: "claude-opus-5-5",
 } as const;
 
 /** The API version header for the raw-fetch call sites that predate the SDK here. */

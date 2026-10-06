@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 
     const kind = scope.org?.kind ?? "customer";
     const tabs: string[] = kind === "supplier"
-      ? ["home", "queries", "issues", "faq", "newsletter", "advisory"]
+      ? ["home", "rfqs", "queries", "issues", "faq", "newsletter", "advisory"]
       : ["home", "queries", "previous", "issues", "faq", "newsletter", "advisory"];
     if (scope.commercials && kind !== "supplier") tabs.splice(2, 0, "commercials");
     if (isPortalAdmin(u)) tabs.push("settings");

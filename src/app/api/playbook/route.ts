@@ -4,7 +4,8 @@ import { AI } from "@/lib/ai";
 import { assertAiOn } from "@/lib/ai-gate";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { compilePlaybook } from "@/lib/playbook-compile";
+import { bump, compilePlaybook } from "@/lib/playbook-compile";
+import { ITEM_EDITORS } from "@/lib/saamaan-hands";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -25,6 +26,15 @@ export const maxDuration = 300;
  * intelligence, so a quiet night costs nothing.
  */
 
+/**
+ * WHO WRITES A BOOK BY HAND. Every book compiles from intelligence; the
+ * Material Playbook may also be edited directly by those who keep the Item
+ * master (Dr Raghu, 6 Oct 2026: "Rameez should be able to edit this as well
+ * as add on any document"). The owner may edit any book.
+ */
+const mayEditBook = (kind: string, email: string, isOwner: boolean) =>
+  isOwner || (kind === "material" && ITEM_EDITORS.has(String(email || "").toLowerCase()));
+
 async function requireUser() {
   const u = await currentUser();
   if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
@@ -34,7 +44,7 @@ async function requireUser() {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    await requireUser();
+    const me = await requireUser();
     if (url.searchParams.get("config")) {
       return NextResponse.json({ clientId: process.env.GOOGLE_OAUTH_CLIENT_ID || "" });
     }
@@ -52,7 +62,7 @@ export async function GET(req: Request) {
       .eq("kind", kind).order("at", { ascending: false }).limit(1000);
     // extracts travel trimmed — the list needs their presence, not their bulk
     const slim = (docs || []).map((d) => ({ ...d, extract: d.extract ? `${String(d.extract).slice(0, 200)}…` : "", hasExtract: !!d.extract }));
-    return NextResponse.json({ installed: true, book, docs: slim });
+    return NextResponse.json({ installed: true, book, docs: slim, canEdit: mayEditBook(kind, me.email, me.isOwner) });
   } catch (e) {
     return errJson(e);
   }
@@ -60,12 +70,27 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    await assertAiOn();
     const user = await requireUser();
     const admin = adminClient();
     const body = await readBody(req, {});
     const action = String(body.action || "");
     const kind = String(body.kind || "");
+
+    /* a hand edit spends nothing on AI, so the pause does not hold it */
+    if (action === "save_content") {
+      if (!mayEditBook(kind, user.email, user.isOwner)) throw new HttpError(403, "This book is edited by hand only by those who keep it.");
+      const content = String(body.content || "");
+      if (content.length > 600_000) throw new HttpError(413, "That is longer than a book should be — split it.");
+      const { data: book } = await admin.from("playbook").select("version, compiled_at").eq("kind", kind).maybeSingle();
+      if (!book) throw new HttpError(404, "No such playbook.");
+      const now = new Date().toISOString();
+      const version = bump(String(book.version), book.compiled_at ? String(book.compiled_at) : now);
+      const { error } = await admin.from("playbook").update({ content, version, compiled_at: now, by: user.email }).eq("kind", kind);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, version });
+    }
+
+    await assertAiOn();
 
     if (action === "add_doc") {
       const title = String(body.title || "").trim();

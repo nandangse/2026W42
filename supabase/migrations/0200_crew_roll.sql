@@ -14,10 +14,10 @@
 -- time the board is opened.
 --
 -- The first time Genie opens the manpower plan after this runs, today is
--- rolled, and today's counts, and every planned day after, are worked out
+-- rolled, and today’s counts, and every planned day after, are worked out
 -- again from the names.
 --
--- ASCII only, additive, safe to re-run.
+-- Additive, safe to re-run. Apostrophes in these comments are typographic: the Supabase SQL editor misreads a straight one in a comment.
 
 create table if not exists public.job_crew_roll (
   day     date primary key,

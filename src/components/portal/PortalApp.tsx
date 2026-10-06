@@ -12,6 +12,7 @@ const Commercials = dynamic(() => import("./Commercials"));
 const Issues = dynamic(() => import("./Issues"));
 const Content = dynamic(() => import("./Content"));
 const Settings = dynamic(() => import("./Settings"));
+const Rfqs = dynamic(() => import("./Rfqs"));
 
 /**
  * THE PORTAL SHELL (Dr Raghu, 3 Oct 2026). The Nandan logo and the
@@ -60,6 +61,7 @@ export default function PortalApp({ initialSlug, initialTab, initialArg }: { ini
     switch (tab) {
       case "home": return <Home boot={boot} go={go} arg={arg} />;
       case "previous": return <Previous boot={boot} go={go} />;
+      case "rfqs": return <Rfqs boot={boot} arg={arg} go={go} />;
       case "queries": return <Queries boot={boot} arg={arg} go={go} />;
       case "commercials": return boot.me.commercials ? <Commercials boot={boot} /> : <NotYours />;
       case "issues": return <Issues boot={boot} />;

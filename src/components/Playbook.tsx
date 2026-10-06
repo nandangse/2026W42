@@ -58,7 +58,9 @@ function Md({ text }: { text: string }) {
 }
 
 export default function PlaybookScreen({ kind, email }: { kind: string; email?: string }) {
-  const [data, setData] = useState<{ installed: boolean; book?: Book; docs?: Doc[] } | null>(null);
+  const [data, setData] = useState<{ installed: boolean; book?: Book; docs?: Doc[]; canEdit?: boolean } | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [tab, setTab] = useState<"book" | "docs">("book");
   const [adding, setAdding] = useState(false);
   const [compiling, setCompiling] = useState(false);
@@ -114,6 +116,9 @@ export default function PlaybookScreen({ kind, email }: { kind: string; email?: 
           </div>
         </div>
         <div className="flex gap-2">
+          {data.canEdit && editing === null && (
+            <button onClick={() => { setEditing(book.content); setTab("book"); }} className="rounded px-3 py-1.5 text-sm font-bold border" style={{ color: INK, borderColor: BORDER, background: "#fff" }}>✎ Edit the book</button>
+          )}
           <button onClick={() => setAdding(true)} className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>
             ＋ Add Intelligence
           </button>
@@ -136,7 +141,25 @@ export default function PlaybookScreen({ kind, email }: { kind: string; email?: 
         ))}
       </div>
 
-      {tab === "book" && (
+      {tab === "book" && editing !== null && (
+        <div className="bg-white rounded-lg border p-3" style={{ borderColor: ORANGE }}>
+          <div className="text-xs mb-2" style={{ color: MUTED }}>Markdown — ## for a part, ### under it, - for a list, | for a table. Saving makes this the latest version; the next compile weaves new documents into it.</div>
+          <textarea value={editing} onChange={(e) => setEditing(e.target.value)} rows={24} className="w-full border rounded px-2 py-1.5 text-sm" style={{ borderColor: BORDER, fontFamily: "ui-monospace, Menlo, monospace" }} />
+          <div className="flex gap-2 mt-2">
+            <button disabled={savingEdit} onClick={async () => {
+              setSavingEdit(true); setMsg("");
+              try {
+                const r = await fetch("/api/playbook", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "save_content", kind, content: editing }) });
+                const j = await r.json(); if (!r.ok) throw new Error(j.error || "Not saved");
+                setMsg(`Saved — now v ${j.version}.`); setEditing(null); load();
+              } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+              finally { setSavingEdit(false); }
+            }} className="rounded px-3 py-1.5 text-sm font-bold text-white" style={{ background: ORANGE }}>{savingEdit ? "Saving…" : "Save as the latest version"}</button>
+            <button onClick={() => setEditing(null)} className="rounded px-3 py-1.5 text-sm font-bold border" style={{ borderColor: BORDER, background: "#fff", color: INK }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {tab === "book" && editing === null && (
         <div className="bg-white rounded-lg border p-4" style={{ borderColor: BORDER, maxHeight: "68vh", overflowY: "auto" }}>
           {book.content
             ? <Md text={book.content} />

@@ -32,10 +32,14 @@ import SupplierDesk from "./SupplierDesk";
 import Kitting from "./Kitting";
 import Slips from "./Slips";
 import PurchaseOrders from "./PurchaseOrders";
+import Inventory from "./Inventory";
+import RfqDesk from "./Rfq";
+import PlaybookScreen from "@/components/Playbook";
 import { LOGO } from "@/lib/logo";
 
 const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
+  { key: "inventory", label: "Inventory", icon: "🏬" },
   { key: "items", label: "Items", icon: "📦" },
   { key: "projects", label: "Projects", icon: "🏗" },
   { key: "bom", label: "BOM", icon: "🧾" },
@@ -49,10 +53,12 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
      as tabs inside one nav row called "Purchase orders", which is a place
      nobody looks for a supplier. A thing that is not in the navbar does not
      exist. Same screen, opened on its own tab. */
+  { key: "rfq", label: "RFQs", icon: "📝" },
   { key: "po", label: "Purchase orders", icon: "🧾" },
   { key: "suppliers", label: "Suppliers", icon: "🏢" },
   { key: "grn", label: "GRNs", icon: "📥" },
   { key: "pinv", label: "Purchase invoices", icon: "🧾" },
+  { key: "playbook", label: "Material Playbook", icon: "📘" },
   { key: "masters", label: "Masters", icon: "⚙" },
   { key: "pull", label: "ERP pull", icon: "⇣" },
 ];
@@ -105,6 +111,9 @@ export default function SaamaanApp({
       case "suppliers": return <SupplierDesk erpBase={summary.erpBase} canKuber={isOwner || email.toLowerCase() === "mukesh@nandan.co.in"} />;
       case "grn": return <PurchaseOrders erpBase={summary.erpBase} openOn="grn" />;
       case "pinv": return <PurchaseOrders erpBase={summary.erpBase} openOn="pinv" />;
+      case "inventory": return <Inventory summary={summary} email={email} isOwner={isOwner} />;
+      case "rfq": return <RfqDesk email={email} isOwner={isOwner} />;
+      case "playbook": return <PlaybookScreen kind="material" email={email} />;
       case "masters": return <Masters />;
       case "pull": return <Pull summary={summary} isOwner={isOwner} onDone={reloadSummary} />;
       default: return <Dashboard summary={summary} go={go} />;

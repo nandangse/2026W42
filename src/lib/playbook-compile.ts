@@ -11,7 +11,20 @@ import { HttpError } from "@/lib/auth";
 
 const MODEL = AI.BACKGROUND;
 
-const bump = (v: string, lastAt: string | null): string => {
+/**
+ * THE MATERIAL PLAYBOOK'S OWN BRIEF (Dr Raghu, 6 Oct 2026): "simple enough
+ * that it should be able to be understood by a guy within 3 days of joining:
+ * how exactly the material is to be bought, how it is to be stored, how it
+ * is to be valued, how it is to be consumed as well as evaluated, what the
+ * real value is that it comes with in the organisation."
+ */
+const MATERIAL_BRIEF =
+  "THIS BOOK'S READER is a new joiner in stores or purchase who must understand it within three days. Write for him: plain words, short sentences, a worked example where a rule is abstract, no jargon left unexplained.\n" +
+  "KEEP THESE FIVE PARTS, in this order, as the ## sections (add sub-sections under them, never new top-level parts except the Source library): " +
+  "## 1. How material is bought · ## 2. How material is stored · ## 3. How material is valued · ## 4. How material is consumed and evaluated · ## 5. The real value material carries in Nandan.\n" +
+  "Open each part with three lines a person could recite: what, who, which screen in Saamaan.";
+
+export const bump = (v: string, lastAt: string | null): string => {
   const [a, b, c] = v.split(".").map((x) => Number(x) || 0);
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const lastDay = lastAt ? new Date(lastAt).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) : null;
@@ -47,7 +60,8 @@ export async function compilePlaybook(
     "- Work only from what is given. Never invent a fact, figure or rule. Where a document gave only a title and source, list it under 'Source library' with its link.\n" +
     "- Cite the source document's name in-line where a fact matters: (from: <doc title>).\n" +
     "- Structure: # for the book title is NOT yours to write; start at ## sections. End with a '## Source library' section listing every document and link.\n" +
-    "- Plain, dense, usable by an engineer on the floor. Short sentences. Tables where the material is tabular.";
+    "- Plain, dense, usable by an engineer on the floor. Short sentences. Tables where the material is tabular." +
+    (kind === "material" ? "\n" + MATERIAL_BRIEF : "");
 
   const content = existing
     ? `THE BOOK AS IT STANDS (v ${book.version}):\n\n${existing}\n\n\nNEW INTELLIGENCE TO WEAVE IN:\n\n${material}\n\nReturn the WHOLE refreshed book.`

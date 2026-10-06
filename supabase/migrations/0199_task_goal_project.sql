@@ -15,9 +15,9 @@ create index if not exists manual_tasks_goal_idx on public.manual_tasks (goal_id
 comment on column public.manual_tasks.goal_id is 'The goal, sub goal or initiative this task serves (goal_item.id). Null when it serves none.';
 comment on column public.manual_tasks.project is 'The ERP project (NGSE-PROJ-…) when the task is on a project rather than one job. The job''s own project still counts when this is null.';
 
--- The Brain Dump pad's goal column still pointed at goal_node, the goals
--- layer before 0019, so no goal from today's tree could be filed on a line.
--- It now points where the rest of Genie's goals live.
+-- The Brain Dump pad’s goal column still pointed at goal_node, the goals
+-- layer before 0019, so no goal from today’s tree could be filed on a line.
+-- It now points where the rest of Genie’s goals live.
 alter table public.brain_dump drop constraint if exists brain_dump_goal_id_fkey;
 update public.brain_dump set goal_id = null
  where goal_id is not null and goal_id not in (select id from public.goal_item);

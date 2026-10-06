@@ -77,6 +77,13 @@ export default function Masters() {
     reload();
   };
 
+  /* WHAT EACH WAREHOUSE HOLDS, LIVE (Dr Raghu, 6 Oct 2026: "the number of
+     items inside this warehouse that have non-zero stock, and what the total
+     value of that is") — read off the ERP's Bin, not the mirror. */
+  const [live, liveBusy, liveReload, liveErr] = useLoad<{ warehouses: { warehouse: string; items: number; value: number }[]; readAt: string }>("/api/saamaan/inventory?view=warehouses");
+  const held = new Map((live?.warehouses ?? []).map((w) => [w.warehouse, w]));
+  const cr = (v: number) => (Math.abs(v) >= 1e5 ? `₹${(v / 1e7).toFixed(2)} Cr` : `₹${Math.round(v).toLocaleString("en-IN")}`);
+
   const rows = (data?.rows ?? []).filter((w) => !w.is_group);
   const counts = KINDS.map((k) => [k || "not said", rows.filter((w) => w.kind === k).length] as const);
 
@@ -84,7 +91,7 @@ export default function Masters() {
     <Screen
       title="Masters — warehouses"
       blurb="Every warehouse the ERP has. The type is Genie's word on what it holds: only Stock warehouses count towards an item's closing stock. Type and remark stay through every pull."
-      action={<Btn onClick={reload} disabled={busy}>↻ Re-read</Btn>}>
+      action={<Btn onClick={() => { reload(); liveReload(); }} disabled={busy || liveBusy}>↻ Re-read</Btn>}>
       {err && <Note kind="error">{err}</Note>}
       {msg && <Note kind="error">{msg}</Note>}
       <Routing />
@@ -95,11 +102,16 @@ export default function Masters() {
         {counts.map(([k, n]) => (
           <span key={k}><b style={{ color: kindColour(k === "not said" ? "" : k) }}>{k}</b> {n}</span>
         ))}
+        <span style={{ marginLeft: "auto" }}>
+          {liveErr ? <span style={{ color: AMBER }}>stock not read: {liveErr}</span>
+            : live ? <>live from the ERP · {new Date(live.readAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · <b style={{ color: INK }}>{(live.warehouses ?? []).reduce((a, w) => a + w.items, 0).toLocaleString("en-IN")}</b> items in stock · <b style={{ color: INK }}>{cr((live.warehouses ?? []).reduce((a, w) => a + w.value, 0))}</b></>
+            : "reading stock from the ERP…"}
+        </span>
       </div>
 
       <GenieTable<Wh>
         rows={data ? rows : null}
-        minWidth={900}
+        minWidth={1100}
         search={(w, q) => [w.warehouse, w.kind, w.remarks, w.parent_warehouse].join(" ").toLowerCase().includes(q)}
         searchPlaceholder="🔍 warehouse, type, remark"
         empty="No warehouse matches."
@@ -115,6 +127,12 @@ export default function Masters() {
                 {KINDS.map((k) => <option key={k} value={k}>{k || "— not said —"}</option>)}
               </select>
             ) },
+          { key: "items", label: "Items in stock", align: "right", sort: (w) => held.get(w.warehouse)?.items ?? -1,
+            title: "Items with a non-zero quantity in this warehouse on the ERP, now",
+            render: (w) => <span className="tnum" style={{ color: held.get(w.warehouse)?.items ? INK : MUTED }}>{live ? (held.get(w.warehouse)?.items ?? 0).toLocaleString("en-IN") : "·"}</span> },
+          { key: "value", label: "Stock value", align: "right", sort: (w) => held.get(w.warehouse)?.value ?? -1,
+            title: "The ERP's stock value of those items, now",
+            render: (w) => <span className="tnum font-bold" style={{ color: held.get(w.warehouse)?.value ? INK : MUTED }}>{live ? cr(held.get(w.warehouse)?.value ?? 0) : "·"}</span> },
           { key: "counts", label: "Counts as stock", align: "center", sort: (w) => (w.kind === "Stock" ? 1 : 0),
             render: (w) => <span style={{ color: w.kind === "Stock" ? GREEN : MUTED, fontWeight: 700 }}>{w.kind === "Stock" ? "✓" : "–"}</span> },
           { key: "remarks", label: "Remarks", align: "left", sort: (w) => w.remarks,
