@@ -1,12 +1,12 @@
--- 0187 — KINDLE: THE TRUST GROUP'S OWN SITE (Kindle 1.0 — not a Genie module, not in Genie's numbering)
+-- 0187 — KINDLE: THE TRUST GROUP’S OWN SITE (Kindle 1.0 — not a Genie module, not in Genie’s numbering)
 --
 -- Dr Raghu, 1 Oct 2026: "I want to create a website for this. Currently, put
 -- it under genie.nandan.co.in/kindle. Whatever is there in the sheet, I
--- wanted it replicated… At minimum, I wanted to have the constitution… a
--- directory with the attendance, late coming, fees… all the check-ins…
--- a complete section on goals… message boards… exercises… meetings and
--- minutes… polls… finances… one-to-ones… agenda… photo gallery… the
--- participation of each of us… This has to have a login page where only
+-- wanted it replicated... At minimum, I wanted to have the constitution... a
+-- directory with the attendance, late coming, fees... all the check-ins...
+-- a complete section on goals... message boards... exercises... meetings and
+-- minutes... polls... finances... one-to-ones... agenda... photo gallery... the
+-- participation of each of us... This has to have a login page where only
 -- 10 of us can log in with the official mail ID that is given in the
 -- directory."
 --
@@ -41,7 +41,7 @@ create table if not exists public.kindle_member (
   stay_at         text,
   office_at       text,
   about           text,
-  photo_path      text,                       -- in the private 'kindle' bucket
+  photo_path      text,                       -- in the private ’kindle’ bucket
   roles           text[] not null default '{}',   -- facilitator, co_facilitator, treasurer, scribe, timekeeper
   is_admin        boolean not null default false, -- the settings gear
   active          boolean not null default true,
@@ -197,7 +197,7 @@ create index if not exists kindle_checkin_member on public.kindle_checkin(member
 create table if not exists public.kindle_goal_set (
   id             uuid primary key default gen_random_uuid(),
   member_id      uuid not null references public.kindle_member(id) on delete cascade,
-  year_label     text not null,               -- '2026-27'
+  year_label     text not null,               -- ’2026-27’
   failed_last    text,
   start_doing    text,
   stop_doing     text,
@@ -230,7 +230,7 @@ alter table public.kindle_goal enable row level security;
 revoke all on public.kindle_goal from anon, authenticated;
 create index if not exists kindle_goal_member on public.kindle_goal(member_id);
 
--- a goal's monthly word, normally written inside that month's check-in
+-- a goal’s monthly word, normally written inside that month’s check-in
 create table if not exists public.kindle_goal_update (
   id          uuid primary key default gen_random_uuid(),
   goal_id     uuid not null references public.kindle_goal(id) on delete cascade,
@@ -252,7 +252,7 @@ create table if not exists public.kindle_one_to_one (
   period      date not null,                  -- the month it is due
   member_a    uuid not null references public.kindle_member(id) on delete cascade,
   member_b    uuid not null references public.kindle_member(id) on delete cascade,
-  planned     boolean not null default true,  -- from the year's pairing plan
+  planned     boolean not null default true,  -- from the year’s pairing plan
   done_on     date,
   mode        text check (mode in ('in_person','call','video')),
   note_a      text,
@@ -413,7 +413,7 @@ revoke all on public.kindle_album from anon, authenticated;
 create table if not exists public.kindle_photo (
   id          uuid primary key default gen_random_uuid(),
   album_id    uuid not null references public.kindle_album(id) on delete cascade,
-  path        text not null,                  -- in the private 'kindle' bucket
+  path        text not null,                  -- in the private ’kindle’ bucket
   caption     text,
   width       int, height int, bytes int,
   uploaded_by uuid references public.kindle_member(id),
@@ -453,8 +453,8 @@ revoke all on public.kindle_audit from anon, authenticated;
 
 -- ============================================================ SEED: members
 -- From the Directory tab of "Ascent Kindle 2026" and the member profile
--- doc. E-mails are the directory's, as he asked. Roles for 2026 are the
--- constitution's: Jigar facilitator, Amit co-facilitator, Niraj treasurer
+-- doc. E-mails are the directory’s, as he asked. Roles for 2026 are the
+-- constitution’s: Jigar facilitator, Amit co-facilitator, Niraj treasurer
 -- and scribe, Ravi time keeper. Dr Raghu holds the settings gear.
 insert into public.kindle_member (email, name, short_name, company, sector, phone, roles, is_admin, joined_on, sort_order) values
   ('amitgupta@cccpl.net',            'Amit Gupta',           'Amit',     'CCPL',                                   'Transport',                                       '8779240225', '{co_facilitator}',   false, '2024-01-05', 10),
@@ -489,7 +489,7 @@ insert into public.kindle_constitution (version, revised_on, passed_by, is_curre
 select '5.2', '2026-09-03',
   array['Anil Daryani','Bharat Haria','Jaydev Sanghavi','Jigar Shah','Niraj Thakkar','Raghunandan Jagdish','Ravi Lodha','Shailesh Jain','Valay Lakdawala','Amit Gupta'],
   true, 'import',
-$md$
+'
 ## 1. Purpose
 
 To create an environment that leads to collaborative growth through experience sharing, mutual trust and transparent feedback.
@@ -518,7 +518,7 @@ To create an environment that leads to collaborative growth through experience s
 
 3.1.9 No sabbatical will be allowed to the members. Members requesting for the same shall exit from the group and rejoin through Ascent / Kindle. The only sabbatical case to be considered is relocation out of the country, and that for three months.
 
-3.1.10 Two-third majority (7/10) related to the quorum of that day's meeting will be required for any decisions of the group.
+3.1.10 Two-third majority (7/10) related to the quorum of that day''s meeting will be required for any decisions of the group.
 
 3.1.11 In case there is no quorum for a particular day, a date change can be done with a vote of more than 70% of the members. Any member who is absent in a date-change month will be condoned for the absence of that month.
 
@@ -538,25 +538,25 @@ To create an environment that leads to collaborative growth through experience s
 
 4.5 A member arriving after the start of the meeting or leaving before the close will be penalised: up to 5 minutes Rs. 1,000; 5 to 15 minutes Rs. 2,000; above 15 minutes Rs. 5,000. The penalty is paid in cash, placed on the table before joining the meeting.
 
-4.6 Tips for synergy: don't advise; share from experience; listen patiently; don't be judgmental.
+4.6 Tips for synergy: don''t advise; share from experience; listen patiently; don''t be judgmental.
 
 4.7 One Zoom / Skype meeting is allowed in the year.
 
 4.8 Only two absences from the meeting are allowed in a year.
 
-4.9 On the 3rd physical absence the member will be asked to resign from the Trust Group. As an alternative, considering the member's contribution, the member can be asked to pay a fine of Rs. 15,000 and continue with the approval of the TG. On the 4th physical absence the member will be asked to resign; as an alternative a fine of Rs. 25,000 and continuation with the approval of the TG. This is a situation that will be discussed by the TG.
+4.9 On the 3rd physical absence the member will be asked to resign from the Trust Group. As an alternative, considering the member''s contribution, the member can be asked to pay a fine of Rs. 15,000 and continue with the approval of the TG. On the 4th physical absence the member will be asked to resign; as an alternative a fine of Rs. 25,000 and continuation with the approval of the TG. This is a situation that will be discussed by the TG.
 
 4.10 A member cannot leave before the end of the scheduled time without the permission of the majority of the members. Only in case of emergency or health issues is late coming or early going allowed, and it is not appreciated. The late or early timing carries the fine above.
 
 4.11 Any delay or absence in attending a Trust Group meeting must be notified to all members by mail or WhatsApp at least 24 hours prior. Last-minute (less than 24 hours) cancellation attracts a penalty of Rs. 10,000. This also allows the Facilitator to ensure a proper quorum.
 
-4.12 Kindlers will engage with a Knowledge Guru once every quarter, based on the group's need.
+4.12 Kindlers will engage with a Knowledge Guru once every quarter, based on the group''s need.
 
 4.13 Engagement and confidentiality will be fostered by holding meetings in an undisturbed venue with all phones and devices switched off or silent. A breach in mobile usage attracts a penalty of Rs. 1,000. Mobiles can be accessed during breaks and are kept aside during the meeting.
 
 4.14 All content and discussions of the meeting will be held confidential as requested by the Knowledge Guru or the member who is sharing it.
 
-4.15 Violation of confidentiality will be ground for disqualification of membership with the group's two-third majority.
+4.15 Violation of confidentiality will be ground for disqualification of membership with the group''s two-third majority.
 
 4.16 Any financial or business transaction between two members will be reported back to the group to ensure transparency and equality.
 
@@ -564,11 +564,11 @@ To create an environment that leads to collaborative growth through experience s
 
 4.18 Attendance and punctuality are key to our Group. Full attendance is expected, with the only exception being an emergency as defined and interpreted by the Group.
 
-4.19 The calendar for the year's meetings will be decided in the January meeting and all 12 dates confirmed.
+4.19 The calendar for the year''s meetings will be decided in the January meeting and all 12 dates confirmed.
 
 4.20 Expenses for the balance / extra meetings will be borne by the entire group.
 
-4.21 The group's constitution can be amended with a two-third majority of the group.
+4.21 The group''s constitution can be amended with a two-third majority of the group.
 
 4.22 A presentation to be made by a group member must be sent to the facilitator / coach and members over e-mail at least 7 days prior to the meeting.
 
@@ -582,11 +582,11 @@ To create an environment that leads to collaborative growth through experience s
 
 ## 5. Voluntary roles
 
-**5.1 Facilitator** — term one year. Selected by the Group, with the support of the initiator if applicable; primarily the co-facilitator is considered. Trained by ASCENT Foundation before assuming the role. Responsible for a homogeneous atmosphere with no advising or superiority during the meeting, and for the quality of check-ins. KRA: follow the meeting agenda per the prescribed protocol; finalise the minutes before the next meeting incorporating members' comments; be the point of contact with the Ascent Foundation. **Jigar Shah is the Facilitator up to December 2026.**
+**5.1 Facilitator** — term one year. Selected by the Group, with the support of the initiator if applicable; primarily the co-facilitator is considered. Trained by ASCENT Foundation before assuming the role. Responsible for a homogeneous atmosphere with no advising or superiority during the meeting, and for the quality of check-ins. KRA: follow the meeting agenda per the prescribed protocol; finalise the minutes before the next meeting incorporating members'' comments; be the point of contact with the Ascent Foundation. **Jigar Shah is the Facilitator up to December 2026.**
 
-**5.2 Co-facilitator** — term one year, selected and trained the same way. Helps the facilitator, learns the facilitator's functions, and conducts the meeting in the facilitator's absence. **Amit Gupta is the Co-facilitator up to December 2026.**
+**5.2 Co-facilitator** — term one year, selected and trained the same way. Helps the facilitator, learns the facilitator''s functions, and conducts the meeting in the facilitator''s absence. **Amit Gupta is the Co-facilitator up to December 2026.**
 
-**5.3 Treasurer** — term one year. Manages the group's finances and submits the annual statement in every January meeting. KRA: an annual budget covering meeting and venue costs, audio-visual equipment, food, gifts and tokens of appreciation or fees for speakers, and the collection of advance fees. **Niraj Thakkar is the Treasurer up to December 2026.**
+**5.3 Treasurer** — term one year. Manages the group''s finances and submits the annual statement in every January meeting. KRA: an annual budget covering meeting and venue costs, audio-visual equipment, food, gifts and tokens of appreciation or fees for speakers, and the collection of advance fees. **Niraj Thakkar is the Treasurer up to December 2026.**
 
 **5.4 Time keeper** — term one year. Keeps the time lines for the meetings; in his absence any member can volunteer for that meeting. **Ravi Lodha is the Time Keeper up to December 2026.**
 
@@ -594,7 +594,7 @@ To create an environment that leads to collaborative growth through experience s
 
 ## 6. Standard agenda
 
-Published monthly by the Facilitator; subject to change for the Group's requirements, announced before the meeting.
+Published monthly by the Facilitator; subject to change for the Group''s requirements, announced before the meeting.
 
 | Item | Minutes |
 | --- | --- |
@@ -625,7 +625,7 @@ This constitution is reviewed once a year, in December.
 | 9 | Missing a 1-2-1, per person | 5,000 |
 | 10 | Not sending the presentation copy to the group one week before the due date | 10,000 |
 | 11 | Check-in not received three days before the meeting | 3,000 |
-$md$
+'
 where not exists (select 1 from public.kindle_constitution where version = '5.2');
 
 -- ========================================= SEED: meetings (Directory tab)
@@ -985,7 +985,7 @@ where not exists (select 1 from public.feature_request f where f.title = v.t);
 
 insert into public.genie_migration (name) values ('0187_kindle') on conflict (name) do nothing;
 
--- ---------------------------------------------------- the group's settings
+-- ---------------------------------------------------- the group’s settings
 -- Small named values the facilitator edits from the gear: the WhatsApp
 -- group link, the Drive folder the gallery seeds from, the meeting venue.
 create table if not exists public.kindle_setting (
