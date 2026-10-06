@@ -194,6 +194,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, ...(await erpPlan(admin, c, lines ?? [])), erp_reco: c.erp_reco, erp_reco_state: c.erp_reco_state });
     }
 
+    /* one item's on-the-fly counts, newest first — for the PI lightbox */
+    if (view === "item_pi") {
+      const code = S(p.get("code"), 80);
+      const { data, error } = await admin.from("material_count_line").select("id, count_id, warehouse, physical_qty, erp_qty_at_count, location, remark, counted_by, counted_at")
+        .eq("item_code", code).not("physical_qty", "is", null).order("counted_at", { ascending: false }).limit(15);
+      if (error) { if (missing(error.message)) return notInstalled(); throw new Error(error.message); }
+      return NextResponse.json({ ok: true, lines: data ?? [] });
+    }
+
     if (view === "itemgroups") {
       return NextResponse.json({ ok: true, groups: await itemGroupStock(admin), readAt: new Date().toISOString() });
     }
@@ -334,6 +343,43 @@ export async function POST(req: Request) {
       if (suspense.length) { const { error } = await admin.from("material_suspense").insert(suspense); if (error) fail(error.message); }
       await admin.from("material_count").update({ status: "submitted", submitted_at: now, submitted_by: me.email }).eq("id", id);
       return NextResponse.json({ ok: true, variances: suspense.length, counted: counted.length, skipped: (lines ?? []).length - counted.length });
+    }
+
+    /* ---- PI ON THE FLY (Dr Raghu, 6 Oct 2026: "one button … called PI,
+       which will create an on-the-fly physical inventory item. Whenever
+       anybody is referring to any item, they can at least update it and
+       keep updating it.") Anybody in Saamaan, from the item itself: one
+       line, counted and submitted at once — a one-line sheet like any other,
+       so its variance goes to suspense and a lead can post it to the ERP. */
+    if (action === "pi_quick") {
+      const code = S(b.item_code, 80), warehouse = S(b.warehouse, 200);
+      const qty = Number(b.physical_qty);
+      if (!code || !warehouse) throw new HttpError(400, "Which item, and where?");
+      if (b.physical_qty === "" || b.physical_qty === null || !Number.isFinite(qty) || qty < 0) throw new HttpError(400, "What is on the shelf — a number, nought or more.");
+      const { data: wh } = await admin.from("material_warehouse").select("warehouse, kind").eq("warehouse", warehouse).maybeSingle();
+      if (!wh) throw new HttpError(400, `${warehouse} is not a warehouse the ERP has.`);
+      const { data: it } = await admin.from("material_item").select("item_name, item_group, stock_uom").eq("item_code", code).maybeSingle();
+      const erp = (await erpQtyAtMany(warehouse, [{ code, at: now }])).get(`${code}|${now}`) ?? { qty: 0, rate: 0 };
+      const { data: c, error } = await admin.from("material_count").insert({
+        kind: "random", warehouse, title: `PI · ${code} · ${warehouse}`.slice(0, 200), assigned_email: me.email.toLowerCase(), assigned_name: S(b.assigned_name, 120),
+        status: "submitted", submitted_at: now, submitted_by: me.email, created_by: me.email, note: "on the fly, from the item",
+      }).select("id").single();
+      if (error) fail(error.message);
+      const { data: line, error: e2 } = await admin.from("material_count_line").insert({
+        count_id: c!.id, item_code: code, item_name: S(it?.item_name), item_group: S(it?.item_group), uom: S(it?.stock_uom), warehouse,
+        erp_qty: erp.qty, erp_rate: erp.rate, erp_qty_at_count: erp.qty, physical_qty: qty, remark: S(b.remark, 1000), location: S(b.location, 120),
+        counted_by: me.email, counted_at: now,
+      }).select("id").single();
+      if (e2) fail(e2.message);
+      const v = qty - erp.qty;
+      if (Math.abs(v) > 1e-9) {
+        const { error: e3 } = await admin.from("material_suspense").insert({
+          item_code: code, item_name: S(it?.item_name), uom: S(it?.stock_uom), warehouse, qty: v, rate: erp.rate,
+          counted_at: now, count_line_id: line!.id, remark: S(b.remark, 1000), opened_by: me.email,
+        });
+        if (e3) fail(e3.message);
+      }
+      return NextResponse.json({ ok: true, id: c!.id, erp: erp.qty, variance: v });
     }
 
     /* ---- the count to the ERP: a DRAFT Stock Reconciliation first ---- */

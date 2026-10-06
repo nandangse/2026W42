@@ -30,6 +30,7 @@ const TABS: { key: string; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "items", label: "Items" },
   { key: "warehouses", label: "Warehouses" },
+  { key: "itemgroups", label: "Item groups" },
   { key: "group", label: "Reconciliation · by item group" },
   { key: "random", label: "Reconciliation · random PI" },
   { key: "suspense", label: "Suspense" },
@@ -61,7 +62,8 @@ export default function Inventory({ summary, email, isOwner }: { summary: Summar
       </div>
       {tab === "items" ? <Items summary={summary} initialGroup="" email={email} isOwner={isOwner} />
         : tab === "warehouses" ? <Warehouses wh={arg ? decodeURIComponent(arg) : ""} go={go} />
-        : tab === "group" || tab === "random" ? <Reconciliation kind={tab} meta={meta} go={go} />
+        : tab === "itemgroups" ? <ItemGroups go={go} lead={!!meta?.me.lead} />
+        : tab === "group" || tab === "random" ? <Reconciliation kind={tab} meta={meta} go={go} preset={tab === "group" && arg ? decodeURIComponent(arg) : ""} />
         : tab === "sheet" && arg ? <Sheet id={arg} go={go} meta={meta} />
         : tab === "suspense" ? <Suspense lead={!!meta?.me.lead} />
         : tab === "suggestions" ? <Suggestions meta={meta} />
@@ -235,12 +237,14 @@ function Warehouses({ wh, go }: { wh: string; go: (r: string) => void }) {
 /* =========================================================== reconciliation */
 interface Count { id: string; kind: string; title: string; warehouse: string; item_group: string | null; assigned_email: string; assigned_name: string; status: string; due_on: string | null; created_at: string; submitted_at: string | null; lines: number; counted: number; variances: number; value: number }
 
-function Reconciliation({ kind, meta, go }: { kind: "group" | "random"; meta: Meta | null; go: (r: string) => void }) {
+function Reconciliation({ kind, meta, go, preset = "" }: { kind: "group" | "random"; meta: Meta | null; go: (r: string) => void; preset?: string }) {
   const [data, busy, reload, err] = useLoad<{ counts: Count[]; installed?: boolean; error?: string }>("/api/saamaan/inventory?view=counts");
   /* the "By" date starts at today (Dr Raghu, 6 Oct 2026) — a count is meant to be done the day it is given */
   const todayIst = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const [f, setF] = useState({ warehouse: "", n: "10", who: "", due_on: todayIst() });
-  const [groups, setGroups] = useState<string[]>([]);
+  /* arriving from Item groups with one already chosen ("Show this item group on the physical inventory") */
+  const [groups, setGroups] = useState<string[]>(preset ? [preset] : []);
+  useEffect(() => { if (preset) setGroups((g) => (g.includes(preset) ? g : [...g, preset])); }, [preset]);
   const [msg, setMsg] = useState("");
   const [making, setMaking] = useState(false);
   const lead = !!meta?.me.lead;
@@ -471,6 +475,43 @@ function ToErp({ id, count: c, log, reloadSheet }: { id: string; count: { wareho
         </div>
       )}
     </div>
+  );
+}
+
+/* ============================================================== item groups */
+/**
+ * ITEM GROUPS (Dr Raghu, 6 Oct 2026): "all the item groups that can be
+ * sorted … the number of items with zero stock … valuation, and average
+ * cost … If you have 3 items and they're costing 4 lakhs versus having
+ * 23,000 items worth 4 lakhs, I would concentrate on going for the
+ * larger-value ones … Show this item group on the physical inventory so
+ * that when we pull it up, all those items come into the picture."
+ * RM stock only (Stock, Vendor, Stores), highest value first.
+ */
+interface GroupRow { group: string; items: number; holding: number; zero: number; qty: number; value: number; avgCost: number | null; valuePerItem: number | null }
+function ItemGroups({ go, lead }: { go: (r: string) => void; lead: boolean }) {
+  const [d, busy, reload, err] = useLoad<{ groups: GroupRow[]; readAt: string }>("/api/saamaan/inventory?view=itemgroups");
+  const total = (d?.groups ?? []).reduce((a, g) => a + g.value, 0);
+  return (
+    <Screen title="Item groups — where the money sits" blurb="Every item group against the RM stock the ERP holds today (Stock, Vendor and Stores warehouses). Average cost is the value divided by the quantity; value per item is the value divided by the items holding stock. Count the heavy groups first."
+      action={<Btn onClick={reload} disabled={busy}>{busy ? "Reading…" : "↻ Re-read"}</Btn>}>
+      {err && <Note kind="error">{err}</Note>}
+      <GenieTable<GroupRow> rows={d ? d.groups : null} minWidth={1150} maxHeight="70vh"
+        search={(g, q) => g.group.toLowerCase().includes(q)} searchPlaceholder="🔍 item group"
+        columns={[
+          { key: "g", label: "Item group", align: "left", sort: (g) => g.group, render: (g) => <b style={{ color: INK }}>{g.group}</b> },
+          { key: "i", label: "Items", align: "right", sort: (g) => g.items, render: (g) => <span className="tnum">{g.items.toLocaleString("en-IN")}</span> },
+          { key: "h", label: "Holding stock", align: "right", sort: (g) => g.holding, render: (g) => <span className="tnum">{g.holding.toLocaleString("en-IN")}</span> },
+          { key: "z", label: "At nought", align: "right", sort: (g) => g.zero, render: (g) => <span className="tnum" style={{ color: MUTED }}>{g.zero.toLocaleString("en-IN")}</span> },
+          { key: "q", label: "Quantity", align: "right", sort: (g) => g.qty, render: (g) => <span className="tnum">{qn(g.qty)}</span> },
+          { key: "v", label: "Value", align: "right", sort: (g) => g.value, render: (g) => <b className="tnum">{cr(g.value)}</b> },
+          { key: "vp", label: "Value %", align: "right", sort: (g) => g.value, render: (g) => <span className="tnum" style={{ color: MUTED }}>{total ? `${((g.value / total) * 100).toFixed(1)}%` : "·"}</span> },
+          { key: "a", label: "Average cost", align: "right", sort: (g) => g.avgCost ?? -1, render: (g) => <span className="tnum">{g.avgCost === null ? "·" : cr(g.avgCost)}</span> },
+          { key: "pi", label: "Value per item", align: "right", sort: (g) => g.valuePerItem ?? -1, render: (g) => <span className="tnum">{g.valuePerItem === null ? "·" : cr(g.valuePerItem)}</span> },
+          ...(lead ? [{ key: "c", label: "", align: "left" as const, render: (g: GroupRow) => g.holding ? <button onClick={() => go(`group/${encodeURIComponent(g.group)}`)} className="text-xs font-bold rounded px-2 py-1" style={{ background: NAVY_SOFT, color: NAVY }}>Count this group →</button> : null }] : []),
+        ]} />
+      {d && <div className="text-xs mt-2" style={{ color: MUTED }}>RM stock across the groups <b style={{ color: INK }}>{cr(total)}</b> · read {new Date(d.readAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</div>}
+    </Screen>
   );
 }
 

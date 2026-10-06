@@ -21,6 +21,7 @@ interface StockValue {
   warehouses: { warehouse: string; value: number; qty: number; bins: number; kind: string }[];
 }
 const cr = (n: number) => `₹${(n / 1e7).toFixed(2)} Cr`;
+const lk = (v: number) => (Math.abs(v) >= 1e7 ? `₹${(v / 1e7).toFixed(2)} Cr` : Math.abs(v) >= 1e5 ? `₹${(v / 1e5).toFixed(2)} L` : `₹${Math.round(v).toLocaleString("en-IN")}`);
 
 export interface PullLine {
   id: string; phase: string; found: number; written: number; removed: number; note: string; by: string | null; at: string;
@@ -51,6 +52,10 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
   const age = pulled ? daysTo(summary.lastPulledAt!.slice(0, 10)) : null;
   // Fetched on its own, so the dashboard never waits on 25,000 bins.
   const [sv, svBusy, , svErr] = useLoad<StockValue>("/api/saamaan/stock?mode=value");
+  /* "Next to this, also show value and value percentage" (Dr Raghu, 6 Oct 2026) — RM stock per group, live */
+  const [gv] = useLoad<{ groups: { group: string; value: number }[] }>("/api/saamaan/inventory?view=itemgroups");
+  const valueOf = new Map((gv?.groups ?? []).map((g) => [g.group, g.value]));
+  const rmTotal = (gv?.groups ?? []).reduce((a, g) => a + g.value, 0);
 
   return (
     <div style={{ maxWidth: 1180 }}>
@@ -151,7 +156,7 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
           <div className="text-xs font-bold uppercase mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>Items by group — click one to open it</div>
           <GenieTable
             rows={summary.groups}
-            minWidth={320}
+            minWidth={480}
             maxHeight="60vh"
             empty={pulled ? "The ERP offered no RM groups." : "Nothing here yet — the ERP has not been pulled. Open ERP pull."}
             columns={[
@@ -161,6 +166,10 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
                 render: (r) => <span className="tnum">{r.n.toLocaleString("en-IN")}</span> },
               { key: "p", label: "Share", align: "right", sort: (r) => r.n,
                 render: (r) => <span className="tnum" style={{ color: MUTED }}>{pct(r.n, summary.items)}</span> },
+              { key: "v", label: "Value", align: "right", sort: (r) => valueOf.get(r.item_group) ?? -1,
+                render: (r) => <b className="tnum" style={{ color: INK }}>{gv ? lk(valueOf.get(r.item_group) ?? 0) : "…"}</b> },
+              { key: "vp", label: "Value %", align: "right", sort: (r) => valueOf.get(r.item_group) ?? -1,
+                render: (r) => <span className="tnum" style={{ color: MUTED }}>{gv && rmTotal ? `${(((valueOf.get(r.item_group) ?? 0) / rmTotal) * 100).toFixed(1)}%` : "·"}</span> },
             ]}
           />
         </div>

@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.4",
+    date: "2026-10-06",
+    module: "Inventory: Item groups tab, value on the group table, PI on any item as a lightbox",
+    items: [
+      "ITEM GROUPS (\u201cIf you have 3 items and they\u2019re costing 4 lakhs versus having 23,000 items worth 4 lakhs, I would concentrate on going for the larger-value ones\u201d). A new Inventory tab: every item group against the RM stock today \u2014 items, holding stock, at nought, quantity, value, value %, average cost (value \u00f7 quantity) and value per item, highest value first and sortable on every column. \u201cCount this group\u201d opens By item group with that group already chosen, so all its items come onto the sheet.",
+      "VALUE AND VALUE % (\u201cNext to this, also show value and value percentage\u201d) on the Saamaan dashboard\u2019s Items by group, read live off the ERP.",
+      "PI ON THE FLY (\u201cone button \u2026 called PI, which will create an on-the-fly physical inventory item \u2026 keep updating it\u201d; \u201cMake the PI come like a light box\u201d). An orange PI button on every item opens a lightbox: warehouse, what is on the shelf, location, remark. Blind like every count \u2014 the ERP\u2019s figure shows only after saving. Each save is a one-line sheet: a difference goes to suspense and can be posted to the ERP from Inventory. Every earlier count of the item is listed beneath, and the last location is offered again. Anybody in Saamaan can use it.",
+    ],
+  },
+  {
     v: "6.3.0.3",
     date: "2026-10-06",
     module: "Inventory: blanks left out, the count back to the ERP, value first and blind, location; WIP kitted theory and real; RM in three parts; MRP file icons; RBOM status follows the ERP",

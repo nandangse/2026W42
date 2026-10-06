@@ -611,6 +611,7 @@ function Detail({ code, base, canEdit = false, onClose }: { code: string; base: 
   const [every, setEvery] = useState(false);
   const [tab, setTab] = useState("erp");
   const [stock, stockErr] = useStock(code);
+  const [pi, setPi] = useState(false);
   const [edits, setEdits] = useState<EditRow[]>([]);
   const [price, setPrice] = useState("");
   const [saving, setSaving] = useState("");
@@ -653,6 +654,7 @@ function Detail({ code, base, canEdit = false, onClose }: { code: string; base: 
 
   return (
     <Modal onClose={onClose} title={`${code}${item ? ` — ${S(item.item_name)}` : ""}`} width={920}>
+      {pi && <PiBox code={code} name={S(item?.item_name)} uom={S(item?.stock_uom)} bins={stock?.bins ?? []} onClose={() => setPi(false)} />}
       {err && <Note kind="error">{err}</Note>}
       {!item && !err && <div className="text-sm" style={{ color: MUTED }}>Reading…</div>}
 
@@ -670,7 +672,11 @@ function Detail({ code, base, canEdit = false, onClose }: { code: string; base: 
               <div>Stock UOM <b style={{ color: INK }}>{S(item.stock_uom) || "·"}</b> · Last purchase <b style={{ color: INK }}>{money(item.last_purchase_rate)}</b> · Valuation <b style={{ color: INK }}>{money(item.valuation_rate)}</b></div>
               <div>Kittable <b style={{ color: INK }}>{S(item.kittable) || "·"}</b> · HSN <b style={{ color: INK }}>{S(item.gst_hsn_code) || "·"}</b>{S(item.drawing_no) ? <> · Drawing <b style={{ color: INK }}>{S(item.drawing_no)}</b></> : null}</div>
             </div>
-            <a href={erpForm(base, "Item", code)} target="_blank" rel="noreferrer" className="inline-block mt-1 text-xs font-bold" style={{ color: NAVY }}>Open in the ERP ↗</a>
+            <div className="flex items-center gap-3 mt-1">
+              <a href={erpForm(base, "Item", code)} target="_blank" rel="noreferrer" className="text-xs font-bold" style={{ color: NAVY }}>Open in the ERP ↗</a>
+              {/* PI on the fly (Dr Raghu, 6 Oct 2026) — "Make the PI come like a light box" */}
+              <button onClick={() => setPi(true)} className="rounded px-2.5 py-1 text-xs font-bold" style={{ background: ORANGE, color: "#fff" }} title="Count this item now, where it is">PI</button>
+            </div>
           </div>
           <ClosingStock stock={stock} err={stockErr} uom={S(item.stock_uom)} />
         </div>
@@ -855,6 +861,99 @@ function Detail({ code, base, canEdit = false, onClose }: { code: string; base: 
         .rich img { max-width: 100%; height: auto; }
         .rich p { margin: 0 0 6px; } .rich table { border-collapse: collapse; } .rich td, .rich th { border: 1px solid #E5E8F0; padding: 2px 6px; }
       `}</style>
+    </Modal>
+  );
+}
+
+/**
+ * PI — A PHYSICAL COUNT OF THIS ONE ITEM, NOW, AS A LIGHTBOX (Dr Raghu, 6 Oct
+ * 2026: "one button … called PI, which will create an on-the-fly physical
+ * inventory item … they can at least update it and keep updating it";
+ * "Make the PI come like a light box").
+ *
+ * Blind, like every count: where and how many, never what the ERP says or
+ * what it is worth — those show only after it is saved. Each save is its own
+ * one-line sheet: the difference goes to suspense, and Mukesh, Rameez or
+ * Dr Raghu can send it to the ERP from Inventory.
+ */
+interface PiLine { id: string; count_id: string; warehouse: string; physical_qty: number; erp_qty_at_count: number | null; location: string; remark: string; counted_by: string; counted_at: string }
+const qf = (n: number) => numFmt(n, "·", 3);
+function PiBox({ code, name, uom, bins, onClose }: { code: string; name: string; uom: string; bins: BinRow[]; onClose: () => void }) {
+  const [whs, setWhs] = useState<{ warehouse: string; kind: string }[]>([]);
+  const [hist, setHist] = useState<PiLine[] | null>(null);
+  const held = bins.filter((b) => b.kind !== "Ignore" && Number(b.actual_qty) !== 0).map((b) => b.warehouse);
+  const [f, setF] = useState({ warehouse: held[0] ?? "", qty: "", location: "", remark: "" });
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
+  const loadHist = useCallback(() => {
+    fetch(`/api/saamaan/inventory?view=item_pi&code=${encodeURIComponent(code)}`, { cache: "no-store" }).then((r) => r.json()).then((j) => setHist(j.lines || [])).catch(() => setHist([]));
+  }, [code]);
+  useEffect(() => {
+    loadHist();
+    fetch("/api/saamaan/warehouse", { cache: "no-store" }).then((r) => r.json()).then((j) => setWhs((j.rows || []).filter((w: { is_group?: boolean; kind: string }) => !w.is_group && w.kind !== "Ignore"))).catch(() => {});
+  }, [loadHist]);
+  useEffect(() => { if (!f.warehouse && held[0]) setF((x) => ({ ...x, warehouse: held[0] })); }, [held, f.warehouse]);
+  /* the location last written for this item in this warehouse, offered again */
+  useEffect(() => {
+    const last = (hist ?? []).find((h) => h.warehouse === f.warehouse && h.location);
+    if (last && !f.location) setF((x) => ({ ...x, location: last.location }));
+  }, [hist, f.warehouse, f.location]);
+  const save = async () => {
+    setBusy(true); setSaid(null);
+    const r = await post("/api/saamaan/inventory", { action: "pi_quick", item_code: code, warehouse: f.warehouse, physical_qty: f.qty === "" ? null : Number(f.qty), location: f.location, remark: f.remark });
+    setBusy(false);
+    if (!r.ok) { setSaid({ ok: false, text: r.error || "Not saved." }); return; }
+    const v = Number(r.variance);
+    setSaid({ ok: true, text: `Saved. The ERP had ${qf(Number(r.erp))} ${uom} in ${f.warehouse} at that moment — ${Math.abs(v) < 1e-9 ? "it agrees." : `a difference of ${v > 0 ? "+" : ""}${qf(v)} ${uom}, now in suspense.`}` });
+    setF((x) => ({ ...x, qty: "", remark: "" }));
+    loadHist();
+  };
+  const pick = [...new Set([...held, ...whs.map((w) => w.warehouse)])];
+  return (
+    <Modal onClose={onClose} title={`PI · ${code}${name ? ` — ${name}` : ""}`} width={640}>
+      <div className="text-xs mb-3" style={{ color: MUTED, lineHeight: 1.6 }}>Count it where it is and write what is on the shelf. A nought is a count. Count again whenever you see it — every save is kept.</div>
+      <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
+        <label className="text-xs font-bold" style={{ color: MUTED }}>Warehouse<br />
+          <input list="pi-wh" value={f.warehouse} onChange={(e) => setF({ ...f, warehouse: e.target.value })} placeholder="type to find"
+            className="rounded border px-2 py-1.5 text-sm mt-1 w-full" style={{ borderColor: BORDER, color: INK }} />
+          <datalist id="pi-wh">{pick.map((w) => <option key={w} value={w}>{held.includes(w) ? "holds it" : ""}</option>)}</datalist>
+        </label>
+        <label className="text-xs font-bold" style={{ color: MUTED }}>On the shelf ({uom || "qty"})<br />
+          <input value={f.qty} inputMode="decimal" autoFocus onChange={(e) => setF({ ...f, qty: e.target.value.replace(/[^0-9.]/g, "") })}
+            onKeyDown={(e) => { if (e.key === "Enter" && f.qty !== "" && f.warehouse) save(); }}
+            className="rounded border px-2 py-1.5 text-sm mt-1 w-full tnum text-right" style={{ borderColor: BORDER, color: INK, fontSize: 18 }} />
+        </label>
+        <label className="text-xs font-bold" style={{ color: MUTED }}>Location<br />
+          <input value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} placeholder="rack / bin"
+            className="rounded border px-2 py-1.5 text-sm mt-1 w-full" style={{ borderColor: BORDER, color: INK }} />
+        </label>
+        <label className="text-xs font-bold" style={{ color: MUTED }}>Remark<br />
+          <input value={f.remark} onChange={(e) => setF({ ...f, remark: e.target.value })} placeholder="anything worth knowing"
+            className="rounded border px-2 py-1.5 text-sm mt-1 w-full" style={{ borderColor: BORDER, color: INK }} />
+        </label>
+      </div>
+      <div className="flex items-center gap-2 mt-3">
+        <Btn kind="primary" onClick={save} disabled={busy || f.qty === "" || !f.warehouse}>{busy ? "Saving…" : "Save the count"}</Btn>
+        <Btn onClick={onClose}>Close</Btn>
+      </div>
+      {said && <div className="mt-3"><Note kind={said.ok ? "info" : "error"}>{said.text}</Note></div>}
+      <div className="text-xs font-bold uppercase mt-4 mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>Counted before</div>
+      {hist === null ? <div className="text-xs" style={{ color: MUTED }}>Reading…</div> : !hist.length ? <div className="text-xs" style={{ color: MUTED }}>Never counted yet.</div> : (
+        <table className="w-full text-xs">
+          <thead><tr style={{ color: MUTED }}><th className="text-left py-1">When</th><th className="text-left">Where</th><th className="text-right">Shelf</th><th className="text-right">ERP then</th><th className="text-left pl-3">By</th></tr></thead>
+          <tbody>
+            {hist.map((h) => (
+              <tr key={h.id} style={{ borderTop: `1px solid ${BORDER}` }}>
+                <td className="py-1">{new Date(h.counted_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
+                <td>{h.warehouse}{h.location ? <span style={{ color: MUTED }}> · {h.location}</span> : null}</td>
+                <td className="text-right tnum font-bold">{qf(Number(h.physical_qty))}</td>
+                <td className="text-right tnum" style={{ color: MUTED }}>{h.erp_qty_at_count === null ? "·" : qf(Number(h.erp_qty_at_count))}</td>
+                <td className="pl-3">{String(h.counted_by || "").split("@")[0]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </Modal>
   );
 }
