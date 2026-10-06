@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.7",
+    date: "2026-10-06",
+    module: "Job lightbox: the actual kitting % beside the typed one",
+    items: [
+      "IN BRACKETS, THE ACTUAL (\u201cNext to that, in the bracket, show the actual kitting percentage that is seen in Saamaan for this particular job \u2026 For the moment, let us at least use it as a display\u201d). Beside the typed Kitting % on the job lightbox: what the store has physically transferred to the job in the ERP (its completed transfers carrying the job number), over the job\u2019s material value \u2014 value less throughput, the same base the typed figure stands on. Hover for the rupees. Display only; the typed figure is still the board\u2019s. A reconciliation screen with a \u201cMove all\u201d button comes later.",
+    ],
+  },
+  {
     v: "6.3.0.6",
     date: "2026-10-06",
     module: "WIP real is what the ERP has physically issued, not Genie's ticks",

@@ -669,7 +669,8 @@ export function JobLightbox({
               canEdit={canEdit} color={C.navy} onSave={(v) => save("pct", v)} />
             <EditBit label="Kitting" value={String(job.kit ?? 0)} suffix="%" kind="number"
               canEdit={canEdit} color={(job.kit || 0) >= 80 ? C.green : (job.kit || 0) >= 40 ? C.amber : C.red}
-              onSave={(v) => save("kit", v)} />
+              onSave={(v) => save("kit", v)}
+              after={<KitActual jobId={job.id} />} />
             <EditBit label="Target delivery" value={job.tdd || ""} kind="date"
               canEdit={canEdit} color={job.tdd && job.tdd < today ? C.red : C.body}
               display={fmt(job.tdd)} onSave={(v) => save("tdd", v)} />
@@ -744,11 +745,37 @@ export function JobLightbox({
 }
 
 /** A figure with a pencil. Reads as a chip until somebody wants to change it. */
+/**
+ * THE ACTUAL KITTING %, IN BRACKETS (Dr Raghu, 6 Oct 2026) — what Saamaan
+ * sees: the value the store has physically transferred to this job in the
+ * ERP, over the job's material value. Display only; the typed figure stays
+ * the board's until a reconciliation screen moves them across.
+ */
+function KitActual({ jobId }: { jobId: string }) {
+  const [a, setA] = useState<{ pct: number | null; issued: number; material: number; read: boolean } | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/job-kit-actual?job=${encodeURIComponent(jobId)}`, { cache: "no-store" })
+      .then((r) => r.json()).then((j) => { if (live && j.ok) setA(j); }).catch(() => {});
+    return () => { live = false; };
+  }, [jobId]);
+  if (!a) return <span style={{ color: C.faint, fontSize: 12, fontWeight: 600 }}> (…)</span>;
+  if (!a.read || a.pct === null) return <span style={{ color: C.faint, fontSize: 12, fontWeight: 600 }} title="The ERP could not be read, or the job has no value"> (·)</span>;
+  const L = (n: number) => `₹${(n / 1e5).toFixed(1)} L`;
+  return (
+    <span style={{ color: C.sub, fontSize: 13, fontWeight: 700 }}
+      title={`Actual, as Saamaan sees it: ${L(a.issued)} physically issued to this job in the ERP, of ${L(a.material)} material (value less throughput)`}>
+      {" "}({Math.round(a.pct)}% actual)
+    </span>
+  );
+}
+
 function EditBit({
-  label, value, display, suffix, kind, canEdit, color, onSave,
+  label, value, display, suffix, kind, canEdit, color, onSave, after,
 }: {
   label: string; value: string; display?: string; suffix?: string;
   kind: "number" | "date" | "text"; canEdit: boolean; color: string; onSave: (v: string) => Promise<void>;
+  after?: React.ReactNode;
 }) {
   const [on, setOn] = useState(false);
   const [v, setV] = useState(value);
@@ -783,7 +810,7 @@ function EditBit({
         </div>
       ) : (
         <div className="tnum font-bold" style={{ fontSize: 14, color }}>
-          {display ?? (value === "" ? "—" : value)}{display ? "" : suffix || ""}
+          {display ?? (value === "" ? "—" : value)}{display ? "" : suffix || ""}{after}
         </div>
       )}
     </div>
