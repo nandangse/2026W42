@@ -76,7 +76,7 @@ export default function Inventory({ summary, email, isOwner }: { summary: Summar
 /* ================================================================ dashboard */
 interface DashData {
   readAt: string; rm: Agg; stock: Agg; vendorRm: Agg; stores: Agg; uniqueItems: number; wip: Agg; total: Agg; finished: number; vendor: number; untyped: { value: number; warehouses: string[] }; ignored?: { value: number; warehouses: string[] };
-  kitted?: { jobs: number; withRbom: number; material: number; theory: number; actual: number; theoryPct: number } | null;
+  kitted?: { jobs: number; withRbom: number; material: number; theory: number; actual: number; theoryPct: number; withIssue?: number; erpRead?: boolean; ticked?: number } | null;
   classes: { cls: string; inClass: number; holding: number; qty: number; value: number }[];
   warehouses: { warehouse: string; kind: string; value: number; qty: number; items: number }[];
 }
@@ -108,7 +108,7 @@ function Dash({ go }: { go: (r: string) => void }) {
     ["RM stock", d.rm.value, "RM in the stores + at vendors + service stores"],
     ["WIP theory", k ? k.theory : null, "each live job's kitting % × its material value"],
     ["Stock + WIP, theory", k ? d.rm.value + k.theory : null, "", true],
-    ["WIP real", k ? k.actual : null, "issued into the jobs against their RBOMs"],
+    ["WIP real", k ? k.actual : null, "physically issued — the ERP's completed transfers out of the stores to each live job"],
     ["Stock + WIP, real", k ? d.rm.value + k.actual : null, "", true],
     ["Theory less real", k ? k.theory - k.actual : null, "the WIP not yet measured — it closes as the WIP is moved in"],
   ] : [];
@@ -131,8 +131,11 @@ function Dash({ go }: { go: (r: string) => void }) {
         <Box big label="RM stock as of today" value={d ? cr(d.rm.value) : "…"} tone={GREEN} sub={aggLine(d?.rm)} />
         <Box big label="WIP theory" value={k ? cr(k.theory) : d ? "·" : "…"} tone={AMBER}
           sub={k ? <>kitting <b style={{ color: INK }}>{k.theoryPct.toFixed(1)}%</b> of {cr(k.material)} material · {k.jobs} live jobs</> : "each job's kitting % on the board"} />
-        <Box big label="WIP real" value={k ? cr(k.actual) : d ? "·" : "…"} tone={ORANGE}
-          sub={<>issued against the RBOM{k ? ` · ${k.withRbom} of ${k.jobs} jobs have one` : ""}{d ? <> · the ERP&apos;s WIP warehouses {cr(d.wip.value)}</> : null}</>} />
+        {/* "Genie tick is what it is proposing … only count that which has been
+            physically issued after the stock transfer is completed" (Dr Raghu, 6 Oct 2026) */}
+        <Box big label="WIP real" value={k && k.erpRead !== false ? cr(k.actual) : d ? "·" : "…"} tone={ORANGE}
+          sub={k ? <>physically issued — the ERP&apos;s completed transfers out of the stores, by job number · {k.withIssue ?? 0} of {k.jobs} live jobs have some
+            {k.ticked ? <> · Genie&apos;s MRP ticks propose {cr(k.ticked)} more, not counted</> : null}</> : "the ERP's completed transfers to the live jobs"} />
       </div>
       <div className="text-xs font-bold uppercase mt-3 mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>The RM stock is these three</div>
       <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>

@@ -8,14 +8,22 @@
  *   THEORY  = the board's kitting % × the job's material value, where the
  *             material value is the board's own: value × (1 − throughput %).
  *             The same arithmetic the board's kitting % already uses.
- *   ACTUAL  = what has really gone into the job's WIP, item by item: each
- *             RBOM line's quantity issued (capped at the RBOM quantity) at
- *             the RBOM rate. Builds up as the store issues against the RBOM.
+ *   REAL    = what the store has PHYSICALLY issued to the job — the ERP's
+ *             submitted Material Transfers carrying the job number
+ *             (custom_job_no), out of an RM warehouse (Stock, Vendor,
+ *             Stores) into WIP or finished goods, at the value the ERP
+ *             moved them, less anything transferred back. Dr Raghu, 6 Oct
+ *             2026: "Genie tick is what it is proposing … You need to only
+ *             count that which has been physically issued after the stock
+ *             transfer is completed. I only need that value."
+ *   TICKED  = Genie's MRP ticks at the RBOM rate — a proposal, shown apart,
+ *             never added to anything.
  *
  * One helper, so the WIP screen and the Inventory dashboard can never say
  * two different things.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { erpAuth } from "@/lib/saamaan-stock";
 
 type Doc = Record<string, unknown>;
 const S = (v: unknown) => (v === null || v === undefined ? "" : String(v)).trim();
@@ -76,6 +84,41 @@ export async function actualKitting(admin: SupabaseClient, rows: { job_no: strin
   return out;
 }
 
+const RM_KINDS = new Set(["Stock", "Vendor", "Stores"]);
+
+/**
+ * The value the ERP has physically moved out of the stores to each job.
+ * One read of the transfer lines that carry these job numbers; a line from
+ * an RM warehouse to anywhere else adds, a line back into one subtracts,
+ * and a move between two non-RM warehouses (WIP to finished goods) is the
+ * job's own business and changes nothing.
+ */
+export async function erpIssuedByJob(admin: SupabaseClient, jobIds: string[]): Promise<{ byJob: Map<string, number>; read: boolean }> {
+  const byJob = new Map<string, number>();
+  const auth = await erpAuth().catch(() => null);
+  if (!auth || !jobIds.length) return { byJob, read: false };
+  const { data: wh } = await admin.from("material_warehouse").select("warehouse, kind").limit(1000);
+  const rm = new Set((wh ?? []).filter((w) => RM_KINDS.has(S(w.kind))).map((w) => S(w.warehouse)));
+  const J = (x: unknown) => encodeURIComponent(JSON.stringify(x));
+  const fields = ["custom_job_no", "`tabStock Entry Detail`.s_warehouse", "`tabStock Entry Detail`.t_warehouse", "`tabStock Entry Detail`.amount"];
+  for (let i = 0; i < jobIds.length; i += 100) {
+    const filters = [["docstatus", "=", 1], ["purpose", "like", "Material Transfer%"], ["custom_job_no", "in", jobIds.slice(i, i + 100)]];
+    for (let start = 0; start < 500000; start += 5000) {
+      const r = await fetch(`${auth.base}/api/resource/${encodeURIComponent("Stock Entry")}?fields=${J(fields)}&filters=${J(filters)}&limit_start=${start}&limit_page_length=5000`, { headers: auth.H, signal: AbortSignal.timeout(60000) });
+      if (!r.ok) throw new Error(`The ERP answered ${r.status} reading the transfers.`);
+      const page = ((await r.json()) as { data?: Doc[] }).data ?? [];
+      for (const l of page) {
+        const from = rm.has(S(l.s_warehouse)), to = rm.has(S(l.t_warehouse));
+        if (from === to) continue;
+        const job = S(l.custom_job_no);
+        byJob.set(job, (byJob.get(job) ?? 0) + (from ? 1 : -1) * N(l.amount));
+      }
+      if (page.length < 5000) break;
+    }
+  }
+  return { byJob, read: true };
+}
+
 /** Every live job's theory and actual, summed — for the Inventory dashboard. */
 export async function wipKittedTotals(admin: SupabaseClient) {
   const { data: jobs, error } = await admin.from("jobs").select("id, proj, val, tpp, kit")
@@ -88,12 +131,19 @@ export async function wipKittedTotals(admin: SupabaseClient) {
     : { data: [] as Doc[] };
   const rbomOf = new Map(((rboms ?? []) as Doc[]).map((r) => [S(r.project_id), S(r.rbom_id)]));
   const actual = await actualKitting(admin, live.map((j) => ({ job_no: S(j.id), rbom_no: rbomOf.get(S(j.proj)) ?? "" })));
-  let theory = 0, material = 0, act = 0, withRbom = 0;
+  const issued = await erpIssuedByJob(admin, live.map((j) => S(j.id)));
+  let theory = 0, material = 0, ticked = 0, withRbom = 0, real = 0, withIssue = 0;
   for (const j of live) {
     theory += theoryKitted(j);
     material += N(j.val) * (1 - N(j.tpp) / 100);
     const a = actual.get(S(j.id));
-    if (a) { act += a.value_kitted; withRbom++; }
+    if (a) { ticked += a.value_kitted; withRbom++; }
+    const v = issued.byJob.get(S(j.id)) ?? 0;
+    if (Math.abs(v) > 0.5) { real += v; withIssue++; }
   }
-  return { jobs: live.length, withRbom, material, theory, actual: act, theoryPct: material > 0 ? (theory / material) * 100 : 0 };
+  return {
+    jobs: live.length, withRbom, material, theory, theoryPct: material > 0 ? (theory / material) * 100 : 0,
+    /* "real" is the ERP's issued value; "ticked" is Genie's proposal */
+    actual: real, withIssue, erpRead: issued.read, ticked,
+  };
 }

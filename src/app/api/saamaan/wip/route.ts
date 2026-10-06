@@ -3,7 +3,7 @@ import { readBody, type AnyBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
-import { actualKitting, theoryKitted } from "@/lib/wip-kitting";
+import { actualKitting, erpIssuedByJob, theoryKitted } from "@/lib/wip-kitting";
 
 export const dynamic = "force-dynamic";
 
@@ -156,6 +156,8 @@ export async function GET(req: Request) {
     //      job's WIP, pending = the rest; the values at the RBOM's rates.
     //      Not stored — derived on every read, so they can never go stale.
     const kitting = await actualKitting(admin, rows.map((r) => ({ job_no: r.job_no, rbom_no: r.rbom_no })));
+    /* what the store has physically transferred to each job, read off the ERP */
+    const issued = await erpIssuedByJob(admin, rows.map((r) => r.job_no)).catch(() => ({ byJob: new Map<string, number>(), read: false }));
 
     // 4 — read back with Genie's own columns, and hand the board row along.
     let table: Doc[] = rows;
@@ -173,6 +175,7 @@ export async function GET(req: Request) {
         ...w,
         ...(k ? { nos_kitted: k.nos_kitted, value_kitted: k.value_kitted, nos_pending: k.nos_pending, value_pending: k.value_pending, kitting_value_pct: k.kitting_value_pct } : {}),
         value_kitted_theory: theoryKitted(j),
+        value_issued_erp: issued.read ? issued.byJob.get(S(w.job_no)) ?? 0 : null,
         kitting_owner_name: nameOf.get(S(w.kitting_owner).toUpperCase()) ?? "",
         job: {
           id: S(j.id), tag: S(j.tag), cust: S(j.cust), fam: S(j.fam), tdd: j.tdd ?? null, otd: j.otd ?? null, stat: S(j.stat),
@@ -183,7 +186,7 @@ export async function GET(req: Request) {
         },
       };
     });
-    return NextResponse.json({ ok: true, installed, rows: out, refreshedAt: now });
+    return NextResponse.json({ ok: true, installed, rows: out, refreshedAt: now, erpRead: issued.read });
   } catch (e) {
     return errJson(e);
   }

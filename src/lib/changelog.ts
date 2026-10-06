@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.6",
+    date: "2026-10-06",
+    module: "WIP real is what the ERP has physically issued, not Genie's ticks",
+    items: [
+      "ONLY WHAT HAS PHYSICALLY GONE (\u201cGenie tick is what it is proposing \u2026 You need to only count that which has been physically issued after the stock transfer is completed. I only need that value.\u201d). WIP real is now read off the ERP: every submitted Material Transfer that carries a live job\u2019s number (the ERP\u2019s Job No field), out of an RM warehouse \u2014 Stock, Vendor or Stores \u2014 into WIP or finished goods, at the value the ERP moved it, less anything sent back. A move from WIP to finished goods for the same job changes nothing. On Inventory it is the WIP real box and the line in the ledger; on the WIP screen it is the card and a new Issued (ERP) column. Genie\u2019s MRP ticks are shown apart as a proposal and added to nothing.",
+      "A transfer made without the job number cannot be tied to a job and is not counted \u2014 about one in five of the transfers into Khopoli Work In Progress this year.",
+    ],
+  },
+  {
     v: "6.3.0.5",
     date: "2026-10-06",
     module: "Reconciliation: Khopoli Main Store, the logged-in person and today, by default",
