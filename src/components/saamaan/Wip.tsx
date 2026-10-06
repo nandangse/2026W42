@@ -28,7 +28,7 @@ const num = (n: unknown) => numFmt(n);
 interface Row {
   job_no: string; warehouse: string; customer_tag: string; project_id: string; customer: string; product_family: string;
   bom_no_erp: string; rbom_no: string; value: number | null;
-  nos_kitted: number | null; value_kitted: number | null; nos_pending: number | null; value_pending: number | null;
+  nos_kitted: number | null; value_kitted: number | null; value_kitted_theory?: number | null; nos_pending: number | null; value_pending: number | null;
   tvc_pct: number | null; throughput_calc: number | null; throughput_erp_pct: number | null; throughput_erp_value: number | null;
   kitting_pct: number | null; kitting_owner: string; kitting_owner_name: string; live: boolean; refreshed_at: string; note: string;
   job: WipJob;
@@ -59,6 +59,8 @@ export default function Wip({ erpBase, role, summary }: { erpBase: string; role:
   const totals = useMemo(() => ({
     value: rows.reduce((a, r) => a + (Number(r.value) || 0), 0),
     tp: rows.reduce((a, r) => a + (Number(r.throughput_erp_value) || 0), 0),
+    theory: rows.reduce((a, r) => a + (Number(r.value_kitted_theory) || 0), 0),
+    actual: rows.reduce((a, r) => a + (Number(r.value_kitted) || 0), 0),
     withBom: rows.filter((r) => r.bom_no_erp).length,
     withRbom: rows.filter((r) => r.rbom_no).length,
   }), [rows]);
@@ -75,8 +77,12 @@ export default function Wip({ erpBase, role, summary }: { erpBase: string; role:
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
           {[
             ["Live jobs", num(rows.length), "each a WIP warehouse"],
-            ["Value", `₹${cr(totals.value)}`, "of the live jobs, as the board has it"],
-            ["Throughput (ERP)", `₹${cr(totals.tp)}`, "the ERP's throughput value, summed"],
+            /* "In the WIP, show what the kitted value is. That is more
+               important than knowing the throughput and the value" (Dr Raghu,
+               6 Oct 2026) — theory from the board's kitting %, actual from
+               what has really been issued against the RBOM */
+            ["Kitted — theory", `₹${cr(totals.theory)}`, `board kitting % × material value · of ₹${cr(totals.value)} live`],
+            ["Kitted — actual", `₹${cr(totals.actual)}`, `issued into the WIP against the RBOM · throughput ₹${cr(totals.tp)}`],
             ["With a BOM · RBOM", `${totals.withBom} · ${totals.withRbom}`, "jobs whose project has a submitted BOM, and an RBOM built"],
           ].map(([t, v, h]) => (
             <div key={String(t)} className="bg-white rounded-lg border p-2.5" style={{ borderColor: BORDER }}>
@@ -111,6 +117,7 @@ export default function Wip({ erpBase, role, summary }: { erpBase: string; role:
               : <span style={{ color: MUTED }} title="no RBOM built for the project yet — BOM section">·</span> },
           { key: "val", label: "Value", align: "right", sort: (r) => Number(r.value ?? -1), render: (r) => <span className="tnum font-bold">{cr(r.value)}</span> },
           { key: "nk", label: "Nos kitted", align: "right", sort: (r) => Number(r.nos_kitted ?? -1), render: (r) => <span className="tnum" style={{ color: r.nos_kitted === null ? MUTED : INK }}>{num(r.nos_kitted)}</span> },
+          { key: "vkt", label: "Kitted (theory)", align: "right", sort: (r) => Number(r.value_kitted_theory ?? -1), render: (r) => <span className="tnum" style={{ color: MUTED }} title="board kitting % × material value">{cr(r.value_kitted_theory)}</span> },
           { key: "vk", label: "Value kitted", align: "right", sort: (r) => Number(r.value_kitted ?? -1), render: (r) => <span className="tnum" style={{ color: r.value_kitted === null ? MUTED : INK }}>{cr(r.value_kitted)}</span> },
           { key: "np", label: "Nos pending", align: "right", sort: (r) => Number(r.nos_pending ?? -1), render: (r) => <span className="tnum" style={{ color: r.nos_pending === null ? MUTED : INK }}>{num(r.nos_pending)}</span> },
           { key: "vp", label: "Value pending", align: "right", sort: (r) => Number(r.value_pending ?? -1), render: (r) => <span className="tnum" style={{ color: r.value_pending === null ? MUTED : INK }}>{cr(r.value_pending)}</span> },

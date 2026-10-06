@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { syncRbomReleased } from "@/lib/rbom-sync";
 import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -35,6 +36,8 @@ export async function GET(req: Request) {
     const { data: head } = await admin.from("material_rbom").select("*").eq("rbom_id", id).maybeSingle();
     if (!head) throw new HttpError(404, "No such RBOM — build it first.");
 
+    /* Draft lines the ERP has since submitted become Released before they are shown */
+    try { await syncRbomReleased(admin, [id]); } catch (e) { swallow("rbom status sync", e); }
     const { data: items } = await admin.from("material_rbom_item").select("*").eq("rbom_id", id).order("idx");
 
     /* remarks may not exist until 0158 has run; an empty thread is not an error */

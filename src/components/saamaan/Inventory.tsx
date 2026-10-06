@@ -73,39 +73,90 @@ export default function Inventory({ summary, email, isOwner }: { summary: Summar
 
 /* ================================================================ dashboard */
 interface DashData {
-  readAt: string; rm: Agg; wip: Agg; total: Agg; finished: number; vendor: number; untyped: { value: number; warehouses: string[] }; ignored?: { value: number; warehouses: string[] };
+  readAt: string; rm: Agg; stock: Agg; vendorRm: Agg; stores: Agg; uniqueItems: number; wip: Agg; total: Agg; finished: number; vendor: number; untyped: { value: number; warehouses: string[] }; ignored?: { value: number; warehouses: string[] };
+  kitted?: { jobs: number; withRbom: number; material: number; theory: number; actual: number; theoryPct: number } | null;
   classes: { cls: string; inClass: number; holding: number; qty: number; value: number }[];
   warehouses: { warehouse: string; kind: string; value: number; qty: number; items: number }[];
 }
 interface Agg { value: number; qty: number; items: number }
 
-function Tile({ label, a, tone, hint }: { label: string; a?: Agg; tone: string; hint: string }) {
+function Box({ label, value, tone, sub, big }: { label: string; value: string; tone: string; sub?: React.ReactNode; big?: boolean }) {
   return (
-    <div className="rounded-lg border p-4 bg-white" style={{ borderColor: BORDER }}>
+    <div className="rounded-lg border p-3 bg-white" style={{ borderColor: BORDER }}>
       <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.6 }}>{label}</div>
-      <div className="font-bold tnum" style={{ fontSize: 30, color: tone, lineHeight: 1.15 }}>{a ? cr(a.value) : "…"}</div>
-      <div className="text-sm mt-1" style={{ color: INK }}>{a ? <><b>{a.items.toLocaleString("en-IN")}</b> items · <b>{qn(a.qty)}</b> in quantity</> : " "}</div>
-      <div className="text-xs mt-1" style={{ color: MUTED }}>{hint}</div>
+      <div className="font-bold tnum" style={{ fontSize: big ? 32 : 22, color: tone, lineHeight: 1.15 }}>{value}</div>
+      {sub && <div className="text-xs mt-1" style={{ color: MUTED, lineHeight: 1.5 }}>{sub}</div>}
     </div>
   );
 }
+const aggLine = (a?: Agg) => (a ? <><b style={{ color: INK }}>{a.items.toLocaleString("en-IN")}</b> items · <b style={{ color: INK }}>{qn(a.qty)}</b> in quantity</> : " ");
+
+/** "a 30th October deadline. On 30th October, we will get a very real number
+ *  for each item's WIP … Item Groups, item, valuation, and quantity, all
+ *  accurate and right" (Dr Raghu, 6 Oct 2026) */
+const TRUE_BY = "2026-10-30";
+const daysTo = (iso: string) => Math.ceil((new Date(`${iso}T18:30:00Z`).getTime() - Date.now()) / 86400000);
 
 function Dash({ go }: { go: (r: string) => void }) {
   const [d, busy, reload, err] = useLoad<DashData>("/api/saamaan/inventory?view=dashboard");
   const rmValue = d?.rm.value || 0;
+  const k = d?.kitted ?? null;
+  const left = daysTo(TRUE_BY);
+  const ledger: [string, number | null, string, boolean?][] = d ? [
+    ["RM stock", d.rm.value, "RM in the stores + at vendors + service stores"],
+    ["WIP theory", k ? k.theory : null, "each live job's kitting % × its material value"],
+    ["Stock + WIP, theory", k ? d.rm.value + k.theory : null, "", true],
+    ["WIP real", k ? k.actual : null, "issued into the jobs against their RBOMs"],
+    ["Stock + WIP, real", k ? d.rm.value + k.actual : null, "", true],
+    ["Theory less real", k ? k.theory - k.actual : null, "the WIP not yet measured — it closes as the WIP is moved in"],
+  ] : [];
   return (
-    <Screen title="Inventory — today" blurb="Read live off the ERP's Bin, every warehouse, this minute. RM is the warehouses Masters types Stock; WIP the ones typed WIP; total is everything the ERP holds."
+    <Screen title="Inventory — today" blurb="Read live off the ERP's Bin, every warehouse, this minute. RM is the warehouses Masters types Stock, Vendor and Stores; WIP is the live jobs' kitted value; a warehouse typed Ignore is in nothing."
       action={<Btn onClick={reload} disabled={busy}>{busy ? "Reading…" : "↻ Re-read"}</Btn>}>
       {err && <Note kind="error">{err}</Note>}
-      <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-        <Tile label="RM stock as of today" a={d?.rm} tone={GREEN} hint="Stock warehouses only — the closing stock that counts" />
-        <Tile label="WIP stock as of today" a={d?.wip} tone={AMBER} hint="Material already issued into the works" />
-        <Tile label="Total inventory up to now" a={d?.total} tone={NAVY} hint={d?.ignored?.warehouses.length ? "Every warehouse but those typed Ignore" : "Every warehouse the ERP has, typed or not"} />
+
+      {/* "on the top, show the number of items with non-zero stock … kitne unique items are there" */}
+      <div className="flex items-baseline gap-3 flex-wrap mb-3">
+        <span className="font-bold tnum" style={{ fontSize: 26, color: NAVY }}>{d ? d.uniqueItems.toLocaleString("en-IN") : "…"}</span>
+        <span className="text-sm" style={{ color: INK }}>unique items hold stock today, across every warehouse but the ignored</span>
+        <span className="text-xs ml-auto rounded px-2 py-1 font-bold" style={{ background: left > 7 ? NAVY_SOFT : "#FEF3C7", color: left > 7 ? NAVY : AMBER }}
+          title="Every item's WIP, group, valuation and quantity right — a little every day">
+          30 Oct: the true number · {left > 0 ? `${left} day${left === 1 ? "" : "s"} left` : left === 0 ? "today" : "past"}
+        </span>
       </div>
+
+      <div className="grid gap-3 mb-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        <Box big label="RM stock as of today" value={d ? cr(d.rm.value) : "…"} tone={GREEN} sub={aggLine(d?.rm)} />
+        <Box big label="WIP theory" value={k ? cr(k.theory) : d ? "·" : "…"} tone={AMBER}
+          sub={k ? <>kitting <b style={{ color: INK }}>{k.theoryPct.toFixed(1)}%</b> of {cr(k.material)} material · {k.jobs} live jobs</> : "each job's kitting % on the board"} />
+        <Box big label="WIP real" value={k ? cr(k.actual) : d ? "·" : "…"} tone={ORANGE}
+          sub={<>issued against the RBOM{k ? ` · ${k.withRbom} of ${k.jobs} jobs have one` : ""}{d ? <> · the ERP&apos;s WIP warehouses {cr(d.wip.value)}</> : null}</>} />
+      </div>
+      <div className="text-xs font-bold uppercase mt-3 mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>The RM stock is these three</div>
+      <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+        <Box label="RM in the stores" value={d ? cr(d.stock.value) : "…"} tone={INK} sub={aggLine(d?.stock)} />
+        <Box label="At vendors" value={d ? cr(d.vendorRm.value) : "…"} tone={INK} sub={aggLine(d?.vendorRm)} />
+        <Box label="Service stores" value={d ? cr(d.stores.value) : "…"} tone={INK}
+          sub={d && !d.stores.items ? <>no warehouse is typed Stores yet — <button onClick={() => (window.location.href = "/saamaan/masters")} style={{ color: NAVY, textDecoration: "underline" }}>type it in Masters</button></> : aggLine(d?.stores)} />
+      </div>
+
+      {/* one below the other, as asked */}
+      {d && (
+        <div className="rounded-lg border bg-white mb-4" style={{ borderColor: BORDER, maxWidth: 760 }}>
+          {ledger.map(([t, v, h, strong]) => (
+            <div key={t} className="flex items-baseline gap-3 px-3 py-2" style={{ borderTop: strong ? `2px solid ${INK}` : `1px solid ${BORDER}`, background: strong ? "#F8FAFC" : undefined }}>
+              <div style={{ width: 180, flexShrink: 0, color: INK, fontWeight: strong ? 800 : 600 }}>{t}</div>
+              <div className="tnum text-right" style={{ width: 130, flexShrink: 0, fontWeight: strong ? 800 : 700, fontSize: strong ? 18 : 15, color: t === "Theory less real" ? AMBER : INK }}>{v === null ? "·" : cr(v)}</div>
+              <div className="text-xs" style={{ color: MUTED }}>{h}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {d && (
         <div className="text-xs mb-4" style={{ color: MUTED, lineHeight: 1.7 }}>
-          Of the total, finished goods <b style={{ color: INK }}>{cr(d.finished)}</b> · at vendors <b style={{ color: INK }}>{cr(d.vendor)}</b>
-          {d.untyped.warehouses.length > 0 && <> · <b style={{ color: AMBER }}>{cr(d.untyped.value)}</b> sits in {d.untyped.warehouses.length} warehouse{d.untyped.warehouses.length === 1 ? "" : "s"} nobody has typed yet — <button onClick={() => (window.location.href = "/saamaan/masters")} style={{ color: NAVY, textDecoration: "underline" }}>type them in Masters</button></>}
+          Total held, every warehouse but the ignored, <b style={{ color: INK }}>{cr(d.total.value)}</b> · finished goods <b style={{ color: INK }}>{cr(d.finished)}</b>
+          {d.untyped.warehouses.length > 0 && <> · <b style={{ color: AMBER }}>{cr(d.untyped.value)}</b> sits in {d.untyped.warehouses.join(", ")}, which nobody has typed yet — <button onClick={() => (window.location.href = "/saamaan/masters")} style={{ color: NAVY, textDecoration: "underline" }}>type it in Masters</button></>}
           {d.ignored && d.ignored.warehouses.length > 0 && <> · <b style={{ color: MUTED }}>{cr(d.ignored.value)}</b> in {d.ignored.warehouses.length} warehouse{d.ignored.warehouses.length === 1 ? "" : "s"} typed Ignore is left out of every figure</>}
           {" "}· read {new Date(d.readAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
         </div>
@@ -288,61 +339,138 @@ function GroupPicker({ all, chosen, onChange }: { all: { group: string; items: n
   );
 }
 
-interface Line { id: string; item_code: string; item_name: string; item_group: string; uom: string; warehouse: string; erp_qty: number | null; erp_rate: number | null; erp_qty_at_count: number | null; physical_qty: number | null; remark: string; counted_at: string | null }
+interface Line { id: string; item_code: string; item_name: string; item_group: string; uom: string; warehouse: string; erp_qty: number | null; erp_rate: number | null; erp_qty_at_count: number | null; physical_qty: number | null; remark: string; counted_at: string | null; location?: string; posted_qty?: number | null }
+interface ErpLog { id: string; action: string; voucher: string | null; lines: number; answer: string; by_email: string; at: string }
+interface PlanRow { line_id: string; item_code: string; item_name: string; uom: string; location: string; physical: number; erp_at_count: number; explained: number; variance: number; erp_at_post: number; post: number; rate: number; value: number; ok: boolean; why: string }
 
 function Sheet({ id, go, meta }: { id: string; go: (r: string) => void; meta: Meta | null }) {
-  const [data, busy, reload, err] = useLoad<{ count: Count & { note: string }; lines: Line[]; canEdit: boolean }>(`/api/saamaan/inventory?view=count&id=${id}`);
-  const [draft, setDraft] = useState<Record<string, { q: string; r: string }>>({});
+  const [data, busy, reload, err] = useLoad<{ count: Count & { note: string; erp_reco?: string | null; erp_reco_state?: string | null; erp_posting_at?: string | null }; lines: Line[]; canEdit: boolean; blind: boolean; lead: boolean; erpLog: ErpLog[] }>(`/api/saamaan/inventory?view=count&id=${id}`);
+  const [draft, setDraft] = useState<Record<string, { q: string; r: string; l: string }>>({});
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState("");
   useEffect(() => {
     if (!data) return;
-    setDraft(Object.fromEntries(data.lines.map((l) => [l.id, { q: l.physical_qty === null ? "" : String(l.physical_qty), r: l.remark || "" }])));
+    setDraft(Object.fromEntries(data.lines.map((l) => [l.id, { q: l.physical_qty === null ? "" : String(l.physical_qty), r: l.remark || "", l: l.location || "" }])));
   }, [data]);
   if (err) return <Note kind="error">{err}</Note>;
   if (!data) return <Empty>Opening the sheet…</Empty>;
-  const { count: c, lines, canEdit } = data;
+  const { count: c, lines, canEdit, blind } = data;
   const erpOf = (l: Line) => Number(l.erp_qty_at_count ?? l.erp_qty ?? 0);
   const varOf = (l: Line) => { const d = draft[l.id]; if (!d || d.q === "") return null; return Number(d.q) - erpOf(l); };
+  const blank = (d?: { q: string; r: string; l: string }) => d ?? { q: "", r: "", l: "" };
   const save = async (l: Line) => {
     const d = draft[l.id]; if (!d) return;
     if (String(l.physical_qty ?? "") === d.q && l.remark === d.r) return;
     setSaving(l.id);
     const r = await post("/api/saamaan/inventory", { action: "save_line", line_id: l.id, physical_qty: d.q === "" ? null : Number(d.q), remark: d.r });
     setSaving(""); if (!r.ok) setMsg(r.error || "Not saved.");
+    else { l.physical_qty = d.q === "" ? null : Number(d.q); l.remark = d.r; }
   };
+  const saveLoc = async (l: Line) => {
+    const d = draft[l.id]; if (!d || (l.location || "") === d.l) return;
+    setSaving(l.id);
+    const r = await post("/api/saamaan/inventory", { action: "save_line", line_id: l.id, location: d.l });
+    setSaving(""); if (!r.ok) setMsg(r.error || "Location not saved."); else l.location = d.l;
+  };
+  const counted = lines.filter((l) => (draft[l.id]?.q ?? "") !== "").length;
   const submit = async () => {
-    if (!confirm("Submit the count? The ERP is read once more, every variance is fixed, and each one opens a suspense entry.")) return;
+    const left = lines.length - counted;
+    if (!confirm(`Submit the count? ${counted} counted line${counted === 1 ? "" : "s"} are checked against the ERP as it stood when each was counted; every difference opens a suspense entry.${left ? ` The ${left} blank line${left === 1 ? " is" : "s are"} left out — no suspense, nothing to the ERP.` : ""}`)) return;
     setMsg("");
     const r = await post("/api/saamaan/inventory", { action: "submit_count", id });
     if (!r.ok) { setMsg(r.error || "Not submitted."); return; }
-    setMsg(`Submitted — ${r.variances} variance${r.variances === 1 ? "" : "s"} went to suspense.`); reload();
+    setMsg(`Submitted — ${r.counted} counted, ${r.variances} variance${r.variances === 1 ? "" : "s"} went to suspense${r.skipped ? `, ${r.skipped} blank left out` : ""}.`); reload();
   };
   const totalVar = lines.reduce((a, l) => a + (varOf(l) ?? 0) * (Number(l.erp_rate) || 0), 0);
-  const counted = lines.filter((l) => (draft[l.id]?.q ?? "") !== "").length;
+  const cols: Parameters<typeof GenieTable<Line>>[0]["columns"] = [
+    { key: "c", label: "Code", align: "left", render: (l) => <b style={{ color: NAVY }}>{l.item_code}</b> },
+    { key: "n", label: "Item", align: "left", render: (l) => <span>{l.item_name}<div className="text-xs" style={{ color: MUTED }}>{l.item_group}</div></span> },
+    /* "make the location" (Dr Raghu, 6 Oct 2026) — where on the shelf it was found; carried to the next sheet */
+    { key: "l", label: "Location", align: "left", render: (l) => canEdit
+        ? <input value={draft[l.id]?.l ?? ""} placeholder="rack / bin" onChange={(e) => setDraft((d) => ({ ...d, [l.id]: { ...blank(d[l.id]), l: e.target.value } }))} onBlur={() => saveLoc(l)}
+            className="rounded border px-2 py-1 text-sm" style={{ borderColor: BORDER, width: 110 }} />
+        : <span>{l.location || "·"}</span> },
+    { key: "e", label: c.status === "submitted" ? "ERP at the count" : "ERP says", align: "right", render: (l) => <span className="tnum">{qn(erpOf(l))} <span style={{ color: MUTED }}>{l.uom}</span></span> },
+    { key: "p", label: "On the shelf", align: "right", render: (l) => canEdit
+        ? <input value={draft[l.id]?.q ?? ""} inputMode="decimal" onChange={(e) => setDraft((d) => ({ ...d, [l.id]: { ...blank(d[l.id]), q: e.target.value.replace(/[^0-9.]/g, "") } }))} onBlur={() => save(l)}
+            className="rounded border px-2 py-1 text-sm tnum text-right" style={{ borderColor: saving === l.id ? ORANGE : BORDER, width: 90 }} />
+        : l.physical_qty === null ? <span className="text-xs" style={{ color: MUTED }}>not counted</span> : <b className="tnum">{qn(Number(l.physical_qty))}</b> },
+    { key: "v", label: "Variance", align: "right", render: (l) => { const v = varOf(l); return v === null ? <span style={{ color: MUTED }}>·</span> : <b className="tnum" style={{ color: Math.abs(v) < 1e-9 ? GREEN : RED }}>{v > 0 ? "+" : ""}{qn(v)}</b>; } },
+    /* no valuation while counting — "otherwise, it will tend to bias the person" */
+    ...(blind ? [] : [{ key: "x", label: "Value", align: "right" as const, render: (l: Line) => { const v = varOf(l); return v === null || Math.abs(v) < 1e-9 ? <span style={{ color: MUTED }}>·</span> : <span className="tnum">{cr(v * (Number(l.erp_rate) || 0))}</span>; } }]),
+    { key: "r", label: "Remark", align: "left", render: (l) => canEdit
+        ? <input value={draft[l.id]?.r ?? ""} placeholder={varOf(l) ? "why it differs" : ""} onChange={(e) => setDraft((d) => ({ ...d, [l.id]: { ...blank(d[l.id]), r: e.target.value } }))} onBlur={() => save(l)}
+            className="rounded border px-2 py-1 text-sm" style={{ borderColor: BORDER, width: "100%", minWidth: 200 }} />
+        : <span>{l.remark || "·"}</span> },
+  ];
   return (
     <Screen title={c.title} blurb={`${c.warehouse} · counted by ${c.assigned_name || c.assigned_email}${c.due_on ? ` · by ${dmy(c.due_on)}` : ""} · ${c.status}`}
-      action={<><Btn onClick={() => go(c.kind)}>← Sheets</Btn>{canEdit && <Btn kind="primary" onClick={submit} disabled={busy}>Submit count</Btn>}{meta?.me.lead && c.status === "open" && <Btn kind="danger" onClick={async () => { if (confirm("Cancel this sheet?")) { await post("/api/saamaan/inventory", { action: "cancel_count", id }); reload(); } }}>Cancel</Btn>}</>}>
+      action={<><Btn onClick={() => go(c.kind)}>← Sheets</Btn>{canEdit && <Btn kind="primary" onClick={submit} disabled={busy || !counted}>Submit count</Btn>}{meta?.me.lead && c.status === "open" && <Btn kind="danger" onClick={async () => { if (confirm("Cancel this sheet?")) { await post("/api/saamaan/inventory", { action: "cancel_count", id }); reload(); } }}>Cancel</Btn>}</>}>
       {msg && <Note kind={/Submitted/.test(msg) ? "info" : "error"}>{msg}</Note>}
-      <div className="text-sm mb-2" style={{ color: INK }}>Counted <b>{counted}</b> of <b>{lines.length}</b> · variance so far <b style={{ color: totalVar < 0 ? RED : totalVar > 0 ? GREEN : INK }}>{cr(totalVar)}</b>
-        <span style={{ color: MUTED }}> · a nought is a count; leave it blank only if you have not counted it</span></div>
-      <GenieTable<Line> rows={lines} minWidth={1000}
-        columns={[
-          { key: "c", label: "Code", align: "left", sort: (l) => l.item_code, render: (l) => <b style={{ color: NAVY }}>{l.item_code}</b> },
-          { key: "n", label: "Item", align: "left", sort: (l) => l.item_name, render: (l) => <span>{l.item_name}<div className="text-xs" style={{ color: MUTED }}>{l.item_group}</div></span> },
-          { key: "e", label: c.status === "submitted" ? "ERP at the count" : "ERP says", align: "right", sort: (l) => erpOf(l), render: (l) => <span className="tnum">{qn(erpOf(l))} <span style={{ color: MUTED }}>{l.uom}</span></span> },
-          { key: "p", label: "On the shelf", align: "right", render: (l) => canEdit
-              ? <input value={draft[l.id]?.q ?? ""} inputMode="decimal" onChange={(e) => setDraft((d) => ({ ...d, [l.id]: { ...(d[l.id] || { q: "", r: "" }), q: e.target.value.replace(/[^0-9.]/g, "") } }))} onBlur={() => save(l)}
-                  className="rounded border px-2 py-1 text-sm tnum text-right" style={{ borderColor: saving === l.id ? ORANGE : BORDER, width: 90 }} />
-              : <b className="tnum">{l.physical_qty === null ? "·" : qn(Number(l.physical_qty))}</b> },
-          { key: "v", label: "Variance", align: "right", sort: (l) => varOf(l) ?? 0, render: (l) => { const v = varOf(l); return v === null ? <span style={{ color: MUTED }}>·</span> : <b className="tnum" style={{ color: Math.abs(v) < 1e-9 ? GREEN : RED }}>{v > 0 ? "+" : ""}{qn(v)}</b>; } },
-          { key: "x", label: "Value", align: "right", sort: (l) => (varOf(l) ?? 0) * (Number(l.erp_rate) || 0), render: (l) => { const v = varOf(l); return v === null || Math.abs(v) < 1e-9 ? <span style={{ color: MUTED }}>·</span> : <span className="tnum">{cr(v * (Number(l.erp_rate) || 0))}</span>; } },
-          { key: "r", label: "Remark", align: "left", render: (l) => canEdit
-              ? <input value={draft[l.id]?.r ?? ""} placeholder={varOf(l) ? "why it differs" : ""} onChange={(e) => setDraft((d) => ({ ...d, [l.id]: { ...(d[l.id] || { q: "", r: "" }), r: e.target.value } }))} onBlur={() => save(l)}
-                  className="rounded border px-2 py-1 text-sm" style={{ borderColor: BORDER, width: "100%", minWidth: 200 }} />
-              : <span>{l.remark || "·"}</span> },
-        ]} />
+      <div className="text-sm mb-2" style={{ color: INK }}>Counted <b>{counted}</b> of <b>{lines.length}</b>
+        {!blind && <> · variance <b style={{ color: totalVar < 0 ? RED : totalVar > 0 ? GREEN : INK }}>{cr(totalVar)}</b></>}
+        <span style={{ color: MUTED }}> · highest value first · a nought is a count; a blank is left out — no suspense, nothing to the ERP</span></div>
+      <GenieTable<Line> rows={lines} minWidth={1100} columns={cols} />
+      {c.status === "submitted" && data.lead && <ToErp id={id} count={c} log={data.erpLog} reloadSheet={reload} />}
     </Screen>
+  );
+}
+
+/**
+ * TO THE ERP — the counted figures go back as the ERP's own count document,
+ * a Stock Reconciliation, posted for the instant the counting began. A
+ * draft first, for a look in the ERP; then Submit, here. Only counted lines
+ * that differ go; the reason is shown for any that cannot.
+ */
+function ToErp({ id, count: c, log, reloadSheet }: { id: string; count: { warehouse: string; erp_reco?: string | null; erp_reco_state?: string | null }; log: ErpLog[]; reloadSheet: () => void }) {
+  const [plan, busy, reload, err] = useLoad<{ postingAt: string | null; rows: PlanRow[]; ready: number; erp_reco: string | null; erp_reco_state: string | null }>(`/api/saamaan/inventory?view=erp_plan&id=${id}`);
+  const [msg, setMsg] = useState("");
+  const [working, setWorking] = useState(false);
+  const act = async (action: string, ask: string) => {
+    if (!confirm(ask)) return;
+    setWorking(true); setMsg("");
+    const r = await post("/api/saamaan/inventory", { action, id });
+    setWorking(false);
+    setMsg(r.ok ? (action === "erp_draft" ? `Draft ${r.voucher} made in the ERP with ${r.lines} line${r.lines === 1 ? "" : "s"}. Look at it there, then submit it here.` : `${r.voucher} submitted. ${r.closed} suspense entr${r.closed === 1 ? "y" : "ies"} closed by it.`) : r.error || "The ERP said no.");
+    reload(); reloadSheet();
+  };
+  const reco = plan?.erp_reco ?? c.erp_reco ?? null;
+  const state = plan?.erp_reco_state ?? c.erp_reco_state ?? null;
+  const at = plan?.postingAt ? new Date(plan.postingAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+  return (
+    <div className="mt-6">
+      <div className="flex items-center gap-2 flex-wrap mb-1">
+        <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.6 }}>To the ERP — a Stock Reconciliation</div>
+        {reco && <span className="rounded px-2 py-0.5 text-xs font-bold" style={{ background: state === "submitted" ? GREEN : AMBER, color: "#fff" }}>{reco} · {state}</span>}
+        <span className="ml-auto flex gap-2">
+          {(!reco) && <Btn kind="primary" disabled={working || busy || !plan?.ready} onClick={() => act("erp_draft", `Make a DRAFT Stock Reconciliation in the ERP for ${plan?.ready} line${plan?.ready === 1 ? "" : "s"} of ${c.warehouse}, posted for ${at} IST? Nothing moves in the ERP until it is submitted.`)}>Make the draft in the ERP</Btn>}
+          {reco && state === "draft" && <Btn kind="primary" disabled={working} onClick={() => act("erp_submit", `Submit ${reco} in the ERP? The ERP's stock for these items becomes the counted figure as of ${at} IST, and the suspense on them closes.`)}>Submit {reco}</Btn>}
+        </span>
+      </div>
+      {msg && <Note kind={/said no|refused|would not|gone|cancelled|first/i.test(msg) ? "error" : "info"}>{msg}</Note>}
+      {err && <Note kind="error">{err}</Note>}
+      <div className="text-xs mb-2" style={{ color: MUTED, lineHeight: 1.6 }}>
+        Posted for <b style={{ color: INK }}>{at || "…"} IST</b>, when the counting began. Each line goes in as the ERP&apos;s quantity at that instant plus the difference found on the shelf, so anything issued or received while the sheet was being counted stays exactly where it is.
+        Blank lines are not here. What has been explained by hand in Suspense is taken off first.
+      </div>
+      <GenieTable<PlanRow> rows={plan ? plan.rows : null} minWidth={1000} empty="Nothing counted on this sheet."
+        columns={[
+          { key: "c", label: "Code", align: "left", sort: (r) => r.item_code, render: (r) => <b style={{ color: NAVY }}>{r.item_code}</b> },
+          { key: "n", label: "Item", align: "left", sort: (r) => r.item_name, render: (r) => <span>{r.item_name}{r.location ? <span className="text-xs" style={{ color: MUTED }}> · {r.location}</span> : null}</span> },
+          { key: "s", label: "Shelf", align: "right", sort: (r) => r.physical, render: (r) => <span className="tnum">{qn(r.physical)}</span> },
+          { key: "e", label: "ERP at count", align: "right", sort: (r) => r.erp_at_count, render: (r) => <span className="tnum">{qn(r.erp_at_count)}</span> },
+          { key: "x", label: "Explained", align: "right", sort: (r) => r.explained, render: (r) => <span className="tnum" style={{ color: MUTED }}>{r.explained ? qn(r.explained) : "·"}</span> },
+          { key: "v", label: "Difference", align: "right", sort: (r) => r.variance, render: (r) => <b className="tnum" style={{ color: Math.abs(r.variance) < 1e-9 ? GREEN : RED }}>{r.variance > 0 ? "+" : ""}{qn(r.variance)}</b> },
+          { key: "p", label: "ERP becomes", align: "right", sort: (r) => r.post, render: (r) => r.ok ? <b className="tnum">{qn(r.post)} <span style={{ color: MUTED, fontWeight: 400 }}>{r.uom}</span></b> : <span style={{ color: MUTED }}>·</span> },
+          { key: "val", label: "Value", align: "right", sort: (r) => r.value, render: (r) => <span className="tnum">{Math.abs(r.variance) < 1e-9 ? "·" : cr(r.value)}</span> },
+          { key: "w", label: "Goes?", align: "left", sort: (r) => (r.ok ? 0 : 1), render: (r) => r.ok ? <b style={{ color: GREEN }}>yes</b> : <span className="text-xs" style={{ color: MUTED }}>{r.why}</span> },
+        ]} />
+      {log.length > 0 && (
+        <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
+          {log.map((x) => <div key={x.id}>{new Date(x.at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {x.by_email.split("@")[0]} · <b style={{ color: x.action === "refused" ? RED : INK }}>{x.action}</b>{x.voucher ? ` ${x.voucher}` : ""} — {x.answer}</div>)}
+        </div>
+      )}
+    </div>
   );
 }
 

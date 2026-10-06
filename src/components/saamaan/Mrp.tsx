@@ -40,8 +40,8 @@ interface Cell {
   qty: number; uom: string; rate: number | null; value: number | null; status: string; source: string;
   issued: number; issued_value: number; issues: number; last_by: string; last_at: string;
 }
-interface Item { item_code: string; item_name: string; item_group: string; cells: Record<string, Cell>; stock: number | null; ordered: number | null; blocked: number | null; order_qty: number | null }
-interface Grid { run: Run; jobs: Col[]; items: Item[]; issues: number; stockLive: boolean; gens?: Gen[] }
+interface Item { item_code: string; item_name: string; item_group: string; files?: { url: string; name: string }[]; cells: Record<string, Cell>; stock: number | null; ordered: number | null; blocked: number | null; order_qty: number | null }
+interface Grid { run: Run; jobs: Col[]; items: Item[]; issues: number; stockLive: boolean; gens?: Gen[]; erpBase?: string }
 interface Person { email: string; display_name: string | null; initials: string | null }
 
 /**
@@ -577,7 +577,7 @@ export function MrpRun({ id, role, email }: { id: string; role: string; email: s
                 </>)}
               </thead>
               <tbody>
-                <ItemRows items={visible} jobs={grid.jobs}
+                <ItemRows erpBase={grid?.erpBase ?? ""} items={visible} jobs={grid.jobs}
                   boxes={boxes} setBoxes={setBoxes} busy={busy} canEdit={canEdit} onIssue={issue} onUnissue={unissue}
                   showPlan={showPlan} orderBox={orderBox} setOrderBox={setOrderBox} onKeep={(code, q) => keepPlan([{ item_code: code, order_qty: q }])} />
                 {visible.length === 0 && <tr><td colSpan={2 + (showPlan ? PLAN_COLS.length : 0) + grid.jobs.length} className="px-3 py-4 text-sm" style={{ color: MUTED }}>No item matches — loosen the group filter or the search.</td></tr>}
@@ -703,8 +703,8 @@ const PLAN_COLS: { key: string; label: string; hint: string; w: number }[] = [
 ];
 
 // ============================================================ the rows
-function ItemRows({ items, jobs, boxes, setBoxes, busy, canEdit, onIssue, onUnissue, showPlan, orderBox, setOrderBox, onKeep }: {
-  items: Item[]; jobs: Col[];
+function ItemRows({ items, jobs, boxes, setBoxes, busy, canEdit, onIssue, onUnissue, showPlan, orderBox, setOrderBox, onKeep, erpBase = "" }: {
+  items: Item[]; jobs: Col[]; erpBase?: string;
   boxes: Record<string, string>; setBoxes: (f: (b: Record<string, string>) => Record<string, string>) => void;
   busy: string; canEdit: boolean; onIssue: (job: string, item: string, cell: Cell) => void; onUnissue: (job: string, item: string) => void;
   showPlan: boolean; orderBox: Record<string, string>; setOrderBox: (f: (b: Record<string, string>) => Record<string, string>) => void; onKeep: (code: string, q: number | null) => void;
@@ -723,6 +723,7 @@ function ItemRows({ items, jobs, boxes, setBoxes, busy, canEdit, onIssue, onUnis
             style={{ position: "sticky", left: 120, background: i % 2 ? "#FAF9F5" : "#fff", borderBottom: `1px solid ${BORDER}`, borderRight: `2px solid ${BORDER}`, zIndex: 1, width: 200, minWidth: 200, maxWidth: 200 }}>
             <b style={{ color: INK }}>{it.item_code}</b>
             <div style={{ color: MUTED, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.25, fontSize: 11 }}>{it.item_name}</div>
+            <FileIcons files={it.files} base={erpBase} />
           </td>
           {showPlan && (() => {
             const pl = plan(it);
@@ -795,5 +796,34 @@ function ItemRows({ items, jobs, boxes, setBoxes, busy, canEdit, onIssue, onUnis
         </tr>
       ))}
     </>
+  );
+}
+
+/* THE ITEM'S FILES, AS ICONS UNDER ITS NAME (Dr Raghu, 6 Oct 2026) — so the
+   one confirming the MRP can open the drawing and see it is the right
+   thing first. Each opens the ERP's own link: an ERP path, or a Drive link
+   the ERP holds. Private ERP files need the reader's ERP login. */
+const fileKind = (f: { url: string; name: string }) => {
+  const x = `${f.name} ${f.url}`.toLowerCase();
+  if (/drive\.google|docs\.google/.test(x)) return { label: "DRIVE", bg: "#1A73E8" };
+  if (/\.pdf\b|drawing pdf/.test(x)) return { label: "PDF", bg: "#B91C1C" };
+  if (/\.dxf\b|drawing dxf/.test(x)) return { label: "DXF", bg: "#0F766E" };
+  if (/\.dwg\b|drawing dwg/.test(x)) return { label: "DWG", bg: "#1D4ED8" };
+  if (/\.(jpe?g|png|webp|gif|heic)\b|^image\b/.test(x)) return { label: "IMG", bg: "#B45309" };
+  return { label: "FILE", bg: "#4B5563" };
+};
+function FileIcons({ files, base }: { files?: { url: string; name: string }[]; base: string }) {
+  if (!files?.length) return null;
+  return (
+    <div className="flex gap-1 flex-wrap mt-0.5">
+      {files.map((f) => {
+        const k = fileKind(f);
+        const href = f.url.startsWith("/") ? `${base}${f.url}` : f.url;
+        return (
+          <a key={f.url} href={href} target="_blank" rel="noreferrer" title={f.name} onClick={(e) => e.stopPropagation()}
+            className="rounded font-bold" style={{ background: k.bg, color: "#fff", fontSize: 9, padding: "1px 5px", letterSpacing: 0.4, textDecoration: "none", lineHeight: "14px" }}>{k.label}</a>
+        );
+      })}
+    </div>
   );
 }

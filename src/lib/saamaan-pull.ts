@@ -1,4 +1,5 @@
 import { HttpError } from "@/lib/auth";
+import { syncRbomReleased } from "@/lib/rbom-sync";
 import { adminClient } from "@/lib/supabase/admin";
 import { crmDb, crmConfigured } from "@/crm/db";
 
@@ -490,7 +491,9 @@ export async function pullPhase(phase: string, by: string): Promise<PullResult> 
     if (dErr && /does not exist|schema cache/i.test(dErr.message))
       throw new HttpError(503, "Run migration 0121 first — the BOM lines table doesn't exist yet.");
     const removed = count ?? 0;
-    const note = `${rows.length} lines on ${bomIds.length} live BOMs across ${projectIds.length} live projects (a job on the board); ${removed} lines no longer in the set, removed.`;
+    /* the RBOM follows: Draft lines whose BOM the ERP has submitted become Released */
+    const synced = await syncRbomReleased(admin).catch(() => 0);
+    const note = `${rows.length} lines on ${bomIds.length} live BOMs across ${projectIds.length} live projects (a job on the board); ${removed} lines no longer in the set, removed.${synced ? ` ${synced} RBOM line${synced === 1 ? "" : "s"} moved Draft → Released, as the ERP has them.` : ""}`;
     await log(rows.length, written, removed, note);
     return ({ ok: true, phase, found: rows.length, written, removed, note });
   }

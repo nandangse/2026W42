@@ -109,6 +109,7 @@ async function readStockValue(base: string, H: Record<string, string>) {
     wip: sumKind("WIP"),
     finished: sumKind("Finished goods"),
     vendor: sumKind("Vendor"),
+    stores: sumKind("Stores"),
     untyped: untyped.reduce((a, r) => a + r.value, 0),
     untypedWarehouses: untyped.map((r) => r.warehouse),
     warehouses: rows,

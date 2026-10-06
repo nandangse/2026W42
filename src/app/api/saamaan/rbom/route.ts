@@ -3,6 +3,7 @@ import { readBody, type AnyBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
+import { syncRbomReleased } from "@/lib/rbom-sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -141,6 +142,8 @@ async function buildOne(admin: ReturnType<typeof adminClient>, projectId: string
     if (error) throw new Error(error.message);
   }
   out.added = fresh.length;
+  /* a rebuild never edits a line — except Draft → Released when the ERP has submitted it */
+  await syncRbomReleased(admin, [out.rbom_id]).catch(() => 0);
   return out;
 }
 

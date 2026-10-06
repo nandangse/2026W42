@@ -83,6 +83,14 @@ async function mirrorClasses(admin: SupabaseClient): Promise<Map<string, { cls: 
  * the RM stock; an item with no class is shown as its own row, never folded
  * into C.
  */
+/**
+ * RM IS THREE PARTS (Dr Raghu, 6 Oct 2026: "how much the RM cost is, how
+ * much the vendor stock is, how much the stores service stores cost. These
+ * three together come to the RM stock"). Stock + Vendor + Stores; WIP,
+ * finished goods and Ignore are never in it.
+ */
+export const RM_KINDS = new Set(["Stock", "Vendor", "Stores"]);
+
 export async function inventoryDashboard(admin: SupabaseClient) {
   const { base, H } = await erpOrThrow();
   const [bins, kinds, mirror] = await Promise.all([
@@ -90,8 +98,11 @@ export async function inventoryDashboard(admin: SupabaseClient) {
     warehouseKinds(admin),
     mirrorClasses(admin),
   ]);
+  type Acc = { value: number; qty: number; items: Set<string> };
+  const acc = (): Acc => ({ value: 0, qty: 0, items: new Set<string>() });
+  const add = (a: Acc, code: string, v: number, q: number) => { a.value += v; a.qty += q; a.items.add(code); };
   const byWh = new Map<string, { warehouse: string; kind: string; remarks: string; value: number; qty: number; items: number }>();
-  const sum = { rm: { value: 0, qty: 0, items: new Set<string>() }, wip: { value: 0, qty: 0, items: new Set<string>() }, total: { value: 0, qty: 0, items: new Set<string>() } };
+  const sum = { rm: acc(), stock: acc(), vendor: acc(), stores: acc(), wip: acc(), total: acc() };
   const cls = new Map<string, { cls: string; inClass: number; holding: Set<string>; qty: number; value: number }>();
   for (const k of ["A", "B", "C", "—"]) cls.set(k, { cls: k, inClass: 0, holding: new Set(), qty: 0, value: 0 });
   for (const m of mirror.values()) cls.get(["A", "B", "C"].includes(m.cls) ? m.cls : "—")!.inClass++;
@@ -104,24 +115,28 @@ export async function inventoryDashboard(admin: SupabaseClient) {
        in either raw material stock, WIP, or finished goods, at least in the
        Genie" — the warehouse keeps its row, named, and adds to nothing */
     if (k.kind === "Ignore") continue;
-    sum.total.value += v; sum.total.qty += q; sum.total.items.add(code);
-    if (k.kind === "Stock") {
-      sum.rm.value += v; sum.rm.qty += q; sum.rm.items.add(code);
+    if (q > 0) add(sum.total, code, v, q); else { sum.total.value += v; sum.total.qty += q; }
+    if (RM_KINDS.has(k.kind)) {
+      add(sum.rm, code, v, q);
+      add(k.kind === "Stock" ? sum.stock : k.kind === "Vendor" ? sum.vendor : sum.stores, code, v, q);
       const m = mirror.get(code);
       const c = cls.get(m && ["A", "B", "C"].includes(m.cls) ? m.cls : "—")!;
       c.holding.add(code); c.qty += q; c.value += v;
     }
-    if (k.kind === "WIP") { sum.wip.value += v; sum.wip.qty += q; sum.wip.items.add(code); }
+    if (k.kind === "WIP") add(sum.wip, code, v, q);
   }
-  const pack = (x: { value: number; qty: number; items: Set<string> }) => ({ value: x.value, qty: x.qty, items: x.items.size });
+  const pack = (x: Acc) => ({ value: x.value, qty: x.qty, items: x.items.size });
   const untyped = [...byWh.values()].filter((w) => !w.kind);
   const ignored = [...byWh.values()].filter((w) => w.kind === "Ignore");
   return {
     readAt: new Date().toISOString(),
     erpBase: base,
-    rm: pack(sum.rm), wip: pack(sum.wip), total: pack(sum.total),
+    rm: pack(sum.rm), stock: pack(sum.stock), vendorRm: pack(sum.vendor), stores: pack(sum.stores),
+    wip: pack(sum.wip), total: pack(sum.total),
+    /* "on the top, show the number of items with non-zero stock … kitne unique items" */
+    uniqueItems: sum.total.items.size,
     finished: [...byWh.values()].filter((w) => w.kind === "Finished goods").reduce((a, w) => a + w.value, 0),
-    vendor: [...byWh.values()].filter((w) => w.kind === "Vendor").reduce((a, w) => a + w.value, 0),
+    vendor: sum.vendor.value,
     untyped: { value: untyped.reduce((a, w) => a + w.value, 0), warehouses: untyped.map((w) => w.warehouse) },
     ignored: { value: ignored.reduce((a, w) => a + w.value, 0), warehouses: ignored.map((w) => w.warehouse) },
     classes: [...cls.values()].map((c) => ({ cls: c.cls, inClass: c.inClass, holding: c.holding.size, qty: c.qty, value: c.value })),
@@ -181,10 +196,12 @@ export async function binsNow(warehouse: string, codes: string[]): Promise<Map<s
  */
 export async function correctionsSince(item: string, warehouse: string, countedAt: string): Promise<{ voucher_type: string; voucher_no: string; qty: number; posting_date: string }[]> {
   const { base, H } = await erpOrThrow();
-  const countDay = countedAt.slice(0, 10);
+  /* the ERP keeps its clock in IST; Genie stamps in UTC — compare like with like */
+  const at = istStamp(countedAt);
+  const countDay = at.date;
   const rows = await getAll(base, H, "Stock Ledger Entry",
     ["voucher_type", "voucher_no", "actual_qty", "posting_date", "creation", "is_cancelled"],
-    [["item_code", "=", item], ["warehouse", "=", warehouse], ["creation", ">", countedAt.replace("T", " ").slice(0, 19)], ["is_cancelled", "=", 0]], 5000);
+    [["item_code", "=", item], ["warehouse", "=", warehouse], ["creation", ">", `${at.date} ${at.time}`], ["is_cancelled", "=", 0]], 5000);
   return rows
     .filter((r) => S(r.voucher_type) === "Stock Reconciliation" || S(r.posting_date) <= countDay)
     .map((r) => ({ voucher_type: S(r.voucher_type), voucher_no: S(r.voucher_no), qty: N(r.actual_qty), posting_date: S(r.posting_date) }));
@@ -222,4 +239,95 @@ export async function groupCodes(admin: SupabaseClient, group: string): Promise<
     if ((data ?? []).length < 1000) break;
   }
   return out;
+}
+
+/** A UTC instant as the ERP writes it: IST date and HH:MM:SS. */
+export function istStamp(iso: string): { date: string; time: string } {
+  const d = new Date(new Date(iso).getTime() + 330 * 60000).toISOString();
+  return { date: d.slice(0, 10), time: d.slice(11, 19) };
+}
+/** "9:05:03.000000" → "09:05:03" — Frappe hands times back unpadded. */
+const hms = (t: unknown) => {
+  const [h = "0", m = "0", sec = "0"] = S(t).split(".")[0].split(":");
+  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}:${sec.padStart(2, "0")}`;
+};
+
+/**
+ * THE ERP'S STOCK AT THE MOMENT OF COUNTING — not at the moment somebody
+ * pressed Submit. A count made at 10 and submitted at 5 would otherwise
+ * call the afternoon's issues a variance. For each (item, instant): the
+ * quantity after the last ledger entry posted at or before that instant.
+ *
+ * One read of the ledger from the earliest counting day on, the Bin for
+ * items that have not moved since, and a single look further back only
+ * for an item that moved that day but not before the instant asked.
+ */
+export async function erpQtyAtMany(warehouse: string, asks: { code: string; at: string }[]): Promise<Map<string, { qty: number; rate: number }>> {
+  const { base, H } = await erpOrThrow();
+  const out = new Map<string, { qty: number; rate: number }>();
+  if (!asks.length) return out;
+  const codes = [...new Set(asks.map((a) => a.code))];
+  const day0 = asks.map((a) => istStamp(a.at).date).sort()[0];
+  const bins = await binsNow(warehouse, codes);
+  const led = new Map<string, Doc[]>();
+  for (let i = 0; i < codes.length; i += 200) {
+    const rows = await getAll(base, H, "Stock Ledger Entry",
+      ["item_code", "posting_date", "posting_time", "creation", "qty_after_transaction", "valuation_rate"],
+      [["warehouse", "=", warehouse], ["item_code", "in", codes.slice(i, i + 200)], ["posting_date", ">=", day0], ["is_cancelled", "=", 0]], 50000);
+    for (const r of rows) (led.get(S(r.item_code)) ?? led.set(S(r.item_code), []).get(S(r.item_code))!).push(r);
+  }
+  const key = (r: Doc) => `${S(r.posting_date)} ${hms(r.posting_time)} ${S(r.creation)}`;
+  for (const l of led.values()) l.sort((a, b) => key(a).localeCompare(key(b)));
+  const before = new Map<string, { qty: number; rate: number }>();
+  for (const a of asks) {
+    const t = istStamp(a.at), stamp = `${t.date} ${t.time}`;
+    const list = led.get(a.code) ?? [];
+    let hit: Doc | null = null;
+    for (const r of list) { if (`${S(r.posting_date)} ${hms(r.posting_time)}` <= stamp) hit = r; else break; }
+    let v: { qty: number; rate: number };
+    if (hit) v = { qty: N(hit.qty_after_transaction), rate: N(hit.valuation_rate) };
+    else if (!list.length) v = bins.get(a.code) ?? { qty: 0, rate: 0 };
+    else {
+      if (!before.has(a.code)) {
+        const r = await fetch(`${base}/api/resource/${encodeURIComponent("Stock Ledger Entry")}?fields=${J(["qty_after_transaction", "valuation_rate"])}&filters=${J([["warehouse", "=", warehouse], ["item_code", "=", a.code], ["posting_date", "<", day0], ["is_cancelled", "=", 0]])}&order_by=${encodeURIComponent("posting_date desc, posting_time desc, creation desc")}&limit_page_length=1`, { headers: H, signal: AbortSignal.timeout(30000) });
+        if (!r.ok) throw new HttpError(502, `The ERP answered ${r.status} reading the ledger.`);
+        const x = (((await r.json()) as { data?: Doc[] }).data ?? [])[0];
+        before.set(a.code, x ? { qty: N(x.qty_after_transaction), rate: N(x.valuation_rate) } : { qty: 0, rate: bins.get(a.code)?.rate ?? 0 });
+      }
+      v = before.get(a.code)!;
+    }
+    if (!v.rate) v = { ...v, rate: bins.get(a.code)?.rate ?? 0 };
+    out.set(`${a.code}|${a.at}`, v);
+  }
+  return out;
+}
+
+/**
+ * ITEM GROUPS (Dr Raghu, 6 Oct 2026: "If you have 3 items and they're
+ * costing 4 lakhs versus having 23,000 items worth 4 lakhs, I would
+ * concentrate on going for the larger-value ones"). Every group in the
+ * mirror against the stock the ERP holds in the RM warehouses (Stock,
+ * Vendor, Stores; never Ignore): items in it, holding stock, at nought,
+ * quantity, value, and the average cost = value ÷ quantity.
+ */
+export async function itemGroupStock(admin: SupabaseClient) {
+  const { base, H } = await erpOrThrow();
+  const [bins, kinds, mirror] = await Promise.all([
+    getAll(base, H, "Bin", ["item_code", "warehouse", "actual_qty", "stock_value"], [["actual_qty", "!=", 0]]),
+    warehouseKinds(admin), mirrorClasses(admin),
+  ]);
+  const g = new Map<string, { group: string; items: number; holding: Set<string>; qty: number; value: number }>();
+  const row = (k: string) => g.get(k) ?? g.set(k, { group: k, items: 0, holding: new Set(), qty: 0, value: 0 }).get(k)!;
+  for (const m of mirror.values()) row(m.group || "(no group)").items++;
+  for (const b of bins) {
+    const kind = kinds.get(S(b.warehouse))?.kind ?? "";
+    if (!RM_KINDS.has(kind)) continue;
+    const m = mirror.get(S(b.item_code));
+    const r = row(m?.group || "(not in the mirror)");
+    r.holding.add(S(b.item_code)); r.qty += N(b.actual_qty); r.value += N(b.stock_value);
+  }
+  return [...g.values()].map((r) => ({
+    group: r.group, items: r.items, holding: r.holding.size, zero: Math.max(0, r.items - r.holding.size), qty: r.qty, value: r.value,
+    avgCost: r.qty > 0 ? r.value / r.qty : null, valuePerItem: r.holding.size ? r.value / r.holding.size : null,
+  })).sort((a, b) => b.value - a.value);
 }

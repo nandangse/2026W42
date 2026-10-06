@@ -89,6 +89,23 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.3",
+    date: "2026-10-06",
+    module: "Inventory: blanks left out, the count back to the ERP, value first and blind, location; WIP kitted theory and real; RM in three parts; MRP file icons; RBOM status follows the ERP",
+    items: [
+      "A BLANK IS LEFT OUT (\u201cif he leaves it blank, ignore it. There will be no suspense entry made, or a consumption entry made, or an addition entry made for that\u201d). Submit no longer refuses a sheet with blanks: the counted lines are checked and every difference opens a suspense entry; the blank lines stay on the sheet as \u201cnot counted\u201d and go nowhere. At least one line has to be counted.",
+      "THE ERP AT THE MOMENT OF COUNTING. Each counted line is compared with the ERP\u2019s stock as it stood when that line was counted, read off the stock ledger, not at the moment somebody pressed Submit \u2014 so the afternoon\u2019s issues are never called a variance. The movement method that releases suspense now compares in IST, the ERP\u2019s own clock.",
+      "THE COUNT GOES BACK TO THE ERP (\u201cso that the count between the two has to be perfect \u2026 so that the ERP is not confused\u201d). On a submitted sheet Mukesh, Rameez or Dr Raghu sees what would go: a Stock Reconciliation, the ERP\u2019s own count document, never a receipt or an issue. It is posted for the instant the counting began, each line as the ERP\u2019s quantity at that instant plus the difference found, so anything issued while the sheet was being counted stays where it is. Made as a DRAFT first to look at in the ERP, then submitted from Genie; on submit the suspense on those lines closes against the voucher. Batch or serial items, lines with no valuation rate and lines that would go below nought are named and kept back. Every ask and every answer is logged on the sheet.",
+      "HIGHEST VALUE FIRST, NO VALUE WHILE COUNTING (\u201cthe valuation-wise highest values are always on the top \u2026 Do not show the valuation on the physical counting; otherwise, it will tend to bias the person\u201d). Sheets are made and shown highest ERP value first; while a sheet is open the rate never leaves the server and the value column and running total are gone. They come back once it is submitted.",
+      "LOCATION ON EVERY LINE (\u201cmake the location\u201d) \u2014 the rack or bin where the item was found, saved as it is typed and carried onto the next sheet for that item in that warehouse.",
+      "WIP: KITTED THEORY AND REAL (\u201cshow what the kitted value is \u2026 Let us show two numbers\u201d). Theory is each live job\u2019s kitting % on the board \u00d7 its material value; real is what has been issued into the job against its RBOM. On the WIP screen they replace Value and Throughput at the top, with a theory column beside Value kitted; on Inventory they stand beside the RM stock.",
+      "RM IS THREE PARTS (\u201chow much the RM cost is, how much the vendor stock is, how much the stores service stores cost\u201d). A new warehouse type, Stores, for the service stores; RM stock = Stock + Vendor + Stores, each in its own box. Below them, one under the other: RM stock, WIP theory, stock + WIP theory, WIP real, stock + WIP real, and theory less real. On top, how many unique items hold stock, and the days left to 30 October, the date for the true number.",
+      "MRP: THE ITEM\u2019S FILES UNDER ITS NAME (\u201ca PDF icon or a file icon, whatever the file is \u2026 linked to the ERP only\u201d). PDF, DXF, DWG, image or Drive badges under each item, each opening the ERP\u2019s own link, so the one confirming can check the drawing first.",
+      "RBOM STATUS FOLLOWS THE ERP (\u201cMukesh says that it is already released in the ERP \u2026 synchronise these statuses\u201d). A Draft line whose item is in a submitted BOM of the project, or whose source BOM has since been submitted, becomes Released \u2014 on every RBOM read, every build and every BOM pull. Only ever Draft to Released; nothing set by hand is touched.",
+      "Run migration 0203 for the location, the ERP voucher on the sheet, the ERP log and the Stores type.",
+    ],
+  },
+  {
     v: "6.3.0.2",
     date: "2026-10-06",
     module: "Inventory reconciliation: typed location, several item groups on one sheet, due today by default",

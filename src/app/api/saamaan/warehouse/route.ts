@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  */
 
 /* Ignore (6 Oct 2026): left out of every figure Genie adds up, until the data behind it is cleaned and put back right in the ERP */
-const KINDS = ["", "Stock", "WIP", "Vendor", "Finished goods", "Ignore"] as const;
+const KINDS = ["", "Stock", "Stores", "WIP", "Vendor", "Finished goods", "Ignore"] as const;
 const notInstalled = (m: string) => /does not exist|schema cache/i.test(m);
 
 export async function GET() {

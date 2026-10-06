@@ -21,8 +21,8 @@ interface Wh {
   kind: string; remarks: string; kind_by: string | null; kind_at: string | null;
 }
 /* Ignore (Dr Raghu, 6 Oct 2026): left out of every figure Genie adds up — RM, WIP, finished goods, total — until the data is cleaned and put right in the ERP */
-const KINDS = ["", "Stock", "WIP", "Vendor", "Finished goods", "Ignore"];
-const kindColour = (k: string) => (k === "Stock" ? GREEN : k === "WIP" ? AMBER : k === "Vendor" ? "#1B6B93" : k === "Finished goods" ? "#6D28D9" : k === "Ignore" ? "#9CA3AF" : MUTED);
+const KINDS = ["", "Stock", "Stores", "WIP", "Vendor", "Finished goods", "Ignore"];
+const kindColour = (k: string) => (k === "Stock" ? GREEN : k === "Stores" ? "#0F766E" : k === "WIP" ? AMBER : k === "Vendor" ? "#1B6B93" : k === "Finished goods" ? "#6D28D9" : k === "Ignore" ? "#9CA3AF" : MUTED);
 
 /** Who the slips go to, and who sits on the ladder (Dr Raghu, 3 Sep 2026). */
 function Routing() {
@@ -149,7 +149,7 @@ export default function Masters() {
       />
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.6 }}>
         Change the type and it saves at once; a remark saves when you leave the box. <b style={{ color: NAVY }}>Only Stock counts</b> towards closing stock on an item —
-        WIP is material already in the works, Vendor is material out at a sub-vendor, Finished goods is delivered items — product, not material. Ignore is left out of every figure Genie adds up — RM, WIP, finished goods and the total — until its data is cleaned up and put right in the ERP. {S(rows.find((w) => /guessed/i.test(w.remarks))?.remarks) ? "Types marked “guessed from the name” were set by the first pull and are yours to correct." : ""}
+        WIP is material already in the works, Vendor is material out at a sub-vendor, Finished goods is delivered items — product, not material. Stores is the service stores — with Stock and Vendor it makes up the RM stock on Inventory. Ignore is left out of every figure Genie adds up — RM, WIP, finished goods and the total — until its data is cleaned up and put right in the ERP. {S(rows.find((w) => /guessed/i.test(w.remarks))?.remarks) ? "Types marked “guessed from the name” were set by the first pull and are yours to correct." : ""}
       </div>
     </Screen>
   );

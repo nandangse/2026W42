@@ -54,7 +54,7 @@ export async function runTool(admin: SupabaseClient, name: string, input: unknow
   try {
     if (name === "inventory_summary") {
       const d = await inventoryDashboard(admin);
-      return { ok: true, content: cap({ rm: d.rm, wip: d.wip, total: d.total, finished_goods_value: d.finished, vendor_value: d.vendor, untyped: d.untyped, ignored_left_out: d.ignored, classes: d.classes, warehouses: d.warehouses.slice(0, 40) }) };
+      return { ok: true, content: cap({ rm: d.rm, rm_parts: { stock_warehouses: d.stock, at_vendors: d.vendorRm, service_stores: d.stores }, unique_items_with_stock: d.uniqueItems, wip: d.wip, total: d.total, finished_goods_value: d.finished, vendor_value: d.vendor, untyped: d.untyped, ignored_left_out: d.ignored, classes: d.classes, warehouses: d.warehouses.slice(0, 40) }) };
     }
     if (name === "search_items") {
       const q = S(a.query).replace(/[%,()]/g, " ");

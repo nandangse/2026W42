@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
+import { wipKittedTotals } from "@/lib/wip-kitting";
 import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
 import {
-  binsNow, correctionsSince, COUNTERS_DEFAULT, groupCodes, inventoryDashboard, itemGroupsInMirror, mayConsultInventory,
-  mayLeadInventory, mirrorMeta, sample, warehouseBins, warehouseKinds,
+  correctionsSince, COUNTERS_DEFAULT, erpQtyAtMany, groupCodes, inventoryDashboard, istStamp, itemGroupStock, itemGroupsInMirror,
+  mayConsultInventory, mayLeadInventory, mirrorMeta, sample, warehouseBins, warehouseKinds,
 } from "@/lib/saamaan-inventory";
+import { erpBatchOrSerial, erpCreateStockReco, erpRecoState, erpSubmitStockReco, erpWarehouseBooks } from "@/lib/saamaan-write";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -22,12 +24,76 @@ export const maxDuration = 120;
  *     ?view=count&id=            one sheet and its lines
  *     ?view=suspense             the suspense ledger and its releases
  *     ?view=suggestions          Genie's and people's suggestions
- * POST create_count · save_line · submit_count · cancel_count
+ *     ?view=erp_plan&id=         what a submitted sheet would send to the ERP
+ *     ?view=itemgroups           every item group: items, at nought, value, average cost
+ * POST create_count · save_line · submit_count · cancel_count · erp_draft · erp_submit
  *      release · sync_suspense · suggestion_add · suggestion_update
  */
 const S = (v: unknown, n = 400) => String(v ?? "").trim().slice(0, n);
 const missing = (m: string) => /material_count|material_suspense|material_inv|schema cache|does not exist/i.test(m);
 const notInstalled = () => NextResponse.json({ installed: false, error: "Run migration 0201 first — Inventory has nowhere to keep its counts yet." }, { status: 503 });
+
+/**
+ * THE POSTING PLAN — what one submitted sheet would send to the ERP.
+ *
+ * The ERP gets a Stock Reconciliation, its own document for a physical
+ * count, posted FOR the instant the counting began (T = the sheet's
+ * earliest count). For each counted line:
+ *
+ *   variance = on the shelf − the ERP at the moment THAT line was counted
+ *              − what people have since explained away by hand (a recount,
+ *                a counting slip) in the suspense
+ *   posted   = the ERP at T + variance
+ *
+ * Posting the ERP-at-T plus the variance, not the bare shelf figure, is
+ * what keeps the ERP from double-counting: an issue made between T and the
+ * moment a line was counted stays where it is, after T, on top of the
+ * corrected figure. Back-dated corrections already made in the ERP move
+ * both readings together and drop out. A line left blank was never counted
+ * and is not in the plan at all.
+ */
+async function erpPlan(admin: ReturnType<typeof adminClient>, c: Record<string, unknown>, lines: Record<string, unknown>[]) {
+  const counted = lines.filter((l) => l.physical_qty !== null && l.physical_qty !== undefined);
+  if (!counted.length) return { postingAt: null as string | null, rows: [] as Record<string, unknown>[], ready: 0 };
+  const when = (l: Record<string, unknown>) => String(l.counted_at || c.submitted_at || new Date().toISOString());
+  const T = counted.map(when).sort()[0];
+  const wh = String(c.warehouse);
+  const at = await erpQtyAtMany(wh, [...counted.map((l) => ({ code: String(l.item_code), at: when(l) })), ...counted.map((l) => ({ code: String(l.item_code), at: T }))]);
+  const ids = counted.map((l) => String(l.id));
+  const sus: Record<string, unknown>[] = [];
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data } = await admin.from("material_suspense").select("id, count_line_id").in("count_line_id", ids.slice(i, i + 300));
+    sus.push(...((data ?? []) as Record<string, unknown>[]));
+  }
+  const lineOfSus = new Map(sus.map((x) => [String(x.id), String(x.count_line_id)]));
+  const manual = new Map<string, number>();
+  const susIds = [...lineOfSus.keys()];
+  for (let i = 0; i < susIds.length; i += 300) {
+    const { data } = await admin.from("material_suspense_release").select("suspense_id, qty, voucher_no").in("suspense_id", susIds.slice(i, i + 300));
+    for (const r of data ?? []) if (!r.voucher_no) { const l = lineOfSus.get(String(r.suspense_id))!; manual.set(l, (manual.get(l) ?? 0) + Number(r.qty || 0)); }
+  }
+  const batched = await erpBatchOrSerial([...new Set(counted.map((l) => String(l.item_code)))]);
+  const rows = counted.map((l) => {
+    const code = String(l.item_code);
+    const atCount = at.get(`${code}|${when(l)}`) ?? { qty: 0, rate: 0 };
+    const atT = at.get(`${code}|${T}`) ?? { qty: 0, rate: 0 };
+    const explained = manual.get(String(l.id)) ?? 0;
+    const variance = Number(l.physical_qty) - atCount.qty - explained;
+    const post = atT.qty + variance;
+    const rate = atT.rate || atCount.rate || Number(l.erp_rate) || 0;
+    const why = batched.has(code) ? "batch or serial item — count it in the ERP itself"
+      : Math.abs(variance) < 1e-9 ? "agrees with the ERP"
+      : post < -1e-9 ? "would go below nought at the posting instant — something moved in between; post it by hand"
+      : post > 1e-9 && rate <= 0 ? "the ERP has no valuation rate for it — set one first"
+      : "";
+    return {
+      line_id: l.id, item_code: code, item_name: l.item_name, uom: l.uom, location: l.location ?? "",
+      physical: Number(l.physical_qty), erp_at_count: atCount.qty, explained, variance, erp_at_post: atT.qty, post, rate, value: variance * rate,
+      ok: !why, why,
+    };
+  });
+  return { postingAt: T, rows, ready: rows.filter((r) => r.ok).length };
+}
 
 export async function GET(req: Request) {
   try {
@@ -36,7 +102,12 @@ export async function GET(req: Request) {
     const p = new URL(req.url).searchParams;
     const view = p.get("view") || "dashboard";
 
-    if (view === "dashboard") return NextResponse.json({ ok: true, ...(await inventoryDashboard(admin)) });
+    if (view === "dashboard") {
+      /* the WIP's kitted value, theory and actual, beside the ERP's WIP
+         warehouses — a failure here never blanks the rest of the page */
+      const [d, kitted] = await Promise.all([inventoryDashboard(admin), wipKittedTotals(admin).catch(() => null)]);
+      return NextResponse.json({ ok: true, ...d, kitted });
+    }
 
     if (view === "warehouses") {
       const d = await inventoryDashboard(admin);
@@ -96,7 +167,35 @@ export async function GET(req: Request) {
       if (!c) throw new HttpError(404, "No such count sheet.");
       if (c.assigned_email !== me.email.toLowerCase() && !mayLeadInventory(me.email, me.isOwner)) throw new HttpError(403, "That sheet is somebody else's.");
       const { data: lines } = await admin.from("material_count_line").select("*").eq("count_id", id).order("item_code");
-      return NextResponse.json({ ok: true, count: c, lines: lines ?? [], canEdit: c.status === "open" && (c.assigned_email === me.email.toLowerCase() || mayLeadInventory(me.email, me.isOwner)) });
+      /* "always make sure that the valuation-wise highest values are always
+         on the top so that they are always counted … Do not show the
+         valuation on the physical counting; otherwise, it will tend to bias
+         the person" (Dr Raghu, 6 Oct 2026). Highest ERP value first; while
+         the sheet is open the rate never leaves the server. */
+      const worth = (l: Record<string, unknown>) => Number(l.erp_qty || 0) * Number(l.erp_rate || 0);
+      const sorted = [...(lines ?? [])].sort((a, b) => worth(b) - worth(a) || String(a.item_code).localeCompare(String(b.item_code)));
+      const blind = c.status === "open";
+      let erpLog: unknown[] = [];
+      if (c.erp_reco || c.status === "submitted") { const { data } = await admin.from("material_count_erp").select("*").eq("count_id", id).order("at", { ascending: false }).limit(20); erpLog = data ?? []; }
+      return NextResponse.json({
+        ok: true, count: c, blind, erpLog, lead: mayLeadInventory(me.email, me.isOwner),
+        lines: blind ? sorted.map((l) => ({ ...l, erp_rate: null })) : sorted,
+        canEdit: c.status === "open" && (c.assigned_email === me.email.toLowerCase() || mayLeadInventory(me.email, me.isOwner)),
+      });
+    }
+
+    if (view === "erp_plan") {
+      if (!mayLeadInventory(me.email, me.isOwner)) throw new HttpError(403, "That is for Mukesh, Rameez or Dr Raghu.");
+      const id = S(p.get("id"), 64);
+      const { data: c } = await admin.from("material_count").select("*").eq("id", id).maybeSingle();
+      if (!c) throw new HttpError(404, "No such count sheet.");
+      if (c.status !== "submitted") throw new HttpError(409, "Submit the sheet first — only a submitted count goes to the ERP.");
+      const { data: lines } = await admin.from("material_count_line").select("*").eq("count_id", id);
+      return NextResponse.json({ ok: true, ...(await erpPlan(admin, c, lines ?? [])), erp_reco: c.erp_reco, erp_reco_state: c.erp_reco_state });
+    }
+
+    if (view === "itemgroups") {
+      return NextResponse.json({ ok: true, groups: await itemGroupStock(admin), readAt: new Date().toISOString() });
     }
 
     if (view === "suspense") {
@@ -149,13 +248,24 @@ export async function POST(req: Request) {
       let pick = bins.filter((x) => x.qty > 0);
       if (kind === "group") {
         const inGroup = new Set((await Promise.all(groups.map((g) => groupCodes(admin, g)))).flat());
-        pick = pick.filter((x) => inGroup.has(x.item_code)).sort((a, b) => a.item_group.localeCompare(b.item_group) || a.item_code.localeCompare(b.item_code));
+        pick = pick.filter((x) => inGroup.has(x.item_code));
         if (!pick.length) throw new HttpError(400, `Nothing of ${groups.length === 1 ? group : "those groups"} is on the ERP's books in ${warehouse}.`);
         if (pick.length > 600) throw new HttpError(400, `That is ${pick.length} items in ${warehouse} — more than one person counts on one sheet. Choose fewer groups (600 at most).`);
       } else {
         if (!pick.length) throw new HttpError(400, `${warehouse} holds nothing on the ERP's books.`);
         pick = sample(pick, n);
       }
+      /* highest value first, so the sheet is counted from the top down */
+      pick = [...pick].sort((a, b) => b.value - a.value);
+      /* where each item was last found in this warehouse, carried onto the new sheet */
+      const lastAt = new Map<string, string>();
+      try {
+        const codes = pick.map((x) => x.item_code);
+        for (let i = 0; i < codes.length; i += 300) {
+          const { data } = await admin.from("material_count_line").select("item_code, location, counted_at").eq("warehouse", warehouse).in("item_code", codes.slice(i, i + 300)).neq("location", "").order("counted_at", { ascending: true });
+          for (const r of data ?? []) lastAt.set(String(r.item_code), String(r.location));
+        }
+      } catch { /* pre-0203: no locations yet */ }
       const { data: c, error } = await admin.from("material_count").insert({
         kind, warehouse, item_group: kind === "group" ? group : null, assigned_email: who, assigned_name: S(b.assigned_name, 120),
         title: S(b.title, 200) || (kind === "group" ? `${groups.length > 2 ? `${groups.slice(0, 2).join(" + ")} + ${groups.length - 2} more` : group} · ${warehouse}`.slice(0, 200) : `Random ${pick.length} · ${warehouse}`),
@@ -164,6 +274,7 @@ export async function POST(req: Request) {
       if (error) fail(error.message);
       const { error: e2 } = await admin.from("material_count_line").insert(pick.map((x) => ({
         count_id: c!.id, item_code: x.item_code, item_name: x.item_name, item_group: x.item_group, uom: x.uom, warehouse, erp_qty: x.qty, erp_rate: x.rate,
+        ...(lastAt.get(x.item_code) ? { location: lastAt.get(x.item_code) } : {}),
       })));
       if (e2) fail(e2.message);
       return NextResponse.json({ ok: true, id: c!.id, lines: pick.length });
@@ -177,10 +288,19 @@ export async function POST(req: Request) {
       const { data: c } = await admin.from("material_count").select("status, assigned_email").eq("id", l.count_id).maybeSingle();
       if (!c || c.status !== "open") throw new HttpError(409, "This sheet is closed.");
       if (c.assigned_email !== me.email.toLowerCase() && !lead) throw new HttpError(403, "This sheet is somebody else's to count.");
+      /* "make the location" (Dr Raghu, 6 Oct 2026) — rack, bin or bay where it was found; saved on its own */
+      if ("location" in b && !("physical_qty" in b)) {
+        const { error } = await admin.from("material_count_line").update({ location: S(b.location, 120) }).eq("id", id);
+        if (error) throw new HttpError(missing(error.message) || /location/.test(error.message) ? 503 : 500, /location/.test(error.message) ? "Run migration 0203 first — the location has nowhere to live yet." : error.message);
+        return NextResponse.json({ ok: true });
+      }
       const raw = b.physical_qty;
       const qty = raw === null || raw === "" || raw === undefined ? null : Number(raw);
       if (qty !== null && (!Number.isFinite(qty) || qty < 0)) throw new HttpError(400, "A count is a number, nought or more.");
-      const { error } = await admin.from("material_count_line").update({ physical_qty: qty, remark: S(b.remark, 1000), counted_by: me.email, counted_at: now }).eq("id", id);
+      /* a cleared box is no count at all — no counter, no time */
+      const { error } = await admin.from("material_count_line").update(qty === null
+        ? { physical_qty: null, remark: S(b.remark, 1000), counted_by: null, counted_at: null }
+        : { physical_qty: qty, remark: S(b.remark, 1000), counted_by: me.email, counted_at: now }).eq("id", id);
       if (error) fail(error.message);
       return NextResponse.json({ ok: true });
     }
@@ -193,13 +313,17 @@ export async function POST(req: Request) {
       if (c.status !== "open") throw new HttpError(409, "Already submitted.");
       if (c.assigned_email !== me.email.toLowerCase() && !lead) throw new HttpError(403, "This sheet is somebody else's.");
       const { data: lines } = await admin.from("material_count_line").select("*").eq("count_id", id);
-      const blank = (lines ?? []).filter((l) => l.physical_qty === null);
-      if (blank.length) throw new HttpError(400, `${blank.length} item${blank.length === 1 ? "" : "s"} not counted yet — a nought is a count; a blank is not.`);
-      /* the ERP at the moment of submission, closest to the moment of counting */
-      const nowBins = await binsNow(c.warehouse, (lines ?? []).map((l) => l.item_code));
+      /* "if he leaves it blank, ignore it. There will be no suspense entry
+         made, or a consumption entry made, or an addition entry made for
+         that" (Dr Raghu, 6 Oct 2026) — a blank line is simply not counted;
+         it stays on the sheet as "not counted" and goes nowhere */
+      const counted = (lines ?? []).filter((l) => l.physical_qty !== null);
+      if (!counted.length) throw new HttpError(400, "Nothing on this sheet is counted yet — put in at least one figure. A nought is a count; a blank is not.");
+      /* the ERP at the moment each line was counted, not at the moment of submitting */
+      const at = await erpQtyAtMany(c.warehouse, counted.map((l) => ({ code: l.item_code, at: l.counted_at || now })));
       const suspense: Record<string, unknown>[] = [];
-      for (const l of lines ?? []) {
-        const erp = nowBins.get(l.item_code) ?? { qty: 0, rate: 0 };
+      for (const l of counted) {
+        const erp = at.get(`${l.item_code}|${l.counted_at || now}`) ?? { qty: 0, rate: 0 };
         await admin.from("material_count_line").update({ erp_qty_at_count: erp.qty, erp_rate: erp.rate || l.erp_rate }).eq("id", l.id);
         const v = Number(l.physical_qty) - erp.qty;
         if (Math.abs(v) > 1e-9) suspense.push({
@@ -209,7 +333,75 @@ export async function POST(req: Request) {
       }
       if (suspense.length) { const { error } = await admin.from("material_suspense").insert(suspense); if (error) fail(error.message); }
       await admin.from("material_count").update({ status: "submitted", submitted_at: now, submitted_by: me.email }).eq("id", id);
-      return NextResponse.json({ ok: true, variances: suspense.length });
+      return NextResponse.json({ ok: true, variances: suspense.length, counted: counted.length, skipped: (lines ?? []).length - counted.length });
+    }
+
+    /* ---- the count to the ERP: a DRAFT Stock Reconciliation first ---- */
+    if (action === "erp_draft") {
+      needLead();
+      const id = S(b.id, 64);
+      const { data: c } = await admin.from("material_count").select("*").eq("id", id).maybeSingle();
+      if (!c) throw new HttpError(404, "No such count sheet.");
+      if (c.status !== "submitted") throw new HttpError(409, "Submit the sheet first — only a submitted count goes to the ERP.");
+      if (c.erp_reco) {
+        const st = await erpRecoState(String(c.erp_reco));
+        if (st === 0 || st === 1) throw new HttpError(409, `${c.erp_reco} already carries this sheet (${st === 0 ? "a draft" : "submitted"}).`);
+      }
+      const { data: lines } = await admin.from("material_count_line").select("*").eq("count_id", id);
+      const plan = await erpPlan(admin, c, lines ?? []);
+      const go = plan.rows.filter((r) => r.ok);
+      if (!go.length) throw new HttpError(400, "Nothing on this sheet differs from the ERP in a way that can be posted — see the reasons on each line.");
+      const stamp = istStamp(String(plan.postingAt));
+      let name = "";
+      try {
+        const books = await erpWarehouseBooks(String(c.warehouse));
+        name = await erpCreateStockReco({ ...books, posting_date: stamp.date, posting_time: stamp.time,
+          lines: go.map((r) => ({ item_code: String(r.item_code), warehouse: String(c.warehouse), qty: Number(r.post), valuation_rate: Number(r.rate) })) });
+      } catch (e) {
+        await admin.from("material_count_erp").insert({ count_id: id, action: "refused", lines: go.length, answer: e instanceof Error ? e.message : String(e), by_email: me.email });
+        throw e;
+      }
+      await admin.from("material_count").update({ erp_reco: name, erp_reco_state: "draft", erp_reco_by: me.email, erp_reco_at: now, erp_posting_at: plan.postingAt }).eq("id", id);
+      await admin.from("material_count_line").update({ posted_qty: null }).eq("count_id", id);
+      for (const r of go) await admin.from("material_count_line").update({ posted_qty: r.post }).eq("id", String(r.line_id));
+      await admin.from("material_count_erp").insert({ count_id: id, action: "draft", voucher: name, lines: go.length, answer: `draft made, posted for ${stamp.date} ${stamp.time} IST`, by_email: me.email });
+      return NextResponse.json({ ok: true, voucher: name, lines: go.length });
+    }
+
+    /* ---- …then submitted from Genie, and the suspense on those lines closed by it ---- */
+    if (action === "erp_submit") {
+      needLead();
+      const id = S(b.id, 64);
+      const { data: c } = await admin.from("material_count").select("*").eq("id", id).maybeSingle();
+      if (!c?.erp_reco) throw new HttpError(409, "There is no draft in the ERP for this sheet yet.");
+      const name = String(c.erp_reco);
+      const st = await erpRecoState(name);
+      if (st === null || st === 2) {
+        await admin.from("material_count").update({ erp_reco: null, erp_reco_state: null }).eq("id", id);
+        await admin.from("material_count_line").update({ posted_qty: null }).eq("count_id", id);
+        throw new HttpError(409, `${name} is ${st === 2 ? "cancelled" : "gone"} in the ERP — make a fresh draft.`);
+      }
+      if (st === 0) {
+        try { await erpSubmitStockReco(name); }
+        catch (e) { await admin.from("material_count_erp").insert({ count_id: id, action: "refused", voucher: name, answer: e instanceof Error ? e.message : String(e), by_email: me.email }); throw e; }
+      }
+      const { data: posted } = await admin.from("material_count_line").select("id").eq("count_id", id).not("posted_qty", "is", null);
+      const lineIds = (posted ?? []).map((l) => String(l.id));
+      let closed = 0;
+      for (let i = 0; i < lineIds.length; i += 300) {
+        const { data: open } = await admin.from("material_suspense").select("*").in("count_line_id", lineIds.slice(i, i + 300)).eq("status", "open");
+        for (const x of open ?? []) {
+          const left = Number(x.qty) - Number(x.released_qty);
+          if (Math.abs(left) < 1e-9) continue;
+          const { error } = await admin.from("material_suspense_release").insert({ suspense_id: x.id, qty: left, reason: "Posted to the ERP", voucher_type: "Stock Reconciliation", voucher_no: name, note: "the counted figure, put into the ERP from the count sheet", by_email: me.email });
+          if (error) continue;
+          await admin.from("material_suspense").update({ released_qty: Number(x.qty), status: "released", synced_at: now }).eq("id", x.id);
+          closed++;
+        }
+      }
+      await admin.from("material_count").update({ erp_reco_state: "submitted" }).eq("id", id);
+      await admin.from("material_count_erp").insert({ count_id: id, action: "submit", voucher: name, lines: lineIds.length, answer: `submitted; ${closed} suspense entr${closed === 1 ? "y" : "ies"} closed by it`, by_email: me.email });
+      return NextResponse.json({ ok: true, voucher: name, closed });
     }
 
     if (action === "cancel_count") {

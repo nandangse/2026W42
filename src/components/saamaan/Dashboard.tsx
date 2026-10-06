@@ -15,7 +15,7 @@ import { Card, Metric, INK, MUTED, BORDER, GREEN, AMBER, fmtD, daysTo, useLoad }
 /** The value of stock, read live off the ERP's Bin — see /api/saamaan/stock?mode=value. */
 interface StockValue {
   ok: boolean; readAt: string; mastersReady: boolean;
-  erpTotal: number; stock: number; wip: number; finished: number; vendor: number;
+  erpTotal: number; stock: number; wip: number; finished: number; vendor: number; stores?: number;
   untyped: number; untypedWarehouses: string[];
   genieTotal?: number; ignored?: number; ignoredWarehouses?: string[];
   warehouses: { warehouse: string; value: number; qty: number; bins: number; kind: string }[];
@@ -122,7 +122,7 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
               </div>
               <div>
                 <div className="tnum" style={{ color: INK, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{cr(sv.vendor)}</div>
-                <div className="text-xs" style={{ color: MUTED }}>at vendors</div>
+                <div className="text-xs" style={{ color: MUTED }}>at vendors{sv.stores ? <> · service stores <b style={{ color: INK }}>{cr(sv.stores)}</b></> : null}</div>
               </div>
               <div>
                 <div className="tnum" style={{ color: MUTED, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{cr(sv.genieTotal ?? sv.erpTotal)}</div>

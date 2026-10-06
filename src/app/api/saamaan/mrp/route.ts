@@ -3,6 +3,7 @@ import { readBody, type AnyBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
+import { erpAuth } from "@/lib/saamaan-stock";
 import { crmDb, crmConfigured } from "@/crm/db";
 
 export const dynamic = "force-dynamic";
@@ -140,12 +141,33 @@ async function grid(admin: ReturnType<typeof adminClient>, mrpId: string) {
     issues.push(...((data ?? []) as Doc[]));
     if (!data || data.length < 1000) break;
   }
+  /* THE ITEM'S FILES UNDER ITS NAME (Dr Raghu, 6 Oct 2026: "below the item
+     description, there has to be a PDF icon or a file icon … a PDF, a JPEG,
+     or a DXF. This is to be linked to the ERP only … Before confirming it,
+     he will verify that it is right.") — the links are the ERP's own, as
+     the Item holds them: an ERP path, or a Drive link pasted into the ERP. */
+  const filesOf = new Map<string, { url: string; name: string }[]>();
+  const addFile = (code: string, url: string, name: string) => {
+    if (!url) return;
+    const list = filesOf.get(code) ?? filesOf.set(code, []).get(code)!;
+    if (!list.some((x) => x.url === url)) list.push({ url, name: name || url.split("/").pop() || "file" });
+  };
   // Item group from the mirror where the line carries none.
   const codes = [...new Set(lines.map((l) => S(l.item_code)))];
   const groupOf = new Map<string, string>();
   for (let i = 0; i < codes.length; i += 500) {
-    const { data } = await admin.from("material_item").select("item_code, item_group").in("item_code", codes.slice(i, i + 500));
-    for (const it of data ?? []) groupOf.set(S(it.item_code), S(it.item_group));
+    const { data } = await admin.from("material_item").select("item_code, item_group, drawing_pdf, drawing_dwg, custom_drawing_dxf, image").in("item_code", codes.slice(i, i + 500));
+    for (const it of data ?? []) {
+      groupOf.set(S(it.item_code), S(it.item_group));
+      for (const [f, label] of [["drawing_pdf", "Drawing PDF"], ["drawing_dwg", "Drawing DWG"], ["custom_drawing_dxf", "Drawing DXF"], ["image", "Image"]] as const)
+        if (S((it as Doc)[f])) addFile(S(it.item_code), S((it as Doc)[f]), label);
+    }
+  }
+  /* every other attachment the ERP holds on the item — read off the file mirror */
+  for (let i = 0; i < codes.length; i += 300) {
+    const { data, error } = await admin.from("material_item_file").select("item_code, file_name, file_url, attached_to_field").in("item_code", codes.slice(i, i + 300)).limit(5000);
+    if (error) break;
+    for (const f of data ?? []) addFile(S(f.item_code), S(f.file_url), S(f.file_name));
   }
 
   // The columns: jobs under their project, in project order then job order.
@@ -201,9 +223,10 @@ async function grid(admin: ReturnType<typeof adminClient>, mrpId: string) {
   if (!planRes.error) for (const p of planRes.data ?? []) planOf.set(S(p.item_code), N(p.order_qty));
   const withPlan = items.map((i) => {
     const st = stock?.get(i.item_code);
-    return { ...i, stock: st ? st.stock : null, ordered: st ? st.ordered : null, blocked: st ? st.blocked : null, order_qty: planOf.has(i.item_code) ? planOf.get(i.item_code) : null };
+    return { ...i, files: (filesOf.get(i.item_code) ?? []).slice(0, 8), stock: st ? st.stock : null, ordered: st ? st.ordered : null, blocked: st ? st.blocked : null, order_qty: planOf.has(i.item_code) ? planOf.get(i.item_code) : null };
   });
-  return { run, jobs, items: withPlan, issues: issues.length, stockLive: stock !== null };
+  const erp = await erpAuth().catch(() => null);
+  return { run, jobs, items: withPlan, issues: issues.length, stockLive: stock !== null, erpBase: erp?.base ?? "" };
 }
 
 /** One tick: what the RBOM owes this job for this item, less what has gone, up to `asked`. */
