@@ -15,7 +15,7 @@ import { Card, Metric, INK, MUTED, BORDER, GREEN, AMBER, NAVY, RED, fmtD, daysTo
 /** The value of stock, read live off the ERP's Bin — see /api/saamaan/stock?mode=value. */
 interface StockValue {
   ok: boolean; readAt: string; mastersReady: boolean;
-  erpTotal: number; stock: number; wip: number; finished: number; vendor: number; stores?: number;
+  erpTotal: number; stock: number; wip: number; finished: number; vendor: number; stores?: number; wipReal?: number | null; wipJobs?: number | null;
   untyped: number; untypedWarehouses: string[];
   genieTotal?: number; ignored?: number; ignoredWarehouses?: string[];
   warehouses: { warehouse: string; value: number; qty: number; bins: number; kind: string }[];
@@ -87,8 +87,8 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
                 <div className="text-xs mt-1" style={{ color: MUTED }}>in <b>Stock</b> warehouses · {sv.warehouses.filter((w) => w.kind === "Stock").length} of them</div>
               </div>
               <div>
-                <div className="tnum" style={{ color: INK, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{cr(sv.wip)}</div>
-                <div className="text-xs" style={{ color: MUTED }}>in WIP</div>
+                <div className="tnum" style={{ color: INK, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{sv.wipReal === null || sv.wipReal === undefined ? "·" : cr(sv.wipReal)}</div>
+                <div className="text-xs" style={{ color: MUTED }} title="the ERP's completed transfers out of the stores to each live job, by job number">WIP real{sv.wipJobs ? ` · ${sv.wipJobs} live jobs` : ""}</div>
               </div>
               <div>
                 <div className="tnum" style={{ color: INK, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{cr(sv.finished)}</div>
@@ -100,14 +100,9 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
               </div>
               <div>
                 <div className="tnum" style={{ color: MUTED, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{cr(sv.genieTotal ?? sv.erpTotal)}</div>
-                <div className="text-xs" style={{ color: MUTED }}>{sv.ignored ? <>every warehouse but the ignored · the ERP&rsquo;s own {cr(sv.erpTotal)}</> : <>the ERP&rsquo;s total, every warehouse</>}</div>
+                <div className="text-xs" style={{ color: MUTED }}>total stock</div>
               </div>
             </div>
-            {!!sv.ignored && (
-              <div className="text-xs mt-2 pt-2" style={{ color: MUTED, borderTop: `1px solid ${BORDER}` }}>
-                <b>{cr(sv.ignored)}</b> in {(sv.ignoredWarehouses ?? []).length} warehouse{(sv.ignoredWarehouses ?? []).length === 1 ? "" : "s"} typed <b>Ignore</b> — {(sv.ignoredWarehouses ?? []).slice(0, 4).join(", ")}{(sv.ignoredWarehouses ?? []).length > 4 ? ` and ${(sv.ignoredWarehouses ?? []).length - 4} more` : ""} — is left out of every figure here until it is cleaned up and put right in the ERP.
-              </div>
-            )}
             {sv.untypedWarehouses.length > 0 && (
               <div className="text-xs mt-2 pt-2" style={{ color: AMBER, borderTop: `1px solid ${BORDER}` }}>
                 <b>{cr(sv.untyped)}</b> sits in {sv.untypedWarehouses.length} warehouse{sv.untypedWarehouses.length === 1 ? "" : "s"} nobody has typed yet

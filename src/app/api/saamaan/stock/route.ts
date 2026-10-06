@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
+import { wipKittedTotals } from "@/lib/wip-kitting";
 import { crmDb, crmConfigured } from "@/crm/db";
 
 export const dynamic = "force-dynamic";
@@ -122,7 +123,10 @@ export async function GET(req: Request) {
     const p = new URL(req.url).searchParams;
     if (p.get("mode") === "value") {
       const { base, H } = await erpConfig();
-      return NextResponse.json({ ok: true, erpBase: base, ...(await readStockValue(base, H)) });
+      /* "show WIP real only, which is already there in the inventory screen" (Dr Raghu, 6 Oct 2026) —
+         what the store has physically transferred to the live jobs, not the ERP's WIP warehouses */
+      const [value, kitted] = await Promise.all([readStockValue(base, H), wipKittedTotals(adminClient()).catch(() => null)]);
+      return NextResponse.json({ ok: true, erpBase: base, ...value, wipReal: kitted && kitted.erpRead !== false ? kitted.actual : null, wipJobs: kitted?.withIssue ?? null });
     }
     const code = String(p.get("code") || "").trim();
     if (!code) throw new HttpError(400, "code required");

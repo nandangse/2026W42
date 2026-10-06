@@ -89,6 +89,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.9",
+    date: "2026-10-06",
+    module: "Kanban rebuilt on dynamic buffer management; WIP real on the stock strip; the Ignore note gone",
+    items: [
+      "THE COLOURS ON TOP, AND BLUE (\u201cShow the colours on the top. Also, the DBM has a fourth colour, too, that is blue, which is generally overstocked\u201d). Black (nothing on hand), red, yellow, green and blue (over the target), each a count and its money and a click to filter, with a bar of the whole shelf above them. Items that used nothing in six months stand apart as no usage.",
+      "REBUILT ON THE PRACTICE (\u201cGo with the best practises of the DBM \u2026 rebuild this from scratch so that Rameez and Mukesh can use it properly to decide\u201d). The target (reorder level) = usage per day \u00d7 (lead time + the review gap) \u00d7 a safety factor of 1.5. The colour is the stock in hand against it; ordering counts what is already on order and starts once in hand plus on order is under two-thirds, back up to the target in whole MOQs. Every morning at 6:30 the zone is recorded and the rule moves the targets: up a third after a lead time of red or black, down a third after three lead times of green or blue, then left alone for one lead time. A target or MOQ typed by hand is never moved.",
+      "THREE DECISIONS, IN ORDER: Genie\u2019s proposals to accept, the requisition (black and red, or with yellow, to one of purchase, in whole MOQs), and the blue to stop buying. The shelf below is worst first, each item with a buffer bar cut in thirds.",
+      "THE INTELLIGENCE LAYER (\u201cauto-populate the reorder level and the MOQs, and we can keep working on that again and again\u201d). \u2728 Genie proposes reads the ERP: six months of usage off the stock ledger, each item\u2019s own PO-to-GRN days over a year (else its group\u2019s), and the quantity purchase usually orders it in for the MOQ. Proposals sit beside each item; accept one, or all (typed ones are kept), or set them aside. Run it again whenever \u2014 weekly is a good habit. Every change is logged.",
+      "WIP REAL ON THE STOCK STRIP (\u201cshow WIP real only, which is already there in the inventory screen\u201d) \u2014 what the store has physically transferred to the live jobs, in place of the ERP\u2019s WIP warehouses.",
+      "THE IGNORE NOTE IS GONE (\u201cRemove this note. Why are you creating confusion?\u201d) from the Saamaan dashboard and from Inventory; the total reads simply as total stock.",
+      "Run migration 0204 for the new Kanban columns.",
+    ],
+  },
+  {
     v: "6.3.0.8",
     date: "2026-10-06",
     module: "Saamaan dashboard: stock value on top, then the pulse — GRNs, counts, purchase follow-up",

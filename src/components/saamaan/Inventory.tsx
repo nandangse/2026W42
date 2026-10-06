@@ -113,14 +113,14 @@ function Dash({ go }: { go: (r: string) => void }) {
     ["Theory less real", k ? k.theory - k.actual : null, "the WIP not yet measured — it closes as the WIP is moved in"],
   ] : [];
   return (
-    <Screen title="Inventory — today" blurb="Read live off the ERP's Bin, every warehouse, this minute. RM is the warehouses Masters types Stock, Vendor and Stores; WIP is the live jobs' kitted value; a warehouse typed Ignore is in nothing."
+    <Screen title="Inventory — today" blurb="Read live off the ERP's Bin, every warehouse, this minute. RM is the warehouses Masters types Stock, Vendor and Stores; WIP is the live jobs' kitted value."
       action={<Btn onClick={reload} disabled={busy}>{busy ? "Reading…" : "↻ Re-read"}</Btn>}>
       {err && <Note kind="error">{err}</Note>}
 
       {/* "on the top, show the number of items with non-zero stock … kitne unique items are there" */}
       <div className="flex items-baseline gap-3 flex-wrap mb-3">
         <span className="font-bold tnum" style={{ fontSize: 26, color: NAVY }}>{d ? d.uniqueItems.toLocaleString("en-IN") : "…"}</span>
-        <span className="text-sm" style={{ color: INK }}>unique items hold stock today, across every warehouse but the ignored</span>
+        <span className="text-sm" style={{ color: INK }}>unique items hold stock today</span>
         <span className="text-xs ml-auto rounded px-2 py-1 font-bold" style={{ background: left > 7 ? NAVY_SOFT : "#FEF3C7", color: left > 7 ? NAVY : AMBER }}
           title="Every item's WIP, group, valuation and quantity right — a little every day">
           30 Oct: the true number · {left > 0 ? `${left} day${left === 1 ? "" : "s"} left` : left === 0 ? "today" : "past"}
@@ -160,9 +160,8 @@ function Dash({ go }: { go: (r: string) => void }) {
 
       {d && (
         <div className="text-xs mb-4" style={{ color: MUTED, lineHeight: 1.7 }}>
-          Total held, every warehouse but the ignored, <b style={{ color: INK }}>{cr(d.total.value)}</b> · finished goods <b style={{ color: INK }}>{cr(d.finished)}</b>
+          Total held <b style={{ color: INK }}>{cr(d.total.value)}</b> · finished goods <b style={{ color: INK }}>{cr(d.finished)}</b>
           {d.untyped.warehouses.length > 0 && <> · <b style={{ color: AMBER }}>{cr(d.untyped.value)}</b> sits in {d.untyped.warehouses.join(", ")}, which nobody has typed yet — <button onClick={() => (window.location.href = "/saamaan/masters")} style={{ color: NAVY, textDecoration: "underline" }}>type it in Masters</button></>}
-          {d.ignored && d.ignored.warehouses.length > 0 && <> · <b style={{ color: MUTED }}>{cr(d.ignored.value)}</b> in {d.ignored.warehouses.length} warehouse{d.ignored.warehouses.length === 1 ? "" : "s"} typed Ignore is left out of every figure</>}
           {" "}· read {new Date(d.readAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
         </div>
       )}
