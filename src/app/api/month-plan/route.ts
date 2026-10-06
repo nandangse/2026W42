@@ -395,6 +395,37 @@ async function ownersFor(admin: ReturnType<typeof adminClient>, ids: string[]): 
   return out;
 }
 
+/** Delivered from 1 April of the plan's financial year to the day before the plan opens. */
+async function ytdBefore(admin: ReturnType<typeof adminClient>, windowFrom: string) {
+  const y = Number(windowFrom.slice(0, 4)), m = Number(windowFrom.slice(5, 7));
+  const from = `${m >= 4 ? y : y - 1}-04-01`;
+  const upto = new Date(Date.parse(`${windowFrom}T00:00:00Z`) - 864e5).toISOString().slice(0, 10);
+  if (upto < from) return { from, upto, jobs: 0, value: 0, throughput: 0 };
+  try { const d = await doneTotals(admin, from, upto); return { from, upto, jobs: d.nos, value: d.value, throughput: d.throughput }; }
+  catch { return undefined; }
+}
+
+/** "Copy for Pankaj Sutar · pankajs@nandan.co.in · 06-10-2026 11:30 IST" — the reader, on every page. */
+async function copyFor(u: { displayName?: string | null; email: string }): Promise<string> {
+  const { istStamp } = await import("@/lib/plan-pdf");
+  return `Copy for ${u.displayName || u.email.split("@")[0]} · ${u.email} · ${istStamp(new Date().toISOString())} · Nandan GSE confidential`;
+}
+
+/**
+ * WHEN DR RAGHU FROZE THE PLAN (6 Oct 2026: "On every page in the footer also
+ * mention - Signed by Raghu <date> <time>. This is when i have frozen my
+ * plan"). His latest signed — not draft — plan for the same period; it is the
+ * one that approves everyone else's. Null until he has signed.
+ */
+async function raghuFrozeAt(admin: ReturnType<typeof adminClient>, kind: string, key: string): Promise<string | null> {
+  try {
+    const { data } = await admin.from("plan_signoff").select("signed_at")
+      .eq("by_email", RAGHU_EMAIL).eq("period_kind", kind).eq("period_key", key)
+      .eq("is_draft", false).order("signed_at", { ascending: false }).limit(1);
+    return data?.[0]?.signed_at ? String(data[0].signed_at) : null;
+  } catch { return null; }
+}
+
 export async function GET(req: Request) {
   try {
     /**
@@ -439,7 +470,7 @@ export async function GET(req: Request) {
           .eq("is_draft", false).lt("signed_at", String(row.signed_at));
         docNo0 = planNumber(w0.key, new Date(String(row.signed_at)), Math.max(0, prior0 ?? 0));
       }
-      const PLAN_FOOTER = planFooter(docNo0);
+      const PLAN_FOOTER = planFooter(docNo0, await raghuFrozeAt(admin0, k0, w0.key));
       let html: string;
       if (row) {
         // the signed thing, exactly as it was signed
@@ -456,6 +487,8 @@ export async function GET(req: Request) {
           showValue: mayValue(u0),
           ...(await planPeople(admin0, k0, w0.key, ((row.snapshot as Record<string, unknown>[]) || []).map((r) => String(r.id)))),
           history: await monthHistory(admin0, w0.from),
+          ytd: await ytdBefore(admin0, w0.from),
+          watermark: await copyFor(u0),
           owners: await ownersFor(admin0, ((row.snapshot as Record<string, unknown>[]) || []).map((r) => String(r.id))),
         });
       } else {
@@ -495,11 +528,16 @@ export async function GET(req: Request) {
           showValue: mayValue(u0),
           ...(await planPeople(admin0, k0, w0.key, jobs0.map((j) => String(j.id)))),
           history: await monthHistory(admin0, w0.from),
+          ytd: await ytdBefore(admin0, w0.from),
+          watermark: await copyFor(u0),
           owners: await ownersFor(admin0, jobs0.map((j) => String(j.id))),
         });
       }
       const { pressPdf } = await import("@/lib/pdf-press");
-      const pdf = await pressPdf(html, { footerHtml: PLAN_FOOTER });
+      const pressed = await pressPdf(html, { footerHtml: PLAN_FOOTER });
+      /* printing is Raghu's and Pankaj's; everyone else's copy is locked (6 Oct 2026) */
+      const { lockPdf, mayPrintPlan } = await import("@/lib/pdf-lock");
+      const pdf = mayPrintPlan(u0.email) ? pressed : await lockPdf(pressed);
       return new NextResponse(new Uint8Array(pdf), {
         headers: {
           "content-type": "application/pdf",
@@ -759,7 +797,7 @@ export async function POST(req: Request) {
       const { APP_VERSION } = await import("@/lib/changelog");
 
       const { planPdfHtml, planFooter } = await import("@/lib/plan-pdf");
-      const PLAN_FOOTER = planFooter(isDraft ? undefined : docNo);
+      const PLAN_FOOTER = planFooter(isDraft ? undefined : docNo, await raghuFrozeAt(admin, kind, w.key));
       const pdfHtml = planPdfHtml({
         title: planTitle, window: w, snapshot, plan, signedOn: dmy(T),
         // A draft is not a numbered document -- it is not issued yet.
@@ -772,6 +810,8 @@ export async function POST(req: Request) {
         real: { jobs: real.jobs, value: Math.round(real.value), throughput: Math.round(real.throughput) },
         done: { nos: done.nos, value: done.value, throughput: done.throughput },
         history: await monthHistory(admin, w.from),
+        ytd: await ytdBefore(admin, w.from),
+        watermark: `Nandan GSE confidential · for the plan team only · issued ${dmy(T)}`,
         owners: await ownersFor(admin, jobs.map((j) => String(j.id))),
       });
 
@@ -779,7 +819,10 @@ export async function POST(req: Request) {
       if (!isDraft) {
         try {
           const { pressPdf } = await import("@/lib/pdf-press");
-          pdfB64 = (await pressPdf(pdfHtml, { footerHtml: PLAN_FOOTER })).toString("base64");
+          /* the mailed copy goes to the whole team, so it is always locked;
+             Raghu and Pankaj print from the desk's own download */
+          const { lockPdf } = await import("@/lib/pdf-lock");
+          pdfB64 = (await lockPdf(await pressPdf(pdfHtml, { footerHtml: PLAN_FOOTER }))).toString("base64");
         } catch { pdfB64 = ""; }   // the mail still goes; it just goes bare
       }
 

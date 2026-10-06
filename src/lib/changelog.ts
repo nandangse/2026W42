@@ -89,6 +89,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.0.2.1",
+    date: "2026-10-06",
+    module: "The plan PDF: the year so far, both week tables on one page, Raghu\u2019s signature on every page, printing locked",
+    items: [
+      "THE YEAR SO FAR, UNDER THE PLAN (Dr Raghu, 6 Oct 2026: \u201cYTD Upto 30th September : Jobs | Values | Throughput, Oct Plan : \u2026, if all Delivered by Oct end : \u2026 will be exciting to see\u201d). Three lines beneath the large numbers: delivered from 1 April to the day before the plan opens, the plan itself, and the two added together in orange \u2014 what the year reads if every planned job goes. Counted from the bank of delivered jobs as \u201cdone so far\u201d is. Page one was tightened to keep all of it, and every signature card, on one sheet.",
+      "PRODUCT AND CLIENT WEEK-WISE ON ONE PAGE (\u201ctry to fit the client and product week wise in one page! You may put the number of jobs (value). Keep spacing comfortable\u201d). Each cell now reads 3 (\u20b91.23 Cr) on one line; week headers are one line; long names stay on one line. The rows are comfortable while they fit and close up only as far as the number of products and clients needs \u2014 eleven products and twenty-two clients share the page.",
+      "SIGNED BY RAGHU, ON EVERY PAGE (\u201cOn every page in the footer also mention - Signed by Raghu <date> <time>. This is when i have frozen my plan\u201d). The footer carries the moment of his latest signed plan for the period, in IST, in green \u2014 or \u201cNot yet signed by Raghu\u201d in amber until he has.",
+      "PRINTING IS LOCKED (\u201cmake this pdf non printable \u2026 Only Raghu or pankaj can print. Add password to print\u201d). Every copy opens without a password, but printing, copying text and editing are switched off by the PDF\u2019s own permissions; the print password lifts them. Raghu and Pankaj download it unlocked. The copy mailed to the team on signing is always locked. Acrobat, Chrome\u2019s viewer and Preview honour this; it stops an honest Print, not a determined one (src/lib/pdf-lock.ts, @cantoo/pdf-lib).",
+      "SCREENSHOTS (\u201ccan you prevent screenshots?\u201d). No document can \u2014 the operating system takes them, and a phone camera needs nothing at all. So every page now carries, faintly across it, whose copy it is: the name, the e-mail and the minute it was downloaded (the mailed copy says it is confidential to the plan team). A screenshot then names the person it came from.",
+    ],
+  },
+  {
     v: "6.0.2.0",
     date: "2026-10-06",
     module: "The plan PDF\u2019s front page: Breakthrough 2027, six months delivered, the month in large letters",

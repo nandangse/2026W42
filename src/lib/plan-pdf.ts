@@ -61,6 +61,18 @@ export interface PlanPdfInput {
   history?: { key: string; label: string; jobs: number; value: number; throughput: number }[];
   /** Each job's planning owner, by job id — the calendar's colours. */
   owners?: Record<string, string>;
+  /**
+   * THE YEAR SO FAR (Dr Raghu, 6 Oct 2026: "YTD Upto 30th September : Jobs |
+   * Values | Throughput, Oct Plan : …, if all Delivered by Oct end : …").
+   * Delivered from 1 April to the day before the plan opens.
+   */
+  ytd?: { from: string; upto: string; jobs: number; value: number; throughput: number };
+  /**
+   * WHOSE COPY THIS IS, faint across every page (6 Oct 2026). A screenshot
+   * cannot be stopped from inside a document; a screenshot that names the
+   * person it came from is one people think twice about taking.
+   */
+  watermark?: string;
 }
 
 /** "September 26", "Q2 26", "FY26-27" — the period as a person says it. */
@@ -122,7 +134,7 @@ function weekCols(rows: Record<string, unknown>[], from: string, end: string): {
 }
 
 /** Rows = product family or client; columns = weeks; each cell: nos, and value when cleared. */
-function weekTable(title: string, key: string, rows: Record<string, unknown>[], from: string, end: string, money: boolean): string {
+function weekTable(title: string, key: string, rows: Record<string, unknown>[], from: string, end: string, money: boolean, dense = 0): string {
   if (!rows.length) return "";
   const { cols, colOf } = weekCols(rows, from, end);
   type Cell = { n: number; v: number };
@@ -146,23 +158,25 @@ function weekTable(title: string, key: string, rows: Record<string, unknown>[], 
   const ordered = [...grid.entries()].sort((a, b) =>
     (isProduct ? sIdx(a[0]) - sIdx(b[0]) : 0) || rowTot(b[1]).n - rowTot(a[1]).n || rowTot(b[1]).v - rowTot(a[1]).v || a[0].localeCompare(b[0]));
   const nameCell = (k: string) => {
-    if (!isProduct) return `<td class="wk1">${esc(k)}</td>`;
+    if (!isProduct) return `<td class="wk1"><span class="nm1" title="${esc(k)}">${esc(k)}</span></td>`;
     const sc = sectorOf(k);
-    return `<td class="wk1" style="border-left:2.2mm solid ${sc.ink};background:${sc.tint}"><span class="sec" style="background:${sc.ink}">${esc(sc.label)}</span> <b style="color:${sc.ink}">${esc(k)}</b></td>`;
+    return `<td class="wk1" style="border-left:2.2mm solid ${sc.ink};background:${sc.tint}"><span class="nm1"><span class="sec" style="background:${sc.ink}">${esc(sc.label)}</span> <b style="color:${sc.ink}">${esc(k)}</b></span></td>`;
   };
   const used = isProduct ? SECTORS.filter((x) => ordered.some(([k]) => sectorOf(k).key === x.key)) : [];
-  const secLegend = used.length ? `<div class="legend">${used.map((x) => `<span class="lk"><i style="background:${x.ink}"></i>${esc(x.label)}</span>`).join("")}</div>` : "";
-  const fmtCell = (c?: Cell) => !c || !c.n ? '<span class="faint">·</span>' : `<b>${c.n}</b>${money ? `<div class="wv">${cr(c.v)}</div>` : ""}`;
+  const secLegend = used.length ? `<div class="legend" style="margin:0">${used.map((x) => `<span class="lk"><i style="background:${x.ink}"></i>${esc(x.label)}</span>`).join("")}</div>` : "";
+  /* NUMBER OF JOBS (VALUE), ON ONE LINE (Dr Raghu, 6 Oct 2026: "try to fit
+     the client and product week wise in one page! You may put the number of
+     jobs (value)") — half the height of a cell that stacked them. */
+  const fmtCell = (c?: Cell) => !c || !c.n ? '<span class="faint">·</span>' : `<b>${c.n}</b>${money ? ` <span class="wv">(${cr(c.v)})</span>` : ""}`;
   const grand = { n: rows.length, v: rows.reduce((a, r) => a + (Number(r.val) || 0), 0) };
   return `
 <div class="wk">
-  <div class="tlabel">${esc(title)}</div>
-  <table class="wt">
-    <thead><tr><th class="wk1"${isProduct ? ' style="border-left:2.2mm solid #22303C"' : ""}>${esc(key === "fam" ? "Product" : "Client")}</th>${cols.map((c) => `<th class="wc">${esc(c.label)}<div class="ws">${esc(c.sub)}</div></th>`).join("")}<th class="wc tot1">Total</th></tr></thead>
+  <div class="wkh"><span class="tlabel">${esc(title)}</span>${secLegend}</div>
+  <table class="wt d${dense}">
+    <thead><tr><th class="wk1"${isProduct ? ' style="border-left:2.2mm solid #22303C"' : ""}>${esc(key === "fam" ? "Product" : "Client")}</th>${cols.map((c) => `<th class="wc">${esc(c.label)}${c.sub ? ` <span class="ws">${esc(c.sub)}</span>` : ""}</th>`).join("")}<th class="wc tot1">Total</th></tr></thead>
     <tbody>${ordered.map(([k, g]) => `<tr>${nameCell(k)}${cols.map((c) => `<td class="wc">${fmtCell(g.get(c.key))}</td>`).join("")}<td class="wc tot1">${fmtCell(rowTot(g))}</td></tr>`).join("")}</tbody>
     <tfoot><tr><td class="wk1"${isProduct ? ' style="border-left:2.2mm solid #22303C"' : ""}><b>Total</b></td>${cols.map((c) => `<td class="wc">${fmtCell(colTot.get(c.key))}</td>`).join("")}<td class="wc tot1">${fmtCell(grand)}</td></tr></tfoot>
   </table>
-  ${secLegend}
 </div>`;
 }
 
@@ -297,6 +311,30 @@ export function planPdfHtml(i: PlanPdfInput): string {
    */
   const money = i.showValue !== false;
   const M = (n: number) => (money ? cr(n) : "—");
+  /* Both week-wise tables share one page: the more products and clients
+     there are, the tighter the rows — comfortable while they fit, closer only
+     when they would not. */
+  /* The year so far, the plan, and the two added together — "if all
+     delivered by the end of the period". Shown only when the period does
+     not itself open the financial year (there is no year so far then). */
+  const ytdBlock = () => {
+    const y = i.ytd;
+    if (!y || y.upto < y.from) return "";
+    const upto = new Date(`${y.upto}T00:00:00Z`);
+    const uptoWords = `${upto.getUTCDate()}${[, "st", "nd", "rd"][upto.getUTCDate() % 10 > 3 || Math.floor(upto.getUTCDate() / 10) === 1 ? 0 : upto.getUTCDate() % 10] || "th"} ${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][upto.getUTCMonth()]}`;
+    const per = period.split(" ")[0];
+    const endWords = (() => { const e = new Date(`${i.window.end}T00:00:00Z`); return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][e.getUTCMonth()]} end`; })();
+    const row = (label: string, j: number, v: number, t: number, cls = "") => `<tr class="${cls}"><td class="yl">${label}</td><td class="yn"><b>${j}</b> jobs</td>${money ? `<td class="yn"><b>${M(v)}</b> value</td><td class="yn"><b>${M(t)}</b> throughput</td>` : ""}</tr>`;
+    return `<table class="ytd">
+${row(`YTD up to ${esc(uptoWords)}`, y.jobs, y.value, y.throughput)}
+${row(`${esc(per)} plan`, i.plan.jobs, i.plan.value, i.plan.throughput)}
+${row(`If all delivered by ${esc(endWords)}`, y.jobs + i.plan.jobs, y.value + i.plan.value, y.throughput + i.plan.throughput, "yall")}
+</table>`;
+  };
+  const distinct = (k: string) => new Set((i.snapshot || []).map((r) => String(r[k] || "").trim() || "—")).size;
+  const tableRows = distinct("fam") + distinct("cust");
+  /* ~170 mm of page for both tables and their four header/total rows */
+  const dense = tableRows <= 20 ? 0 : tableRows <= 27 ? 1 : tableRows <= 34 ? 2 : 3;
 
   const rows = (i.snapshot || []).map((r) => {
     const b = Number(r.belief) || 0;
@@ -422,25 +460,36 @@ mark.hl { background: #FFF200; color: #16232F; padding: 0 .6mm; border-radius: .
 .lk i { display: inline-block; width: 3mm; height: 3mm; border-radius: .6mm; }
 .sec { display: inline-block; color: #fff; font-size: 6pt; font-weight: 800; letter-spacing: .06em; padding: .2mm 1.2mm; border-radius: .6mm; vertical-align: 1px; }
 
+/* the reader's name across every page — position: fixed repeats on each printed page */
+.wm { position: fixed; inset: 0; z-index: 50; pointer-events: none; display: flex; flex-direction: column; justify-content: space-around; align-items: center; overflow: hidden; }
+.wm div { transform: rotate(-24deg); font-size: 15pt; font-weight: 700; letter-spacing: .06em; color: rgba(22, 35, 47, .075); white-space: nowrap; }
+
 /* page one: the year's banner, six months delivered, the plan in large letters */
-.hero { display: flex; align-items: center; gap: 6mm; margin-bottom: 2mm; }
-.bt { height: 30mm; }
+.hero { display: flex; align-items: center; gap: 6mm; margin-bottom: 1mm; }
+.bt { height: 24mm; }
 .hero .t { flex: 1; min-width: 0; }
-.charts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin: 2mm 0 3mm; }
-.chart { border: 1px solid #E2E0DA; border-radius: 2mm; padding: 2mm 2.5mm 1mm; }
+.charts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin: 1mm 0 2mm; }
+.chart { border: 1px solid #E2E0DA; border-radius: 2mm; padding: 1.4mm 2.5mm .6mm; }
 .chart .ct1 { font-size: 7.2pt; font-weight: 800; letter-spacing: .08em; color: #8A94A0; }
-.chart svg { display: block; width: 100%; height: 34mm; }
-.big { display: flex; align-items: stretch; gap: 4mm; margin: 1mm 0 2mm; border-top: 2px solid #22303C; border-bottom: 2px solid #22303C; padding: 2mm 0; }
+.chart svg { display: block; width: 100%; height: 25mm; }
+.big { display: flex; align-items: stretch; gap: 4mm; margin: 0 0 1.5mm; border-top: 2px solid #22303C; border-bottom: 2px solid #22303C; padding: 1.2mm 0; }
 .big .bl { font-size: 7.4pt; font-weight: 800; letter-spacing: .1em; color: #E8600A; align-self: center; width: 30mm; line-height: 1.3; }
 .big .bn { flex: 1; }
-.big .bn b { display: block; font-size: 26pt; font-weight: 800; color: #12386B; line-height: 1.05; letter-spacing: -.01em; }
+.big .bn b { display: block; font-size: 21pt; font-weight: 800; color: #12386B; line-height: 1.05; letter-spacing: -.01em; }
 .big .bn span { font-size: 7.4pt; color: #5A6672; font-weight: 700; letter-spacing: .08em; }
+table.ytd { width: auto; border-collapse: collapse; margin: 0 0 1.2mm; font-size: 8.4pt; }
+table.ytd td { border: none; padding: .3mm 6mm .3mm 0; background: transparent !important; }
+table.ytd td.yl { color: #5A6672; font-weight: 700; min-width: 52mm; }
+table.ytd td.yn b { color: #16232F; font-size: 9.6pt; }
+table.ytd tr.yall td { border-top: 1.5px solid #22303C; padding-top: .8mm; }
+table.ytd tr.yall td.yl { color: #E8600A; }
+table.ytd tr.yall td.yn b { color: #E8600A; font-size: 11pt; }
 .real { font-size: 8.6pt; color: #46545F; margin-bottom: 1mm; }
 .real b { color: #E8600A; }
 
 /* page one is the signatures; the calendar opens page two */
 .p2 { break-before: page; page-break-before: always; }
-.sigwrap.first { margin-top: 3mm; }
+.sigwrap.first { margin-top: 1.5mm; padding-top: 1.5mm; }
 
 /* the calendar */
 .cal { margin-bottom: 5mm; }
@@ -463,18 +512,32 @@ td.cd.out .dn { color: #C9C5BB; }
 .cflowi .ws { display: block; margin-top: -.4mm; }
 .ws { font-size: 6.5pt; color: #8A94A0; font-weight: 400; }
 
-/* week-wise tables */
-.wk { margin: 4mm 0 5mm; break-inside: avoid; }
-table.wt { font-size: 7.6pt; }
+/* week-wise tables — both on one page */
+.wkpage { break-inside: avoid; page-break-inside: avoid; }
+.wk { margin: 0 0 4mm; }
+.wkh { display: flex; align-items: center; justify-content: space-between; gap: 4mm; margin-bottom: 1.2mm; }
+.wkh .tlabel { margin: 0; }
+table.wt { font-size: 7.8pt; line-height: 1.3; }
+table.wt th { padding: 1.4mm 1.6mm; }
+table.wt td { padding: 1.3mm 1.6mm; vertical-align: middle; }
+table.wt.d1 { font-size: 7.4pt; }
+table.wt.d1 th, table.wt.d1 td { padding: .85mm 1.4mm; }
+table.wt.d2 { font-size: 7pt; line-height: 1.25; }
+table.wt.d2 th, table.wt.d2 td { padding: .5mm 1.3mm; }
+table.wt.d3 { font-size: 6.4pt; line-height: 1.2; }
+table.wt.d3 th, table.wt.d3 td { padding: .3mm 1.2mm; }
+.nm1 { display: block; max-width: 64mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 table.wt th.wc, table.wt td.wc { text-align: center; white-space: nowrap; }
-table.wt th.wk1, table.wt td.wk1 { width: 40mm; }
+table.wt th.wk1, table.wt td.wk1 { width: 66mm; }
 table.wt td.tot1, table.wt th.tot1 { background: #EEF2F6 !important; }
 table.wt th.tot1 { color: #16232F; }
 table.wt tfoot td { border-top: 2px solid #22303C; background: #F4F2EC; font-weight: 700; }
-.wv { font-size: 6.6pt; color: #5A6672; }
+table.wt th .ws { color: #B8C2CC; font-weight: 400; }
+.wv { font-size: .86em; color: #5A6672; font-weight: 400; }
 
 </style></head><body>
 
+${i.watermark ? `<div class="wm" aria-hidden="true">${Array.from({ length: 6 }, () => `<div>${esc(i.watermark)}</div>`).join("")}</div>` : ""}
 <div class="hero">
   <img class="bt" src="${BREAKTHROUGH}" alt="Nandan GSE — Breakthrough 2027" />
   <div class="t">
@@ -493,14 +556,18 @@ ${historyCharts(i.history || [], i.plan, KIND === "MONTH PLAN" ? `${period.split
   ${money ? `<div class="bn"><b>${M(i.plan.value)}</b><span>VALUE</span></div>
   <div class="bn"><b>${M(i.plan.throughput)}</b><span>THROUGHPUT</span></div>` : ""}
 </div>
+${ytdBlock()}
 <div class="real">The realistic read, on my dates and my belief: <b>${i.real.jobs} jobs at 50% belief or better</b>${money ? ` · ${M(i.real.value)} · ${M(i.real.throughput)} throughput` : ""}${i.done ? ` &nbsp;·&nbsp; done so far this period: ${i.done.nos} nos${money ? ` · ${M(i.done.value)} · ${M(i.done.throughput)}` : ""}` : ""}</div>
 
 ${sigBlock.replace('class="sigwrap"', 'class="sigwrap first"')}
 
 <div class="p2">
 ${calendar(i.snapshot || [], i.window.from, i.window.end, money, i.owners || {})}
-${weekTable("PRODUCT — WEEK-WISE DELIVERIES" + (money ? ", NOS AND VALUE" : ", NOS"), "fam", i.snapshot || [], i.window.from, i.window.end, money)}
-${weekTable("CLIENT — WEEK-WISE DELIVERIES" + (money ? ", NOS AND VALUE" : ", NOS"), "cust", i.snapshot || [], i.window.from, i.window.end, money)}
+</div>
+
+<div class="p2 wkpage">
+${weekTable("PRODUCT — WEEK-WISE DELIVERIES" + (money ? ", NOS (VALUE)" : ", NOS"), "fam", i.snapshot || [], i.window.from, i.window.end, money, dense)}
+${weekTable("CLIENT — WEEK-WISE DELIVERIES" + (money ? ", NOS (VALUE)" : ", NOS"), "cust", i.snapshot || [], i.window.from, i.window.end, money, dense)}
 </div>
 
 <div class="p2">
@@ -522,16 +589,31 @@ ${money ? '<th style="width:8%">Value</th><th style="width:8%">TP</th>' : ""}
 /** The footer Chromium draws on every page — it will not read the page's CSS. */
 export const PLAN_FOOTER = planFooter();
 
+/** "05-10-2026 18:42 IST" — the moment, as it was on the clock in India. */
+export function istStamp(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
+    .formatToParts(d).map((x) => [x.type, x.value]));
+  return `${p.day}-${p.month}-${p.year} ${p.hour}:${p.minute} IST`;
+}
+
 /**
  * The document number rides on EVERY page, not just the first. A signed plan
  * gets photocopied, forwarded and pulled apart; a loose page with no number on
  * it is a page nobody can place.
+ *
+ * So does the moment Dr Raghu froze the plan (6 Oct 2026: "On every page in
+ * the footer also mention - Signed by Raghu <date> <time>"). A loose page
+ * then says not only which plan it is but whether it had been approved —
+ * and until he has signed, it says that instead.
  */
-export function planFooter(docNo?: string): string {
+export function planFooter(docNo?: string, raghuAt?: string | null): string {
+  const signed = raghuAt ? `Signed by Raghu ${esc(istStamp(raghuAt))}` : "Not yet signed by Raghu";
   return `
 <div style="width:100%;font:7.5pt -apple-system,Arial,sans-serif;color:#8A94A0;padding:0 10mm;
-            display:flex;justify-content:space-between;">
-  <span>${docNo ? esc(docNo) + " &middot; " : ""}Nandan GSE &middot; the living version is on the Month, Quarter &amp; Year Plan desk in Genie</span>
-  <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+            display:flex;justify-content:space-between;gap:6mm;">
+  <span>${docNo ? esc(docNo) + " &middot; " : ""}<b style="color:${raghuAt ? "#0D7A3F" : "#B26A00"}">${signed}</b> &middot; Nandan GSE &middot; the living version is on the Month, Quarter &amp; Year Plan desk in Genie</span>
+  <span style="white-space:nowrap">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
 </div>`;
 }
