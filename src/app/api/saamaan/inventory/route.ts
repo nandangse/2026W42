@@ -140,21 +140,25 @@ export async function POST(req: Request) {
       const who = S(b.assigned_email, 120).toLowerCase();
       if (!warehouse || !who) throw new HttpError(400, "A location and a person.");
       const n = Math.max(5, Math.min(50, Number(b.n) || 10));
-      const group = S(b.item_group, 200);
-      if (kind === "group" && !group) throw new HttpError(400, "Which item group?");
+      /* SEVERAL GROUPS ON ONE SHEET (Dr Raghu, 6 Oct 2026: "in item groups,
+         let us choose multiple so that they all come in there") */
+      const groups = [...new Set((Array.isArray(b.item_groups) ? (b.item_groups as unknown[]) : [b.item_group]).map((g) => S(g, 200)).filter(Boolean))].slice(0, 30);
+      const group = groups.join(" + ");
+      if (kind === "group" && !groups.length) throw new HttpError(400, "Which item group?");
       const bins = await warehouseBins(admin, warehouse, 20000);
       let pick = bins.filter((x) => x.qty > 0);
       if (kind === "group") {
-        const inGroup = new Set(await groupCodes(admin, group));
-        pick = pick.filter((x) => inGroup.has(x.item_code)).slice(0, 300);
-        if (!pick.length) throw new HttpError(400, `Nothing of ${group} is on the ERP's books in ${warehouse}.`);
+        const inGroup = new Set((await Promise.all(groups.map((g) => groupCodes(admin, g)))).flat());
+        pick = pick.filter((x) => inGroup.has(x.item_code)).sort((a, b) => a.item_group.localeCompare(b.item_group) || a.item_code.localeCompare(b.item_code));
+        if (!pick.length) throw new HttpError(400, `Nothing of ${groups.length === 1 ? group : "those groups"} is on the ERP's books in ${warehouse}.`);
+        if (pick.length > 600) throw new HttpError(400, `That is ${pick.length} items in ${warehouse} — more than one person counts on one sheet. Choose fewer groups (600 at most).`);
       } else {
         if (!pick.length) throw new HttpError(400, `${warehouse} holds nothing on the ERP's books.`);
         pick = sample(pick, n);
       }
       const { data: c, error } = await admin.from("material_count").insert({
         kind, warehouse, item_group: kind === "group" ? group : null, assigned_email: who, assigned_name: S(b.assigned_name, 120),
-        title: S(b.title, 200) || (kind === "group" ? `${group} · ${warehouse}` : `Random ${pick.length} · ${warehouse}`),
+        title: S(b.title, 200) || (kind === "group" ? `${groups.length > 2 ? `${groups.slice(0, 2).join(" + ")} + ${groups.length - 2} more` : group} · ${warehouse}`.slice(0, 200) : `Random ${pick.length} · ${warehouse}`),
         due_on: /^\d{4}-\d{2}-\d{2}$/.test(S(b.due_on, 10)) ? S(b.due_on, 10) : null, created_by: me.email, note: S(b.note, 1000),
       }).select("id").single();
       if (error) fail(error.message);

@@ -186,7 +186,10 @@ interface Count { id: string; kind: string; title: string; warehouse: string; it
 
 function Reconciliation({ kind, meta, go }: { kind: "group" | "random"; meta: Meta | null; go: (r: string) => void }) {
   const [data, busy, reload, err] = useLoad<{ counts: Count[]; installed?: boolean; error?: string }>("/api/saamaan/inventory?view=counts");
-  const [f, setF] = useState({ warehouse: "", item_group: "", n: "10", who: "", due_on: "" });
+  /* the "By" date starts at today (Dr Raghu, 6 Oct 2026) — a count is meant to be done the day it is given */
+  const todayIst = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const [f, setF] = useState({ warehouse: "", n: "10", who: "", due_on: todayIst() });
+  const [groups, setGroups] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
   const [making, setMaking] = useState(false);
   const lead = !!meta?.me.lead;
@@ -195,7 +198,7 @@ function Reconciliation({ kind, meta, go }: { kind: "group" | "random"; meta: Me
   const make = async () => {
     setMsg(""); setMaking(true);
     const p = (meta?.people ?? []).find((x) => x.email === f.who);
-    const r = await post("/api/saamaan/inventory", { action: "create_count", kind, warehouse: f.warehouse, item_group: f.item_group, n: Number(f.n), assigned_email: f.who, assigned_name: p?.name || "", due_on: f.due_on });
+    const r = await post("/api/saamaan/inventory", { action: "create_count", kind, warehouse: f.warehouse, item_groups: groups, n: Number(f.n), assigned_email: f.who, assigned_name: p?.name || "", due_on: f.due_on });
     setMaking(false);
     if (!r.ok) { setMsg(r.error || "Could not make the sheet."); return; }
     go(`sheet/${r.id}`);
@@ -210,17 +213,13 @@ function Reconciliation({ kind, meta, go }: { kind: "group" | "random"; meta: Me
       {err && <Note kind={/0201/.test(err) ? "warn" : "error"}>{err}</Note>}
       {lead && (
         <div className="rounded-lg border p-3 mb-4 bg-white flex gap-3 flex-wrap items-end" style={{ borderColor: BORDER }}>
+          {/* TYPED, NOT SCROLLED (Dr Raghu, 6 Oct 2026: "let us type it so that it comes in") */}
           <label className="text-xs font-bold" style={{ color: MUTED }}>Location<br />
-            <select value={f.warehouse} onChange={(e) => setF({ ...f, warehouse: e.target.value })} className="rounded border px-2 py-1.5 text-sm bg-white" style={{ borderColor: BORDER, minWidth: 240 }}>
-              <option value="">— choose —</option>
-              <optgroup label="Stock warehouses">{stockWh.map((w) => <option key={w.warehouse}>{w.warehouse}</option>)}</optgroup>
-              <optgroup label="Other">{otherWh.map((w) => <option key={w.warehouse}>{w.warehouse}</option>)}</optgroup>
-            </select></label>
+            <input list="inv-wh" value={f.warehouse} onChange={(e) => setF({ ...f, warehouse: e.target.value })} placeholder="type a warehouse…"
+              className="rounded border px-2 py-1.5 text-sm bg-white" style={{ borderColor: f.warehouse && !(meta?.warehouses ?? []).some((w) => w.warehouse === f.warehouse) ? RED : BORDER, minWidth: 260 }} />
+            <datalist id="inv-wh">{[...stockWh, ...otherWh].map((w) => <option key={w.warehouse} value={w.warehouse}>{w.kind || "untyped"}</option>)}</datalist></label>
           {kind === "group" ? (
-            <label className="text-xs font-bold" style={{ color: MUTED }}>Item group<br />
-              <select value={f.item_group} onChange={(e) => setF({ ...f, item_group: e.target.value })} className="rounded border px-2 py-1.5 text-sm bg-white" style={{ borderColor: BORDER, minWidth: 220 }}>
-                <option value="">— choose —</option>{(meta?.groups ?? []).map((g) => <option key={g.group} value={g.group}>{g.group} ({g.items})</option>)}
-              </select></label>
+            <GroupPicker all={meta?.groups ?? []} chosen={groups} onChange={setGroups} />
           ) : (
             <label className="text-xs font-bold" style={{ color: MUTED }}>Items<br />
               <select value={f.n} onChange={(e) => setF({ ...f, n: e.target.value })} className="rounded border px-2 py-1.5 text-sm bg-white" style={{ borderColor: BORDER }}>
@@ -232,7 +231,7 @@ function Reconciliation({ kind, meta, go }: { kind: "group" | "random"; meta: Me
               <option value="">— choose —</option>{(meta?.people ?? []).map((p) => <option key={p.email} value={p.email}>{p.name}{p.store ? " · store" : ""}</option>)}
             </select></label>
           <label className="text-xs font-bold" style={{ color: MUTED }}>By<br /><input type="date" value={f.due_on} onChange={(e) => setF({ ...f, due_on: e.target.value })} className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: BORDER }} /></label>
-          <Btn kind="primary" onClick={make} disabled={making || !f.warehouse || !f.who || (kind === "group" && !f.item_group)}>{making ? "Picking…" : kind === "random" ? "🎲 Make the sheet" : "Make the sheet"}</Btn>
+          <Btn kind="primary" onClick={make} disabled={making || !(meta?.warehouses ?? []).some((w) => w.warehouse === f.warehouse) || !f.who || (kind === "group" && !groups.length)}>{making ? "Picking…" : kind === "random" ? "🎲 Make the sheet" : "Make the sheet"}</Btn>
           {msg && <span className="text-sm font-bold" style={{ color: RED }}>{msg}</span>}
         </div>
       )}
@@ -247,6 +246,45 @@ function Reconciliation({ kind, meta, go }: { kind: "group" | "random"; meta: Me
           { key: "d", label: "Made", align: "right", sort: (c) => c.created_at, render: (c) => <span style={{ color: MUTED }}>{dmy(c.created_at)}</span> },
         ]} />
     </Screen>
+  );
+}
+
+/**
+ * ITEM GROUPS, TYPED AND SEVERAL (Dr Raghu, 6 Oct 2026: "let us type it so
+ * that it comes in, and also in item groups, let us choose multiple so that
+ * they all come in there"). Type a few letters, pick from what matches —
+ * Enter takes the first — and each pick becomes a chip; × takes it off.
+ */
+function GroupPicker({ all, chosen, onChange }: { all: { group: string; items: number }[]; chosen: string[]; onChange: (g: string[]) => void }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const needle = q.trim().toLowerCase();
+  const hits = all.filter((g) => !chosen.includes(g.group) && (!needle || g.group.toLowerCase().includes(needle))).slice(0, 40);
+  const take = (g: string) => { onChange([...chosen, g]); setQ(""); };
+  const items = all.filter((g) => chosen.includes(g.group)).reduce((a, g) => a + g.items, 0);
+  return (
+    <div className="text-xs font-bold" style={{ color: MUTED, position: "relative", minWidth: 300, flex: "1 1 300px" }}>
+      Item groups{chosen.length ? <span style={{ fontWeight: 400 }}> · {chosen.length} chosen · {items.toLocaleString("en-IN")} items in the master</span> : null}<br />
+      <div className="rounded border px-1.5 py-1 bg-white flex flex-wrap gap-1 items-center" style={{ borderColor: BORDER, minHeight: 36 }} onClick={() => setOpen(true)}>
+        {chosen.map((g) => (
+          <span key={g} className="rounded px-1.5 py-0.5 text-xs font-bold flex items-center gap-1" style={{ background: NAVY_SOFT, color: NAVY }}>
+            {g}<button onClick={(e) => { e.stopPropagation(); onChange(chosen.filter((x) => x !== g)); }} style={{ color: MUTED }} aria-label={`Remove ${g}`}>×</button>
+          </span>
+        ))}
+        <input value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onKeyDown={(e) => { if (e.key === "Enter" && hits[0]) { e.preventDefault(); take(hits[0].group); } if (e.key === "Backspace" && !q && chosen.length) onChange(chosen.slice(0, -1)); }}
+          placeholder={chosen.length ? "add another…" : "type a group…"} className="text-sm font-normal outline-none" style={{ flex: 1, minWidth: 120, color: INK }} />
+      </div>
+      {open && hits.length > 0 && (
+        <div className="absolute rounded border bg-white shadow-lg" style={{ borderColor: BORDER, zIndex: 30, left: 0, right: 0, top: "100%", maxHeight: 280, overflowY: "auto" }}>
+          {hits.map((g) => (
+            <button key={g.group} onMouseDown={(e) => { e.preventDefault(); take(g.group); }} className="w-full text-left px-2 py-1.5 text-sm font-normal hover:bg-gray-50 flex justify-between" style={{ color: INK }}>
+              <span>{g.group}</span><span style={{ color: MUTED }}>{g.items}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

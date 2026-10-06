@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.2",
+    date: "2026-10-06",
+    module: "Inventory reconciliation: typed location, several item groups on one sheet, due today by default",
+    items: [
+      "TYPED, NOT SCROLLED, AND SEVERAL AT ONCE (Dr Raghu, 6 Oct 2026: \u201clet us type it so that it comes in, and also in item groups, let us choose multiple so that they all come in there\u201d). On a reconciliation sheet the location is typed and picked from what matches; on By item group, groups are typed too \u2014 a few letters, pick (Enter takes the first), and each becomes a chip; \u00d7 or Backspace takes it off. Choose as many as one person can count: every item of every chosen group on the ERP\u2019s books in that location comes onto the one sheet, grouped by item group. Six hundred lines at most, and the sheet says so rather than cutting it short.",
+      "THE \u201cBY\u201d DATE STARTS AT TODAY (\u201cThis also, by default, make it today\u2019s date\u201d) \u2014 change it if the count can wait.",
+    ],
+  },
+  {
     v: "6.3.0.1",
     date: "2026-10-06",
     module: "Saamaan: a warehouse can be typed Ignore",
