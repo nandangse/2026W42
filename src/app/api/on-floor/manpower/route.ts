@@ -6,6 +6,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { today } from "@/lib/schedule";
 import { TRADES } from "@/lib/templates";
 import { ensureManpowerRollover, istToday } from "@/lib/manpower-rollover";
+import { ensureCrewRollover } from "@/lib/crew-roll";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export async function GET(req: Request) {
       /* Today is inside the window, so the rollover still gets its chance to
          heal a missed night before anybody reads it. */
       if (from <= istToday() && istToday() <= to) {
-        try { await ensureManpowerRollover(); } catch (e) { swallow("on-floor/manpower", e); }
+        try { await ensureManpowerRollover(); await ensureCrewRollover(); } catch (e) { swallow("on-floor/manpower", e); }
       }
       const { data, error } = await admin
         .from("job_manpower").select("job_id, day, crew, noted_by, updated_at")
@@ -76,7 +77,7 @@ export async function GET(req: Request) {
     // the missing days fill themselves in — back-dated correctly — the first
     // time anyone looks. Cheap when there is nothing to do.
     if (day === istToday()) {
-      try { await ensureManpowerRollover(); } catch (e) { swallow("on-floor/manpower", e); /* read still answers */ }
+      try { await ensureManpowerRollover(); await ensureCrewRollover(); } catch (e) { swallow("on-floor/manpower", e); /* read still answers */ }
     }
     const { data, error } = await admin
       .from("job_manpower").select("job_id, day, crew, noted_by, updated_at").eq("day", day);
@@ -109,6 +110,14 @@ export async function POST(req: Request) {
       if (n < 0 || n > 99) throw new HttpError(400, `${t.label}: ${n} is not a crew size.`);
       crew[t.key] = n;
     }
+
+    /* WHERE THERE ARE NAMES, THE NAMES ARE THE COUNT (Dr Raghu, 6 Oct 2026:
+       "whatever is manually written will slowly get overridden by this one").
+       A typed count beside them would be overwritten at the next change of
+       names, so it is refused with the reason, not silently lost later. */
+    const { data: named, error: nerr } = await admin.from("job_crew_person").select("emp_name").eq("job_id", jobId).eq("day", day);
+    if (!nerr && (named || []).length)
+      throw new HttpError(409, `This job has ${named!.length} name${named!.length === 1 ? "" : "s"} on the Manpower Plan for ${day} — the count comes from them. Change the names there.`);
 
     const { error } = await admin.from("job_manpower").upsert({
       job_id: jobId, day, crew,

@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.0.2.3",
+    date: "2026-10-06",
+    module: "Manpower Plan: the names roll to the next day, and the count comes from the names",
+    items: [
+      "THE NAMES ROLL FORWARD (Dr Raghu, 6 Oct 2026: \u201cIf there is no update on that, the same guy has to work on the same job for the next day. Keep moving that accordingly till the time it finishes\u201d). Every working day, each job\u2019s named crew from the last working day is carried in \u2014 unless somebody has already put names on that job for the day, and never a man who is already on another job that day. It stops when the job is delivered, or when somebody empties the job (the carry reads only the day before, so an emptied day breaks the chain). Sundays and the third Saturday are skipped, as the count rollover skips them: Monday carries Saturday. A carried name wears \u21bb until somebody touches the job. It runs at 4 AM with the count rollover, and again the first time anyone opens the board if the cron slept, back-dated, at most ten days.",
+      "THE COUNT IS THE NAMES (\u201cIf this is not done, then the manpower count will come out wrong. Right now, whatever is manually written will slowly get overridden by this one\u201d). On any day a job has names, its count \u2014 the job_manpower row the labour cost is worked out from \u2014 is the names, counted by trade, a man on two jobs half a man-day on each. It is re-worked out on every change of names, and every morning for today and the eight days ahead. A name whose designation maps to no trade counts as a helper, the cheapest, so a guess never overstates the cost. Typing a count by hand for a job that has names on that day is refused, with the reason \u2014 change the names instead. The ledger marks these days \u201cfrom the names\u201d.",
+      "TODAY IS OVERRIDDEN (\u201ceven today, if you would like, just override the manpower plan so that the numbers come from the names given\u201d). Migration 0200 (job_crew_roll, one row per day carried, so a day is carried once and an emptied job stays empty). The first time the board is opened after it runs, today is carried and today\u2019s counts, and every planned day after, are taken from the names.",
+      "THE COUNT ROLLOVER NO LONGER STOPS AT THE FIRST ROW FOR TODAY. It treated today as done the moment any row existed, so one count typed early \u2014 or one taken from the names \u2014 could leave every other job on the floor without today\u2019s row. It now finishes only when every job on the floor has one, and rows written for the days ahead no longer make it think today has been handled.",
+    ],
+  },
+  {
     v: "6.0.2.2",
     date: "2026-10-06",
     module: "The plan PDF: TDD with value (TP) in one cell, the team\u2019s words wider, the calendar on one page",

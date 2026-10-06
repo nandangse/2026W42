@@ -4,6 +4,9 @@ import { adminClient } from "@/lib/supabase/admin";
 import { readBody } from "@/lib/validate";
 import { tradeOf, type Person } from "@/lib/manpower-plan";
 import { TRADES } from "@/lib/templates";
+import { swallow } from "@/lib/swallow";
+import { ensureManpowerRollover } from "@/lib/manpower-rollover";
+import { countsFromNames, ensureCrewRollover } from "@/lib/crew-roll";
 
 export const dynamic = "force-dynamic";
 
@@ -52,8 +55,12 @@ export async function GET(req: Request) {
       trade: tradeOf(e.designation as string),
     }));
 
+    /* the board heals itself when it is opened: a night the cron slept is
+       carried in, back-dated, before anybody reads it */
+    try { await ensureManpowerRollover(); await ensureCrewRollover(); } catch (e) { swallow("manpower-plan/roll", e); }
+
     const [aRes, nRes] = await Promise.all([
-      db.from("job_crew_person").select("id, job_id, day, emp_id, emp_name, trade, note").gte("day", from).lte("day", to),
+      db.from("job_crew_person").select("id, job_id, day, emp_id, emp_name, trade, note, noted_by").gte("day", from).lte("day", to),
       db.from("job_day_note").select("job_id, day, text, noted_by, updated_at").gte("day", from).lte("day", to),
     ]);
     if (aRes.error && !NOT_INSTALLED.test(aRes.error.message)) throw new Error(aRes.error.message);
@@ -100,6 +107,7 @@ export async function POST(req: Request) {
         noted_by: user.email, updated_at: new Date().toISOString(),
       }, { onConflict: "job_id,day,emp_id" });
       if (error) fail(error.message);
+      await countsFromNames(action === "move" && DAY.test(S(body.from_day, 10)) ? [day, S(body.from_day, 10)] : [day]);
       return NextResponse.json({ ok: true });
     }
 
@@ -107,6 +115,7 @@ export async function POST(req: Request) {
       const { error } = await db.from("job_crew_person").delete()
         .eq("job_id", S(body.job_id, 64)).eq("day", S(body.day, 10)).eq("emp_id", S(body.emp_id, 64));
       if (error) fail(error.message);
+      if (DAY.test(S(body.day, 10))) await countsFromNames([S(body.day, 10)]);
       return NextResponse.json({ ok: true });
     }
 
@@ -134,6 +143,7 @@ export async function POST(req: Request) {
       if (!rows.length) return NextResponse.json({ ok: true, copied: 0, note: "There was nothing on that day to carry." });
       const { error: e2 } = await db.from("job_crew_person").upsert(rows, { onConflict: "job_id,day,emp_id" });
       if (e2) fail(e2.message);
+      await countsFromNames([to]);
       return NextResponse.json({ ok: true, copied: rows.length });
     }
 

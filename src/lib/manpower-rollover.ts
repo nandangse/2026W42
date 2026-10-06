@@ -67,16 +67,25 @@ export async function ensureManpowerRollover(): Promise<{ filledDays: string[]; 
   const admin = adminClient();
   const T = istToday();
 
+  /* The ledger's last day is the last day UP TO TODAY. Since 6 Oct 2026 the
+     count is also written from the named plan for the days ahead, and a
+     future row must not make the rollover think today is already done. */
   const { data: maxRow } = await admin
-    .from("job_manpower").select("day").order("day", { ascending: false }).limit(1);
+    .from("job_manpower").select("day").lte("day", T).order("day", { ascending: false }).limit(1);
   const last = maxRow?.[0]?.day ? String(maxRow[0].day).slice(0, 10) : null;
-  if (last === T) return { filledDays: [], rowsWritten: 0 };
 
   const { data: jobRows, error: jerr } = await admin
     .from("jobs").select("id").eq("on_floor", true).eq("delivered", false);
   if (jerr) throw new Error(jerr.message);
   const jobs = (jobRows || []).map((r) => String(r.id));
   if (!jobs.length) return { filledDays: [], rowsWritten: 0 };
+
+  /* Done only when EVERY rolling job has today's row — one job's row (a
+     count typed early, or one taken from the names) is not the whole floor. */
+  if (last === T) {
+    const { data: todays } = await admin.from("job_manpower").select("job_id").eq("day", T).in("job_id", jobs);
+    if ((todays || []).length >= jobs.length) return { filledDays: [], rowsWritten: 0 };
+  }
 
   // History for the carry, and to know which rows already exist.
   const { data: hist, error: herr } = await admin
@@ -94,7 +103,7 @@ export async function ensureManpowerRollover(): Promise<{ filledDays: string[]; 
   // Catch-up window: from the day after the ledger's last day, at most the
   // last ten days — a ledger abandoned for a month restarts near today
   // rather than manufacturing four weeks of guesses.
-  let start = last ? addDays(last, 1) : T;
+  let start = last ? (last === T ? T : addDays(last, 1)) : T;
   if (start < addDays(T, -9)) start = addDays(T, -9);
 
   const filledDays: string[] = [];

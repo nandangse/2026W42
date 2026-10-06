@@ -140,7 +140,7 @@ export default function ManpowerPlan({
       <div className="flex items-baseline gap-2 flex-wrap mb-2">
         <div className="font-bold" style={{ fontSize: 15 }}>Manpower planning</div>
         <div className="text-xs" style={{ color: C.mute }}>
-          yesterday, today, and the seven days after · {people.length} people on the rolls
+          yesterday, today, and the seven days after · {people.length} people on the rolls · names carry to the next working day until changed (↻) · the count is the names
         </div>
         <div className="flex-1" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 job or tag"
@@ -227,7 +227,7 @@ export default function ManpowerPlan({
                             <span key={a.emp_id}
                               draggable={canEdit}
                               onDragStart={() => setDrag({ emp: { id: a.emp_id, name: a.emp_name, designation: null, department: null, trade: a.trade }, from: { job: j.id, day: d } })}
-                              title={clashing ? `${a.emp_name} is on more than one job on ${fmt(d)} — counted as a share of a day` : a.emp_name}
+                              title={clashing ? `${a.emp_name} is on more than one job on ${fmt(d)} — counted as a share of a day` : a.noted_by === "rollover@genie" ? `${a.emp_name} — carried from the last working day; nobody changed this job` : a.emp_name}
                               className="rounded px-1 flex items-center gap-1"
                               style={{
                                 fontSize: 10, fontWeight: 600, cursor: canEdit ? "grab" : "default",
@@ -237,6 +237,7 @@ export default function ManpowerPlan({
                               }}>
                               {t && <b>{t.tiny}</b>}
                               {shortName(a.emp_name)}
+                              {a.noted_by === "rollover@genie" && <span style={{ opacity: .55, fontSize: 9 }} aria-label="carried">↻</span>}
                               {canEdit && (
                                 <button onClick={() => post({ action: "unassign", job_id: j.id, day: d, emp_id: a.emp_id }, noteKey)}
                                   title="Take them off" style={{ color: C.faint, fontWeight: 800 }}>×</button>

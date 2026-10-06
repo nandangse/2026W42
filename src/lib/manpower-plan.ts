@@ -43,6 +43,8 @@ export interface Assignment {
   id: string; job_id: string; day: string;
   emp_id: string; emp_name: string; trade: string | null;
   note: string | null;
+  /** rollover@genie when the day's carry put them here, not a person (6 Oct 2026) */
+  noted_by?: string | null;
 }
 export interface Person {
   id: string; name: string; designation: string | null; department: string | null;

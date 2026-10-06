@@ -103,6 +103,7 @@ export function ManpowerLedger({ jobId, V }: { jobId: string; V: (n: number) => 
   const costOf = (c: Record<string, number>) =>
     rates ? TRADES.reduce((n, t) => n + (Number(c?.[t.key]) || 0) * (rates[t.key] || 0), 0) : 0;
   const srcOf = (r: LedgerRow) => {
+    if (r.noted_by === "names@genie") return "from the names";
     if (r.noted_by !== "rollover@genie") return r.noted_by ? `by ${String(r.noted_by).split("@")[0]}` : "recorded";
     return totalOf(r.crew) === 0 && isHoliday(r.day) ? "holiday" : "carried";
   };

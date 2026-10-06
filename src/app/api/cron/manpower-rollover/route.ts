@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireStratcom, errJson, HttpError } from "@/lib/auth";
 import { ensureManpowerRollover } from "@/lib/manpower-rollover";
+import { ensureCrewRollover } from "@/lib/crew-roll";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,11 @@ export async function GET(req: Request) {
         throw new HttpError(401, "The 4 AM cron or Stratcom only.");
       }
     }
+    /* counts first (every on-floor job gets today's row), then the names:
+       carried into today, and wherever a job has names, its count is them */
     const result = await ensureManpowerRollover();
-    return NextResponse.json({ ok: true, ...result });
+    const names = await ensureCrewRollover();
+    return NextResponse.json({ ok: true, ...result, names });
   } catch (e) {
     return errJson(e);
   }
