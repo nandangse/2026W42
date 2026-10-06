@@ -237,11 +237,26 @@ function Warehouses({ wh, go }: { wh: string; go: (r: string) => void }) {
 /* =========================================================== reconciliation */
 interface Count { id: string; kind: string; title: string; warehouse: string; item_group: string | null; assigned_email: string; assigned_name: string; status: string; due_on: string | null; created_at: string; submitted_at: string | null; lines: number; counted: number; variances: number; value: number }
 
+const DEFAULT_WH = "Khopoli Main Store - NGSE";
+
 function Reconciliation({ kind, meta, go, preset = "" }: { kind: "group" | "random"; meta: Meta | null; go: (r: string) => void; preset?: string }) {
   const [data, busy, reload, err] = useLoad<{ counts: Count[]; installed?: boolean; error?: string }>("/api/saamaan/inventory?view=counts");
   /* the "By" date starts at today (Dr Raghu, 6 Oct 2026) — a count is meant to be done the day it is given */
   const todayIst = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-  const [f, setF] = useState({ warehouse: "", n: "10", who: "", due_on: todayIst() });
+  /* THE HABIT (Dr Raghu, 6 Oct 2026: "This warehouse, always keep it by
+     default: Khopoli main store. The who counts, keep it equal to the
+     logged-in person by default. It can be changed … and the date, of
+     course, will be today.") */
+  const [f, setF] = useState({ warehouse: DEFAULT_WH, n: "10", who: "", due_on: todayIst() });
+  useEffect(() => {
+    if (!meta) return;
+    setF((x) => ({
+      ...x,
+      who: x.who || meta.me.email,
+      warehouse: x.warehouse && meta.warehouses.some((w) => w.warehouse === x.warehouse) ? x.warehouse
+        : meta.warehouses.find((w) => /khopoli main store/i.test(w.warehouse))?.warehouse ?? x.warehouse,
+    }));
+  }, [meta]);
   /* arriving from Item groups with one already chosen ("Show this item group on the physical inventory") */
   const [groups, setGroups] = useState<string[]>(preset ? [preset] : []);
   useEffect(() => { if (preset) setGroups((g) => (g.includes(preset) ? g : [...g, preset])); }, [preset]);

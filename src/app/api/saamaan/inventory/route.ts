@@ -127,8 +127,10 @@ export async function GET(req: Request) {
         admin.from("profiles").select("email, display_name, disabled"),
       ]);
       const name = new Map((profiles.data ?? []).filter((x) => !x.disabled).map((x) => [String(x.email).toLowerCase(), String(x.display_name || "") || String(x.email).split("@")[0]]));
-      const emails = new Set<string>([...COUNTERS_DEFAULT.map((h) => h.email), ...(access.data ?? []).map((a) => String(a.email).toLowerCase())]);
-      const people = [...emails].filter((e) => name.has(e) || COUNTERS_DEFAULT.some((h) => h.email === e))
+      /* the one making the sheet is always on the list — it defaults to them */
+      const mine = me.email.toLowerCase();
+      const emails = new Set<string>([mine, ...COUNTERS_DEFAULT.map((h) => h.email), ...(access.data ?? []).map((a) => String(a.email).toLowerCase())]);
+      const people = [...emails].filter((e) => e === mine || name.has(e) || COUNTERS_DEFAULT.some((h) => h.email === e))
         .map((e) => ({ email: e, name: name.get(e) || COUNTERS_DEFAULT.find((h) => h.email === e)?.name || e.split("@")[0], store: COUNTERS_DEFAULT.some((h) => h.email === e) }))
         .sort((a, b) => Number(b.store) - Number(a.store) || a.name.localeCompare(b.name));
       return NextResponse.json({

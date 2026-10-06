@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.5",
+    date: "2026-10-06",
+    module: "Reconciliation: Khopoli Main Store, the logged-in person and today, by default",
+    items: [
+      "THE HABIT (\u201cThis warehouse, always keep it by default: Khopoli main store. The who counts, keep it equal to the logged-in person by default. It can be changed, of course \u2026 and the date, of course, will be today\u201d). A new sheet, random or by item group, opens on Khopoli Main Store - NGSE, counted by whoever is signed in, due today. Each can still be changed before the sheet is made.",
+    ],
+  },
+  {
     v: "6.3.0.4",
     date: "2026-10-06",
     module: "Inventory: Item groups tab, value on the group table, PI on any item as a lightbox",
