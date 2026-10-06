@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.11",
+    date: "2026-10-06",
+    module: "Suppliers: no cash flow in Saamaan; Supplier Payment Release to Kuber and accounts@",
+    items: [
+      "NO CASH FLOW, ONLY SUPPLIERS (\u201cEnsure that there is no information in this about the cash flow in or out. This only has to do with the suppliers\u201d). Saamaan\u2019s Supplier Payment Plan no longer shows Kuber\u2019s 13-week strip, openings, inflows, closings, customer advances, other incomes or other payments. It shows the payments planned to suppliers \u2014 for when, to whom, against which bill, how much, and whether approved or paid \u2014 with a total per week. The door is shut on the server too: the supplier hand can no longer read Kuber\u2019s cash plan at all, only the supplier payments. Still Mukesh\u2019s and Dr Raghu\u2019s alone.",
+      "SUPPLIER PAYMENT RELEASE (\u201cget the supplier\u2019s name and the amount, and let them attach the bills, the P.I. \u2026 The moment he clicks Submit, an email has to go to accounts@nandan.co.in\u201d). A new tab: supplier (typed, from the ERP\u2019s list), advance or against a bill, amount, bill or PI number, wanted-by date, remarks, and the files. Submit records it, puts it into Kuber\u2019s Payment Planning \u2192 Payment Request as awaiting approval (\u201cthey will then look at the accounts in the Kubers module only in one place\u201d), and mails accounts@ \u2014 subject \u201cAdvance Payment to <supplier> \u2014 \u20b9<amount>\u201d, a table of date, supplier name, payment against bill number, amount and remarks, the files attached, one mail per release, for intimation only. Every release is listed with its state in Kuber.",
+      "The mail goes from purchase@nandan.co.in once that Gmail is connected in Genie; until then it goes from the sender\u2019s own Gmail with replies to purchase@, and if neither is connected the release still stands in Kuber and the screen says the mail did not go. Run migration 0205.",
+    ],
+  },
+  {
     v: "6.3.0.10",
     date: "2026-10-06",
     module: "Saamaan: every pulse tile opens its documents in a lightbox; last pull with the time in IST",

@@ -16,18 +16,20 @@
  */
 import { useState } from "react";
 import PurchaseOrders from "./PurchaseOrders";
-import { AgeingScreen, ReportCardScreen, PaymentHub } from "@/components/kuber/Books";
+import { AgeingScreen, ReportCardScreen } from "@/components/kuber/Books";
+import { PaymentRelease, SupplierPlan } from "./SupplierRelease";
 import { INK, MUTED, BORDER, NAVY, ORANGE } from "@/components/ims/ui";
 
-type Tab = "list" | "card" | "outstanding" | "plan";
+type Tab = "list" | "release" | "card" | "outstanding" | "plan";
 
 export default function SupplierDesk({ erpBase, canKuber }: { erpBase: string; canKuber: boolean }) {
   const [tab, setTab] = useState<Tab>("list");
   const TABS: [Tab, string, string][] = [
     ["list", "Suppliers", "the ERP's supplier master, mirrored"],
+    ["release", "Supplier Payment Release", "raise an advance or a bill payment — it goes to Kuber's payment requests and accounts@ is told"],
     ["card", "Supplier Report Card", "graded A–D on how we pay them and how they deliver — Kuber's figures, live"],
     ["outstanding", "Supplier Outstanding", "every open supplier bill, aged, net of advances — Kuber's payables ageing, live"],
-    ["plan", "Supplier Payment Plan", "the 13-week cash plan's supplier side — what we are going to pay, and when"],
+    ["plan", "Supplier Payment Plan", "what is planned to be paid to which supplier, and when — suppliers only"],
   ];
   const shown = canKuber ? TABS : TABS.slice(0, 1);
   return (
@@ -46,12 +48,9 @@ export default function SupplierDesk({ erpBase, canKuber }: { erpBase: string; c
       {tab === "list" && <PurchaseOrders erpBase={erpBase} openOn="suppliers" />}
       {tab === "card" && canKuber && <ReportCardScreen />}
       {tab === "outstanding" && canKuber && <AgeingScreen kind="payable" />}
-      {tab === "plan" && canKuber && (
-        <div>
-          <div className="text-sm mb-2" style={{ color: INK }}><b>Supplier payment plan</b> <span style={{ color: MUTED }}>— the next thirteen weeks, supplier bills by the week they are planned; the same hub Kuber plans on.</span></div>
-          <PaymentHub />
-        </div>
-      )}
+      {tab === "release" && canKuber && <PaymentRelease />}
+      {/* "Ensure that there is no information in this about the cash flow in or out" (Dr Raghu, 6 Oct 2026) — suppliers only */}
+      {tab === "plan" && canKuber && <SupplierPlan />}
     </div>
   );
 }

@@ -244,7 +244,9 @@ export async function GET(req: Request) {
     /* the supplier hand's side door: the payables side only (lib/accounts) */
     const supplierView =
       (["ageing", "billsdue"].includes(view) && url.searchParams.get("kind") === "payable") ||
-      ["reportcard", "supplier", "cashplan", "party_contact", "pos"].includes(view);
+      ["reportcard", "supplier", "supplierplan", "party_contact", "pos"].includes(view);
+    /* NO CASH FLOW THROUGH THE SIDE DOOR (Dr Raghu, 6 Oct 2026: "Ensure that there is no information in this about the cash flow in or out. This only has to do with the suppliers") —
+       the 13-week cash plan (openings, inflows, customer advances, closings) is Kuber's alone; the supplier hand reads only "supplierplan", the supplier payments planned */
     await requireKuberOr(supplierView);
     const admin = adminClient();
     const today = IST_TODAY();
@@ -820,6 +822,19 @@ export async function GET(req: Request) {
      * outside the totals, because an unplanned bill is a question, not a
      * decision.
      */
+    if (view === "supplierplan") {
+      /* only payments to suppliers: planned, approved, or paid in the last 30 days — never "Other" payments, never anything coming in */
+      const since = addDays(today, -30);
+      const out: Record<string, unknown>[] = [];
+      for (let a = 0; ; a += 1000) {
+        const { data, error } = await admin.from("kuber_payment_plan").select("id, plan_date, party, amount, purpose, bill_ref, status, paid_on, note").neq("status", "dropped").order("plan_date").range(a, a + 999);
+        if (error) throw new Error(error.message);
+        out.push(...(data ?? []).filter((r) => !/^other/i.test(String(r.purpose || "")) && (r.status !== "paid" || String(r.paid_on || r.plan_date) >= since)));
+        if (!data || data.length < 1000) break;
+      }
+      return NextResponse.json({ ok: true, rows: out.map(({ note: _n, ...r }) => { void _n; return r; }) });
+    }
+
     if (view === "cashplan") {
       const sundayOf = (iso: string) => addDays(iso, -new Date(iso + "T00:00:00Z").getUTCDay());
       const start = sundayOf(today);
