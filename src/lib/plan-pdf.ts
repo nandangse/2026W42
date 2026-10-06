@@ -10,8 +10,9 @@
  * itself from today's table would be a different plan wearing the same
  * signature.
  */
-import { LOGO } from "@/lib/logo";
 import { esc, dmy } from "@/lib/fmt";
+import { BREAKTHROUGH } from "@/lib/breakthrough-logo";
+import { ownerColour, sectorOf, SECTORS } from "@/lib/owner-colour";
 
 const CR = 1e7;
 const cr = (n: number) => `₹${((Number(n) || 0) / CR).toFixed(2)} Cr`;
@@ -52,6 +53,14 @@ export interface PlanPdfInput {
   signed?: PlanPerson[];
   drafts?: PlanPerson[];
   notViewed?: PlanPerson[];
+  /**
+   * THE LAST SIX MONTHS, DELIVERED (Dr Raghu, 6 Oct 2026: "show the last 6
+   * months results as a graph - Jobs, value, Throughput"). From the bank of
+   * delivered jobs, a month at a time, oldest first.
+   */
+  history?: { key: string; label: string; jobs: number; value: number; throughput: number }[];
+  /** Each job's planning owner, by job id — the calendar's colours. */
+  owners?: Record<string, string>;
 }
 
 /** "September 26", "Q2 26", "FY26-27" — the period as a person says it. */
@@ -129,17 +138,31 @@ function weekTable(title: string, key: string, rows: Record<string, unknown>[], 
     t.n++; t.v += Number(r.val) || 0;
   }
   const rowTot = (g: Map<string, Cell>) => [...g.values()].reduce((a, c) => ({ n: a.n + c.n, v: a.v + c.v }), { n: 0, v: 0 });
-  const ordered = [...grid.entries()].sort((a, b) => rowTot(b[1]).n - rowTot(a[1]).n || rowTot(b[1]).v - rowTot(a[1]).v || a[0].localeCompare(b[0]));
+  /* PRODUCTS WEAR THEIR SECTOR (Dr Raghu, 6 Oct 2026: "the product should
+     have the colour of the Sector of GSE, MHE, DEF") — grouped in that order,
+     busiest first inside each. Clients keep the busiest-first order. */
+  const isProduct = key === "fam";
+  const sIdx = (k: string) => SECTORS.findIndex((x) => x.key === sectorOf(k).key);
+  const ordered = [...grid.entries()].sort((a, b) =>
+    (isProduct ? sIdx(a[0]) - sIdx(b[0]) : 0) || rowTot(b[1]).n - rowTot(a[1]).n || rowTot(b[1]).v - rowTot(a[1]).v || a[0].localeCompare(b[0]));
+  const nameCell = (k: string) => {
+    if (!isProduct) return `<td class="wk1">${esc(k)}</td>`;
+    const sc = sectorOf(k);
+    return `<td class="wk1" style="border-left:2.2mm solid ${sc.ink};background:${sc.tint}"><span class="sec" style="background:${sc.ink}">${esc(sc.label)}</span> <b style="color:${sc.ink}">${esc(k)}</b></td>`;
+  };
+  const used = isProduct ? SECTORS.filter((x) => ordered.some(([k]) => sectorOf(k).key === x.key)) : [];
+  const secLegend = used.length ? `<div class="legend">${used.map((x) => `<span class="lk"><i style="background:${x.ink}"></i>${esc(x.label)}</span>`).join("")}</div>` : "";
   const fmtCell = (c?: Cell) => !c || !c.n ? '<span class="faint">·</span>' : `<b>${c.n}</b>${money ? `<div class="wv">${cr(c.v)}</div>` : ""}`;
   const grand = { n: rows.length, v: rows.reduce((a, r) => a + (Number(r.val) || 0), 0) };
   return `
 <div class="wk">
   <div class="tlabel">${esc(title)}</div>
   <table class="wt">
-    <thead><tr><th class="wk1">${esc(key === "fam" ? "Product" : "Client")}</th>${cols.map((c) => `<th class="wc">${esc(c.label)}<div class="ws">${esc(c.sub)}</div></th>`).join("")}<th class="wc tot1">Total</th></tr></thead>
-    <tbody>${ordered.map(([k, g]) => `<tr><td class="wk1">${esc(k)}</td>${cols.map((c) => `<td class="wc">${fmtCell(g.get(c.key))}</td>`).join("")}<td class="wc tot1">${fmtCell(rowTot(g))}</td></tr>`).join("")}</tbody>
-    <tfoot><tr><td class="wk1"><b>Total</b></td>${cols.map((c) => `<td class="wc">${fmtCell(colTot.get(c.key))}</td>`).join("")}<td class="wc tot1">${fmtCell(grand)}</td></tr></tfoot>
+    <thead><tr><th class="wk1"${isProduct ? ' style="border-left:2.2mm solid #22303C"' : ""}>${esc(key === "fam" ? "Product" : "Client")}</th>${cols.map((c) => `<th class="wc">${esc(c.label)}<div class="ws">${esc(c.sub)}</div></th>`).join("")}<th class="wc tot1">Total</th></tr></thead>
+    <tbody>${ordered.map(([k, g]) => `<tr>${nameCell(k)}${cols.map((c) => `<td class="wc">${fmtCell(g.get(c.key))}</td>`).join("")}<td class="wc tot1">${fmtCell(rowTot(g))}</td></tr>`).join("")}</tbody>
+    <tfoot><tr><td class="wk1"${isProduct ? ' style="border-left:2.2mm solid #22303C"' : ""}><b>Total</b></td>${cols.map((c) => `<td class="wc">${fmtCell(colTot.get(c.key))}</td>`).join("")}<td class="wc tot1">${fmtCell(grand)}</td></tr></tfoot>
   </table>
+  ${secLegend}
 </div>`;
 }
 
@@ -149,7 +172,7 @@ function weekTable(title: string, key: string, rows: Record<string, unknown>[], 
  * lines and more rather than cut to one. A thin left rule says the team's
  * belief: green at 50% or better, amber below.
  */
-function calendar(rows: Record<string, unknown>[], from: string, end: string, money: boolean): string {
+function calendar(rows: Record<string, unknown>[], from: string, end: string, money: boolean, owners: Record<string, string> = {}): string {
   if (!rows.length) return "";
   const byDay = new Map<string, Record<string, unknown>[]>();
   const outside: Record<string, unknown>[] = [];
@@ -158,10 +181,18 @@ function calendar(rows: Record<string, unknown>[], from: string, end: string, mo
     if (!d || d < from || d > end) { outside.push(r); continue; }
     (byDay.get(d) ?? byDay.set(d, []).get(d)!).push(r);
   }
+  /* COLOUR IS THE PLANNING OWNER (Dr Raghu, 6 Oct 2026) — the same colour
+     the person wears on My Week, so the calendar answers "whose week is
+     this" before a word is read. A key under the calendar names them. */
+  const ownerOfRow = (r: Record<string, unknown>) => String(owners[String(r.id ?? "")] || "").trim();
   const chip = (r: Record<string, unknown>) => {
-    const b = Number(r.belief) || 0;
-    return `<div class="cj" style="border-left-color:${b >= 50 ? "#0D7A3F" : "#B26A00"}"><b>${esc(String(r.id ?? "").slice(-4))}</b> ${esc(r.tag)}${money ? `<span class="cv"> · ${cr(Number(r.val) || 0)}</span>` : ""}</div>`;
+    const o = ownerOfRow(r); const c = ownerColour(o);
+    return `<div class="cj" style="border-left-color:${c};background:${c}14"><b style="color:${c}">${esc(String(r.id ?? "").slice(-4))}</b> ${esc(r.tag)}${money ? `<span class="cv"> · ${cr(Number(r.val) || 0)}</span>` : ""}</div>`;
   };
+  const keyCount = new Map<string, number>();
+  for (const r of rows) { const o = ownerOfRow(r) || "No planning owner"; keyCount.set(o, (keyCount.get(o) || 0) + 1); }
+  const legend = [...keyCount.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([o, n]) => `<span class="lk"><i style="background:${o === "No planning owner" ? "#8B8F87" : ownerColour(o)}"></i>${esc(o)} · ${n}</span>`).join("");
   const first = mondayOf(from), last = mondayOf(end);
   const weeks: string[] = [];
   for (let t = atUtc(first).getTime(); t <= atUtc(last).getTime(); t += 7 * DAY) weeks.push(isoOf(new Date(t)));
@@ -192,6 +223,43 @@ function calendar(rows: Record<string, unknown>[], from: string, end: string, mo
   </table>
   ${strip(`LATER — DUE AFTER ${dShort(end).toUpperCase()}`, after)}
   ${strip("NO TARGET DATE", none)}
+  <div class="legend"><span class="tlabel">PLANNING OWNER</span>${legend}</div>
+</div>`;
+}
+
+/**
+ * The last six months as three small bar charts — jobs, value, throughput —
+ * with the period's plan beside them as an outlined bar, so the month ahead
+ * is read against the months behind it. Inline SVG: the press has no
+ * network and no chart library.
+ */
+function historyCharts(h: NonNullable<PlanPdfInput["history"]>, plan: { jobs: number; value: number; throughput: number }, planLabel: string | null, money: boolean): string {
+  if (!h.length) return "";
+  const W = 300, H = 128, padB = 18, padT = 14;
+  const panel = (title: string, pick: (x: { jobs: number; value: number; throughput: number }) => number, fmtv: (n: number) => string, fill: string) => {
+    const vals = h.map(pick);
+    const planV = planLabel ? pick(plan) : null;
+    const max = Math.max(1, ...vals, planV ?? 0);
+    const n = h.length + (planLabel ? 1 : 0);
+    const slot = W / n, bw = Math.min(30, slot * 0.62);
+    const bar = (i: number, v: number, label: string, isPlan: boolean) => {
+      const x = i * slot + (slot - bw) / 2;
+      const bh = ((H - padB - padT) * v) / max;
+      const y = H - padB - bh;
+      return `${isPlan
+        ? `<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(bh, .5)}" fill="#FFF3E8" stroke="#E8600A" stroke-width="1.4" stroke-dasharray="3 2"/>`
+        : `<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(bh, .5)}" fill="${fill}" rx="1.5"/>`}
+<text x="${x + bw / 2}" y="${y - 3}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${isPlan ? "#E8600A" : "#16232F"}">${esc(fmtv(v))}</text>
+<text x="${x + bw / 2}" y="${H - 5}" text-anchor="middle" font-size="8" fill="${isPlan ? "#E8600A" : "#5A6672"}" font-weight="${isPlan ? 800 : 400}">${esc(label)}</text>`;
+    };
+    const bars = h.map((m, i) => bar(i, pick(m), m.label, false)).join("") + (planLabel && planV != null ? bar(h.length, planV, planLabel, true) : "");
+    return `<div class="chart"><div class="ct1">${esc(title)}</div><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" y1="${H - padB}" x2="${W}" y2="${H - padB}" stroke="#D9D6CE"/>${bars}</svg></div>`;
+  };
+  const crs = (n: number) => (n / CR).toFixed(2);
+  return `<div class="charts">
+${panel("JOBS DELIVERED — LAST SIX MONTHS", (x) => x.jobs, (n) => String(Math.round(n)), "#1B3A5C")}
+${money ? panel("VALUE DELIVERED, ₹ CR", (x) => x.value, crs, "#3B6EA8") : ""}
+${money ? panel("THROUGHPUT DELIVERED, ₹ CR", (x) => x.throughput, crs, "#0D7A3F") : ""}
 </div>`;
 }
 
@@ -234,9 +302,14 @@ export function planPdfHtml(i: PlanPdfInput): string {
     const b = Number(r.belief) || 0;
     const mine = String(r.comment || "").trim();
     const others = (i.voices || {})[String(r.id ?? "")] || [];
+    /* ANYTHING SHORT OF 100% IS HIGHLIGHTED, FLUORESCENT YELLOW (Dr Raghu,
+       6 Oct 2026: "highlight those which are not 100%") — the doubt is the
+       part of the plan worth reading first. */
+    const line = (who: string, pct: number, text: string) =>
+      pct < 100 ? `<div><mark class="hl"><b>${esc(who)}</b> ${pct}% · ${esc(text)}</mark></div>` : `<div><b>${esc(who)}</b> ${pct}% · ${esc(text)}</div>`;
     const lines = [
-      ...(mine ? [`<div><b>MINE</b> ${b}% · ${esc(mine)}</div>`] : []),
-      ...others.map((v) => `<div><b>${esc(v.initials)}</b> ${v.belief}% · ${esc(v.comment)}</div>`),
+      ...(mine ? [line("MINE", b, mine)] : []),
+      ...others.map((v) => line(v.initials, Number(v.belief) || 0, v.comment)),
     ];
     return `<tr>
 <td class="c">${esc(String(r.id ?? "").slice(-4))}</td>
@@ -327,18 +400,43 @@ td.team { font-size: 8pt; }
    on overleaf. */
 .sigwrap { margin-top: 6mm; border-top: 2px solid #22303C; padding-top: 3mm; }
 .sighead, .sigrow { break-inside: avoid; page-break-inside: avoid; }
-.sighead { font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; color: #8A94A0; margin: 2.5mm 0 1.5mm; }
-.sigrow { display: flex; flex-wrap: wrap; gap: 3mm; }
-.sig { break-inside: avoid; page-break-inside: avoid; border: 1px solid #E2E0DA; border-radius: 2mm; padding: 2mm 3mm; min-width: 46mm; }
+.sighead { font-size: 7pt; font-weight: 800; letter-spacing: .08em; color: #8A94A0; margin: 1.6mm 0 1mm; }
+.sigrow { display: flex; flex-wrap: wrap; gap: 2mm; }
+.sig { break-inside: avoid; page-break-inside: avoid; border: 1px solid #E2E0DA; border-radius: 1.6mm; padding: 1.2mm 2.2mm; min-width: 40mm; }
 .sig.signed { background: #E8F3EC; border-color: #B7DFC8; }
 .sig.draft  { background: #F4F2EC; }
 .sig.none   { background: #fff; border-style: dashed; }
 .sig .nm { font-family: "Segoe Script", "Bradley Hand", "Snell Roundhand", cursive;
-           font-size: 13pt; font-weight: 600; color: #0D7A3F; }
+           font-size: 10.5pt; font-weight: 600; color: #0D7A3F; line-height: 1.2; }
 .sig.draft .nm { color: #5A6672; font-size: 11.5pt; }
 .sig.none .nm  { color: #8A94A0; font-size: 11pt; font-family: inherit; font-weight: 700; }
-.sig .num { font-size: 8.5pt; font-weight: 700; }
+.sig .num { font-size: 7.4pt; font-weight: 700; }
+.sig .sub { font-size: 6.6pt; }
 .foot { margin-top: 3mm; color: #8A94A0; font-size: 7.5pt; }
+
+
+mark.hl { background: #FFF200; color: #16232F; padding: 0 .6mm; border-radius: .6mm; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.legend { display: flex; flex-wrap: wrap; gap: 1.5mm 4mm; align-items: center; margin-top: 2mm; font-size: 7.2pt; color: #46545F; }
+.legend .tlabel { margin: 0 1mm 0 0; }
+.lk { display: inline-flex; align-items: center; gap: 1.2mm; }
+.lk i { display: inline-block; width: 3mm; height: 3mm; border-radius: .6mm; }
+.sec { display: inline-block; color: #fff; font-size: 6pt; font-weight: 800; letter-spacing: .06em; padding: .2mm 1.2mm; border-radius: .6mm; vertical-align: 1px; }
+
+/* page one: the year's banner, six months delivered, the plan in large letters */
+.hero { display: flex; align-items: center; gap: 6mm; margin-bottom: 2mm; }
+.bt { height: 30mm; }
+.hero .t { flex: 1; min-width: 0; }
+.charts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin: 2mm 0 3mm; }
+.chart { border: 1px solid #E2E0DA; border-radius: 2mm; padding: 2mm 2.5mm 1mm; }
+.chart .ct1 { font-size: 7.2pt; font-weight: 800; letter-spacing: .08em; color: #8A94A0; }
+.chart svg { display: block; width: 100%; height: 34mm; }
+.big { display: flex; align-items: stretch; gap: 4mm; margin: 1mm 0 2mm; border-top: 2px solid #22303C; border-bottom: 2px solid #22303C; padding: 2mm 0; }
+.big .bl { font-size: 7.4pt; font-weight: 800; letter-spacing: .1em; color: #E8600A; align-self: center; width: 30mm; line-height: 1.3; }
+.big .bn { flex: 1; }
+.big .bn b { display: block; font-size: 26pt; font-weight: 800; color: #12386B; line-height: 1.05; letter-spacing: -.01em; }
+.big .bn span { font-size: 7.4pt; color: #5A6672; font-weight: 700; letter-spacing: .08em; }
+.real { font-size: 8.6pt; color: #46545F; margin-bottom: 1mm; }
+.real b { color: #E8600A; }
 
 /* page one is the signatures; the calendar opens page two */
 .p2 { break-before: page; page-break-before: always; }
@@ -377,26 +475,30 @@ table.wt tfoot td { border-top: 2px solid #22303C; background: #F4F2EC; font-wei
 
 </style></head><body>
 
-<div class="head">
-  <img class="logo" src="${LOGO}" alt="Nandan GSE" />
-  <div>
+<div class="hero">
+  <img class="bt" src="${BREAKTHROUGH}" alt="Nandan GSE — Breakthrough 2027" />
+  <div class="t">
     <div class="band" style="background:${band.bg}">${band.text}</div>
     <h1>${esc(i.title)}</h1>
+    ${i.docNo ? `<div class="docno">${esc(i.docNo)}${i.appVersion ? ` &middot; Genie ${esc(i.appVersion)}` : ""}</div>` : ""}
+    <div class="sub2" style="margin:0">${esc(i.window.label)} · ${esc(i.window.key)} · ${esc(dmy(i.window.from))} to ${esc(dmy(i.window.end))} · ${esc(i.signedOn)} (IST)</div>
   </div>
 </div>
-${i.docNo ? `<div class="docno">${esc(i.docNo)}${i.appVersion ? ` &middot; Genie ${esc(i.appVersion)}` : ""}</div>` : ""}
-<div class="sub2">${esc(i.window.label)} · ${esc(i.window.key)} · ${esc(dmy(i.window.from))} to ${esc(dmy(i.window.end))} · ${esc(i.signedOn)} (IST)</div>
 
-<div class="tot" style="margin:0 0 2mm">
-<div>The plan as it stands: <b>${i.plan.jobs} jobs</b>${money ? ` · ${M(i.plan.value)} · ${M(i.plan.throughput)} throughput` : ""}</div>
-<div>The realistic read, on my dates and my belief: <b>${i.real.jobs} jobs at 50% belief or better</b>${money ? ` · ${M(i.real.value)} · ${M(i.real.throughput)} throughput` : ""}</div>
-${i.done ? `<div style="color:#5A6672">Done so far this period: ${i.done.nos} nos${money ? ` · ${M(i.done.value)} · ${M(i.done.throughput)}` : ""}</div>` : ""}
+${historyCharts(i.history || [], i.plan, KIND === "MONTH PLAN" ? `${period.split(" ")[0].slice(0, 3)} plan` : null, money)}
+
+<div class="big">
+  <div class="bl">PLANNED FOR<br>${esc(period.toUpperCase())}</div>
+  <div class="bn"><b>${i.plan.jobs}</b><span>JOBS</span></div>
+  ${money ? `<div class="bn"><b>${M(i.plan.value)}</b><span>VALUE</span></div>
+  <div class="bn"><b>${M(i.plan.throughput)}</b><span>THROUGHPUT</span></div>` : ""}
 </div>
+<div class="real">The realistic read, on my dates and my belief: <b>${i.real.jobs} jobs at 50% belief or better</b>${money ? ` · ${M(i.real.value)} · ${M(i.real.throughput)} throughput` : ""}${i.done ? ` &nbsp;·&nbsp; done so far this period: ${i.done.nos} nos${money ? ` · ${M(i.done.value)} · ${M(i.done.throughput)}` : ""}` : ""}</div>
 
 ${sigBlock.replace('class="sigwrap"', 'class="sigwrap first"')}
 
 <div class="p2">
-${calendar(i.snapshot || [], i.window.from, i.window.end, money)}
+${calendar(i.snapshot || [], i.window.from, i.window.end, money, i.owners || {})}
 ${weekTable("PRODUCT — WEEK-WISE DELIVERIES" + (money ? ", NOS AND VALUE" : ", NOS"), "fam", i.snapshot || [], i.window.from, i.window.end, money)}
 ${weekTable("CLIENT — WEEK-WISE DELIVERIES" + (money ? ", NOS AND VALUE" : ", NOS"), "cust", i.snapshot || [], i.window.from, i.window.end, money)}
 </div>

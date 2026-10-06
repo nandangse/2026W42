@@ -345,6 +345,56 @@ async function doneTotals(admin: ReturnType<typeof adminClient>, from: string, t
   };
 }
 
+/**
+ * THE SIX MONTHS BEFORE THE PLAN, DELIVERED (Dr Raghu, 6 Oct 2026: "show the
+ * last 6 months results as a graph"). Whole calendar months ending the day
+ * before the window opens, counted exactly as "done so far" is counted.
+ */
+async function monthHistory(admin: ReturnType<typeof adminClient>, windowFrom: string) {
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const y0 = Number(windowFrom.slice(0, 4)), m0 = Number(windowFrom.slice(5, 7)) - 1;
+  const months = Array.from({ length: 6 }, (_, k) => {
+    const d = new Date(Date.UTC(y0, m0 - 6 + k, 1));
+    const from = d.toISOString().slice(0, 10);
+    const to = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+    return { key: from.slice(0, 7), label: `${MON[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`, from, to };
+  });
+  try {
+    const rows = await Promise.all(months.map((m) => doneTotals(admin, m.from, m.to)));
+    return months.map((m, k) => ({ key: m.key, label: m.label, jobs: rows[k].nos, value: rows[k].value, throughput: rows[k].throughput }));
+  } catch { return []; }
+}
+
+/**
+ * Each job's planning owner, as a name — the same matching the board does
+ * (erp_owner, then e-mail, initials, name), so a person's colour on the
+ * plan's calendar is their colour on My Week.
+ */
+async function ownersFor(admin: ReturnType<typeof adminClient>, ids: string[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  if (!ids.length) return out;
+  try {
+    const own = new Map<string, string>();
+    for (let i = 0; i < ids.length; i += 300) {
+      const part = ids.slice(i, i + 300);
+      const [a, b] = await Promise.all([
+        admin.from("jobs").select("id, own").in("id", part),
+        admin.from("delivered_jobs").select("id, own").in("id", part),
+      ]);
+      for (const r of [...(b.data || []), ...(a.data || [])]) if (r.own) own.set(String(r.id), String(r.own));
+    }
+    const { data: people } = await admin.from("profiles").select("email, initials, display_name, erp_owner").eq("disabled", false);
+    const norm = (v: unknown) => String(v ?? "").trim().toLowerCase().split("@")[0].trim();
+    const by = new Map<string, string>();
+    for (const p of people || []) {
+      const name = String(p.display_name || "").trim() || String(p.email || "").split("@")[0];
+      for (const k of [p.erp_owner, p.email, p.initials, p.display_name]) { const n = norm(k); if (n && !by.has(n)) by.set(n, name); }
+    }
+    for (const [id, raw] of own) out[id] = by.get(norm(raw)) || raw.split("@")[0];
+  } catch { /* the calendar draws grey rather than not at all */ }
+  return out;
+}
+
 export async function GET(req: Request) {
   try {
     /**
@@ -405,6 +455,8 @@ export async function GET(req: Request) {
           voices: await voicesFor(admin0, ((row.snapshot as Record<string, unknown>[]) || []).map((r) => String(r.id))),
           showValue: mayValue(u0),
           ...(await planPeople(admin0, k0, w0.key, ((row.snapshot as Record<string, unknown>[]) || []).map((r) => String(r.id)))),
+          history: await monthHistory(admin0, w0.from),
+          owners: await ownersFor(admin0, ((row.snapshot as Record<string, unknown>[]) || []).map((r) => String(r.id))),
         });
       } else {
         /**
@@ -442,6 +494,8 @@ export async function GET(req: Request) {
           voices: await voicesFor(admin0, jobs0.map((j) => String(j.id))),
           showValue: mayValue(u0),
           ...(await planPeople(admin0, k0, w0.key, jobs0.map((j) => String(j.id)))),
+          history: await monthHistory(admin0, w0.from),
+          owners: await ownersFor(admin0, jobs0.map((j) => String(j.id))),
         });
       }
       const { pressPdf } = await import("@/lib/pdf-press");
@@ -717,6 +771,8 @@ export async function POST(req: Request) {
         ...(await planPeople(admin, kind, w.key, jobs.map((j) => String(j.id)))),
         real: { jobs: real.jobs, value: Math.round(real.value), throughput: Math.round(real.throughput) },
         done: { nos: done.nos, value: done.value, throughput: done.throughput },
+        history: await monthHistory(admin, w.from),
+        owners: await ownersFor(admin, jobs.map((j) => String(j.id))),
       });
 
       let pdfB64 = "";

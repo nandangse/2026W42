@@ -89,6 +89,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.0.2.0",
+    date: "2026-10-06",
+    module: "The plan PDF\u2019s front page: Breakthrough 2027, six months delivered, the month in large letters",
+    items: [
+      "BREAKTHROUGH 2027 ON THE FRONT (Dr Raghu, 6 Oct 2026: \u201cPut the breakthrough logo on the top page\u201d) \u2014 the year\u2019s banner, the one already on the delivery picture, in place of the plain logo beside the band and the plan\u2019s number.",
+      "THE LAST SIX MONTHS AS A GRAPH (\u201cshow the last 6 months results as a graph - Jobs, value, Throughput\u201d): three bar charts \u2014 jobs, value and throughput delivered in each of the six whole months before the plan opens, counted exactly as \u201cdone so far\u201d is counted, from the bank of delivered jobs. On a month plan the month ahead stands beside them as an outlined orange bar, so the plan is read against what was actually done. Value and throughput show only to those cleared for money.",
+      "WHAT IS PLANNED, IN LARGE LETTERS (\u201cThen show whats planned for this month in large letters\u201d): jobs, value and throughput for the period, with the realistic read on the line beneath. The signature cards are smaller, five to a row, so the whole of it stays on page one (\u201creduce the signature boxes size if needed\u201d).",
+      "THE CALENDAR WEARS THE PLANNING OWNERS\u2019 COLOURS (\u201cin the calendar view use the colour codes of the project managers\u201d) \u2014 the same colour each person wears on My Week, now from one shared function (src/lib/owner-colour.ts) so the two can never drift. A key under the calendar names each owner and how many jobs they carry. The owner is read from the job today, matched to the person as the board does.",
+      "PRODUCTS WEAR THEIR SECTOR (\u201cthe product should have the colour of the Sector of GSE, MHE, DEF\u201d): in the product week-wise table each family carries its sector \u2014 GSE dark blue, MHE dark green, DEF maroon, anything else grey \u2014 as a tag, a rule and a tint, grouped in that order and busiest first inside each, with a key.",
+      "THE DOUBTS ARE HIGHLIGHTED (\u201cIn the team plan, highlight those which are not 100% by yellow flourescent highlight\u201d): every line in the team\u2019s belief column below 100% \u2014 yours or anyone\u2019s \u2014 is marked in fluorescent yellow, so the reader goes straight to what might not happen.",
+    ],
+  },
+  {
     v: "6.0.1.1",
     date: "2026-10-05",
     module: "The plan PDF: signatures first, the jobs as a calendar, week-wise by product and by client",

@@ -1,5 +1,6 @@
 "use client";
 // split out of PlanningSuite.tsx (Genie 5.0.1.1) — one file per tab, loaded when opened
+import { ownerColour } from "@/lib/owner-colour";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
@@ -65,14 +66,6 @@ const daysBetween = (a: string, b: string) =>
  * Thursday" at a glance. The colour is derived from the name itself, so a
  * person keeps their colour everywhere without a table to maintain.
  */
-const OWNER_INK = ["#1B3A5C", "#B45309", "#0D7A3F", "#7C3AED", "#B3392E", "#0E7490", "#8A5B00", "#4338CA", "#9D174D", "#155E75"];
-function ownerColour(name: string): string {
-  const n = String(name || "").trim().toLowerCase();
-  if (!n) return "#8B8F87";
-  let h = 0;
-  for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0;
-  return OWNER_INK[h % OWNER_INK.length];
-}
 const ownerOf = (j: Job) => j.ownerName || j.ownerInitials || (j.own ? j.own.split("@")[0] : "—");
 
 /** The seven columns after today, whether or not anything lands on them. */
