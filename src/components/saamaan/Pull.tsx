@@ -58,7 +58,7 @@ export default function Pull({ summary, isOwner, onDone }: { summary: Summary; i
     onDone();
   };
 
-  const fmtAt = (s: string) => new Date(s).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  const fmtAt = (s: string) => `${new Date(s).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} IST`;
 
   return (
     <Screen

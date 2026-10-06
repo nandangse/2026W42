@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.10",
+    date: "2026-10-06",
+    module: "Saamaan: every pulse tile opens its documents in a lightbox; last pull with the time in IST",
+    items: [
+      "QUICK VIEW (\u201cThese numbers that are there, please make the data open up in a light box \u2026 by clicking the header, it can be sorted, and by typing on the top, it can start filtering out. This is only for quick view\u201d). Click any purchase follow-up tile \u2014 open POs, POs overdue, overdue more than two months, GRN in with no invoice, no invoice after seven days \u2014 or any GRN tile, and the documents behind it open in a lightbox, in the house table: every header sorts, the box on top filters by number, supplier or status. POs show supplier, date, required-by, days late, % received, value and pending; GRNs show supplier, date, days old, quantity and value not yet invoiced. Each number opens the document in the ERP. Read live, changes nothing.",
+      "THE LAST PULL WITH ITS TIME (\u201cIn the last pull, everywhere, also please give the time in IST\u201d) \u2014 on the Saamaan dashboard\u2019s Last pulled card, on Purchase orders, on ERP pull and on Seva\u2019s tickets.",
+    ],
+  },
+  {
     v: "6.3.0.9",
     date: "2026-10-06",
     module: "Kanban rebuilt on dynamic buffer management; WIP real on the stock strip; the Ignore note gone",

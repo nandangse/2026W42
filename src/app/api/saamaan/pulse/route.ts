@@ -45,13 +45,50 @@ async function all(base: string, H: Record<string, string>, doctype: string, fie
   return out;
 }
 
-export async function GET() {
+/* ?list= — the documents behind one tile, for the quick-view lightbox */
+const LISTS = ["po_open", "po_overdue", "po_overdue60", "grn_noinv", "grn_noinv7", "grn_today", "grn_7", "grn_15"] as const;
+type ListKey = (typeof LISTS)[number];
+const days = (from: string, to: string) => Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000);
+
+async function listOf(base: string, H: Record<string, string>, key: ListKey, today: string): Promise<Doc[]> {
+  const d7 = minus(today, 6), d15 = minus(today, 14), d60 = minus(today, 60), b7 = minus(today, 7);
+  if (key.startsWith("po_")) {
+    const rows = await all(base, H, "Purchase Order", ["name", "supplier", "transaction_date", "schedule_date", "base_net_total", "per_received", "per_billed", "status", "total_qty"],
+      [["docstatus", "=", 1], ["status", "in", ["To Receive and Bill", "To Receive"]], ["per_received", "<", 100]]);
+    return rows
+      .filter((r) => key === "po_open" || (S(r.schedule_date) && S(r.schedule_date) < (key === "po_overdue60" ? d60 : today)))
+      .map((r) => ({
+        doc: S(r.name), doctype: "Purchase Order", supplier: S(r.supplier), date: S(r.transaction_date), due: S(r.schedule_date),
+        late: S(r.schedule_date) && S(r.schedule_date) < today ? days(S(r.schedule_date), today) : 0,
+        value: N(r.base_net_total), pending: N(r.base_net_total) * (1 - Math.min(100, N(r.per_received)) / 100), received_pct: N(r.per_received), billed_pct: N(r.per_billed), qty: N(r.total_qty), status: S(r.status),
+      }));
+  }
+  if (key === "grn_noinv" || key === "grn_noinv7") {
+    const rows = await all(base, H, "Purchase Receipt", ["name", "supplier", "posting_date", "base_net_total", "total_qty", "per_billed", "status"],
+      [["docstatus", "=", 1], ["is_return", "=", 0], ["status", "in", ["To Bill", "Partly Billed"]]]);
+    return rows.filter((r) => key === "grn_noinv" || S(r.posting_date) < b7).map((r) => {
+      const left = 1 - Math.min(100, N(r.per_billed)) / 100;
+      return { doc: S(r.name), doctype: "Purchase Receipt", supplier: S(r.supplier), date: S(r.posting_date), age: days(S(r.posting_date), today), value: N(r.base_net_total), pending: N(r.base_net_total) * left, qty: N(r.total_qty), qty_pending: N(r.total_qty) * left, billed_pct: N(r.per_billed), status: S(r.status) };
+    });
+  }
+  const from = key === "grn_today" ? today : key === "grn_7" ? d7 : d15;
+  const rows = await all(base, H, "Purchase Receipt", ["name", "supplier", "posting_date", "base_net_total", "total_qty", "per_billed", "status"],
+    [["docstatus", "=", 1], ["is_return", "=", 0], ["posting_date", ">=", from]]);
+  return rows.map((r) => ({ doc: S(r.name), doctype: "Purchase Receipt", supplier: S(r.supplier), date: S(r.posting_date), age: days(S(r.posting_date), today), value: N(r.base_net_total), pending: 0, qty: N(r.total_qty), qty_pending: 0, billed_pct: N(r.per_billed), status: S(r.status) }));
+}
+
+export async function GET(req: Request) {
   try {
     await requireSaamaan();
     const auth = await erpAuth();
     if (!auth) throw new HttpError(503, "The ERP is not connected — CRM → Integrations holds its URL and key.");
     const { base, H } = auth;
     const today = istDay(), d7 = minus(today, 6), d15 = minus(today, 14), d60 = minus(today, 60), b7 = minus(today, 7);
+    const list = new URL(req.url).searchParams.get("list") as ListKey | null;
+    if (list) {
+      if (!LISTS.includes(list)) throw new HttpError(400, "Which list?");
+      return NextResponse.json({ ok: true, erpBase: base, today, rows: await listOf(base, H, list, today) });
+    }
 
     const [recent, unbilled, openPo] = await Promise.all([
       all(base, H, "Purchase Receipt", ["posting_date", "total_qty", "base_net_total"], [["docstatus", "=", 1], ["is_return", "=", 0], ["posting_date", ">=", d15]]),

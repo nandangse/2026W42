@@ -10,7 +10,8 @@
  */
 
 import GenieTable from "@/components/GenieTable";
-import { Card, Metric, INK, MUTED, BORDER, GREEN, AMBER, NAVY, RED, fmtD, daysTo, useLoad } from "@/components/ims/ui";
+import { Card, Metric, Modal, INK, MUTED, BORDER, GREEN, AMBER, NAVY, RED, fmtD, daysTo, useLoad } from "@/components/ims/ui";
+import { useState } from "react";
 
 /** The value of stock, read live off the ERP's Bin — see /api/saamaan/stock?mode=value. */
 interface StockValue {
@@ -145,6 +146,7 @@ export default function Dashboard({ summary, go }: { summary: Summary; go: (k: s
         <Card title="Last pulled" hint={pulled ? (age === 0 ? "today" : `${Math.abs(age ?? 0)} day${Math.abs(age ?? 0) === 1 ? "" : "s"} ago`) : "never — open ERP pull"}>
           <span style={{ color: pulled ? (age !== null && age <= -7 ? AMBER : GREEN) : MUTED, fontSize: pulled ? 20 : 15, fontWeight: 800, lineHeight: 1 }}>
             {pulled ? fmtD(summary.lastPulledAt) : "No data"}
+            {pulled && <div style={{ fontSize: 15, marginTop: 4 }}>{new Date(summary.lastPulledAt!).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} IST</div>}
           </span>
         </Card>
       </div>
@@ -228,11 +230,56 @@ function Bars({ values, labels, colour, title }: { values: number[]; labels: str
   );
 }
 
+/* "make the data open up in a light box … by clicking the header, it can be sorted, and by typing on the top, it can start filtering out. This is only for quick view" (Dr Raghu, 6 Oct 2026) */
+type ListKey = "po_open" | "po_overdue" | "po_overdue60" | "grn_noinv" | "grn_noinv7" | "grn_today" | "grn_7" | "grn_15";
+interface DocRow { doc: string; doctype: string; supplier: string; date: string; due?: string; late?: number; age?: number; value: number; pending: number; qty: number; qty_pending?: number; received_pct?: number; billed_pct: number; status: string }
+const dmy = (d: string) => (d ? `${d.slice(8, 10)}-${d.slice(5, 7)}-${d.slice(2, 4)}` : "·");
+
+function QuickView({ list, title, onClose }: { list: ListKey; title: string; onClose: () => void }) {
+  const [d, busy, , err] = useLoad<{ rows: DocRow[]; erpBase: string }>(`/api/saamaan/pulse?list=${list}`);
+  const po = list.startsWith("po_");
+  const pendingGrn = list === "grn_noinv" || list === "grn_noinv7";
+  const href = (r: DocRow) => `${d?.erpBase ?? ""}/app/${r.doctype.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(r.doc)}`;
+  const rows = d?.rows ?? null;
+  const sumV = (rows ?? []).reduce((a, r) => a + (po || pendingGrn ? r.pending : r.value), 0);
+  return (
+    <Modal onClose={onClose} title={title} width={1100}>
+      {err && <div className="text-sm mb-2" style={{ color: RED }}>{err}</div>}
+      {rows && <div className="text-xs mb-2" style={{ color: MUTED }}>{rows.length.toLocaleString("en-IN")} documents · <b style={{ color: INK }}>{lk(sumV)}</b> {po ? "still to be received" : pendingGrn ? "not yet invoiced" : "received"} · read live off the ERP; click a number to open it there</div>}
+      {busy && !rows && <div className="text-sm" style={{ color: MUTED }}>Reading the ERP…</div>}
+      <GenieTable<DocRow> rows={rows} minWidth={900} maxHeight="65vh"
+        search={(r, q) => `${r.doc} ${r.supplier} ${r.status}`.toLowerCase().includes(q)} searchPlaceholder="🔍 number, supplier, status"
+        columns={po ? [
+          { key: "d", label: "PO", align: "left", sort: (r) => r.doc, render: (r) => <a href={href(r)} target="_blank" rel="noreferrer" className="font-bold" style={{ color: NAVY }}>{r.doc}</a> },
+          { key: "s", label: "Supplier", align: "left", sort: (r) => r.supplier, render: (r) => <span style={{ whiteSpace: "normal" }}>{r.supplier}</span> },
+          { key: "dt", label: "Date", align: "left", sort: (r) => r.date, render: (r) => <span className="tnum">{dmy(r.date)}</span> },
+          { key: "due", label: "Required by", align: "left", sort: (r) => r.due ?? "", render: (r) => <span className="tnum">{dmy(r.due ?? "")}</span> },
+          { key: "late", label: "Days late", align: "right", sort: (r) => r.late ?? 0, render: (r) => <b className="tnum" style={{ color: (r.late ?? 0) > 60 ? RED : (r.late ?? 0) > 0 ? AMBER : MUTED }}>{r.late ? r.late : "·"}</b> },
+          { key: "rcv", label: "Received", align: "right", sort: (r) => r.received_pct ?? 0, render: (r) => <span className="tnum">{Math.round(r.received_pct ?? 0)}%</span> },
+          { key: "v", label: "PO value", align: "right", sort: (r) => r.value, render: (r) => <span className="tnum">{lk(r.value)}</span> },
+          { key: "p", label: "Pending", align: "right", sort: (r) => r.pending, render: (r) => <b className="tnum">{lk(r.pending)}</b> },
+          { key: "st", label: "Status", align: "left", sort: (r) => r.status, render: (r) => <span className="text-xs" style={{ color: MUTED }}>{r.status}</span> },
+        ] : [
+          { key: "d", label: "GRN", align: "left", sort: (r) => r.doc, render: (r) => <a href={href(r)} target="_blank" rel="noreferrer" className="font-bold" style={{ color: NAVY }}>{r.doc}</a> },
+          { key: "s", label: "Supplier", align: "left", sort: (r) => r.supplier, render: (r) => <span style={{ whiteSpace: "normal" }}>{r.supplier}</span> },
+          { key: "dt", label: "Date", align: "left", sort: (r) => r.date, render: (r) => <span className="tnum">{dmy(r.date)}</span> },
+          { key: "age", label: "Days old", align: "right", sort: (r) => r.age ?? 0, render: (r) => <b className="tnum" style={{ color: pendingGrn && (r.age ?? 0) > 7 ? RED : INK }}>{r.age ?? "·"}</b> },
+          { key: "q", label: pendingGrn ? "Qty not invoiced" : "Qty", align: "right", sort: (r) => (pendingGrn ? r.qty_pending ?? 0 : r.qty), render: (r) => <span className="tnum">{qn2(pendingGrn ? r.qty_pending ?? 0 : r.qty)}</span> },
+          { key: "v", label: "GRN value", align: "right", sort: (r) => r.value, render: (r) => <span className="tnum">{lk(r.value)}</span> },
+          ...(pendingGrn ? [{ key: "p", label: "Not invoiced", align: "right" as const, sort: (r: DocRow) => r.pending, render: (r: DocRow) => <b className="tnum">{lk(r.pending)}</b> }] : []),
+          { key: "b", label: "Billed", align: "right", sort: (r) => r.billed_pct, render: (r) => <span className="tnum">{Math.round(r.billed_pct)}%</span> },
+          { key: "st", label: "Status", align: "left", sort: (r) => r.status, render: (r) => <span className="text-xs" style={{ color: MUTED }}>{r.status}</span> },
+        ]} />
+    </Modal>
+  );
+}
+
 function PulseBlock() {
   const [p, busy, , err] = useLoad<Pulse>("/api/saamaan/pulse");
+  const [open, setOpen] = useState<{ list: ListKey; title: string } | null>(null);
   const dd = (day: string) => day.slice(8, 10);
-  const cell = (label: string, w?: Win) => (
-    <div className="rounded border px-2.5 py-2" style={{ borderColor: BORDER }}>
+  const cell = (label: string, w?: Win, list?: ListKey) => (
+    <div className="rounded border px-2.5 py-2" style={{ borderColor: BORDER, cursor: list ? "pointer" : undefined }} onClick={list ? () => setOpen({ list, title: `GRNs — ${label.toLowerCase()}` }) : undefined} title={list ? "open the list" : undefined}>
       <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.5 }}>{label}</div>
       <div className="tnum" style={{ color: INK, fontSize: 22, fontWeight: 800, lineHeight: 1.1 }}>{w ? w.n.toLocaleString("en-IN") : "…"}</div>
       <div className="text-xs tnum" style={{ color: MUTED }}>{w ? <><b style={{ color: INK }}>{lk(w.value)}</b> · {qn2(w.qty)} qty</> : " "}</div>
@@ -245,8 +292,8 @@ function PulseBlock() {
       <div className="text-xs tnum" style={{ color: MUTED }}>{c ? <>lines · {c.items} items · {c.sheets} sheet{c.sheets === 1 ? "" : "s"}</> : " "}</div>
     </div>
   );
-  const flag = (label: string, n: number | undefined, value: number | undefined, tone: string, hint: string, qty?: number) => (
-    <div className="rounded border px-2.5 py-2" style={{ borderColor: BORDER, borderLeft: `4px solid ${tone}` }}>
+  const flag = (label: string, n: number | undefined, value: number | undefined, tone: string, hint: string, qty?: number, list?: ListKey) => (
+    <div className="rounded border px-2.5 py-2" style={{ borderColor: BORDER, borderLeft: `4px solid ${tone}`, cursor: list ? "pointer" : undefined }} onClick={list ? () => setOpen({ list, title: label }) : undefined} title={list ? "open the list" : undefined}>
       <div className="text-xs font-bold uppercase" style={{ color: MUTED, letterSpacing: 0.5 }}>{label}</div>
       <div className="flex items-baseline gap-2">
         <span className="tnum" style={{ color: tone, fontSize: 22, fontWeight: 800, lineHeight: 1.1 }}>{n === undefined ? "…" : n.toLocaleString("en-IN")}</span>
@@ -267,7 +314,7 @@ function PulseBlock() {
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))" }}>
         <div>
           <div className="text-sm font-bold mb-1" style={{ color: INK }}>GRNs</div>
-          <div className="grid grid-cols-3 gap-2 mb-2">{cell("Today", p?.grn.today)}{cell("Last 7 days", p?.grn.d7)}{cell("Last 15 days", p?.grn.d15)}</div>
+          <div className="grid grid-cols-3 gap-2 mb-2">{cell("Today", p?.grn.today, "grn_today")}{cell("Last 7 days", p?.grn.d7, "grn_7")}{cell("Last 15 days", p?.grn.d15, "grn_15")}</div>
           {p && <Bars values={p.grn.days.map((d) => d.value)} labels={p.grn.days.map((d) => dd(d.day))} colour="#1B6B93"
             title={(i) => `${p.grn.days[i].day}: ${p.grn.days[i].n} GRN${p.grn.days[i].n === 1 ? "" : "s"} · ${lk(p.grn.days[i].value)} · ${qn2(p.grn.days[i].qty)} qty`} />}
           <div className="text-xs" style={{ color: MUTED }}>value received each day, the last fifteen — hover a bar for the day</div>
@@ -285,12 +332,13 @@ function PulseBlock() {
 
       <div className="text-sm font-bold mt-3 mb-1" style={{ color: INK }}>Purchase follow-up</div>
       <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
-        {flag("Open POs", p?.poOpen.n, p?.poOpen.value, NAVY, "still to be received, at value pending")}
-        {flag("POs overdue", p?.poOverdue.n, p?.poOverdue.value, AMBER, "past the required-by date")}
-        {flag("Overdue > 2 months", p?.poOverdue60.n, p?.poOverdue60.value, RED, "close them or chase them")}
-        {flag("GRN in, no invoice", p?.noInvoice.n, p?.noInvoice.value, AMBER, "received, invoice not booked", p?.noInvoice.qty)}
-        {flag("No invoice > 7 days", p?.noInvoice7.n, p?.noInvoice7.value, RED, "GRNs older than a week, still unbilled", p?.noInvoice7.qty)}
+        {flag("Open POs", p?.poOpen.n, p?.poOpen.value, NAVY, "still to be received, at value pending", undefined, "po_open")}
+        {flag("POs overdue", p?.poOverdue.n, p?.poOverdue.value, AMBER, "past the required-by date", undefined, "po_overdue")}
+        {flag("Overdue > 2 months", p?.poOverdue60.n, p?.poOverdue60.value, RED, "close them or chase them", undefined, "po_overdue60")}
+        {flag("GRN in, no invoice", p?.noInvoice.n, p?.noInvoice.value, AMBER, "received, invoice not booked", p?.noInvoice.qty, "grn_noinv")}
+        {flag("No invoice > 7 days", p?.noInvoice7.n, p?.noInvoice7.value, RED, "GRNs older than a week, still unbilled", p?.noInvoice7.qty, "grn_noinv7")}
       </div>
+      {open && <QuickView list={open.list} title={open.title} onClose={() => setOpen(null)} />}
     </div>
   );
 }

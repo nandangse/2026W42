@@ -33,6 +33,8 @@ interface Pull { modified?: string; at?: string; items_modified?: string; items_
 
 
 const d = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }) : "·");
+/* a pull's moment, with the time in IST (Dr Raghu, 6 Oct 2026: "In the last pull, everywhere, also please give the time in IST") */
+const dt = (s: string | null | undefined) => (s ? `${new Date(s).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" })} IST` : "·");
 const statusColour = (s: string) => (/Completed/.test(s) ? GREEN : /Cancelled|Closed/.test(s) ? MUTED : /Draft/.test(s) ? AMBER : /Receive|Bill/.test(s) ? NAVY : RED);
 const erpForm = (base: string, doctype: string, name: string) => `${base}/app/${doctype.toLowerCase().replace(/\s+/g, "-")}/${encodeURIComponent(name)}`;
 
@@ -106,7 +108,7 @@ export default function PurchaseOrders({ erpBase, openOn }: { erpBase: string; o
       <div className="flex gap-1.5 mb-2 items-center flex-wrap">
         {(["po", "suppliers", "grn", "pinv"] as const).map((k) => <button key={k} onClick={() => { setTab(k); setPage(0); }} className="rounded px-3 py-1.5 text-xs font-bold" style={{ background: tab === k ? NAVY : "#fff", color: tab === k ? "#fff" : INK, border: `1px solid ${tab === k ? NAVY : BORDER}` }}>{k === "po" ? `Purchase orders${pos ? ` (${pos.total.toLocaleString("en-IN")})` : ""}` : k === "suppliers" ? `Suppliers${sups ? ` (${sups.rows.length.toLocaleString("en-IN")})` : ""}` : k === "grn" ? `GRNs${grns ? ` (${grns.total.toLocaleString("en-IN")})` : ""}` : `Purchase invoices${pinvs ? ` (${pinvs.total.toLocaleString("en-IN")})` : ""}`}</button>)}
         <span style={{ flex: 1 }} />
-        {p && <span className="text-xs" style={{ color: MUTED }}>POs to {p.modified ? d(p.modified) : "·"} · lines {p.items_at ? d(p.items_at) : "·"} · suppliers {p.suppliers_at ? d(p.suppliers_at) : "·"}</span>}
+        {p && <span className="text-xs" style={{ color: MUTED }}>POs to {p.modified ? dt(p.modified) : "·"} · lines {p.items_at ? dt(p.items_at) : "·"} · suppliers {p.suppliers_at ? dt(p.suppliers_at) : "·"}</span>}
       </div>
 
       {tab === "po" && (

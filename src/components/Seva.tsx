@@ -290,7 +290,7 @@ function ErpTicketPanel({ row }: { row: Row }) {
     <div className="rounded border p-3 mb-2" style={{ borderColor: BORDER, background: "#FBFAF7" }}>
       <div className="flex items-center gap-2 mb-2 flex-wrap text-xs">
         <b style={{ color: "var(--blue)" }}>{S(row.erp_name)}</b>
-        <span style={{ color: MUTED }}>off the ERP · modified {S(row.erp_modified).slice(0, 16) || "·"} · pulled {fmtD(row.pulled_at)}</span>
+        <span style={{ color: MUTED }}>off the ERP · modified {S(row.erp_modified).slice(0, 16) || "·"} · pulled {fmtD(row.pulled_at)}{row.pulled_at ? ` ${new Date(String(row.pulled_at)).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} IST` : ""}</span>
         {row.raised_as_nc ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#FBEAE8", color: "#B3392E" }}>raised as NC</span> : null}
         {row.via_portal ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#EEF1FA", color: "var(--blue)" }}>via customer portal</span> : null}
       </div>
