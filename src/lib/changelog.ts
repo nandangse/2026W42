@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.51",
+    date: "2026-10-07",
+    module: "Mass mail: each person\u2019s own salary slip attached",
+    items: [
+      "THE SLIP THAT DID NOT GO (\u201cWe did the salary slip through communication, choosing that template for the mass mail. However, the attachment of the salary slip did not happen. Why is that?\u201d). Because the mass mail carried one shared attachment set to everybody and knew nothing of slips \u2014 only the Salary Slips \u2192 Mail slips screen pressed a slip per person. Now the mass mail has a tick, \u201cAttach each person\u2019s own salary slip\u201d, on by itself when the salary-slip template is chosen: every mail carries that person\u2019s own A5 slip for the latest payroll month, pressed to PDF as it goes (five a batch). A person on hold, or not on the register, is named and not sent; the ledger marks the slip as sent so Mail slips will not send it twice. The six mails of 18:17 went without slips \u2014 send those six again with the tick on.",
+    ],
+  },
+  {
     v: "6.3.0.50",
     date: "2026-10-07",
     module: "Finalise Frozen Sheet to Management \u2014 the register PDF, mailed by Vinay",

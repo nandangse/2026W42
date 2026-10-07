@@ -436,8 +436,21 @@ export async function POST(req: Request) {
       }
       if (atts.reduce((a, x) => a + (x.base64 || "").length * 0.75, 0) > MAX_ATTACH) throw new HttpError(400, "The attachments come to more than 18 MB together — Gmail will not carry that.");
 
+      /* EACH PERSON'S OWN SLIP (Dr Raghu, 7 Oct 2026: "the attachment of the
+         salary slip did not happen") — ticked on the screen (and ticked by
+         itself when the template is the salary slip), every mail in the
+         batch carries that person's own A5 slip for the month, pressed here.
+         Five a call, since each slip is a page through Chromium. A person on
+         hold, or with no line on the register, is named and not sent. */
+      const attachSlip = !!b.attach_slip;
+      const perCall = attachSlip ? 5 : MAX_PER_CALL;
       const offset = Math.max(0, Number(b.offset) || 0);
-      const slice = sendable.slice(offset, offset + MAX_PER_CALL);
+      const slice = sendable.slice(offset, offset + perCall);
+      let slipPack: Awaited<ReturnType<typeof import("@/lib/slip-pack").monthSlipPdfs>> | null = null;
+      if (attachSlip && slice.length) {
+        const { monthSlipPdfs } = await import("@/lib/slip-pack");
+        slipPack = await monthSlipPdfs(admin, slice.map((r) => r.id), Number(b.slip_month) || null, Number(b.slip_year) || null);
+      }
 
       /**
        * THE CAMPAIGN THIS BELONGS TO. Opened on the first batch and carried
@@ -461,8 +474,16 @@ export async function POST(req: Request) {
         // a reply finds the right record through this, and it costs nothing.
         const box: { threadId?: string } = {};
         try {
-          const id = atts.length
-            ? await gmailSendMixed(token, headerFrom, r.to, r.subject, r.html, atts, undefined, undefined, fromName, replyTo, box)
+          let mine = atts;
+          if (slipPack) {
+            const sp = slipPack.slips.get(r.id);
+            if (!sp) throw new Error(`no salary slip for ${slipPack.period} — not on that month's register`);
+            if (sp.hold) throw new Error(`on hold for ${slipPack.period} — no slip is sent`);
+            if (!sp.base64) throw new Error("the slip could not be rendered");
+            mine = [...atts, { name: sp.fileName, mime: "application/pdf", base64: sp.base64 }];
+          }
+          const id = mine.length
+            ? await gmailSendMixed(token, headerFrom, r.to, r.subject, r.html, mine, undefined, undefined, fromName, replyTo, box)
             : await gmailSend(token, headerFrom, r.to, r.subject, r.html, undefined, undefined, fromName, undefined, null, replyTo, box);
           sent++;
           const thread = box.threadId || null;
@@ -471,7 +492,7 @@ export async function POST(req: Request) {
             mass_id: massId, thread_id: thread,
             subject: r.subject, body: r.html, template_key: b.template_key || null,
             status: "sent", sent_by: `${u.email} · from ${headerFrom}${headerFrom !== fromEmail ? ` (through ${fromEmail})` : ""}`, sent_at: new Date().toISOString(),
-            external_id: id, meta: { mass: true, attachments: atts.map((a) => a.name), reply_to: replyTo, through: fromEmail },
+            external_id: id, meta: { mass: true, attachments: [...atts.map((a) => a.name), ...(slipPack ? [slipPack.slips.get(r.id)?.fileName] : [])].filter(Boolean), reply_to: replyTo, through: fromEmail, ...(slipPack ? { slip: true, month: slipPack.month, year: slipPack.year } : {}) },
           }).then(() => null, (e2) => swallow("hrms/mass-mail ledger", e2));
         } catch (e) {
           let why = e instanceof Error ? e.message : String(e);

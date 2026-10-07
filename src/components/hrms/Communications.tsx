@@ -340,6 +340,8 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
   const [depts, setDepts] = useState<string[]>(draft?.audience?.departments || []);
   const [groups, setGroups] = useState<string[]>(draft?.audience?.groups || []);
   const [atts, setAtts] = useState<{ name: string; mime: string; path: string; size: number }[]>([]);
+  // EACH PERSON'S OWN SLIP (Dr Raghu, 7 Oct 2026): on when the salary-slip template is chosen; can be ticked for any mail
+  const [attachSlip, setAttachSlip] = useState(false);
   const [upload, setUpload] = useState("");
   const [pre, setPre] = useState<Pre | null>(null);
   const [showList, setShowList] = useState(false);
@@ -422,7 +424,7 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
     let off = 0, sent = 0, failed = 0, cid = campId;
     try {
       for (;;) {
-        const r = await api.post("/api/hrms/mass-mail", { action: "send", subject, body, ...settings, ...audience, campaign_id: cid || undefined, attachments: atts.map(({ name, mime, path }) => ({ name, mime, path })), offset: off });
+        const r = await api.post("/api/hrms/mass-mail", { action: "send", subject, body, ...settings, ...audience, campaign_id: cid || undefined, attachments: atts.map(({ name, mime, path }) => ({ name, mime, path })), attach_slip: attachSlip, offset: off });
         cid = r.campaign_id || cid; setCampId(cid);
         sent += r.sent || 0; failed += (r.failed || []).length; off = r.done;
         setProgress({ done: r.done, of: r.of, sent, failed });
@@ -456,7 +458,7 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
                     </select>
                   </label>
                   <label className="text-xs font-bold" style={{ color: C.dim }}>TEMPLATE
-                    <select value={tpl} onChange={(e) => { setTpl(e.target.value); const t = boot.templates.find((x) => x.key === e.target.value); if (t) { setBody(t.body || ""); setSeed((n) => n + 1); if (!subject.trim()) setSubject(t.title || ""); } }} style={{ ...inp, marginTop: 3 }}>
+                    <select value={tpl} onChange={(e) => { setTpl(e.target.value); const t = boot.templates.find((x) => x.key === e.target.value); if (t) { setBody(t.body || ""); setSeed((n) => n + 1); if (!subject.trim()) setSubject(t.title || ""); setAttachSlip(/slip/i.test(`${t.key} ${t.title}`)); } }} style={{ ...inp, marginTop: 3 }}>
                       <option value="">— none, write it here —</option>
                       {boot.templates.map((t) => <option key={t.key} value={t.key}>{t.title}</option>)}
                     </select>
@@ -536,6 +538,9 @@ function MassEmail({ draft, onClose }: { draft: Camp | null; onClose: () => void
                     📎 Attach files<input type="file" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
                   </label>
                   {upload && <span className="text-xs font-bold" style={{ color: "var(--blue)" }}>{upload}</span>}
+                  <label className="text-xs flex items-center gap-1" style={{ color: attachSlip ? "var(--navy)" : C.dim, fontWeight: attachSlip ? 700 : 400, border: `1px solid ${attachSlip ? "var(--navy)" : C.line}`, borderRadius: 4, padding: "2px 8px", cursor: "pointer" }} title="Every mail carries that person's own A5 salary slip for the latest payroll month, pressed to PDF as it goes — five mails a batch">
+                    <input type="checkbox" checked={attachSlip} onChange={(e) => setAttachSlip(e.target.checked)} /> 📄 Attach each person&apos;s own salary slip
+                  </label>
                   {atts.map((a, i) => (
                     <span key={i} className="text-xs rounded px-2 py-1" style={{ background: "#F4F2EC" }}>
                       {a.name} <span style={{ color: C.faint }}>{(a.size / 1024).toFixed(0)} KB</span>
