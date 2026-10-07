@@ -244,6 +244,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, binned });
     }
 
+    /** RE-READ THE MUSTER (7 Oct 2026) — the newest muster file on the run,
+        fetched back from Drive and parsed again with today's parser. For
+        the day a file lands that the parser did not yet understand, so
+        nobody has to find the CSV and upload it twice. */
+    if (action === "reparse_muster") {
+      const id = String(body.id || "");
+      const { data: f } = await admin.from("hrms_payroll_file").select("id, name, drive_id, kind").eq("sheet_id", id).eq("kind", "muster").order("uploaded_at", { ascending: false }).limit(1).maybeSingle();
+      if (!f) throw new HttpError(404, "No muster file on this run yet — upload it first.");
+      if (!f.drive_id) throw new HttpError(409, `${f.name} was never filed in Drive, so it cannot be read again — upload it once more.`);
+      const cfg = driveConfig();
+      if (!cfg) throw new HttpError(503, "Drive is not configured on this deploy.");
+      const { downloadFile } = await import("@/lib/drive");
+      const buf = await downloadFile(cfg, String(f.drive_id));
+      const m = parseMuster(gridOf(buf, String(f.name)));
+      await admin.from("hrms_payroll_file").update({ parsed: m }).eq("id", f.id);
+      await admin.from("hrms_salary_sheet").update({ muster: m, updated_at: now }).eq("id", id);
+      return NextResponse.json({ ok: true, rows: m.rows.length, days: m.days, month: m.month, year: m.year, warnings: m.warnings });
+    }
+
     /** SUBMIT AN INPUT — the signature on one of the run's forms (0140). */
     if (action === "submit_input" || action === "unsubmit_input") {
       const key = String(body.key || "");

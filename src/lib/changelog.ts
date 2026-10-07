@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.19",
+    date: "2026-10-07",
+    module: "HRMS payroll: the Salary tab is read as a muster; Re-read a file already uploaded",
+    items: [
+      "WHY SEPTEMBER\u2019S MUSTER \u201cWASN\u2019T TAKING\u201d (\u201cmuster is being uploaded but its not taking \u2026 for the moment can we take from uploaded file?\u201d). The file uploaded was the sheet\u2019s Salary tab \u2014 Id, Name, Category, Status, Type \u2026 Attendance \u2026 Pay Days \u2014 not the Muster tab with its day-by-day marks, which is all the parser knew. It read 0 people and said so only in small print. The parser now reads the Salary tab too: Attendance as present days, Pay Days as pay days, the month and its days off the banner\u2019s dates, and OT, comp-off, late, loan, advance, site allowance, leave encashed, lunch, TDS, other deductions and mobile from their columns. Week-offs and holidays are not separated in that tab, so the muster print has no day grid for such a month.",
+      "RE-READ. A \u21bb Re-read button on the Muster sheet card fetches the newest muster file back from Drive and parses it again with today\u2019s parser \u2014 no second upload. When a file reads as nobody, the card now says so in amber with the parser\u2019s reason.",
+    ],
+  },
+  {
     v: "6.3.0.18",
     date: "2026-10-07",
     module: "Submit to Client: the attachment checklist; the Profile tells the truth about Gmail",

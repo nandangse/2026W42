@@ -37,6 +37,7 @@ const n = (v: unknown): number | null => { const s = String(v ?? "").replace(/[�
 /** header → key. Order matters: the first rule that matches wins. */
 const RULES: [RegExp, keyof MusterRow | "skip"][] = [
   [/^emp(loyee)?\.? ?(id|no|code)?$/, "employee_id"],
+  [/^id$/, "employee_id"],                       // the Salary tab calls it Id
   [/^name$/, "name"],
   [/^status$/, "status"],
   [/total present|^present( days?)?$/, "present"],
@@ -46,9 +47,9 @@ const RULES: [RegExp, keyof MusterRow | "skip"][] = [
   [/total pay|pay(able)? days/, "pay_days"],
   [/^category$|^type$/, "category"],
   [/^attendance$/, "attendance"],
-  [/comp ?off/, "compoff"],
-  [/^ot$|^ot hours|overtime/, "ot"],
-  [/late ?m/, "late"],
+  [/comp ?off?/, "compoff"],                     // "Comp Of_m" on the Salary tab
+  [/^ot$|^ot m$|^ot hours|overtime/, "ot"],      // "OT_m" on the Salary tab
+  [/late ?m|^late coming/, "late"],
   [/^lunch/, "lunch"],
   [/loan taken/, "loan_taken"],
   [/advance/, "advance"],
@@ -59,7 +60,7 @@ const RULES: [RegExp, keyof MusterRow | "skip"][] = [
   [/^tds/, "tds"],
   [/other ded/, "other_ded"],
   [/^loc(a)?tion$/, "location"],
-  [/^design?t/, "designation"],
+  [/^design?t|^designation/, "designation"],
   [/^department$/, "department"],
   [/mobile/, "mobile"],
   [/message|wa link|^email$|^address$|pick up/, "skip"],
@@ -76,7 +77,22 @@ export function parseMuster(grid: unknown[][]): Muster {
     if (hasId && dayN > best) { best = dayN; headerRow = r; }
   }
   const warnings: string[] = [];
-  if (headerRow < 0) return { month: null, year: null, days: 0, rows: [], headerRow: 0, columns: {}, unmapped: [], warnings: ["No header row with Emp. Id and day columns (1/7 …) was found."] };
+  /* THE SALARY TAB AS A MUSTER (Dr Raghu, 7 Oct 2026: "for the moment can we
+     take from uploaded file?"). September's upload was the sheet's Salary
+     tab, not its Muster tab: Id, Name, Category, Status, Type … Attendance
+     … Pay Days — no day-by-day marks. It carries what the register needs
+     (attendance, pay days, OT, comp-off, late, loan, advance, site, leave
+     encashed, lunch, TDS, other deductions, mobile), so it is read: present
+     is Attendance, pay days is Pay Days, the month and its days come off the
+     banner's dates, and the day marks stay empty. */
+  let salaryTab = false;
+  if (headerRow < 0) {
+    for (let r = 0; r < Math.min(grid.length, 6); r++) {
+      const cells = (grid[r] || []).map((c) => norm(c));
+      if (cells.includes("id") && cells.includes("attendance") && cells.some((c) => /pay days/.test(c))) { headerRow = r; salaryTab = true; break; }
+    }
+  }
+  if (headerRow < 0) return { month: null, year: null, days: 0, rows: [], headerRow: 0, columns: {}, unmapped: [], warnings: ["No header row with Emp. Id and day columns (1/7 …) was found — and this is not the Salary tab either. Export the Muster tab of the month's sheet."] };
 
   const headers = (grid[headerRow] || []).map((h) => String(h ?? "").trim());
   const dayCols: { i: number; d: number; m: number }[] = [];
@@ -93,12 +109,28 @@ export function parseMuster(grid: unknown[][]): Muster {
     if (colOf[hit[1]] === undefined) { colOf[hit[1]] = i; columns[hit[1]] = h; }
   });
   dayCols.sort((a, b) => a.d - b.d);
-  const month = dayCols.length ? dayCols[0].m : null;
+  let month = dayCols.length ? dayCols[0].m : null;
   // the year: a banner cell like "July 2026" above the header, else null
   let year: number | null = null;
   for (let r = 0; r < headerRow; r++) for (const c of grid[r] || []) { const m = /(20\d\d)/.exec(String(c ?? "")); if (m) { year = Number(m[1]); break; } }
+  /* the Salary tab's banner (the row under its header) carries the month's
+     first and last day as dd/mm/yyyy, and "Days in Month" beside the count */
+  let daysInMonth = dayCols.length;
+  let typeCol: number | undefined;
+  if (salaryTab) {
+    headers.forEach((h, i) => { if (norm(h) === "type") typeCol = i; });
+    const scan = [grid[headerRow + 1] || [], ...grid.slice(0, headerRow)];
+    for (const row of scan) {
+      for (const c of row) {
+        const d = /^(\d{1,2})\/(\d{1,2})\/(20\d\d)$/.exec(String(c ?? "").trim());
+        if (d) { month = Number(d[2]); year = Number(d[3]); daysInMonth = new Date(Number(d[3]), Number(d[2]), 0).getDate(); break; }
+      }
+      if (month) break;
+    }
+    warnings.push("Read from the Salary tab: attendance and pay days as the sheet totals them; no day-by-day marks, so week-offs and holidays are not separated and the muster print has no day grid.");
+  }
   if (colOf.employee_id === undefined) warnings.push("No Emp. Id column.");
-  if (!dayCols.length) warnings.push("No day columns (1/7 … 31/7) — present and absent cannot be counted.");
+  if (!dayCols.length && !salaryTab) warnings.push("No day columns (1/7 … 31/7) — present and absent cannot be counted.");
 
   const rows: MusterRow[] = [];
   let dropped = 0;
@@ -107,15 +139,25 @@ export function parseMuster(grid: unknown[][]): Muster {
     const at = (k: keyof MusterRow) => (colOf[k] === undefined ? null : line[colOf[k] as number]);
     const id = String(at("employee_id") ?? "").trim();
     if (!/^\d{4}$/.test(id)) { if (String(line[0] ?? "").trim()) dropped++; continue; }
+    // the Salary tab repeats its header as the third row — not a person
+    if (salaryTab && norm(line[colOf.employee_id as number]) === "id") continue;
     const days = dayCols.map((c) => String(line[c.i] ?? "").trim().toUpperCase());
     const count = (re: RegExp) => days.filter((d) => re.test(d)).length;
-    const present = n(at("present")) ?? count(/^P/);
-    const absent = n(at("absent")) ?? count(/^A/);
-    const wo = n(at("wo")) ?? count(/^WO/);
-    const mo_st = n(at("mo_st")) ?? count(/^(MO|ST|H)/);
-    const pay_days = n(at("pay_days")) ?? present + wo + mo_st + count(/^S$/);
+    let present = n(at("present")) ?? count(/^P/);
+    let absent = n(at("absent")) ?? count(/^A/);
+    let wo = n(at("wo")) ?? count(/^WO/);
+    let mo_st = n(at("mo_st")) ?? count(/^(MO|ST|H)/);
+    let pay_days = n(at("pay_days")) ?? present + wo + mo_st + count(/^S$/);
+    if (salaryTab) {
+      present = n(at("attendance")) ?? present;
+      pay_days = n(at("pay_days")) ?? present;
+      wo = Math.max(0, pay_days - present);       // paid days not worked — week-offs and holidays together
+      mo_st = 0;
+      absent = Math.max(0, daysInMonth - pay_days);
+    }
+    const statusRaw = salaryTab && typeCol !== undefined ? String(line[typeCol] ?? "").trim() : String(at("status") ?? "").trim();
     rows.push({
-      employee_id: id, name: String(at("name") ?? "").trim(), status: String(at("status") ?? "").trim(), category: String(at("category") ?? "").trim(),
+      employee_id: id, name: String(at("name") ?? "").trim(), status: statusRaw, category: String(at("category") ?? "").trim(),
       days, present, absent, wo, mo_st, pay_days,
       attendance: n(at("attendance")), compoff: n(at("compoff")), ot: n(at("ot")), late: n(at("late")), lunch: n(at("lunch")),
       loan_taken: n(at("loan_taken")), advance: n(at("advance")), site_allowance: n(at("site_allowance")), leave_encash: n(at("leave_encash")),
@@ -126,7 +168,7 @@ export function parseMuster(grid: unknown[][]): Muster {
   }
   if (!rows.length) warnings.push("No lines with a four-digit Emp. Id were read.");
   if (dropped) warnings.push(`${dropped} line${dropped === 1 ? "" : "s"} without a four-digit Emp. Id left out (banners, totals).`);
-  return { month, year, days: dayCols.length, rows, headerRow: headerRow + 1, columns, unmapped, warnings };
+  return { month, year, days: daysInMonth, rows, headerRow: headerRow + 1, columns, unmapped, warnings };
 }
 
 /** The rate list: one line per employee, the monthly rate under whatever the column is called. */

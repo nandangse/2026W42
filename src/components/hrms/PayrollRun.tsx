@@ -232,7 +232,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
               : inp.key === "loan" ? `${fromMuster("loan_ded", "Loan deduction")}${m ? ` · loans taken ₹${inr(sum("loan_taken"))}` : ""}`
               : inp.key === "lunch" ? fromMuster("lunch", "Lunch")
               : inp.key === "site" ? fromMuster("site_allowance", "Site allowance")
-              : inp.key === "muster" ? (m ? `${m.rows.length} people over ${m.days} days · leave encashment ₹${inr(sum("leave_encash"))} · advance ₹${inr(sum("advance"))} · loan ₹${inr(sum("loan_ded"))} · lunch ₹${inr(sum("lunch"))} · site ₹${inr(sum("site_allowance"))}` : "Not uploaded yet.")
+              : inp.key === "muster" ? (m ? (m.rows.length ? `${m.rows.length} people over ${m.days} days · leave encashment ₹${inr(sum("leave_encash"))} · advance ₹${inr(sum("advance"))} · loan ₹${inr(sum("loan_ded"))} · lunch ₹${inr(sum("lunch"))} · site ₹${inr(sum("site_allowance"))}` : `⚠ The file was read but nobody was found in it — ${(m.warnings || []).join(" ") || "no header row the parser knows."} Press Re-read after a fix, or upload the Muster tab.`) : "Not uploaded yet.")
               : inp.key === "rates" ? (d.rates ? `Rate list uploaded on this run: ${d.rates.rows} rates (overrides the Live structure).` : d.live_rates ? `Live structure: ${d.live_rates.title}, ${d.live_rates.count} rates — Generate reads it.` : "No Live salary structure — set one in HRIS → Salary Rate List, or upload a rate list here.")
               : (files.length ? `${files.length} file${files.length === 1 ? "" : "s"} filed as evidence. Attendance itself is read from the muster.` : "Not uploaded yet. Attendance itself is read from the muster.");
             return (
@@ -257,6 +257,11 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                   </div>
                 ))}
                 <div className="px-3 py-2 flex gap-2 items-center flex-wrap" style={{ borderTop: "1px solid #EEECE6" }}>
+                  {/* RE-READ (7 Oct 2026): the file already on the run, fetched back from Drive and parsed again with today's parser */}
+                  {inp.key === "muster" && files.length > 0 && !signed && (
+                    <button onClick={() => act({ action: "reparse_muster" }, (j) => `Re-read: ${j.rows} people over ${j.days} days${(j.warnings as string[])?.length ? ` · ${(j.warnings as string[]).join(" ")}` : ""}`)}
+                      disabled={busy} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#EEF3F8", color: "var(--navy)" }} title="Read the newest muster file on this run again, without uploading it twice">↻ Re-read</button>
+                  )}
                   {inp.upload && !signed && (
                     <>
                       <input type="file" multiple accept={inp.accept} className="block" style={{ fontSize: 12 }} onChange={(e) => setPick({ ...pick, [inp.key]: e.target.files })} />
