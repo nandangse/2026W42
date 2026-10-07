@@ -47,32 +47,41 @@ const HEADS: [string, string][] = [
 ];
 export interface PayCompare {
   ready: boolean; why?: string;
-  compared: number; matched: number; holds: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number | null; status: string }[];
-  mismatches: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number; diff: number; heads: { head: string; genie: number; sheet: number; diff: number }[] }[];
-  genie_total: number; sheet_total: number; not_in_sheet: number;
+  compared: number; matched: number; pay_mismatched: number;
+  holds: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number | null; sheet_pay: number | null; status: string }[];
+  mismatches: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number; diff: number; genie_pay: number; sheet_pay: number | null; pay_diff: number; heads: { head: string; genie: number; sheet: number; diff: number }[] }[];
+  genie_total: number; sheet_total: number; genie_pay_total: number; sheet_pay_total: number; not_in_sheet: number;
 }
 function comparePay(register: Record<string, unknown>[], musterRows: Record<string, unknown>[]): PayCompare {
   const sheetOf = new Map(musterRows.map((m) => [String(m.employee_id), m]));
   const withSheet = musterRows.filter((m) => m.sheet && typeof m.sheet === "object").length;
-  if (!register.length) return { ready: false, why: "Nothing generated yet — press Generate, then this compares the register with the sheet.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, not_in_sheet: 0 };
-  if (!withSheet) return { ready: false, why: "The uploaded muster carries no computed figures to compare against — upload the Salary tab (or press Re-read on it) and the comparison writes itself.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, not_in_sheet: 0 };
+  if (!register.length) return { ready: false, why: "Nothing generated yet — press Generate, then this compares the register with the sheet.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, not_in_sheet: 0 };
+  if (!withSheet) return { ready: false, why: "The uploaded muster carries no computed figures to compare against — upload the Salary tab (or press Re-read on it) and the comparison writes itself.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, not_in_sheet: 0 };
   const N = (v: unknown) => Math.round((Number(v) || 0) * 100) / 100;
-  const out: PayCompare = { ready: true, compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, not_in_sheet: 0 };
+  const out: PayCompare = { ready: true, compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, not_in_sheet: 0 };
   for (const r of register) {
     const id = String(r.employee_id), m = sheetOf.get(id);
     const sh = (m?.sheet ?? null) as Record<string, number> | null;
     const genieNet = N(r.net), sheetNet = sh ? N(sh.net) : null;
+    // TO PAY TOO (Dr Raghu, 7 Oct 2026: "If the 'to pay' in the sheet is
+    // different from the 'to pay' in the calculation, put that into
+    // observation so that it can be done") — the bank figure beside the
+    // booked one; a line is a mismatch if either differs
+    const geniePay = Math.round(N(r.to_pay)), sheetPay = sh && sh.to_pay != null ? Math.round(N(sh.to_pay)) : null;
     out.genie_total += genieNet; if (sheetNet != null) out.sheet_total += sheetNet;
+    out.genie_pay_total += geniePay; if (sheetPay != null) out.sheet_pay_total += sheetPay;
     const name = String(r.name || m?.name || id), type = String(r.type || m?.category || "");
-    if (r.hold) { out.holds.push({ employee_id: id, name, type, genie_net: genieNet, sheet_net: sheetNet, status: String(m?.status || "HOLD") }); continue; }
+    if (r.hold) { out.holds.push({ employee_id: id, name, type, genie_net: genieNet, sheet_net: sheetNet, sheet_pay: sheetPay, status: String(m?.status || "HOLD") }); continue; }
     if (!sh) { out.not_in_sheet++; continue; }
     out.compared++;
     const diff = Math.round(genieNet - sheetNet!);
-    if (Math.abs(diff) < 1) { out.matched++; continue; }
+    const payDiff = sheetPay == null ? 0 : geniePay - sheetPay;
+    if (Math.abs(payDiff) >= 1) out.pay_mismatched++;
+    if (Math.abs(diff) < 1 && Math.abs(payDiff) < 1) { out.matched++; continue; }
     const heads = HEADS.map(([k, label]) => ({ head: label, genie: N(r[k]), sheet: N(sh[k]), diff: Math.round(N(r[k]) - N(sh[k])) })).filter((h) => Math.abs(h.diff) >= 1);
-    out.mismatches.push({ employee_id: id, name, type, genie_net: genieNet, sheet_net: sheetNet!, diff, heads });
+    out.mismatches.push({ employee_id: id, name, type, genie_net: genieNet, sheet_net: sheetNet!, diff, genie_pay: geniePay, sheet_pay: sheetPay, pay_diff: payDiff, heads });
   }
-  out.mismatches.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  out.mismatches.sort((a, b) => Math.max(Math.abs(b.diff), Math.abs(b.pay_diff)) - Math.max(Math.abs(a.diff), Math.abs(a.pay_diff)));
   out.holds.sort((a, b) => a.name.localeCompare(b.name));
   return out;
 }

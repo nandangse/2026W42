@@ -50,10 +50,10 @@ type ObsPerson = {
 };
 const REG_KEYS = ["employee_id", "name", "type", "days_due", "leave_ob", "leave_earned", "compoff_days", "leave_used", "leave_encashed", "leave_cb", "paid_days", "per_day", "basic_da", "hra", "fixed_allowance", "conveyance", "medical", "ot_pay", "site_allowance", "compoff_amt", "encash_amt", "arrears", "earned", "pf", "pt", "loan", "advance", "tds", "lunch", "late_ded", "other_ded", "deductions", "net", "round_up", "to_pay", "rate_from"];
 type PayCompare = {
-  ready: boolean; why?: string; compared: number; matched: number;
-  holds: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number | null; status: string }[];
-  mismatches: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number; diff: number; heads: { head: string; genie: number; sheet: number; diff: number }[] }[];
-  genie_total: number; sheet_total: number; not_in_sheet: number;
+  ready: boolean; why?: string; compared: number; matched: number; pay_mismatched: number;
+  holds: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number | null; sheet_pay: number | null; status: string }[];
+  mismatches: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number; diff: number; genie_pay: number; sheet_pay: number | null; pay_diff: number; heads: { head: string; genie: number; sheet: number; diff: number }[] }[];
+  genie_total: number; sheet_total: number; genie_pay_total: number; sheet_pay_total: number; not_in_sheet: number;
 };
 type ObsData = {
   pay?: PayCompare;
@@ -453,10 +453,11 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                   <div className="flex flex-wrap gap-2 mb-2">
                     {([
                       ["Compared", obs.pay.compared, C.ink], ["Match to the rupee", obs.pay.matched, "#2A6B39"], ["Do not match", obs.pay.mismatches.length, obs.pay.mismatches.length ? "#8E2C20" : "#2A6B39"],
-                      ["On hold", obs.pay.holds.length, "#B26A00"], ["Genie net", Math.round(obs.pay.genie_total), C.ink], ["Sheet net", Math.round(obs.pay.sheet_total), C.ink], ["Difference", Math.round(obs.pay.genie_total - obs.pay.sheet_total), Math.abs(obs.pay.genie_total - obs.pay.sheet_total) >= 1 ? "#8E2C20" : "#2A6B39"],
+                      ["On hold", obs.pay.holds.length, "#B26A00"], ["Genie net", Math.round(obs.pay.genie_total), C.ink], ["Sheet net", Math.round(obs.pay.sheet_total), C.ink], ["Net difference", Math.round(obs.pay.genie_total - obs.pay.sheet_total), Math.abs(obs.pay.genie_total - obs.pay.sheet_total) >= 1 ? "#8E2C20" : "#2A6B39"],
+                      ["To pay differs", obs.pay.pay_mismatched, obs.pay.pay_mismatched ? "#8E2C20" : "#2A6B39"], ["Genie to pay (bank)", obs.pay.genie_pay_total, C.ink], ["Sheet to pay (bank)", obs.pay.sheet_pay_total, C.ink], ["To pay difference", obs.pay.genie_pay_total - obs.pay.sheet_pay_total, Math.abs(obs.pay.genie_pay_total - obs.pay.sheet_pay_total) >= 1 ? "#8E2C20" : "#2A6B39"],
                     ] as [string, number, string][]).map(([label, n, col]) => (
                       <div key={label} className="rounded px-3 py-2" style={{ border: `1px solid ${C.line}`, minWidth: 120, background: "#fff" }}>
-                        <div className="tnum font-bold" style={{ fontSize: 18, color: col, lineHeight: 1.1 }}>{/net|Difference/i.test(label) ? `₹${inr(n)}` : n.toLocaleString("en-IN")}</div>
+                        <div className="tnum font-bold" style={{ fontSize: 18, color: col, lineHeight: 1.1 }}>{/net|difference|to pay \(/i.test(label) ? `₹${inr(n)}` : n.toLocaleString("en-IN")}</div>
                         <div style={{ fontSize: 11, color: C.dim }}>{label}</div>
                       </div>
                     ))}
@@ -466,15 +467,15 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                       <div className="text-xs font-bold mb-1" style={{ color: "#B26A00" }}>ON HOLD — {obs.pay.holds.length}: attendance earnings only, nothing paid until lifted</div>
                       <div className="text-xs" style={{ color: C.ink, lineHeight: 1.7 }}>
                         {obs.pay.holds.filter((h) => !q || h.name.toLowerCase().includes(q.toLowerCase()) || h.employee_id.includes(q)).map((h) => (
-                          <div key={h.employee_id}><b>{h.employee_id}</b> {h.name} <span style={{ color: C.faint }}>· {h.type} · {h.status}</span> — Genie net ₹{inr(h.genie_net)}{h.sheet_net != null ? ` · sheet ₹${inr(h.sheet_net)}` : ""} · <b>to pay ₹0</b></div>
+                          <div key={h.employee_id}><b>{h.employee_id}</b> {h.name} <span style={{ color: C.faint }}>· {h.type} · {h.status}</span> — Genie net ₹{inr(h.genie_net)}{h.sheet_net != null ? ` · sheet net ₹${inr(h.sheet_net)}` : ""} · <b>Genie to pay ₹0</b>{h.sheet_pay != null && h.sheet_pay > 0 && <span style={{ color: "#8E2C20" }}> · <b>but the sheet pays ₹{inr(h.sheet_pay)}</b> — settle which is right</span>}</div>
                         ))}
                       </div>
                     </div>
                   )}
-                  {obs.pay.mismatches.length === 0 ? <div className="text-xs" style={{ color: "#2A6B39" }}>Every line that is not on hold matches the sheet to the rupee.</div> : (
+                  {obs.pay.mismatches.length === 0 ? <div className="text-xs" style={{ color: "#2A6B39" }}>Every line that is not on hold matches the sheet to the rupee — net and to pay both.</div> : (
                     <div style={{ maxHeight: "48vh", overflow: "auto" }}>
                       <table className="w-full text-xs genie-table">
-                        <thead><tr><th style={TH}>Employee</th><th style={TH}>Type</th><th style={{ ...TH, textAlign: "right" }}>Genie net</th><th style={{ ...TH, textAlign: "right" }}>Sheet net</th><th style={{ ...TH, textAlign: "right" }}>Difference</th><th style={TH}>Where it differs (Genie vs sheet)</th></tr></thead>
+                        <thead><tr><th style={TH}>Employee</th><th style={TH}>Type</th><th style={{ ...TH, textAlign: "right" }}>Genie net</th><th style={{ ...TH, textAlign: "right" }}>Sheet net</th><th style={{ ...TH, textAlign: "right" }}>Net diff</th><th style={{ ...TH, textAlign: "right" }}>Genie to pay</th><th style={{ ...TH, textAlign: "right" }}>Sheet to pay</th><th style={{ ...TH, textAlign: "right" }}>To pay diff</th><th style={TH}>Where it differs (Genie vs sheet)</th></tr></thead>
                         <tbody>
                           {obs.pay.mismatches.filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q)).map((m) => (
                             <tr key={m.employee_id} style={{ borderTop: "1px solid #EEECE6" }}>
@@ -482,8 +483,11 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                               <td className="px-2 py-1" style={{ color: C.faint }}>{m.type}</td>
                               <td className="px-2 py-1 text-right tnum">₹{inr(m.genie_net)}</td>
                               <td className="px-2 py-1 text-right tnum">₹{inr(m.sheet_net)}</td>
-                              <td className="px-2 py-1 text-right tnum font-bold" style={{ color: m.diff > 0 ? "#2A6B39" : "#8E2C20" }}>{m.diff > 0 ? "+" : ""}₹{inr(m.diff)}</td>
-                              <td className="px-2 py-1" style={{ color: C.dim, whiteSpace: "normal" }}>{m.heads.length ? m.heads.map((h) => `${h.head} ${inr(h.genie)} vs ${inr(h.sheet)} (${h.diff > 0 ? "+" : ""}${inr(h.diff)})`).join(" · ") : "same heads — the sheet's own net differs from its parts"}</td>
+                              <td className="px-2 py-1 text-right tnum font-bold" style={{ color: Math.abs(m.diff) < 1 ? C.faint : m.diff > 0 ? "#2A6B39" : "#8E2C20" }}>{Math.abs(m.diff) < 1 ? "same" : `${m.diff > 0 ? "+" : ""}₹${inr(m.diff)}`}</td>
+                              <td className="px-2 py-1 text-right tnum">₹{inr(m.genie_pay)}</td>
+                              <td className="px-2 py-1 text-right tnum">{m.sheet_pay == null ? "—" : `₹${inr(m.sheet_pay)}`}</td>
+                              <td className="px-2 py-1 text-right tnum font-bold" style={{ color: Math.abs(m.pay_diff) < 1 ? C.faint : m.pay_diff > 0 ? "#2A6B39" : "#8E2C20" }}>{Math.abs(m.pay_diff) < 1 ? "same" : `${m.pay_diff > 0 ? "+" : ""}₹${inr(m.pay_diff)}`}</td>
+                              <td className="px-2 py-1" style={{ color: C.dim, whiteSpace: "normal" }}>{m.heads.length ? m.heads.map((h) => `${h.head} ${inr(h.genie)} vs ${inr(h.sheet)} (${h.diff > 0 ? "+" : ""}${inr(h.diff)})`).join(" · ") : (Math.abs(m.diff) < 1 ? "net agrees — only the to-pay (bank) figure differs: a rounding or a hold the sheet treats differently" : "same heads — the sheet's own net differs from its parts")}</td>
                             </tr>
                           ))}
                         </tbody>
