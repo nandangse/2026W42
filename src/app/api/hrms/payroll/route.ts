@@ -9,6 +9,7 @@ import { driveConfig, uploadToFolder, trashFile } from "@/lib/drive";
 import { readEssl, type EsslPunch } from "@/lib/essl";
 import { parseMuster, parseRates, generateRegister, musterVars, OPTIONAL_MUSTER_VARS, type Muster, type Rates, type RegisterRow, workingDaysFor } from "@/lib/muster";
 import { buildBankFiles } from "@/lib/bank-files";
+import { buildSalaryXlsx, salaryXlsxName, fyOf } from "@/lib/salary-xlsx";
 import { totalsFor } from "@/lib/salary-sheet";
 import { MONTHS } from "@/lib/hrms-template";
 import { people, renderFor, queueMessages, queueStatuses } from "@/lib/hrms-wa";
@@ -62,6 +63,18 @@ export async function GET(req: Request) {
     /* EXECUTE BANK FILES (Dr Raghu, 7 Oct 2026) — the approved run as the
        bank's own upload files, zipped: see src/lib/bank-files.ts. Only once
        the run is approved; the amounts are the register's to-pay. */
+    /* THE FINALISED SALARY SHEET, ON DEMAND — the same Excel approval files in Drive */
+    if (id && new URL(req.url).searchParams.get("xlsx") === "1") {
+      const r = await runRow(admin, id);
+      if (!r.approved_at && !/frozen/i.test(String(r.status))) throw new HttpError(409, "Approve the run first — the salary sheet is made from the approved register.");
+      const rows = (r.rows ?? []) as RegisterRow[];
+      if (!rows.length) throw new HttpError(400, "Nothing generated on this run yet.");
+      const ppl = await people(admin, rows.map((x) => x.employee_id));
+      const month = Number(r.month), year = Number(r.year);
+      const buf = buildSalaryXlsx(rows, ppl, month, year, fyOf(month, year));
+      return new Response(new Uint8Array(buf), { headers: { "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "content-disposition": `attachment; filename="${salaryXlsxName(month, year, fyOf(month, year))}"` } });
+    }
+
     if (id && new URL(req.url).searchParams.get("bank") === "1") {
       const r = await runRow(admin, id);
       if (!r.approved_at && !/frozen/i.test(String(r.status))) throw new HttpError(409, "Approve the run first — the bank files are made from the approved register.");
@@ -246,7 +259,30 @@ export async function POST(req: Request) {
       const patch = action === "approve" ? { approved_by: stamp, approved_at: now, updated_at: now } : { approved_by: null, approved_at: null, updated_at: now };
       const { error } = await admin.from("hrms_salary_sheet").update(patch).eq("id", id);
       if (error) { if (/approved_by/i.test(error.message)) throw new HttpError(503, "Run migration 0132 first — approval has nowhere to be kept yet."); throw new Error(error.message); }
-      return NextResponse.json({ ok: true });
+      /* ON APPROVAL, THE FINALISED SALARY SHEET IS MADE AND FILED (Dr Raghu,
+         7 Oct 2026) — the Excel in the Salary tab's layout goes to the run's
+         Drive folder and onto the run's uploads as kind "final". A Drive
+         hiccup never undoes the approval; the sheet can be downloaded from
+         the run at any time. */
+      let filed: string | null = null, note = "";
+      if (action === "approve") {
+        try {
+          const r = await runRow(admin, id);
+          const rows = (r.rows ?? []) as RegisterRow[];
+          if (rows.length) {
+            const month = Number(r.month), year = Number(r.year), fy = fyOf(month, year);
+            const ppl = await people(admin, rows.map((x) => x.employee_id));
+            const buf = buildSalaryXlsx(rows, ppl, month, year, fy);
+            const name = salaryXlsxName(month, year, fy);
+            const cfg = driveConfig();
+            let drive: { id: string; link: string | null } | null = null;
+            if (cfg) { try { drive = await uploadToFolder(cfg, cfg.folderId, folderName(month, year), new Uint8Array(buf).buffer as ArrayBuffer, name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); } catch (e) { note = `Drive: ${e instanceof Error ? e.message : String(e)}`; } }
+            await admin.from("hrms_payroll_file").insert({ sheet_id: id, kind: "final", name, mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: buf.byteLength, drive_id: drive?.id || null, drive_link: drive?.link || null, parsed: { rows: rows.length, approved_by: stamp }, uploaded_by: stamp });
+            filed = drive?.link || "made";
+          } else note = "nothing generated yet, so no salary sheet was made";
+        } catch (e) { note = e instanceof Error ? e.message : String(e); }
+      }
+      return NextResponse.json({ ok: true, salary_sheet: filed, note });
     }
 
     /** REMOVE an upload — the row goes, the Drive copy is binned, and the run's muster or rates fall back to the newest remaining file of that kind. */

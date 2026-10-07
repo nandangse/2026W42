@@ -27,7 +27,7 @@ const who = (s: string | null) => (s ? String(s).split("·")[0].trim() : "—");
 const dayOfWeek = (year: number | null, month: number | null, day: number): number | null =>
   year && month ? new Date(Date.UTC(year, month - 1, day)).getUTCDay() : null;
 
-const KINDS = [["essl", "ESSL attendance"], ["muster", "Attendance muster"], ["rates", "Salary rate list"], ["advance", "Advance (Tally)"], ["loan", "Loan (Tally)"], ["other", "Other document"]] as const;
+const KINDS = [["essl", "ESSL attendance"], ["muster", "Attendance muster"], ["rates", "Salary rate list"], ["advance", "Advance (Tally)"], ["loan", "Loan (Tally)"], ["final", "Finalised salary sheet (Excel)"], ["bank", "Bank files (zip)"], ["other", "Other document"]] as const;
 /** The run's inputs, one form each (Dr Raghu, 5 Sep 2026) — who brings it, how it comes, whether a file is expected. */
 const INPUTS: { key: string; label: string; by: string; how: string; upload: boolean; needFile: boolean; accept: string }[] = [
   { key: "essl", label: "ESSL attendance output", by: "Vishwas", how: "the biometric export, Excel or CSV", upload: true, needFile: true, accept: ".csv,.xlsx,.xls,.txt" },
@@ -157,6 +157,11 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
         </div>
         <button onClick={waPreview} disabled={busy || !d.muster} className="text-xs font-bold rounded px-3 py-2" style={{ background: d.muster ? "#25D366" : "rgba(255,255,255,0.12)", color: d.muster ? "#0B3D1E" : "#8FA1B3" }} title={d.muster ? "The attendance message to everybody on the muster, through the WhatsApp queue" : "Upload the muster first"}>💬 Send WhatsApp message</button>
         {/* EXECUTE BANK FILES (Dr Raghu, 7 Oct 2026): once approved, the bank's own upload files, one per class, under ₹10 lakh each, zipped */}
+        {/* THE FINALISED SALARY SHEET (Dr Raghu, 7 Oct 2026): the Excel in the Google Sheet's Salary-tab layout, made on approval and filed in Drive */}
+        {r.approved_by && (
+          <a href={`/api/hrms/payroll?id=${encodeURIComponent(id)}&xlsx=1`} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#D7DEE6", color: "#1F2328", textDecoration: "none" }}
+            title="The month's salary sheet as Excel, in the same columns as the Google Sheet's Salary tab — made from the approved register">📗 Salary sheet (Excel)</a>
+        )}
         {r.approved_by && (
           <a href={`/api/hrms/payroll?id=${encodeURIComponent(id)}&bank=1`} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#F3B33D", color: "#1F2328", textDecoration: "none" }}
             title="The bank's NEFT upload files for this run — management, staff and labour kept apart, each file under ₹10 lakh, with a note of anybody left out">🏦 Execute Bank Files</a>
@@ -375,7 +380,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                   — the same as the printed register, so the screen and the
                   paper name their columns the same way. */}
               <thead><tr style={{ fontSize: 10 }}>
-                {["Emp", "Name", "Type", "Due", "Leave OB", "Earned lv", "Comp off", "Lv used", "Encashed", "Leave CB", "Paid days", "Per day", "Basic & DA", "HRA", "Fixed", "Conv", "Medical", "OT pay", "Site", "Comp off ₹", "Encash ₹", "Arrears", "Earned", "PF", "PT", "Loan", "Advance", "TDS", "Lunch", "Late", "Other", "Deductions", "Net", "To pay", "Rate from"].map((h, i) => (
+                {["Emp", "Name", "Type", "Due", "Leave OB", "Earned lv", "Comp off", "Lv used", "Encashed", "Leave CB", "Paid days", "Per day", "Basic & DA", "HRA", "Fixed", "Conv", "Medical", "OT pay", "Site", "Comp off ₹", "Encash ₹", "Arrears", "Earned", "PF", "PT", "Loan", "Advance", "TDS", "Lunch", "Late", "Other", "Deductions", "Net", "Round up", "To pay", "Rate from"].map((h, i) => (
                   <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#16232F", color: "#fff", fontWeight: 700, textAlign: i < 3 ? "left" : "right", zIndex: i < 2 ? 3 : 2, borderBottom: "2px solid #16232F", ...(i === 0 ? { left: 0, minWidth: 60, width: 60 } : i === 1 ? { left: 60 } : {}) }}>{h}</th>
                 ))}
               </tr></thead>
@@ -388,8 +393,8 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                     {[x.days_due, x.leave_ob, x.leave_earned, x.compoff_days, x.leave_used, x.leave_encashed, x.leave_cb, x.paid_days].map((v, i) => (
                       <td key={"l" + i} className="px-2 py-1 text-right tnum" style={{ color: i === 6 ? "var(--blue)" : C.dim, fontWeight: i === 6 || i === 7 ? 700 : 400 }}>{v == null ? "—" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
                     ))}
-                    {[x.per_day, x.basic_da, x.hra, x.fixed_allowance, x.conveyance, x.medical, x.ot_pay, x.site_allowance, x.compoff_amt, x.encash_amt, x.arrears, x.earned, x.pf, x.pt, x.loan, x.advance, x.tds, x.lunch, x.late_ded, x.other_ded, x.deductions, x.net, x.to_pay].map((v, i) => (
-                      <td key={i} className="px-2 py-1 text-right tnum" style={i === 11 || i === 21 || i === 22 ? { fontWeight: 700 } : undefined}>{inr(v)}</td>
+                    {[x.per_day, x.basic_da, x.hra, x.fixed_allowance, x.conveyance, x.medical, x.ot_pay, x.site_allowance, x.compoff_amt, x.encash_amt, x.arrears, x.earned, x.pf, x.pt, x.loan, x.advance, x.tds, x.lunch, x.late_ded, x.other_ded, x.deductions, x.net, x.round_up, x.to_pay].map((v, i) => (
+                      <td key={i} className="px-2 py-1 text-right tnum" style={i === 11 || i === 21 || i === 23 ? { fontWeight: 700 } : i === 22 ? { color: C.faint } : undefined}>{i === 22 ? (v ? Number(v).toFixed(2) : "·") : inr(v)}</td>
                     ))}
                     <td className="px-2 py-1 text-right" style={{ color: x.rate_from === "none" ? C.red : C.faint, fontSize: 10 }}>{x.rate_from}</td>
                   </tr>
@@ -397,7 +402,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
               </tbody>
               <tfoot><tr style={{ borderTop: `2px solid ${C.line}`, fontWeight: 700 }}>
                 <td className="px-2 py-1.5" colSpan={3} style={{ position: "sticky", left: 0, background: "#fff" }}>{regRows.length} people</td>
-                {["days_due", "leave_ob", "leave_earned", "compoff_days", "leave_used", "leave_encashed", "leave_cb", "paid_days", "per_day", "basic_da", "hra", "fixed_allowance", "conveyance", "medical", "ot_pay", "site_allowance", "compoff_amt", "encash_amt", "arrears", "earned", "pf", "pt", "loan", "advance", "tds", "lunch", "late_ded", "other_ded", "deductions", "net", "to_pay"].map((k) => (
+                {["days_due", "leave_ob", "leave_earned", "compoff_days", "leave_used", "leave_encashed", "leave_cb", "paid_days", "per_day", "basic_da", "hra", "fixed_allowance", "conveyance", "medical", "ot_pay", "site_allowance", "compoff_amt", "encash_amt", "arrears", "earned", "pf", "pt", "loan", "advance", "tds", "lunch", "late_ded", "other_ded", "deductions", "net", "round_up", "to_pay"].map((k) => (
                   <td key={k} className="px-2 py-1.5 text-right tnum">{["days_due", "leave_ob", "leave_earned", "compoff_days", "leave_used", "leave_encashed", "leave_cb", "paid_days", "per_day"].includes(k) ? "" : inr(regRows.reduce((a, x) => a + (Number((x as unknown as Record<string, unknown>)[k]) || 0), 0))}</td>
                 ))}
                 <td />

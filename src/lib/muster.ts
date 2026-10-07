@@ -249,6 +249,8 @@ export interface RegisterRow {
   per_day: number; gross: number; basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical: number;
   ot_pay: number; site_allowance: number; compoff_amt: number; encash_amt: number; arrears: number; earned: number;
   pf: number; pt: number; loan: number; advance: number; tds: number; lunch: number; late_ded: number; other_ded: number; deductions: number; net: number; to_pay: number;
+  /** to-pay less net: the net rounded UP to the next rupee, as a column (Dr Raghu, 7 Oct 2026) */
+  round_up: number;
   leave_ob: number; leave_earned: number; compoff_days: number; leave_used: number; leave_encashed: number; leave_cb: number;
   loan_ob: number; loan_taken: number; loan_cb: number;
   hold: boolean; rate_from: "rates" | "record" | "none"; mobile: string | null;
@@ -424,12 +426,19 @@ export function generateRegister(
     // nothing earned, nothing deducted: a loan or advance waits for a month with pay
     const deductions = nobodyPresent ? 0 : pf + pt + loan + advance + tds + lunch + lateDed + other;
     const net = earned - deductions;
+    /* ROUNDED UP, NEVER PAID IN PAISE (Dr Raghu, 7 Oct 2026: "Have you done
+       the round-up to the next integer, because we cannot give salaries as
+       decimals? … the round-up should be coming as a column"). To-pay is the
+       net taken up to the next rupee; a salary on hold or with no attendance
+       pays nought; the difference stands in its own column. */
+    const toPay = onHold || nobodyPresent ? 0 : Math.ceil(net);
+    const roundUp = toPay > 0 ? r2(toPay - net) : 0;
     return {
       employee_id: m.employee_id, name: m.name || rec?.name || m.employee_id, type,
       present: m.present, absent: m.absent, wo: m.wo, mo_st: m.mo_st, days_due: due, pay_days: payDays, paid_days: r2(paidDays), attendance: m.attendance ?? m.present, ot: m.ot,
       per_day: Math.round(perDay), gross: Math.round(gross), basic_da: eBasic, hra, fixed_allowance: eFixed, conveyance: eConv, medical: eMed,
       ot_pay: otPay, site_allowance: site, compoff_amt: compAmt, encash_amt: encashAmt, arrears, earned,
-      pf, pt, loan, advance, tds, lunch, late_ded: lateDed, other_ded: other, deductions, net, to_pay: onHold || nobodyPresent ? 0 : Math.ceil(net),
+      pf, pt, loan, advance, tds, lunch, late_ded: lateDed, other_ded: other, deductions, net, to_pay: toPay, round_up: roundUp,
       leave_ob: r2(leaveOb), leave_earned: leaveEarned, compoff_days: compDays, leave_used: r2(leaveUsed + compUsed), leave_encashed: r2(encashDays), leave_cb: leaveCb, loan_ob: Math.round(loanOb), loan_taken: m.loan_taken ?? 0, loan_cb: Math.round(loanOb + (m.loan_taken ?? 0) - loan),
       hold: nobodyPresent || onHold, rate_from: from, mobile: m.mobile,
     };

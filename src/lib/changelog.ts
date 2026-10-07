@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.24",
+    date: "2026-10-07",
+    module: "Payroll: Approve makes the finalised salary sheet as Excel; Round Up is a column",
+    items: [
+      "THE FINALISED SALARY SHEET, ON APPROVAL (\u201cOnce I click on the approve button here, it should then just generate the finalised salary sheets \u2026 an Excel sheet, should be generated automatically and populated, so that in future we don\u2019t have to create it from the main document\u201d). Approve now makes the month\u2019s salary sheet as Excel in the Google Sheet\u2019s own Salary-tab layout, column for column \u2014 Id, Name, Category, Status, Type, the rates, attendance and pay days, every earning and deduction, net, the loan and leave ledgers, Round Up, To be paid Salary, In words, the statutory numbers and the bank details \u2014 with the banner row of totals under the header and the header repeated as the sheet does it. It is filed in the run\u2019s Drive folder as \u2018Nandan GSE Salary Sheet 2026-27 - September 2026.xlsx\u2019, listed on the run\u2019s uploads, and a \ud83d\udcd7 button downloads it any time. Columns Genie does not keep are blank, never guessed.",
+      "ROUND UP, AS A COLUMN (\u201cHave you done the round-up to the next integer, because we cannot give salaries as decimals? \u2026 the round-up should be coming as a column\u201d). To-pay has always been the net taken up to the next rupee; a salary on hold or with no attendance pays nought. The difference now stands in its own Round Up column on the register, in the Excel and in the bank files\u2019 amounts.",
+    ],
+  },
+  {
     v: "6.3.0.23",
     date: "2026-10-07",
     module: "Payroll: Execute Bank Files — the bank\u2019s own upload files, zipped, from the approved run",
