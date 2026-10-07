@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.21",
+    date: "2026-10-07",
+    module: "Payroll: nobody present, nobody paid; a worker\u2019s leave waits for approval; HOLD means nothing extra",
+    items: [
+      "NOBODY PRESENT, NOBODY PAID (\u201ccheck 6177 \u2014 his earning is 0 but the payment is made. DO NOT use the leaves of 0 attendance employees\u201d). Until today a person with no attendance still drew a salary: the gap in pay days was filled from his leave balance and the filled days earned \u2014 6177 was paid \u20b912,407 on 15.8 days of leave he never applied for, and three such people drew \u20b935,439 in September\u2019s first run. A month with nothing present now earns nothing, deducts nothing, spends no leave and stands on hold.",
+      "A WORKER\u2019S LEAVE IS NOT SPENT WITHOUT APPROVAL (\u201cThe leave balance of the workers should not be used without approval \u2026 Shortfall against paydays is not made from labour automatically. Please note it is only for staff.\u201d). For Labour the balance stays where it is and the short days stay unpaid; the run names the workers who were short so the approvals can be taken. In September\u2019s first run 63 workers had 292.6 days of leave spent for them unasked. Staff keep the rule they had: leave fills the gap while the balance stays above 15.",
+      "HOLD MEANS NOTHING EXTRA (\u201ccheck the field called hold. If that is mentioned, it is due to a particular reason. Do not give them any extra things\u201d). The Salary tab\u2019s Status column carries HOLD and its Type column Active or F&F Due; both are read now, where the first pass took only the Type and lost fifteen holds. A held person earns what the attendance earns and no more \u2014 no leave spent, no comp-off used or encashed, no leave encashment, no arrears \u2014 and to-pay shows nought until the hold is lifted. The run names them.",
+    ],
+  },
+  {
     v: "6.3.0.20",
     date: "2026-10-07",
     module: "Payroll: the muster\u2019s site allowance is paid on top of the structure\u2019s, never discarded",

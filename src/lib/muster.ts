@@ -155,7 +155,12 @@ export function parseMuster(grid: unknown[][]): Muster {
       mo_st = 0;
       absent = Math.max(0, daysInMonth - pay_days);
     }
-    const statusRaw = salaryTab && typeCol !== undefined ? String(line[typeCol] ?? "").trim() : String(at("status") ?? "").trim();
+    /* on the Salary tab, Status says HOLD (or No) and Type says Active or
+       F&F Due — both matter to the register, so the hold word wins and the
+       type follows it */
+    const statusCell = String(at("status") ?? "").trim();
+    const typeCell = salaryTab && typeCol !== undefined ? String(line[typeCol] ?? "").trim() : "";
+    const statusRaw = salaryTab ? (/hold/i.test(statusCell) ? `HOLD${typeCell ? ` · ${typeCell}` : ""}` : typeCell || statusCell) : statusCell;
     rows.push({
       employee_id: id, name: String(at("name") ?? "").trim(), status: statusRaw, category: String(at("category") ?? "").trim(),
       days, present, absent, wo, mo_st, pay_days,
@@ -274,6 +279,8 @@ export function generateRegister(
   const rateOf = new Map((rates?.rows || []).map((r) => [r.employee_id, r]));
   const warnings: string[] = [];
   const siteClash: string[] = [];
+  const zeroAttendance: string[] = [];
+  const workersShort: string[] = [];
   let noRate = 0;
   const rows = muster.rows.map((m) => {
     const rec = record(m.employee_id);
@@ -320,14 +327,39 @@ export function generateRegister(
     const due = m.pay_days;
     let shortfall = Math.max(0, payDays - due);
     const available = leaveOb + leaveEarned;
+    /**
+     * NOBODY PRESENT, NOBODY PAID (Dr Raghu, 7 Oct 2026: "check 6177 — his
+     * earning is 0 but the payment is made. DO NOT use the leaves of 0
+     * attendance employees … if someone has 0 attendance NO payments to be
+     * made to them"). Until today a person with no attendance still drew a
+     * salary: the shortfall in pay days was quietly filled from his leave
+     * balance, and the filled days earned. Now a month with nothing present
+     * earns nothing, uses no leave, and goes on hold.
+     *
+     * A WORKER'S LEAVE IS NOT SPENT WITHOUT APPROVAL ("The leave balance of
+     * the workers should not be used without approval"). For Labour the
+     * balance stays where it is; the short days stay unpaid, and the run
+     * says how many were short so the approvals can be taken. Staff keep the
+     * rule they had: leave fills the gap when the balance stays above 15.
+     */
+    const nobodyPresent = m.present <= 0;
+    /* ON HOLD, NOTHING EXTRA (Dr Raghu, 7 Oct 2026: "check the field called
+       hold. If that is mentioned, it is due to a particular reason. Do not
+       give them any extra things"). A held person earns what the attendance
+       earns and no more: no leave spent to fill the gap, no comp-off used or
+       encashed, no leave encashment, no arrears. The payment itself waits. */
+    const onHold = /hold/i.test(m.status) || /f ?& ?f|resign|terminat/i.test(m.status);
+    const noExtras = nobodyPresent || onHold;
     let leaveUsed = 0;
-    if (shortfall > 0 && earnsLeave && available >= minBal) { leaveUsed = Math.min(shortfall, available); shortfall -= leaveUsed; }
+    if (shortfall > 0 && earnsLeave && !worker && !noExtras && available >= minBal) { leaveUsed = Math.min(shortfall, available); shortfall -= leaveUsed; }
+    if (shortfall > 0 && worker && !noExtras && available > 0) workersShort.push(m.employee_id);
     let compUsed = 0;
-    if (shortfall > 0 && compDays > 0) { compUsed = Math.min(shortfall, compDays); shortfall -= compUsed; }
-    const compEncash = compDays - compUsed;
-    const encashDays = (m.leave_encash ?? 0) + compEncash;
-    const paidDays = Math.min(payDays, due + leaveUsed + compUsed);
-    const leaveCb = r2(leaveOb + leaveEarned + compDays - leaveUsed - compUsed - compEncash - (m.leave_encash ?? 0));
+    if (shortfall > 0 && compDays > 0 && !noExtras) { compUsed = Math.min(shortfall, compDays); shortfall -= compUsed; }
+    const compEncash = noExtras ? 0 : compDays - compUsed;
+    const encashDays = noExtras ? 0 : (m.leave_encash ?? 0) + compEncash;
+    const paidDays = nobodyPresent ? 0 : Math.min(payDays, due + leaveUsed + compUsed);
+    if (nobodyPresent) zeroAttendance.push(m.employee_id);
+    const leaveCb = r2(leaveOb + leaveEarned + compDays - leaveUsed - compUsed - compEncash - (noExtras ? 0 : (m.leave_encash ?? 0)));
 
     // ── earnings ──
     const f = payDays > 0 ? paidDays / payDays : 0;
@@ -372,9 +404,9 @@ export function generateRegister(
     const site = worker ? eSite + Math.max(0, otPay - hra) : eSite;
     const otShort = worker && otPay < hra ? hra - otPay : 0;
     const compAmt = Math.round(compEncash * perDay);
-    const encashAmt = Math.round((m.leave_encash ?? 0) * perDay);
-    const arrears = m.arrears ?? 0;
-    const earned = eBasic + hra + eFixed + eConv + eMed + site + compAmt + encashAmt + arrears;
+    const encashAmt = noExtras ? 0 : Math.round((m.leave_encash ?? 0) * perDay);
+    const arrears = noExtras ? 0 : (m.arrears ?? 0);
+    const earned = nobodyPresent ? 0 : eBasic + hra + eFixed + eConv + eMed + site + compAmt + encashAmt + arrears;
 
     // ── deductions ──
     const exempt = NO_STATUTORY.has(t);
@@ -384,20 +416,28 @@ export function generateRegister(
     const loan = m.loan_ded ?? 0, advance = m.advance ?? 0, tds = m.tds ?? 0, lunch = m.lunch ?? 0;
     const lateDed = Math.round((m.late ?? 0) * perDay);
     const other = (m.other_ded ?? 0) + otShort;
-    const deductions = pf + pt + loan + advance + tds + lunch + lateDed + other;
+    // nothing earned, nothing deducted: a loan or advance waits for a month with pay
+    const deductions = nobodyPresent ? 0 : pf + pt + loan + advance + tds + lunch + lateDed + other;
     const net = earned - deductions;
     return {
       employee_id: m.employee_id, name: m.name || rec?.name || m.employee_id, type,
       present: m.present, absent: m.absent, wo: m.wo, mo_st: m.mo_st, days_due: due, pay_days: payDays, paid_days: r2(paidDays), attendance: m.attendance ?? m.present, ot: m.ot,
       per_day: Math.round(perDay), gross: Math.round(gross), basic_da: eBasic, hra, fixed_allowance: eFixed, conveyance: eConv, medical: eMed,
       ot_pay: otPay, site_allowance: site, compoff_amt: compAmt, encash_amt: encashAmt, arrears, earned,
-      pf, pt, loan, advance, tds, lunch, late_ded: lateDed, other_ded: other, deductions, net, to_pay: Math.ceil(net),
+      pf, pt, loan, advance, tds, lunch, late_ded: lateDed, other_ded: other, deductions, net, to_pay: onHold || nobodyPresent ? 0 : Math.ceil(net),
       leave_ob: r2(leaveOb), leave_earned: leaveEarned, compoff_days: compDays, leave_used: r2(leaveUsed + compUsed), leave_encashed: r2(encashDays), leave_cb: leaveCb, loan_ob: Math.round(loanOb), loan_taken: m.loan_taken ?? 0, loan_cb: Math.round(loanOb + (m.loan_taken ?? 0) - loan),
-      hold: /hold/i.test(m.status) || /f ?& ?f|resign|terminat/i.test(m.status), rate_from: from, mobile: m.mobile,
+      hold: nobodyPresent || onHold, rate_from: from, mobile: m.mobile,
     };
   });
   if (siteClash.length)
     warnings.push(`${siteClash.length} ${siteClash.length === 1 ? "person" : "people"} drew an actual site allowance from the muster ON TOP of the structure's (${siteClash.slice(0, 8).join(", ")}${siteClash.length > 8 ? " …" : ""}) — both are paid, as Dr Raghu directed on 7 Oct 2026.`);
+  const held = rows.filter((r) => r.hold && r.present > 0);
+  if (held.length)
+    warnings.push(`${held.length} on HOLD (${held.slice(0, 10).map((r) => r.employee_id).join(", ")}${held.length > 10 ? " …" : ""}): earnings from attendance only — no leave spent, no comp-off or leave encashed, no arrears — and to-pay shown as nought until the hold is lifted.`);
+  if (zeroAttendance.length)
+    warnings.push(`${zeroAttendance.length} ${zeroAttendance.length === 1 ? "person" : "people"} with no attendance at all (${zeroAttendance.slice(0, 10).join(", ")}${zeroAttendance.length > 10 ? " …" : ""}) earn nothing this month, use no leave, and stand on hold — Dr Raghu, 7 Oct 2026.`);
+  if (workersShort.length)
+    warnings.push(`${workersShort.length} worker${workersShort.length === 1 ? "" : "s"} short of pay days (${workersShort.slice(0, 10).join(", ")}${workersShort.length > 10 ? " …" : ""}) — the leave balance is NOT used without approval; the short days stay unpaid until HR approves the leave.`);
   if (noRate) warnings.push(`${noRate} line${noRate === 1 ? "" : "s"} have no rate — neither in the rate list nor on the record — so earn nothing until one is given.`);
   return { rows, warnings };
 }
