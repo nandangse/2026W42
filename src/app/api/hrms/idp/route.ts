@@ -817,11 +817,7 @@ export async function POST(req: Request) {
           throw new HttpError(503, "Run migration 0061 first — the appraisal decision has nowhere to live yet.");
         throw new Error(error.message);
       }
-      // HIS SAVE IS THE APPROVAL — and the approval reaches the rate list and the history (7 Oct 2026)
-      if (!draft && owner) {
-        try { const { syncApprovedToMaster } = await import("@/lib/appraisal-sync"); await syncApprovedToMaster(admin, [employee_id], stamp); }
-        catch (e) { swallow("idp/appraisal sync", e); /* the approval stands; Salary Rate List → Sync from approvals catches up */ }
-      }
+      // An approved appraisal is a PROPOSAL for the Salary Structure; the signed structure is the rate (7 Oct 2026, "it has to take from latest salary structure")
       return NR.json({ ok: true, approved: owner });
     }
 
@@ -843,10 +839,6 @@ export async function POST(req: Request) {
         q = q.in("employee_id", ids);
       }
       const { data, error } = await q.select("employee_id");
-      if (!error && data?.length) {
-        try { const { syncApprovedToMaster } = await import("@/lib/appraisal-sync"); await syncApprovedToMaster(admin, data.map((d) => String(d.employee_id)), stamp); }
-        catch (e) { swallow("idp/approve-appraisal sync", e); }
-      }
       if (error) {
         if (/pending_since|schema cache/i.test(error.message))
           throw new HttpError(503, "Run migration 0063 first — the appraisal approval has nowhere to live yet.");

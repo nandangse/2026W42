@@ -24,10 +24,9 @@ export const maxDuration = 120;
  *
  * Gross and per-day are worked out on save: gross = basic + HRA + fixed +
  * conveyance + medical; per day = gross ÷ 26 for Labour and Labour - Contract,
- * ÷ the calendar days of the current month for everybody else (Dr Raghu,
- * 7 Sep and 7 Oct 2026 — never a fixed 31). The payroll run recomputes its
- * own per-day from the gross over the run's own month, so this stored figure
- * is the rate card's, not the month's.
+ * ÷ 31 for everybody else — the DISPLAYED rate (Dr Raghu, 7 Sep and 7 Oct
+ * 2026: "only for display purposes"). The payroll run works its own per-day
+ * from the gross over the month's actual pay days.
  */
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/[₹,\s]/g, "")); return Number.isFinite(n) ? n : 0; };
 const derive = (r: { basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical_allowance: number }, type?: string | null) => {
@@ -184,7 +183,13 @@ export async function POST(req: Request) {
           throw new HttpError(503, "Run migration 0155 first — a signature has nowhere to sit yet.");
         throw new Error(error.message);
       }
-      return NextResponse.json({ ok: true, frozen: on, signed_as: on ? signed : null });
+      // SIGNING IS THE APPROVAL — the signed list backflushes into every HRIS record and the FY history (7 Oct 2026)
+      let back: { records: number; changed: number; fy: string } | null = null;
+      if (on) {
+        const { data: st } = await admin.from("hrms_salary_structure").select("status").eq("id", sid).maybeSingle();
+        if (st?.status === "Live") { try { const { backflushStructure } = await import("@/lib/structure-sync"); back = await backflushStructure(admin, sid, stamp); } catch (e) { swallow("hrms/rates backflush", e); } }
+      }
+      return NextResponse.json({ ok: true, frozen: on, signed_as: on ? signed : null, backflushed: back });
     }
 
     if (action === "save_rate") {
@@ -213,6 +218,8 @@ export async function POST(req: Request) {
       const { error } = await admin.from("hrms_salary_rate").upsert(row, { onConflict: "structure_id,employee_id" });
       if (error) throw new Error(error.message);
       await admin.from("hrms_salary_structure").update({ updated_at: now }).eq("id", sid);
+      // a line saved on the LIVE list reaches the record at once (7 Oct 2026)
+      try { const { data: st2 } = await admin.from("hrms_salary_structure").select("status").eq("id", sid).maybeSingle(); if (st2?.status === "Live") { const { backflushStructure } = await import("@/lib/structure-sync"); await backflushStructure(admin, sid, stamp, [eid]); } } catch (e) { swallow("hrms/rates save backflush", e); }
       return NextResponse.json({ ok: true, type: hrisType, ...derive(r, hrisType) });
     }
 
@@ -224,10 +231,14 @@ export async function POST(req: Request) {
      * quietly on a read: it rewrites 205 rates, and by his own rule every
      * change to a rate carries who made it and when.
      */
-    /** SYNC FROM APPROVALS (7 Oct 2026): every approved appraisal's gross and split onto the Live list, and the FY history */
-    if (action === "sync_from_approvals") {
-      const { syncApprovedToMaster } = await import("@/lib/appraisal-sync");
-      const r = await syncApprovedToMaster(admin, null, stamp);
+    /** BACKFLUSH TO HRIS (7 Oct 2026): the Live list's every line onto the HRIS record's Pay fields and the FY history */
+    if (action === "backflush") {
+      if (!owner) throw new HttpError(403, `Backflushing the rate list into the records is ${RAGHU_EMAIL}'s.`);
+      const sid = String(body.structure_id || "");
+      const { data: st } = await admin.from("hrms_salary_structure").select("status").eq("id", sid).maybeSingle();
+      if (st?.status !== "Live") throw new HttpError(400, "Only the Live list backflushes into the records.");
+      const { backflushStructure } = await import("@/lib/structure-sync");
+      const r = await backflushStructure(admin, sid, stamp);
       return NextResponse.json({ ok: true, ...r });
     }
 

@@ -851,8 +851,8 @@ function AppraisalTab({ d, isOwner, onSaved }: { d: PersonData; isOwner: boolean
           <Head n={`${inc >= 0 ? "+" : "−"}₹${inr(Math.abs(inc))}`} l="Increment / month" sub={prev ? `${inc >= 0 ? "+" : "−"}${Math.abs((inc / prev) * 100).toFixed(1)}% increment` : ""} good={inc >= 0} />
           <Head n={`${inc >= 0 ? "+" : "−"}₹${inr(Math.abs(inc) * 12)}`} l="Increment / year" good={inc >= 0} />
           {newTable && <Head n={`Rs ${newTable.ctcLakhs} L`} l="New annual CTC (approx)" good />}
-          {/* Per day: gross ÷ 26 for Labour and Labour - Contract, ÷ the
-              calendar days of the month for everybody else (7 Sep / 7 Oct 2026). */}
+          {/* The DISPLAYED per day: gross ÷ 26 for Labour and Labour - Contract,
+              ÷ 31 for everybody else (7 Sep 2026; "only for display", 7 Oct 2026). */}
           {newTable && (
             <Head
               n={`₹${inr(Math.round(perDayOf(newTable.gross, d.employee.type) ?? 0))}`}

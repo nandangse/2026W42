@@ -135,7 +135,7 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
                 every rate change carries who made it and when. */}
             {isOwner && !s.frozen_at && (
               <button onClick={async () => {
-                if (!window.confirm(`Pull every Type from the HRIS and work the per-day rates out again?\n\nPer day = Gross ÷ 26 for Labour and Labour - Contract, ÷ the calendar days of the month for the rest. Lines already right are left alone.`)) return;
+                if (!window.confirm(`Pull every Type from the HRIS and work the per-day rates out again?\n\nPer day = Gross ÷ 26 for Labour and Labour - Contract, ÷ 31 for the rest — the displayed rate. Lines already right are left alone.`)) return;
                 try {
                   const j = await api.post("/api/hrms/rates", { action: "sync_types", structure_id: s.id }) as { checked: number; changed: number; noType: number };
                   setMsg(`${j.changed} of ${j.checked} lines updated${j.noType ? `; ${j.noType} have no Type on their HRIS record` : ""}.`);
@@ -148,16 +148,19 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
                 … even in the HRIS, it is showing the same thing"). Every approved appraisal's
                 gross and split onto the Live list — approvals now write through on their own;
                 this catches up anything made before 7 Oct. */}
-            {isOwner && s.status === "Live" && !s.frozen_at && (
+            {/* BACKFLUSH TO HRIS (Dr Raghu, 7 Oct 2026: "it has to take from latest salary structure … it has
+                to get backflushed into the HRIS"). Signing the Live list does this on its own; the button
+                does it again on demand. */}
+            {isOwner && s.status === "Live" && (
               <button onClick={async () => {
-                if (!window.confirm(`Bring the Live list level with every approved appraisal?\n\nEach approved person's gross and split (basic, HRA, fixed, conveyance, medical) is written onto this list and into the ${"2026-27"} salary history, marked as from the approval.`)) return;
+                if (!window.confirm(`Backflush ${s.title} into the HRIS records?\n\nEvery line's Basic and DA, HRA, Fixed, Conveyance, Medical, Gross and Per day rate is written onto the person's record as an approved edit (changes logged), and the gross into the financial year's salary history. Payroll reads this list.`)) return;
                 try {
-                  const j = await api.post("/api/hrms/rates", { action: "sync_from_approvals" }) as { rates: number; history: number; skipped: string[] };
-                  setMsg(`${j.rates} rates and ${j.history} history lines brought level with the approvals${j.skipped?.length ? `; ${j.skipped.length} whose parts do not add to the gross: ${j.skipped.slice(0, 5).join(", ")}` : ""}.`);
+                  const j = await api.post("/api/hrms/rates", { action: "backflush", structure_id: s.id }) as { records: number; changed: number; fy: string };
+                  setMsg(`${j.records} records backflushed from ${s.title}; ${j.changed} field${j.changed === 1 ? "" : "s"} moved; ${j.fy} history written.`);
                   load(cur);
                 } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
               }} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }}
-                title="Every approved appraisal's gross and split, written onto this Live list and the FY history">✓ Sync from approvals</button>
+                title="This list's every line onto the HRIS records' Pay fields and the FY salary history">⇩ Backflush to HRIS</button>
             )}
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="block" style={{ fontSize: 11, maxWidth: 200 }} />
             <button onClick={upload} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }} title="Rows from a CSV or Excel, matched on Employee ID">⬆ Import</button>
@@ -200,7 +203,7 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
               </tr></tfoot>
             </table>
           </div>
-          <div className="text-xs mt-2" style={{ color: C.faint }}>Gross = Basic and DA + HRA + Fixed + Conveyance + Medical. Per day = Gross ÷ 26 for Labour and Labour - Contract, ÷ 31 for everybody else — the Type decides it, and the Type comes from the HRIS. Last change {fmtFull(String(s.updated_at))}.</div>
+          <div className="text-xs mt-2" style={{ color: C.faint }}>Gross = Basic and DA + HRA + Fixed + Conveyance + Medical. Per day = Gross ÷ 26 for Labour and Labour - Contract, ÷ 31 for everybody else (the displayed rate; payroll works on the month's own days) — the Type decides it, and the Type comes from the HRIS. Last change {fmtFull(String(s.updated_at))}.</div>
         </>
       )}
     </Pane>

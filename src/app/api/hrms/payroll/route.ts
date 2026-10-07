@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { allRows } from "@/lib/all-rows";
 import { readBody } from "@/lib/validate";
 import { splitGross } from "@/lib/salary";
 import { swallow } from "@/lib/swallow";
@@ -440,25 +441,21 @@ ${warnings.length ? `<p><b>${warnings.length} warning${warnings.length === 1 ? "
       let rates = (r.rates as Rates | null) || null;
       let systemCount = 0;
       if (wantSystem) {
-        /* THE SYSTEM RATES ARE THE HRIS RECORDS (Dr Raghu, 7 Oct 2026:
-           "Whenever there is an approval … it has to get backflushed into the
-           HRIS so that it maintains the correct record, and that's where the
-           payroll has to pull from"). Until today this read the approved
-           appraisals directly; now every approval writes through to the
-           record's Pay fields (appraisal-sync.ts), and the record is the one
-           place payroll reads. A record with no gross falls to the Live rate
-           list below, and the run says so. */
-        const roll = await people(admin, muster.rows.map((m) => m.employee_id));
-        const num0 = (v: unknown) => Number(String(v ?? "").replace(/[₹,\s]/g, "")) || 0;
-        const rows2 = roll.map((p) => {
-          const g = (k: string) => num0(p.value[k]);
-          const parts = { basic_da: g("basic_da"), hra: g("hra"), fixed: g("fixed_allowance"), conveyance: g("conveyance"), medical: g("medical_allowance") };
-          const gross = g("gross") || parts.basic_da + parts.hra + parts.fixed + parts.conveyance + parts.medical;
-          return { employee_id: p.id, name: p.name, type: p.type || null, gross: gross || null, basic_da: parts.basic_da || null, hra: parts.hra || null, fixed: parts.fixed || null, conveyance: parts.conveyance || null, medical: parts.medical || null, site: null, per_day: null };
-        }).filter((r) => r.gross);
+        /* THE SYSTEM RATES ARE THE LATEST SALARY STRUCTURE (Dr Raghu, 7 Oct
+           2026: "it has to take from latest salary structure"). The Live
+           list — frozen and signed by him — is the one authority; it
+           backflushes into the HRIS records (structure-sync.ts), and the
+           appraisals are proposals until they are on it. Somebody on the
+           muster with no line on the list shows rate "none" and the run
+           says who. */
+        const { data: live } = await admin.from("hrms_salary_structure").select("id, title, frozen_at, signed_as, effective_from").eq("status", "Live").maybeSingle();
+        if (!live) throw new HttpError(409, "There is no Live Salary Structure — HRIS → Salary Rate List, make one Live (and sign it) first.");
+        const lr = await allRows<{ employee_id: string; name: string | null; type: string | null; basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical_allowance: number; gross: number; per_day: number }>(() => admin.from("hrms_salary_rate").select("employee_id, name, type, basic_da, hra, fixed_allowance, conveyance, medical_allowance, gross, per_day").eq("structure_id", live.id));
+        const rows2 = (lr || []).map((x) => ({ employee_id: String(x.employee_id), name: x.name, type: x.type, gross: Number(x.gross) || null, basic_da: Number(x.basic_da) || null, hra: Number(x.hra) || null, fixed: Number(x.fixed_allowance) || null, conveyance: Number(x.conveyance) || null, medical: Number(x.medical_allowance) || null, site: null, per_day: null }));
         systemCount = rows2.length;
-        const missing = muster.rows.length - rows2.length;
-        rates = { rows: rows2, columns: { source: `Genie — the HRIS records of ${rows2.length} people (approvals written through)` }, warnings: missing > 0 ? [`${missing} on the muster have no gross on their HRIS record — those lines take the Live rate list, or show rate "none".`] : [] };
+        const onList = new Set(rows2.map((x) => x.employee_id));
+        const missing = muster.rows.filter((m) => !onList.has(m.employee_id)).map((m) => m.employee_id);
+        rates = { rows: rows2, columns: { source: `${live.title}${live.frozen_at ? ` · frozen and signed by ${live.signed_as || "—"} on ${String(live.frozen_at).slice(0, 10)}` : " · Live, NOT yet signed"} · ${rows2.length} lines` }, warnings: missing.length ? [`${missing.length} on the muster have no line on ${live.title} (${missing.slice(0, 10).join(", ")}${missing.length > 10 ? " …" : ""}) — rate "none" until they are added to the list.`] : [] };
       }
       // no rate list uploaded → the Live salary structure (HRIS → Salary Rate List) is the rate list
       if (!rates || !rates.rows?.length) {

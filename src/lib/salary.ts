@@ -61,21 +61,26 @@ export const daysInMonthOf = (month?: number | null, year?: number | null): numb
 };
 
 /**
- * PAY DAYS IN A MONTH, and so the per-day rate. Workers — Labour and
- * Labour - Contract — are on a 26-day month (Dr Raghu, 7 Sep 2026). Everybody
- * else is on the calendar month: 30 in September, 28 in February, 31 only
- * when the month has 31 (Dr Raghu, 7 Oct 2026: "the calculation is being
- * done with a hard-coded 31, which is wrong. It should be divided by the
- * number of days that are there in that month. If it is February, it will be
- * divided by 28 … Only for workers, it is hard-coded to 26"). Pass the month
- * when you have it; a standing figure with no month uses the current month.
+ * THE DISPLAYED PER-DAY RATE: gross ÷ 31 for staff and management, ÷ 26 for
+ * workers — Labour and Labour - Contract (Dr Raghu, 7 Sep 2026; reaffirmed
+ * 7 Oct 2026: "The per-day rate that is displayed is the gross salary divided
+ * by 31 for staff and gross salary divided by 26 for the workers. This is
+ * only for display purposes"). The rate list, the appraisal card, the HRIS
+ * record's Per day rate all show this standing figure. The PAYROLL does not
+ * divide by it: the month's calculation runs on the month's own pay days —
+ * see payDaysInMonth — "while we are working on the other days, we will work
+ * on the actual days in the month".
  */
-export const payDaysFor = (type: string | null | undefined, month?: number | null, year?: number | null): number =>
+export const payDaysFor = (type: string | null | undefined): 26 | 31 =>
+  NO_HRA_NO_MEDICAL.has(String(type || "")) ? 26 : 31;
+
+/** Pay days for a CALCULATION in a given month: 26 for workers, the calendar days of that month for everybody else. */
+export const payDaysInMonth = (type: string | null | undefined, month?: number | null, year?: number | null): number =>
   NO_HRA_NO_MEDICAL.has(String(type || "")) ? 26 : daysInMonthOf(month, year);
 
-/** The per-day rate on a gross, by his rule. */
-export const perDayOf = (gross: number | null | undefined, type: string | null | undefined, month?: number | null, year?: number | null): number | null =>
-  gross == null || !Number.isFinite(Number(gross)) ? null : Number(gross) / payDaysFor(type, month, year);
+/** The displayed per-day rate on a gross, by his rule (÷ 31 / ÷ 26). */
+export const perDayOf = (gross: number | null | undefined, type: string | null | undefined): number | null =>
+  gross == null || !Number.isFinite(Number(gross)) ? null : Number(gross) / payDaysFor(type);
 
 /** The annual bonus belongs to Staff and Labour alone (same day). */
 const BONUS_TYPES = new Set(["Staff", "Labour"]);

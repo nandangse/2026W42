@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.37",
+    date: "2026-10-07",
+    module: "The latest signed Salary Structure is the rate \u2014 it backflushes into the HRIS; appraisals no longer write over it",
+    items: [
+      "THE DISPLAYED PER DAY IS \u00f7 31 / \u00f7 26 (\u201cThe per-day rate that is displayed is the gross salary divided by 31 for staff and gross salary divided by 26 for the workers. This is only for display purposes. While we are calculating \u2026 we will work on the actual days in the month\u201d). The rate list, appraisal card and HRIS record show the standing \u00f7 31 / \u00f7 26 figure again; the payroll\u2019s own per-day for the month stays on the month\u2019s actual pay days (6.3.0.27).",
+      "SANJU IS 23,400 (\u201cit has to take from latest salary structure\u201d; \u201csanju is 23400!!!\u201d). Dr Raghu set Sanju to 23,400 on the Live list at 15:39 IST and froze and signed it at 15:40. For one afternoon (6.3.0.35\u201336) an appraisal approval wrote itself over the Live list and the record \u2014 that road is closed: an approved appraisal is a proposal until it is on the list. The payroll\u2019s system rates now read the Live Salary Structure, frozen and signed, and name who on the muster has no line on it. Signing the list \u2014 and every line saved to a Live list \u2014 backflushes into the HRIS record\u2019s Pay fields (as approved edits, logged old \u2192 new) and the financial year\u2019s salary history; \u21e9 Backflush to HRIS on the list does it again on demand. Run once today from Salary Structure 2026-09 as signed: 205 records.",
+    ],
+  },
+  {
     v: "6.3.0.36",
     date: "2026-10-07",
     module: "Approvals backflush into the HRIS record; payroll pulls from the record",

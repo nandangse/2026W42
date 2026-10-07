@@ -51,7 +51,7 @@ export async function buildAppraisalWorkbook(rows: ExportRow[], title: string): 
   ws.addRow([...LEFT, "", ...RIGHT, ...TAIL]);
 
   for (const r of rows) {
-    const days = r.payDays || payDaysFor(String(r.type || ""));   // 26 for workers, the calendar month otherwise — never a fixed 31 (7 Oct 2026)
+    const days = r.payDays || payDaysFor(String(r.type || ""));   // the displayed per-day: ÷ 26 for workers, ÷ 31 otherwise (7 Oct 2026)
     const o = r.oldParts, p = r.newParts;
     const og = r.prevGross, ng = r.newGross;
     const opd = og != null && days ? og / days : null;

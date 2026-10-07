@@ -532,7 +532,7 @@ export const PAYROLL_RULES_AS_OF = "7 Oct 2026";
 export type RuleLine = { text: string; changed?: string };
 export const PAYROLL_RULES: { head: string; lines: RuleLine[] }[] = [
   { head: "Rates", lines: [
-    { text: "The rate is the person's HRIS record (Pay fields). An approved appraisal writes through to the record, the Salary Rate List and the salary history the moment it is approved — the record is the one place payroll reads.", changed: "7 Oct 2026" },
+    { text: "The rate is the LATEST SALARY STRUCTURE — the Live list, frozen and signed by Dr Raghu. It backflushes into the HRIS record's Pay fields and the salary history the moment it is signed (and on every line saved to it). An approved appraisal is a proposal until it is on that list.", changed: "7 Oct 2026" },
   ] },
   { head: "Days", lines: [
     { text: "Pay days: the calendar days of the month for Staff and Management — 30 in September, 28 in February, 31 only when the month has 31; 26 for Labour, Labour - Contract and the other contract types.", changed: "7 Oct 2026" },
@@ -549,7 +549,7 @@ export const PAYROLL_RULES: { head: string; lines: RuleLine[] }[] = [
     { text: "Closing balance = opening + earned + comp off − used − encashed. Opening comes from last month's register, else the record." },
   ] },
   { head: "Per day", lines: [
-    { text: "Per day = gross ÷ pay days: 26 for Labour and Labour - Contract, the calendar days of the month for everybody else — never a fixed 31 or 26.", changed: "7 Oct 2026" },
+    { text: "In the month's calculation, per day = gross ÷ the month's pay days: 26 for Labour and Labour - Contract, the calendar days of that month for everybody else (30 in September). The per-day RATE shown on the rate list, the appraisal card and the HRIS record is gross ÷ 31 (staff) or ÷ 26 (workers) — display only.", changed: "7 Oct 2026" },
   ] },
   { head: "Earnings", lines: [
     { text: "Basic & DA = rate × paid days ÷ pay days." },
