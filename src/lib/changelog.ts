@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.40",
+    date: "2026-10-07",
+    module: "Payroll: medical allowance is all or nothing",
+    items: [
+      "MEDICAL, FULL FOR ANY ATTENDANCE (\u201cIf the attendance is greater than zero \u2014 even if he is present for 1 day \u2014 he should get the full 1,250 as medical allowance, because that is an annual CTC structure where 1,250 \u00d7 12 is allowable to him under deduction \u2026 Either 1,250 is given or it is not given\u201d). It was pro-rated under seven days like Fixed; now the full figure for any month with attendance above zero, nothing in a month with none. Rules panel updated, line yellow.",
+    ],
+  },
+  {
     v: "6.3.0.39",
     date: "2026-10-07",
     module: "Observation: per-day is shown, not counted \u2014 the sheet\u2019s \u00f731 against Genie\u2019s month days is a rule, not an error",

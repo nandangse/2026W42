@@ -255,8 +255,9 @@ export function parseRates(grid: unknown[][]): Rates {
  *     Conveyance = rate × present ÷ the company's working days that month
  *     (calendar days less Sundays and the third Saturday, or what HR set on
  *     the run) — so a day worked beyond them earns conveyance too (Dr Raghu,
- *     5 Sep 2026). Medical, like fixed: in full at 7 or more days present,
- *     else pro rata (Dr Raghu, 5 Sep 2026).
+ *     5 Sep 2026). Medical: the full 1,250 for any attendance above zero,
+ *     nothing otherwise (Dr Raghu, 7 Oct 2026 — superseding the 5 Sep pro
+ *     rata).
  *   · PF 12% of earned basic capped at 1,800; PT by the slab, and ₹300 in
  *     February for the top slab; none for women earning up to 25,000
  *     (Dr Raghu, 5 Sep 2026); ESI never
@@ -414,7 +415,13 @@ export function generateRegister(
     const hra = contractish ? 0 : Math.round(eBasic * 0.2);
     const eFixed = m.present >= 7 ? fixed : Math.round(fixed * m.present / 26);
     const eConv = workingDays > 0 ? Math.round(conv * m.present / workingDays) : 0;   // extra days earn extra conveyance
-    const eMed = m.present >= 7 ? med : Math.round(med * m.present / 26);   // like fixed: full from 7 days, else pro rata
+    /* MEDICAL IS ALL OR NOTHING (Dr Raghu, 7 Oct 2026: "If the attendance is
+       greater than zero — even if he is present for 1 day — he should get the
+       full 1,250 as medical allowance, because that is an annual CTC
+       structure where 1,250 × 12 is allowable to him under deduction …
+       Either 1,250 is given or it is not given"). It was pro-rated under
+       seven days like Fixed; it is not Fixed. */
+    const eMed = m.present > 0 ? med : 0;
     const otPay = worker ? Math.round((m.ot ?? 0) * basic / 208) : 0;
 
     /**
@@ -558,7 +565,7 @@ export const PAYROLL_RULES: { head: string; lines: RuleLine[] }[] = [
     { text: "Site allowance is the muster's figure, and only that — the rate list's standing site figure is not paid (where the rate list carries one, the run says so). For Labour and Labour - Contract the OT above HRA rides on top.", changed: "7 Oct 2026" },
     { text: "Fixed allowance in full at 7 or more days present, else pro rata." },
     { text: "Conveyance = rate × present ÷ the company's working days that month (calendar days less Sundays and the third Saturday, or what HR set on the run). A day worked beyond them earns conveyance too." },
-    { text: "Medical, like fixed: in full at 7 or more days present, else pro rata." },
+    { text: "Medical allowance is all or nothing: the full 1,250 for any month with attendance above zero (even one day) — it is an annual CTC head, 1,250 × 12 allowable under deduction. Nothing in a month with no attendance.", changed: "7 Oct 2026" },
     { text: "Arrears as the muster carries them (none while on hold)." },
   ] },
   { head: "Deductions", lines: [
