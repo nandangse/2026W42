@@ -7,7 +7,7 @@
  * at the top, through the queue; every message and every reply kept on the
  * run's Communications tab.
  */
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
 /** date AND time, in IST (Dr Raghu, 7 Oct 2026: "show the time vinay generated. and also mine approval time") */
@@ -64,6 +64,7 @@ type PayCompare = {
   mismatches: {
     employee_id: string; name: string; type: string; genie_net: number; sheet_net: number; diff: number; genie_pay: number; sheet_pay: number | null; pay_diff: number;
     genie_gross: number; sheet_gross: number | null; genie_per_day: number; sheet_per_day: number | null; genie_att: number; sheet_att: number | null; genie_paid: number; sheet_paid: number | null;
+    genie_leave_used: number; sheet_leave_used: number | null; genie_leave_cb: number; sheet_leave_cb: number | null;
     heads: { head: string; genie: number; sheet: number; diff: number }[];
   }[];
   genie_total: number; sheet_total: number; genie_pay_total: number; sheet_pay_total: number; not_in_sheet: number;
@@ -497,49 +498,62 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                       </div>
                     </div>
                   )}
-                  {obs.pay.mismatches.length === 0 ? <div className="text-xs" style={{ color: "#2A6B39" }}>Every line that is not on hold matches the sheet on every count — rate, attendance, net and to pay.</div> : (
-                    <div style={{ maxHeight: "48vh", overflow: "auto" }}>
-                      <table className="w-full text-xs genie-table">
-                        <thead>
-                          <tr>
-                            <th style={TH} rowSpan={2}>Employee</th><th style={TH} rowSpan={2}>Type</th>
-                            <th style={{ ...TH, textAlign: "center", borderLeft: "1px solid #D7DEE6" }} colSpan={2}>Gross rate</th><th style={{ ...TH, textAlign: "center", borderLeft: "1px solid #D7DEE6" }} colSpan={2}>Per day</th>
-                            <th style={{ ...TH, textAlign: "center", borderLeft: "1px solid #D7DEE6" }} colSpan={2}>Attendance</th><th style={{ ...TH, textAlign: "center", borderLeft: "1px solid #D7DEE6" }} colSpan={2}>Payment days</th>
-                            <th style={{ ...TH, textAlign: "center", borderLeft: "1px solid #D7DEE6" }} colSpan={3}>Net</th><th style={{ ...TH, textAlign: "center", borderLeft: "1px solid #D7DEE6" }} colSpan={3}>To pay (bank)</th>
-                            <th style={TH} rowSpan={2}>Where the heads differ (Genie vs sheet)</th>
-                          </tr>
-                          <tr>
-                            {["Genie", "Sheet", "Genie", "Sheet", "Genie", "Sheet", "Genie", "Sheet", "Genie", "Sheet", "Diff", "Genie", "Sheet", "Diff"].map((h, i) => <th key={i} style={{ ...TH, textAlign: "right", fontWeight: 400, borderLeft: [0, 2, 4, 6, 8, 11].includes(i) ? "1px solid #D7DEE6" : undefined }}>{h}</th>)}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {obs.pay.mismatches.filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q)).map((m) => {
-                            const off = (a: number | null, b: number | null, tol = 1) => a != null && b != null && Math.abs(a - b) >= tol;
-                            const RED = { background: "#FBE3E0", color: "#8E2C20", fontWeight: 700 } as const;
-                            const cell = (v: number | null, bad: boolean, days = false, left = false) => (
-                              <td className="px-2 py-1 text-right tnum" style={{ ...(bad ? RED : {}), borderLeft: left ? "1px solid #EEECE6" : undefined }}>{v == null ? "—" : days ? Number(v).toLocaleString("en-IN", { maximumFractionDigits: 1 }) : `₹${inr(v)}`}</td>
-                            );
-                            const rateBad = off(m.genie_gross, m.sheet_gross), pdBad = off(m.genie_per_day, m.sheet_per_day, 2), attBad = off(m.genie_att, m.sheet_att, 0.5), paidBad = off(m.genie_paid, m.sheet_paid, 0.5), netBad = Math.abs(m.diff) >= 1, payBad = Math.abs(m.pay_diff) >= 1;
-                            return (
-                            <tr key={m.employee_id} style={{ borderTop: "1px solid #EEECE6" }}>
-                              <td className="px-2 py-1"><b>{m.employee_id}</b> {m.name}</td>
-                              <td className="px-2 py-1" style={{ color: C.faint }}>{m.type}</td>
-                              {cell(m.genie_gross, rateBad, false, true)}{cell(m.sheet_gross, rateBad)}
-                              {cell(m.genie_per_day, pdBad, false, true)}{cell(m.sheet_per_day, pdBad)}
-                              {cell(m.genie_att, attBad, true, true)}{cell(m.sheet_att, attBad, true)}
-                              {cell(m.genie_paid, paidBad, true, true)}{cell(m.sheet_paid, paidBad, true)}
-                              {cell(m.genie_net, netBad, false, true)}{cell(m.sheet_net, netBad)}
-                              <td className="px-2 py-1 text-right tnum font-bold" style={{ color: netBad ? (m.diff > 0 ? "#2A6B39" : "#8E2C20") : C.faint }}>{netBad ? `${m.diff > 0 ? "+" : ""}₹${inr(m.diff)}` : "same"}</td>
-                              {cell(m.genie_pay, payBad, false, true)}{cell(m.sheet_pay, payBad)}
-                              <td className="px-2 py-1 text-right tnum font-bold" style={{ color: payBad ? (m.pay_diff > 0 ? "#2A6B39" : "#8E2C20") : C.faint }}>{payBad ? `${m.pay_diff > 0 ? "+" : ""}₹${inr(m.pay_diff)}` : "same"}</td>
-                              <td className="px-2 py-1" style={{ color: C.dim, whiteSpace: "normal", minWidth: 220 }}>{m.heads.length ? m.heads.map((h) => `${h.head} ${inr(h.genie)} vs ${inr(h.sheet)} (${h.diff > 0 ? "+" : ""}${inr(h.diff)})`).join(" · ") : netBad ? "same heads — the sheet's own net differs from its parts" : rateBad || attBad || paidBad ? "the rate or the attendance differs, the money happens to agree" : "net agrees — only the to-pay (bank) figure differs: a rounding or a hold the sheet treats differently"}</td>
-                            </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  {/* EACH OBSERVATION ON ITS OWN (Dr Raghu, 7 Oct 2026: "show all the observations
+                      separately so that we can verify that") — one list per question, each
+                      naming only the people on whom that question differs */}
+                  {obs.pay.mismatches.length === 0 ? <div className="text-xs" style={{ color: "#2A6B39" }}>Every line that is not on hold matches the sheet on every count — rate, attendance, leave, net and to pay.</div> : (() => {
+                    const list = obs.pay.mismatches.filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q));
+                    const off = (a: number | null, b: number | null, tol = 1) => a != null && b != null && Math.abs(a - b) >= tol;
+                    const money = (v: number | null) => (v == null ? "—" : `₹${inr(v)}`);
+                    const days = (v: number | null) => (v == null ? "—" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 1 }));
+                    type M = typeof list[number];
+                    const sections: { title: string; why: string; cols: [string, (m: M) => string, (m: M) => string, (m: M) => number | null][]; rows: M[] }[] = [
+                      { title: "1 · Rates — Genie's gross rate against the sheet's", why: "the appraisal in force in Genie against the rate the sheet is paying on; per day follows the gross",
+                        cols: [["Gross rate", (m) => money(m.genie_gross), (m) => money(m.sheet_gross), (m) => m.sheet_gross == null ? null : m.genie_gross - m.sheet_gross], ["Per day", (m) => money(m.genie_per_day), (m) => money(m.sheet_per_day), (m) => m.sheet_per_day == null ? null : m.genie_per_day - m.sheet_per_day]],
+                        rows: list.filter((m) => off(m.genie_gross, m.sheet_gross) || off(m.genie_per_day, m.sheet_per_day, 2)) },
+                      { title: "2 · Attendance — the muster against the sheet", why: "days present as the muster counts them against the sheet's Attendance; payment days follow",
+                        cols: [["Attendance", (m) => days(m.genie_att), (m) => days(m.sheet_att), (m) => m.sheet_att == null ? null : m.genie_att - m.sheet_att], ["Payment days", (m) => days(m.genie_paid), (m) => days(m.sheet_paid), (m) => m.sheet_paid == null ? null : m.genie_paid - m.sheet_paid]],
+                        rows: list.filter((m) => off(m.genie_att, m.sheet_att, 0.5) || off(m.genie_paid, m.sheet_paid, 0.5)) },
+                      { title: "3 · Leave — used and closing balance", why: "leave filled against short days (whole days, above the 15 / 8 floor) and the balance carried forward",
+                        cols: [["Leave used", (m) => days(m.genie_leave_used), (m) => days(m.sheet_leave_used), (m) => m.sheet_leave_used == null ? null : m.genie_leave_used - m.sheet_leave_used], ["Leave CB", (m) => days(m.genie_leave_cb), (m) => days(m.sheet_leave_cb), (m) => m.sheet_leave_cb == null ? null : m.genie_leave_cb - m.sheet_leave_cb]],
+                        rows: list.filter((m) => off(m.genie_leave_used, m.sheet_leave_used, 0.5) || off(m.genie_leave_cb, m.sheet_leave_cb, 0.5)) },
+                      { title: "4 · Net payable — Genie's calculation against the sheet's", why: "the booked net; the heads that differ are named on the right",
+                        cols: [["Net", (m) => money(m.genie_net), (m) => money(m.sheet_net), (m) => m.diff]],
+                        rows: list.filter((m) => Math.abs(m.diff) >= 1) },
+                      { title: "5 · To pay — the bank figure", why: "net rounded up to the rupee, nought on hold; a difference here with the net agreeing is a rounding or a hold the sheet treats differently",
+                        cols: [["To pay", (m) => money(m.genie_pay), (m) => money(m.sheet_pay), (m) => m.sheet_pay == null ? null : m.pay_diff]],
+                        rows: list.filter((m) => Math.abs(m.pay_diff) >= 1) },
+                    ];
+                    return sections.map((sec) => (
+                      <div key={sec.title} className="mt-3">
+                        <div className="text-sm font-bold" style={{ color: sec.rows.length ? "#8E2C20" : "#2A6B39" }}>{sec.title} <span className="font-normal" style={{ color: C.dim }}>· {sec.rows.length ? `${sec.rows.length} differ` : "all agree"}</span></div>
+                        <div className="text-xs mb-1" style={{ color: C.faint }}>{sec.why}</div>
+                        {sec.rows.length > 0 && (
+                          <div style={{ maxHeight: "40vh", overflow: "auto" }}>
+                            <table className="w-full text-xs genie-table">
+                              <thead><tr><th style={TH}>Employee</th><th style={TH}>Type</th>{sec.cols.map(([h]) => <th key={h} colSpan={3} style={{ ...TH, textAlign: "center", borderLeft: "1px solid #D7DEE6" }}>{h} · Genie / sheet / diff</th>)}{sec.title.startsWith("4") && <th style={TH}>Where the heads differ (Genie vs sheet)</th>}</tr></thead>
+                              <tbody>
+                                {sec.rows.map((m) => (
+                                  <tr key={m.employee_id} style={{ borderTop: "1px solid #EEECE6" }}>
+                                    <td className="px-2 py-1"><b>{m.employee_id}</b> {m.name}</td>
+                                    <td className="px-2 py-1" style={{ color: C.faint }}>{m.type}</td>
+                                    {sec.cols.map(([h, g, sh, d]) => { const dv = d(m); const bad = dv != null && Math.abs(dv) >= (h === "Per day" ? 2 : /days|Leave|Attendance/i.test(h) ? 0.5 : 1); return (
+                                      <Fragment key={h}>
+                                        <td className="px-2 py-1 text-right tnum" style={{ borderLeft: "1px solid #EEECE6", ...(bad ? { background: "#FBE3E0", color: "#8E2C20", fontWeight: 700 } : {}) }}>{g(m)}</td>
+                                        <td className="px-2 py-1 text-right tnum" style={bad ? { background: "#FBE3E0", color: "#8E2C20", fontWeight: 700 } : undefined}>{sh(m)}</td>
+                                        <td className="px-2 py-1 text-right tnum font-bold" style={{ color: !bad ? C.faint : dv! > 0 ? "#2A6B39" : "#8E2C20" }}>{dv == null ? "—" : !bad ? "same" : `${dv > 0 ? "+" : ""}${/days|Leave|Attendance/i.test(h) ? days(dv) : inr(dv)}`}</td>
+                                      </Fragment>
+                                    ); })}
+                                    {sec.title.startsWith("4") && <td className="px-2 py-1" style={{ color: C.dim, whiteSpace: "normal", minWidth: 240 }}>{m.heads.length ? m.heads.map((h) => `${h.head} ${inr(h.genie)} vs ${inr(h.sheet)} (${h.diff > 0 ? "+" : ""}${inr(h.diff)})`).join(" · ") : "same heads — the sheet's own net differs from its parts"}</td>}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    ));
+                  })()}
                   {obs.pay.not_in_sheet > 0 && <div className="text-xs mt-1" style={{ color: C.dim }}>{obs.pay.not_in_sheet} on the register with no line in the sheet.</div>}
                 </>
               )}

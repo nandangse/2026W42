@@ -382,12 +382,27 @@ export function generateRegister(
        make sure that you hold the minimum days of leave that have to be
        there in the register, that is, 15 and 8"). Only what sits above the
        floor can be spent — 15 for staff, 8 for a worker — never the floor. */
-    const spendable = Math.max(0, available - minBal);
-    if (shortfall > 0 && earnsLeave && !worker && !noExtras && spendable > 0) { leaveUsed = Math.min(shortfall, spendable); shortfall -= leaveUsed; }
+    /* WHOLE DAYS, FROM THE OPENING BALANCE, AND THE FLOOR HOLDS AFTER THE USE
+       (Dr Raghu, 7 Oct 2026: "in the sheet, if a lesser number of days is
+       taken, leave utilised is limited to the leave that will happen once the
+       leave is utilised. It should never go below 15 for staff, and it should
+       not go below 8 for workers"). As the sheet does it: leave fills the gap
+       in whole days, taken from what the OPENING balance holds above the
+       floor (this month's earned leave is not spent in the month it is
+       earned), and never so much that the closing balance dips under the
+       floor. Until today Genie spent fractions (5.2 days) and reached into
+       the month's own earned leave.
+
+       COMP OFF IS NOT SPENT ON THE GAP. The sheet never fills short days
+       from comp off — it pays comp off out as its own amount. Genie did fill
+       from it, which is how 6971 (balance 13.1, below the floor) was shown
+       using 1.5 days and 7002 (balance 1.7) six: those were comp-off days.
+       Comp off is encashed in full, as the sheet does. */
+    const spendable = Math.min(Math.max(0, Math.round(leaveOb - minBal)), Math.max(0, Math.floor(available - minBal)));
+    if (shortfall > 0 && earnsLeave && !worker && !noExtras && spendable > 0) { leaveUsed = Math.min(Math.floor(shortfall), spendable); shortfall -= leaveUsed; }
     if (shortfall > 0 && worker && !noExtras && available > 0) workersShort.push(m.employee_id);
-    let compUsed = 0;
-    if (shortfall > 0 && compDays > 0 && !noExtras) { compUsed = Math.min(shortfall, compDays); shortfall -= compUsed; }
-    const compEncash = noExtras ? 0 : compDays - compUsed;
+    const compUsed = 0;
+    const compEncash = noExtras ? 0 : compDays;
     const encashDays = noExtras ? 0 : (m.leave_encash ?? 0) + compEncash;
     const paidDays = nobodyPresent ? 0 : Math.min(payDays, due + leaveUsed + compUsed);
     if (nobodyPresent) zeroAttendance.push(m.employee_id);
@@ -525,9 +540,9 @@ export const PAYROLL_RULES: { head: string; lines: RuleLine[] }[] = [
   ] },
   { head: "Leave", lines: [
     { text: "Earned this month = present ÷ 10 for Staff, ÷ 20 for workers. None for Management and contract types." },
-    { text: "Comp off is added to the leave balance first." },
-    { text: "Staff only: a shortfall against pay days is filled from leave, but only from what sits above the 15-day floor, then from comp off. Workers' leave (floor 8) is never spent without approval — the short days stay unpaid and the run names the people.", changed: "7 Oct 2026" },
-    { text: "Comp off not used is encashed at the per-day rate. Leave encashment likewise." },
+    { text: "Comp off is added to the leave balance and paid out in full at the per-day rate (Comp. Off Amt.) — it is never spent on short days.", changed: "7 Oct 2026" },
+    { text: "Staff only: a shortfall against pay days is filled from leave in WHOLE days, taken from what the opening balance holds above the 15-day floor (the month's own earned leave is not spent), and never so far that the closing balance dips under 15. Workers' leave (floor 8) is never spent without approval — the short days stay unpaid and the run names the people.", changed: "7 Oct 2026" },
+    { text: "Leave encashment as the muster carries it, at the per-day rate." },
     { text: "Closing balance = opening + earned + comp off − used − encashed. Opening comes from last month's register, else the record." },
   ] },
   { head: "Per day", lines: [

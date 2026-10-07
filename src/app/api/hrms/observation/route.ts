@@ -54,6 +54,7 @@ export interface PayCompare {
     genie_net: number; sheet_net: number; diff: number; genie_pay: number; sheet_pay: number | null; pay_diff: number;
     genie_gross: number; sheet_gross: number | null; genie_per_day: number; sheet_per_day: number | null;
     genie_att: number; sheet_att: number | null; genie_paid: number; sheet_paid: number | null;
+    genie_leave_used: number; sheet_leave_used: number | null; genie_leave_cb: number; sheet_leave_cb: number | null;
     heads: { head: string; genie: number; sheet: number; diff: number }[];
   }[];
   genie_total: number; sheet_total: number; genie_pay_total: number; sheet_pay_total: number; not_in_sheet: number;
@@ -91,8 +92,11 @@ function comparePay(register: Record<string, unknown>[], musterRows: Record<stri
     const geniePd = Math.round(N(r.per_day)), sheetPd = sh.per_day != null ? Math.round(N(sh.per_day)) : null;
     const genieAtt = N(r.attendance ?? r.present), sheetAtt = sh.attendance != null ? N(sh.attendance) : null;
     const geniePaid = N(r.paid_days), sheetPaid = sh.paid_days != null ? N(sh.paid_days) : null;
+    const genieLu = N(r.leave_used), sheetLu = sh.leave_used != null ? N(sh.leave_used) : null;
+    const genieLcb = N(r.leave_cb), sheetLcb = sh.leave_cb != null ? N(sh.leave_cb) : null;
+    const leaveOff = (sheetLu != null && Math.abs(genieLu - sheetLu) >= 0.5) || (sheetLcb != null && Math.abs(genieLcb - sheetLcb) >= 0.5);
     const rateOff = sheetGross != null && Math.abs(genieGross - sheetGross) >= 1;
-    const attOff = (sheetAtt != null && Math.abs(genieAtt - sheetAtt) >= 0.5) || (sheetPaid != null && Math.abs(geniePaid - sheetPaid) >= 0.5);
+    const attOff = (sheetAtt != null && Math.abs(genieAtt - sheetAtt) >= 0.5) || (sheetPaid != null && Math.abs(geniePaid - sheetPaid) >= 0.5) || leaveOff;
     if (Math.abs(payDiff) >= 1) out.pay_mismatched++;
     if (Math.abs(diff) >= 1) out.net_mismatched++;
     if (rateOff) out.rate_mismatched++;
@@ -100,7 +104,8 @@ function comparePay(register: Record<string, unknown>[], musterRows: Record<stri
     if (Math.abs(diff) < 1 && Math.abs(payDiff) < 1 && !rateOff && !attOff) { out.matched++; continue; }
     const heads = HEADS.map(([k, label]) => ({ head: label, genie: N(r[k]), sheet: N(sh[k]), diff: Math.round(N(r[k]) - N(sh[k])) })).filter((h) => Math.abs(h.diff) >= 1);
     out.mismatches.push({ employee_id: id, name, type, genie_net: genieNet, sheet_net: sheetNet!, diff, genie_pay: geniePay, sheet_pay: sheetPay, pay_diff: payDiff,
-      genie_gross: genieGross, sheet_gross: sheetGross, genie_per_day: geniePd, sheet_per_day: sheetPd, genie_att: genieAtt, sheet_att: sheetAtt, genie_paid: geniePaid, sheet_paid: sheetPaid, heads });
+      genie_gross: genieGross, sheet_gross: sheetGross, genie_per_day: geniePd, sheet_per_day: sheetPd, genie_att: genieAtt, sheet_att: sheetAtt, genie_paid: geniePaid, sheet_paid: sheetPaid,
+      genie_leave_used: genieLu, sheet_leave_used: sheetLu, genie_leave_cb: genieLcb, sheet_leave_cb: sheetLcb, heads });
   }
   out.mismatches.sort((a, b) => Math.max(Math.abs(b.diff), Math.abs(b.pay_diff)) - Math.max(Math.abs(a.diff), Math.abs(a.pay_diff)));
   out.holds.sort((a, b) => a.name.localeCompare(b.name));

@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.34",
+    date: "2026-10-07",
+    module: "Payroll: leave fills in whole days above the floor; comp off is paid out, never spent on the gap",
+    items: [
+      "THE FLOOR, PROPERLY (\u201cin the sheet, if a lesser number of days is taken, leave utilised is limited to the leave that will happen once the leave is utilised. It should never go below 15 for staff, and it should not go below 8 for workers\u201d). Checked against the September sheet: Genie was spending fractions of a day (5.2), reaching into the month\u2019s own earned leave, and \u2014 the real breach \u2014 filling short days from comp off even when the balance stood under the floor (6971 at 13.1 shown using 1.5 days; 7002 at 1.7 using six). Now: leave fills the gap in WHOLE days, from what the opening balance holds above 15, never so far that the closing balance dips under 15; comp off is never spent on the gap \u2014 it is paid out in full as Comp. Off Amt., as the sheet does. Rules panel updated, both lines yellow.",
+      "EACH OBSERVATION ON ITS OWN (\u201cIn the observation, show all the observations separately so that we can verify that\u201d). Five numbered lists \u2014 1 Rates, 2 Attendance, 3 Leave, 4 Net payable, 5 To pay \u2014 each naming only the people on whom that question differs, Genie / sheet / difference, red where they part; a list that agrees says so in one line.",
+      "LEAVE IN THE OBSERVATION (\u201cit\u2019s not coming up there\u201d). Leave used and Leave CB now stand as their own Genie / sheet columns on every mismatch line, red where they differ, and a leave difference alone is enough to list the person.",
+    ],
+  },
+  {
     v: "6.3.0.33",
     date: "2026-10-07",
     module: "The version badge for everybody",
