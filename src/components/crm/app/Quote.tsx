@@ -1361,6 +1361,8 @@ export function SubmitQuoteModal({ row, mode, onClose, onSent }: {
     `Submission of Qtn ${String(row.quote_no ?? "")} : Dt ${dISub}${row.subject ? ` | ${row.subject}` : ""}`);
   const [files, setFiles] = useState<{ name: string; path: string; from: "quote" | "library" }[]>([]);
   const [ticked, setTicked] = useState<Set<string>>(new Set());
+  /* "make a checklist — submit quotation pdf by default checked; other attachments need to be added" (Dr Raghu, 7 Oct 2026) */
+  const [attachPdf, setAttachPdf] = useState(true);
   /* WHO IT COULD GO TO (Dr Raghu, 8 Sep 2026: "i need to send quote, check
      why not possible"). 40707 had no contact and an empty To:, so Send
      refused — but only AFTER he pressed it, with "Who does it go To?", which
@@ -1440,7 +1442,7 @@ export function SubmitQuoteModal({ row, mode, onClose, onSent }: {
           quotation_id: rid, mode,
           to: split(to), cc: split(cc), bcc: split(bcc),
           subject, body_html: String(row.letter_text || ""),
-          attach_paths: [...ticked],
+          attach_paths: [...ticked], attach_pdf: attachPdf,
         }),
       });
       const j = await r.json();
@@ -1498,12 +1500,14 @@ export function SubmitQuoteModal({ row, mode, onClose, onSent }: {
             <input value={subject} onChange={(e) => setSubject(e.target.value)}
               className="w-full px-2 py-1.5 rounded border text-sm" style={{ borderColor: BORDER }} />
           </label>
-          <div className="text-xs mb-2 rounded px-3 py-2" style={{ background: "#FAF9F5", border: `1px solid ${BORDER}`, color: "var(--dim)" }}>
-            The <b>Covering Letter</b> rides as the email body — edit it on the Covering Letter tab. The quotation
-            <b> PDF attaches itself</b>{mode === "client" ? " (clean, no watermark)" : " (DRAFT watermark)"}.
-          </div>
-          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>MORE ATTACHMENTS</div>
-          {files.length === 0 && <div className="text-xs mb-1" style={{ color: MUTED }}>None on the quote, and the Library is empty.</div>}
+          <div className="text-xs mb-2" style={{ color: "var(--dim)" }}>The <b>Covering Letter</b> rides as the email body — edit it on the Covering Letter tab.</div>
+          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.6 }}>ATTACHMENTS</div>
+          <label className="flex items-center gap-2 text-sm py-0.5">
+            <input type="checkbox" checked={attachPdf} onChange={(e) => setAttachPdf(e.target.checked)} style={{ accentColor: NAVY }} />
+            <span style={{ fontWeight: 700 }}>Quotation PDF</span>
+            <span className="text-xs" style={{ color: MUTED }}>{mode === "client" ? "· clean, no watermark" : "· DRAFT watermark"}{!attachPdf ? " · will NOT be attached" : ""}</span>
+          </label>
+          {files.length === 0 && <div className="text-xs mb-1" style={{ color: MUTED }}>Nothing more on the quote, and the Library is empty — attach from your computer below.</div>}
           <div style={{ maxHeight: 160, overflowY: "auto" }}>
             {files.map((f) => (
               <label key={f.path} className="flex items-center gap-2 text-sm py-0.5">

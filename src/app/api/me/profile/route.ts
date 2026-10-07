@@ -25,10 +25,24 @@ export async function GET() {
         return NextResponse.json({ whatsapp_no: null, oauth_available: false, needsMigration: true });
       throw new Error(error.message);
     }
+    /* THE TOKEN'S REAL STATE (7 Oct 2026). oauth_connected_at is the day the
+       Gmail was connected and is never cleared, so the card said "Connected"
+       while Google had revoked the token (invalid_grant) and every quote
+       send failed. The mailbox row knows: active, or auth_failed and why. */
+    let mailbox: { status: string; error: string | null; at: string | null } | null = null;
+    try {
+      const { crmDb, crmConfigured } = await import("@/crm/db");
+      if (crmConfigured()) {
+        const { data: mb } = await crmDb().from("mailbox").select("status, last_error, updated_at")
+          .eq("email_address", user.email.toLowerCase()).eq("credential_kind", "oauth_refresh_token").maybeSingle();
+        if (mb) mailbox = { status: String(mb.status || ""), error: mb.last_error ? String(mb.last_error) : null, at: mb.updated_at ? String(mb.updated_at) : null };
+      }
+    } catch { /* the card falls back to the stamp */ }
     return NextResponse.json({
       whatsapp_no: data?.whatsapp_no ?? null,
       oauth_available: !!data?.oauth_available,
       oauth_connected_at: data?.oauth_connected_at ?? null,
+      mailbox,
     });
   } catch (e) {
     return errJson(e);

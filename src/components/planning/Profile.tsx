@@ -83,16 +83,20 @@ export function ProfileSelf() {
   const [wa, setWa] = useState("");
   const [oauthOk, setOauthOk] = useState(false);
   const [connectedAt, setConnectedAt] = useState<string | null>(null);
+  /* the token's real state, from the mailbox row (7 Oct 2026: the card said
+     "Connected" while Google had revoked the token and every send failed) */
+  const [mailbox, setMailbox] = useState<{ status: string; error: string | null; at: string | null } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
     api.get("/api/me/profile")
-      .then((r: { whatsapp_no?: string | null; oauth_available?: boolean; oauth_connected_at?: string | null }) => {
+      .then((r: { whatsapp_no?: string | null; oauth_available?: boolean; oauth_connected_at?: string | null; mailbox?: { status: string; error: string | null; at: string | null } | null }) => {
         setWa(r.whatsapp_no || "");
         setOauthOk(!!r.oauth_available);
         setConnectedAt(r.oauth_connected_at || null);
+        setMailbox(r.mailbox ?? null);
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -131,7 +135,16 @@ export function ProfileSelf() {
 
       <div className="mt-3 rounded p-2.5" style={{ background: "#F4F2EC" }}>
         <div className="text-xs font-bold" style={{ color: "var(--navy)" }}>✉ Gmail connection</div>
-        {connectedAt ? (
+        {mailbox && mailbox.status !== "active" ? (
+          <div className="mt-0.5">
+            <div className="text-xs" style={{ color: "var(--red)", fontWeight: 700 }}>
+              Needs reconnecting — Google refused the token{mailbox.error ? ` (${mailbox.error})` : ""}{mailbox.at ? ` on ${fmtFull(String(mailbox.at))}` : ""}. Nothing sends from this account until it is reconnected.
+            </div>
+            <a href="/api/crm/gmail/connect" className="inline-block mt-1.5 rounded px-3 py-1.5 text-xs font-bold"
+              style={{ background: "var(--accent)", color: "#fff", textDecoration: "none" }}>✉ Reconnect Gmail</a>
+            <div className="text-xs mt-1" style={{ color: "var(--muted)", lineHeight: 1.45 }}>This happens when the Google password changes, when access is removed under Google Account → Security → Third-party access, or when Google expires a token. Reconnecting takes a minute.</div>
+          </div>
+        ) : connectedAt ? (
           <div className="text-xs mt-0.5" style={{ color: "var(--green)", fontWeight: 700 }}>Connected · {fmtFull(String(connectedAt))}</div>
         ) : oauthOk ? (
           <div className="mt-1">

@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.18",
+    date: "2026-10-07",
+    module: "Submit to Client: the attachment checklist; the Profile tells the truth about Gmail",
+    items: [
+      "THE ATTACHMENT CHECKLIST (\u201cmake a checklist \u2014 submit quotation pdf by default checked; other attachments need to be added\u201d). On Submit to Client the quotation PDF is the first line, ticked; untick it and it does not ride. The files on the quote and in the Library follow, unticked until you tick them; Attach from computer adds more. The mailed PDF is the same flowing document as the download and carries the same name \u2014 NGSE-QTN-26-27-40712 - Customer - Product.pdf.",
+      "THE PROFILE SAID \u201cCONNECTED\u201d WHILE GOOGLE HAD REVOKED THE TOKEN (7 Oct 2026: \u201cits connected still not going\u201d). The card showed the day Gmail was first connected and never looked again. It now reads the mailbox\u2019s real state: green when active; red with Google\u2019s reason and a Reconnect Gmail button when the token has been refused. Nitu\u2019s has been refused since 26 September and shows the same.",
+    ],
+  },
+  {
     v: "6.3.0.17",
     date: "2026-10-07",
     module: "Rich text: a heading can no longer swallow the paragraphs pasted into it",
