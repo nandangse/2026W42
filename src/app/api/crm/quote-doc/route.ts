@@ -190,7 +190,7 @@ export async function GET(req: Request) {
       if (!/<p[\s>]/i.test(inner)) return whole;
       const paras = inner.match(/<p[^>]*>[\s\S]*?<\/p>/gi) ?? [];
       if (!paras.length) return whole;
-      const first = paras[0].replace(/<\/?(p|strong|b)[^>]*>/gi, "").trim();
+      const first = (paras[0] ?? "").replace(/<\/?(p|strong|b)[^>]*>/gi, "").trim();
       return `<${tag}>${first}</${tag}>${paras.slice(1).join("")}`;
     });
     const fill = (html: string) => fillQuoteVars(unwrapHeadings(html), VARS, esc);
