@@ -351,7 +351,12 @@ export function generateRegister(
     const onHold = /hold/i.test(m.status) || /f ?& ?f|resign|terminat/i.test(m.status);
     const noExtras = nobodyPresent || onHold;
     let leaveUsed = 0;
-    if (shortfall > 0 && earnsLeave && !worker && !noExtras && available >= minBal) { leaveUsed = Math.min(shortfall, available); shortfall -= leaveUsed; }
+    /* THE FLOOR STAYS (Dr Raghu, 7 Oct 2026: "while giving leave to anybody,
+       make sure that you hold the minimum days of leave that have to be
+       there in the register, that is, 15 and 8"). Only what sits above the
+       floor can be spent — 15 for staff, 8 for a worker — never the floor. */
+    const spendable = Math.max(0, available - minBal);
+    if (shortfall > 0 && earnsLeave && !worker && !noExtras && spendable > 0) { leaveUsed = Math.min(shortfall, spendable); shortfall -= leaveUsed; }
     if (shortfall > 0 && worker && !noExtras && available > 0) workersShort.push(m.employee_id);
     let compUsed = 0;
     if (shortfall > 0 && compDays > 0 && !noExtras) { compUsed = Math.min(shortfall, compDays); shortfall -= compUsed; }

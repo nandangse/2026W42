@@ -13,6 +13,8 @@ import { useMemo } from "react";
 import { LOGO } from "@/lib/logo";
 import { LEDGER_COLUMNS, MONTHS, REGISTER_COLUMNS, otOf, type SheetRow } from "@/lib/salary-sheet";
 import { inr } from "@/lib/fmt";
+import SalaryMis from "./SalaryMis";
+import type { Mis } from "@/lib/salary-mis";
 
 interface Sheet {
   id: string; month: number; year: number; status: string;
@@ -41,7 +43,7 @@ function colSum(rows: SheetRow[], key: keyof SheetRow): number | null {
   return any ? Math.round(sum) : null;
 }
 
-export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
+export default function SalaryRegisterPrint({ sheet, mis }: { sheet: Sheet; mis?: Mis | null }) {
   const rows = sheet.rows || [];
   const title = `${MONTHS[sheet.month - 1]} ${sheet.year}`;
 
@@ -295,6 +297,9 @@ export default function SalaryRegisterPrint({ sheet }: { sheet: Sheet }) {
             Not carried by this sheet, so printed as a dash: {absent.map((c) => c.label).join(", ")}. For the past months the sheet is the only truth.
           </div>
         )}
+
+        {/* ═══ the Salary MIS — three months, every head, beside the deliveries (7 Oct 2026) ═══ */}
+        {mis && mis.months.length > 0 && <SalaryMis mis={mis} />}
 
         <div className="pagebreak" />
 

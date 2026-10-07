@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.22",
+    date: "2026-10-07",
+    module: "Payroll: the leave floor holds; the three-month Salary MIS inside the printed register",
+    items: [
+      "THE LEAVE FLOOR HOLDS (\u201cwhile giving leave to anybody, make sure that you hold the minimum days of leave that have to be there in the register, that is, 15 and 8\u201d). When leave fills a staff member\u2019s short days, only what sits above 15 is spent; a worker\u2019s floor is 8 and his leave is not spent without approval at all. The old rule only checked the balance was above the floor before it started spending.",
+      "THE SALARY MIS (\u201cGenerate a document just like this next to the salary register, which will showcase, for 3 months, what all the heads were \u2026 correlated with the deliveries done in those months \u2026 Act like the world\u2019s best CHRO \u2026 merge it into that document\u201d). The printed salary register now carries two MIS pages after the month\u2019s summary: every head by month for this month and the two before \u2014 people, attendance, each earning and deduction, net, cost per head and per attendance day, staff against labour \u2014 beside the deliveries made, the value delivered and the throughput generated in the same months, with salary as a share of value delivered, salary per delivery, value per head and throughput per rupee of salary, each with its change on the month before. Then three pictures \u2014 the bill, where the earnings sit, and salary against output \u2014 and a commentary written from the numbers the moment the page is printed: the trend, the unit costs, overtime, the hold list, the people with no attendance, and what the ratios say. A head an earlier month\u2019s sheet never carried prints as a dash.",
+    ],
+  },
+  {
     v: "6.3.0.21",
     date: "2026-10-07",
     module: "Payroll: nobody present, nobody paid; a worker\u2019s leave waits for approval; HOLD means nothing extra",
