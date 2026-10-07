@@ -508,9 +508,9 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                     const days = (v: number | null) => (v == null ? "—" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 1 }));
                     type M = typeof list[number];
                     const sections: { title: string; why: string; cols: [string, (m: M) => string, (m: M) => string, (m: M) => number | null][]; rows: M[] }[] = [
-                      { title: "1 · Rates — Genie's gross rate against the sheet's", why: "the appraisal in force in Genie against the rate the sheet is paying on; per day follows the gross",
+                      { title: "1 · Rates — Genie's gross rate against the sheet's", why: "the signed Salary Structure against the rate the sheet is paying on. Per day is shown beside it but is not counted as a difference: the sheet divides a staff gross by 31 in every month, Genie by the month's own days (30 in September) — by rule, not by error",
                         cols: [["Gross rate", (m) => money(m.genie_gross), (m) => money(m.sheet_gross), (m) => m.sheet_gross == null ? null : m.genie_gross - m.sheet_gross], ["Per day", (m) => money(m.genie_per_day), (m) => money(m.sheet_per_day), (m) => m.sheet_per_day == null ? null : m.genie_per_day - m.sheet_per_day]],
-                        rows: list.filter((m) => off(m.genie_gross, m.sheet_gross) || off(m.genie_per_day, m.sheet_per_day, 2)) },
+                        rows: list.filter((m) => off(m.genie_gross, m.sheet_gross)) },
                       { title: "2 · Attendance — the muster against the sheet", why: "days present as the muster counts them against the sheet's Attendance; payment days follow",
                         cols: [["Attendance", (m) => days(m.genie_att), (m) => days(m.sheet_att), (m) => m.sheet_att == null ? null : m.genie_att - m.sheet_att], ["Payment days", (m) => days(m.genie_paid), (m) => days(m.sheet_paid), (m) => m.sheet_paid == null ? null : m.genie_paid - m.sheet_paid]],
                         rows: list.filter((m) => off(m.genie_att, m.sheet_att, 0.5) || off(m.genie_paid, m.sheet_paid, 0.5)) },

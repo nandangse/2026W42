@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.39",
+    date: "2026-10-07",
+    module: "Observation: per-day is shown, not counted \u2014 the sheet\u2019s \u00f731 against Genie\u2019s month days is a rule, not an error",
+    items: [
+      "\u00f730 vs \u00f731 (\u201cGenie 30 kar raha hai aur sheet 31 le raha hai\u201d). The sheet divides a staff gross by 31 whatever the month; Genie divides by the month\u2019s own days, as ruled this morning. So every staff per-day \u201cdiffered\u201d in list 1. Per-day now rides beside the gross for reference and is not a difference on its own; list 1 names only the people whose GROSS rate differs from the sheet.",
+    ],
+  },
+  {
     v: "6.3.0.38",
     date: "2026-10-07",
     module: "Salary Rate List: an import takes the Type from the HRIS; Types & per day works on a signed list",

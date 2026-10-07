@@ -95,6 +95,9 @@ function comparePay(register: Record<string, unknown>[], musterRows: Record<stri
     const genieLu = N(r.leave_used), sheetLu = sh.leave_used != null ? N(sh.leave_used) : null;
     const genieLcb = N(r.leave_cb), sheetLcb = sh.leave_cb != null ? N(sh.leave_cb) : null;
     const leaveOff = (sheetLu != null && Math.abs(genieLu - sheetLu) >= 0.5) || (sheetLcb != null && Math.abs(genieLcb - sheetLcb) >= 0.5);
+    // the gross RATE is the question; per-day is shown beside it but is not a difference on its own —
+    // the sheet divides a staff gross by 31 whatever the month, Genie by the month's days (30 in
+    // September), so every staff per-day "differs" by rule, not by error (Dr Raghu, 7 Oct 2026)
     const rateOff = sheetGross != null && Math.abs(genieGross - sheetGross) >= 1;
     const attOff = (sheetAtt != null && Math.abs(genieAtt - sheetAtt) >= 0.5) || (sheetPaid != null && Math.abs(geniePaid - sheetPaid) >= 0.5) || leaveOff;
     if (Math.abs(payDiff) >= 1) out.pay_mismatched++;
