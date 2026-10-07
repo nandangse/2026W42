@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.17",
+    date: "2026-10-07",
+    module: "Rich text: a heading can no longer swallow the paragraphs pasted into it",
+    items: [
+      "THE ABOUT PAGE CAME OUT ENTIRELY BOLD AND NAVY (7 Oct 2026). Text pasted into a template while the caret sat inside its heading landed inside that heading, so every paragraph wore the heading\u2019s style. The editor now lifts the paragraphs out when it saves, the quotation document does the same when it is made, and the About text already on the quote and in the template has been straightened.",
+    ],
+  },
+  {
     v: "6.3.0.16",
     date: "2026-10-07",
     module: "Quotation PDF: the header sits clear of the body",

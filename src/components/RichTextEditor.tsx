@@ -46,6 +46,19 @@ export function sanitizeRich(html: string): string {
     if (el.tagName === "A") { el.setAttribute("target", "_blank"); el.setAttribute("rel", "noreferrer"); }
   };
   for (const child of [...root.children]) walk(child);
+  /* A HEADING THAT SWALLOWED THE PARAGRAPHS (7 Oct 2026): text pasted while
+     the caret sat inside a heading becomes <h2><p>…</p><p>…</p></h2>, and
+     every paragraph then wears the heading's size and weight. The first
+     paragraph is the heading; the rest come out from under it. */
+  for (const h of [...root.querySelectorAll("h1,h2,h3,h4,h5,h6")]) {
+    const paras = [...h.querySelectorAll(":scope > p, :scope > div")];
+    if (!paras.length) continue;
+    const first = paras.shift()!;
+    const rest = paras;
+    h.textContent = first.textContent?.trim() || h.textContent?.replace(/\s+/g, " ").trim() || "";
+    let after: Element = h;
+    for (const pEl of rest) { after.insertAdjacentElement("afterend", pEl); after = pEl; }
+  }
   return root.innerHTML;
 }
 

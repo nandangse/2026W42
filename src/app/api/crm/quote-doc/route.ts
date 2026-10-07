@@ -182,7 +182,18 @@ export async function GET(req: Request) {
     // ONE implementation, shared with the email that carries the same letter
     // (@/crm/quote-vars) — see the note there about how they came to differ.
     const VARS = await quoteVars(db, q as Record<string, unknown>);
-    const fill = (html: string) => fillQuoteVars(html, VARS, esc);
+    /* A HEADING THAT SWALLOWED THE PARAGRAPHS (seen 7 Oct 2026: the About
+       page came out entirely in the heading's bold navy). Text pasted into
+       an editor whose caret sat inside <h2> lands as <h2><p>…</p><p>…</p></h2>.
+       The first paragraph is the heading; the rest come out from under it. */
+    const unwrapHeadings = (html: string) => html.replace(/<(h[1-6])(\s[^>]*)?>([\s\S]*?)<\/\1>/gi, (whole, tag: string, _attrs: string, inner: string) => {
+      if (!/<p[\s>]/i.test(inner)) return whole;
+      const paras = inner.match(/<p[^>]*>[\s\S]*?<\/p>/gi) ?? [];
+      if (!paras.length) return whole;
+      const first = paras[0].replace(/<\/?(p|strong|b)[^>]*>/gi, "").trim();
+      return `<${tag}>${first}</${tag}>${paras.slice(1).join("")}`;
+    });
+    const fill = (html: string) => fillQuoteVars(unwrapHeadings(html), VARS, esc);
 
     // ---- content per section: [sectionKey, title, html-chunks] ----------
     type Sec = { key: string; title: string; chunks: string[]; centered?: boolean };
