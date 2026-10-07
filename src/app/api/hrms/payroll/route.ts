@@ -13,6 +13,7 @@ import { buildBankFiles } from "@/lib/bank-files";
 import { buildSalaryXlsx, salaryXlsxName, fyOf } from "@/lib/salary-xlsx";
 import { totalsFor } from "@/lib/salary-sheet";
 import { MONTHS } from "@/lib/hrms-template";
+import { hrmsTables } from "@/lib/hrms";
 import { people, renderFor, queueMessages, queueStatuses } from "@/lib/hrms-wa";
 
 export const dynamic = "force-dynamic";
@@ -232,6 +233,56 @@ export async function POST(req: Request) {
            computed. When the muster uploaded is the real Muster tab, the
            Observation's Genie-against-the-sheet needs the Salary tab beside
            it — it rides as its own upload and never touches the run's muster. */
+        /* APPROVED BANK DETAILS → THE HRIS (Dr Raghu, 7 Oct 2026: "I want to
+           upload the bank details of people again with the correct one so that
+           there is no error. We will need to backflush it onto the HRIS and then
+           use that in future for generating the bank file … it is not dependent
+           upon any Excel sheet. These are the approved bank details"). The file
+           — ID, name in bank, bank, account, 15-digit account, IFSC, branch — is
+           written straight onto each record's bank fields as approved edits,
+           every change logged old → new. The bank files read the record and
+           nothing else. */
+        if (kind === "bankdetails") {
+          try {
+            const grid = gridOf(buf, f.name);
+            const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+            let hr = 0, best = -1;
+            for (let i = 0; i < Math.min(grid.length, 15); i++) { const sc = (grid[i] || []).filter((c) => /ifsc|account|bank|^id$|emp/.test(norm(c))).length; if (sc > best) { best = sc; hr = i; } }
+            const Hd = (grid[hr] || []).map(norm);
+            const col = (...res: RegExp[]) => Hd.findIndex((h) => res.some((re) => re.test(h)));
+            const cId = col(/^emp(loyee)? ?id$/, /^id$/, /^emp$/), cNib = col(/name in bank/, /beneficiary/), cBank = col(/^bank( name)?$/), cAcc15 = col(/15/), cAcc = col(/^account( no| number)?$/, /^a ?c no$/, /account no$/), cIfsc = col(/ifsc/), cBranch = col(/branch/);
+            if (cId < 0 || cIfsc < 0 || (cAcc < 0 && cAcc15 < 0)) throw new HttpError(400, "The file needs an Employee ID, an IFSC and an account number column.");
+            const T = await hrmsTables(admin);
+            const FIELDS: [string, number][] = [["name_in_bank", cNib], ["bank_name", cBank], ["account_no", cAcc], ["account_15", cAcc15], ["ifsc", cIfsc], ["branch", cBranch]];
+            const lines = grid.slice(hr + 1).map((L) => L || []).filter((L) => /^\d{4}$/.test(String(L[cId] ?? "").trim()));
+            const ids = lines.map((L) => String(L[cId]).trim());
+            const { data: cur } = await admin.from(T.edits).select("employee_id, field, value").in("employee_id", ids).in("field", FIELDS.map(([k]) => k));
+            const curVal = new Map((cur || []).map((e) => [`${e.employee_id}|${e.field}`, e.value == null ? null : String(e.value)]));
+            const edits: Record<string, unknown>[] = [], log: Record<string, unknown>[] = [], bad: string[] = [];
+            let people_n = 0, changed = 0;
+            for (const L of lines) {
+              const eid = String(L[cId]).trim(); people_n++;
+              const ifsc = String(L[cIfsc] ?? "").replace(/\s+/g, "").toUpperCase();
+              const acct = String((cAcc15 >= 0 ? L[cAcc15] : "") || (cAcc >= 0 ? L[cAcc] : "") || "").replace(/[^0-9]/g, "");
+              if (ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) bad.push(`${eid}: IFSC "${ifsc}"`);
+              if (acct && !/^\d{6,20}$/.test(acct)) bad.push(`${eid}: account "${acct}"`);
+              for (const [field, ci] of FIELDS) {
+                if (ci < 0) continue;
+                let value = String(L[ci] ?? "").trim();
+                if (field === "ifsc") value = ifsc; if (field === "account_no" || field === "account_15") value = value.replace(/[^0-9]/g, "");
+                if (!value) continue;   // a blank cell never erases what the record holds
+                const old = curVal.get(`${eid}|${field}`);
+                edits.push({ employee_id: eid, field, value, edited_by: stamp, edited_at: now, approved_at: now, approved_by: stamp });
+                if (old !== value) { changed++; log.push({ employee_id: eid, field, old_value: old ?? null, new_value: value, edited_by: `${stamp} — approved bank details (${f.name})`, edited_at: now }); }
+              }
+            }
+            for (let i = 0; i < edits.length; i += 300) { const { error: e } = await admin.from(T.edits).upsert(edits.slice(i, i + 300), { onConflict: "employee_id,field" }); if (e) throw new Error(e.message); }
+            for (let i = 0; i < log.length; i += 300) { const { error: e } = await admin.from("hrms_employee_edit_log").insert(log.slice(i, i + 300)); if (e) throw new Error(e.message); }
+            parsed = { people: people_n, changed, bad, fields: FIELDS.filter(([, ci]) => ci >= 0).map(([k]) => k) };
+            summary = `${people_n} people · ${changed} bank field${changed === 1 ? "" : "s"} changed on the HRIS records`;
+            warnings = bad.length ? [`${bad.length} line${bad.length === 1 ? "" : "s"} with a doubtful IFSC or account — written as given, check them: ${bad.slice(0, 8).join("; ")}${bad.length > 8 ? " …" : ""}`] : [];
+          } catch (e) { if (e instanceof HttpError) throw e; warnings.push(`Could not read ${f.name}: ${e instanceof Error ? e.message : String(e)}`); }
+        }
         if (kind === "gsheet") {
           try {
             const g = parseMuster(gridOf(buf, f.name));
@@ -404,7 +455,7 @@ ${warnings.length ? `<p><b>${warnings.length} warning${warnings.length === 1 ? "
     /** SUBMIT AN INPUT — the signature on one of the run's forms (0140). */
     if (action === "submit_input" || action === "unsubmit_input") {
       const key = String(body.key || "");
-      if (!/^(essl|rates|muster|gsheet|advance|loan|lunch|site)$/.test(key)) throw new HttpError(400, "Which input?");
+      if (!/^(essl|rates|muster|gsheet|bankdetails|advance|loan|lunch|site)$/.test(key)) throw new HttpError(400, "Which input?");
       const sheetId = String(body.id || "");
       await runRow(admin, sheetId);
       const signed = action === "submit_input";

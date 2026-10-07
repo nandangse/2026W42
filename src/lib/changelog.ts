@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.44",
+    date: "2026-10-07",
+    module: "Approved bank details upload \u2192 the HRIS record; the bank files read the record",
+    items: [
+      "BANK DETAILS, ONCE, ONTO THE RECORD (\u201cI want to upload the bank details of people again with the correct one so that there is no error. We will need to backflush it onto the HRIS and then use that in future for generating the bank file \u2026 it is not dependent upon any Excel sheet. These are the approved bank details\u201d). A new upload on the run, \u201cApproved bank details\u201d: a CSV or Excel with Employee ID, Name in bank, Bank, Account No, Account No (15 digit), IFSC and Branch (any of the detail columns may be absent; a blank cell never erases what the record holds). Each line is written onto the person\u2019s HRIS record as an approved edit, every change logged old \u2192 new; doubtful IFSCs and accounts are named. Execute Bank Files already reads the record \u2014 IFSC, the 15-digit account (else Account No), Name in bank \u2014 and nothing else.",
+    ],
+  },
+  {
     v: "6.3.0.43",
     date: "2026-10-07",
     module: "Payroll: no PT from the age of 65",

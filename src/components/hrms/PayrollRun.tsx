@@ -35,12 +35,13 @@ const who = (s: string | null) => (s ? String(s).split("·")[0].trim() : "—");
 const dayOfWeek = (year: number | null, month: number | null, day: number): number | null =>
   year && month ? new Date(Date.UTC(year, month - 1, day)).getUTCDay() : null;
 
-const KINDS = [["essl", "ESSL attendance"], ["muster", "Attendance muster"], ["gsheet", "Google Sheet — Salary tab (for comparison)"], ["rates", "Salary rate list"], ["advance", "Advance (Tally)"], ["loan", "Loan (Tally)"], ["final", "Finalised salary sheet (Excel)"], ["bank", "Bank files (zip)"], ["other", "Other document"]] as const;
+const KINDS = [["essl", "ESSL attendance"], ["muster", "Attendance muster"], ["gsheet", "Google Sheet — Salary tab (for comparison)"], ["bankdetails", "Approved bank details (→ HRIS)"], ["rates", "Salary rate list"], ["advance", "Advance (Tally)"], ["loan", "Loan (Tally)"], ["final", "Finalised salary sheet (Excel)"], ["bank", "Bank files (zip)"], ["other", "Other document"]] as const;
 /** The run's inputs, one form each (Dr Raghu, 5 Sep 2026) — who brings it, how it comes, whether a file is expected. */
 const INPUTS: { key: string; label: string; by: string; how: string; upload: boolean; needFile: boolean; accept: string }[] = [
   { key: "essl", label: "ESSL attendance output", by: "Vishwas", how: "the biometric export, Excel or CSV", upload: true, needFile: true, accept: ".csv,.xlsx,.xls,.txt" },
   { key: "rates", label: "Salary rates", by: "Vinay", how: "from the Appraisals — the Live salary structure; a rate list can be uploaded to override", upload: true, needFile: false, accept: ".csv,.xlsx,.xls" },
   { key: "muster", label: "Muster sheet", by: "HR", how: "CSV — attendance, leave encashment, loan, advance, lunch, site allowance", upload: true, needFile: true, accept: ".csv,.xlsx,.xls" },
+  { key: "bankdetails", label: "Approved bank details", by: "Accounts", how: "CSV/Excel: Employee ID, Name in bank, Bank, Account No, Account No (15 digit), IFSC, Branch — written straight onto the HRIS records as approved; the bank files read the record, never a sheet", upload: true, needFile: false, accept: ".csv,.xlsx,.xls" },
   { key: "gsheet", label: "Google Sheet — Salary tab", by: "HR", how: "the sheet's Salary tab as CSV or Excel — compared against Genie's register on the Observation tab, nothing else; not needed once the sheet is retired", upload: true, needFile: false, accept: ".csv,.xlsx,.xls" },
   { key: "advance", label: "Advance", by: "Suresh", how: "PDF from Tally, sent on the 1st to Vinay", upload: true, needFile: true, accept: ".pdf,.csv,.xlsx,.xls" },
   { key: "loan", label: "Loan", by: "Suresh", how: "PDF from Tally, sent on the 1st to Vinay", upload: true, needFile: true, accept: ".pdf,.csv,.xlsx,.xls" },
