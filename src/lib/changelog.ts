@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.42",
+    date: "2026-10-07",
+    module: "Rules: encashment may be fractional, leave utilised never",
+    items: [
+      "ON THE RECORD (\u201cLeave encashment can be done for decimals. Please note: leave utilised will always be in integers\u201d). The engine already did both; the rules panel and the printed rules page now say so in one line.",
+    ],
+  },
+  {
     v: "6.3.0.41",
     date: "2026-10-07",
     module: "Payroll: fixed allowance at seven days, rounding as the sheet rounds, the rules printed, a person\u2019s card on every ID",

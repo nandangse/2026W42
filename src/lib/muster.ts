@@ -561,7 +561,7 @@ export const PAYROLL_RULES: { head: string; lines: RuleLine[] }[] = [
     { text: "Earned this month = present ÷ 10 for Staff, ÷ 20 for workers. None for Management and contract types." },
     { text: "Comp off is added to the leave balance and paid out in full at the per-day rate (Comp. Off Amt.) — it is never spent on short days.", changed: "7 Oct 2026" },
     { text: "Staff only: a shortfall against pay days is filled from leave in WHOLE days, taken from what the opening balance holds above the 15-day floor (the month's own earned leave is not spent), and never so far that the closing balance dips under 15. Workers' leave (floor 8) is never spent without approval — the short days stay unpaid and the run names the people.", changed: "7 Oct 2026" },
-    { text: "Leave encashment as the muster carries it, at the per-day rate." },
+    { text: "Leave encashment as the muster carries it, at the per-day rate — decimals allowed (1.5 days encash as 1.5). Leave UTILISED, by contrast, is always whole days.", changed: "7 Oct 2026" },
     { text: "Closing balance = opening + earned + comp off − used − encashed. Opening comes from last month's register, else the record." },
   ] },
   { head: "Per day", lines: [
