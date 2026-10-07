@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.46",
+    date: "2026-10-07",
+    module: "Bank files pay on the 15-digit account only; a wrong IFSC is refused at upload",
+    items: [
+      "THE 15-DIGIT ACCOUNT (\u201cthe correct one will be the 15 digit account no\u201d). The bank files take the record\u2019s Account No (15 digit) and nothing else \u2014 the short account number is never used; a person without one is named in NOT_IN_FILES.txt.",
+      "A WRONG IFSC IS TOLD, NOT WRITTEN (\u201cwhile uploading if the ifsc is wrong tell them\u201d). The approved-bank-details upload refuses any line whose IFSC is not four letters, a zero and six letters or digits, or whose 15-digit account is not 15 digits \u2014 the line is not written and the upload names every refused person, so it is fixed at the source. A file with no 15-digit column is told so.",
+    ],
+  },
+  {
     v: "6.3.0.45",
     date: "2026-10-07",
     module: "Bank files: the envelope to accounts; account numbers kept as text",

@@ -67,7 +67,8 @@ async function bankZip(admin: ReturnType<typeof adminClient>, r: Record<string, 
   const rows = (r.rows ?? []) as RegisterRow[];
   if (!rows.length) throw new HttpError(400, "Nothing generated on this run yet.");
   const ppl = await people(admin, rows.map((x) => x.employee_id));
-  const bankOf = new Map(ppl.map((p) => [p.id, { ifsc: String(p.value.ifsc || ""), account: String(p.value.account_15 || p.value.account_no || ""), nameInBank: String(p.value.name_in_bank || p.name || "") }]));
+  // THE 15-DIGIT ACCOUNT IS THE ACCOUNT (Dr Raghu, 7 Oct 2026: "the correct one will be the 15 digit account no") — never the short one
+  const bankOf = new Map(ppl.map((p) => [p.id, { ifsc: String(p.value.ifsc || ""), account: String(p.value.account_15 || ""), nameInBank: String(p.value.name_in_bank || p.name || "") }]));
   const built = buildBankFiles(rows, (eid) => bankOf.get(eid) ?? null, Number(r.month), Number(r.year));
   const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
@@ -143,7 +144,7 @@ export async function GET(req: Request) {
       if (!r.approved_at && !/frozen/i.test(String(r.status))) throw new HttpError(409, "Approve the run first — the bank files are made from the approved register.");
       const rows = (r.rows ?? []) as RegisterRow[];
       const ppl = await people(admin, rows.map((x) => x.employee_id));
-      const bankOf = new Map(ppl.map((p) => [p.id, { ifsc: String(p.value.ifsc || ""), account: String(p.value.account_15 || p.value.account_no || ""), nameInBank: String(p.value.name_in_bank || p.name || "") }]));
+      const bankOf = new Map(ppl.map((p) => [p.id, { ifsc: String(p.value.ifsc || ""), account: String(p.value.account_15 || ""), nameInBank: String(p.value.name_in_bank || p.name || "") }]));
       const built = buildBankFiles(rows, (eid) => bankOf.get(eid) ?? null, Number(r.month), Number(r.year));
       return NextResponse.json({ ok: true, ...bankMailDraft(r as unknown as Record<string, unknown>, id, built), files: built.files.map((f) => ({ name: f.name, lines: f.lines, total: f.total })), total: built.total, lines: built.lines, skipped: built.skipped, zipName: `bank_files_${label(Number(r.month), Number(r.year)).replace(/\s+/g, "_")}.zip` });
     }
@@ -295,12 +296,19 @@ export async function POST(req: Request) {
             const curVal = new Map((cur || []).map((e) => [`${e.employee_id}|${e.field}`, e.value == null ? null : String(e.value)]));
             const edits: Record<string, unknown>[] = [], log: Record<string, unknown>[] = [], bad: string[] = [];
             let people_n = 0, changed = 0;
+            const refused: string[] = [];
             for (const L of lines) {
               const eid = String(L[cId]).trim(); people_n++;
               const ifsc = String(L[cIfsc] ?? "").replace(/\s+/g, "").toUpperCase();
-              const acct = String((cAcc15 >= 0 ? L[cAcc15] : "") || (cAcc >= 0 ? L[cAcc] : "") || "").replace(/[^0-9]/g, "");
-              if (ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) bad.push(`${eid}: IFSC "${ifsc}"`);
-              if (acct && !/^\d{6,20}$/.test(acct)) bad.push(`${eid}: account "${acct}"`);
+              const acct15 = String(cAcc15 >= 0 ? L[cAcc15] ?? "" : "").replace(/\s+/g, "");
+              /* A WRONG IFSC IS NOT WRITTEN (Dr Raghu, 7 Oct 2026: "while uploading
+                 if the ifsc is wrong tell them"). Four letters, a zero, six
+                 letters or digits — anything else, the whole line is refused and
+                 named, so it is corrected at the source, not discovered by the
+                 bank. A 15-digit account that is not 15 digits is refused the
+                 same way. */
+              if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) { refused.push(`${eid}: IFSC "${ifsc || "blank"}"`); continue; }
+              if (acct15 && !/^\d{15}$/.test(acct15)) { refused.push(`${eid}: 15-digit account "${acct15}" is ${acct15.length} characters`); continue; }
               for (const [field, ci] of FIELDS) {
                 if (ci < 0) continue;
                 let value = String(L[ci] ?? "").trim();
@@ -313,9 +321,10 @@ export async function POST(req: Request) {
             }
             for (let i = 0; i < edits.length; i += 300) { const { error: e } = await admin.from(T.edits).upsert(edits.slice(i, i + 300), { onConflict: "employee_id,field" }); if (e) throw new Error(e.message); }
             for (let i = 0; i < log.length; i += 300) { const { error: e } = await admin.from("hrms_employee_edit_log").insert(log.slice(i, i + 300)); if (e) throw new Error(e.message); }
-            parsed = { people: people_n, changed, bad, fields: FIELDS.filter(([, ci]) => ci >= 0).map(([k]) => k) };
-            summary = `${people_n} people · ${changed} bank field${changed === 1 ? "" : "s"} changed on the HRIS records`;
-            warnings = bad.length ? [`${bad.length} line${bad.length === 1 ? "" : "s"} with a doubtful IFSC or account — written as given, check them: ${bad.slice(0, 8).join("; ")}${bad.length > 8 ? " …" : ""}`] : [];
+            parsed = { people: people_n, written: people_n - refused.length, changed, refused, bad, fields: FIELDS.filter(([, ci]) => ci >= 0).map(([k]) => k) };
+            summary = `${people_n - refused.length} of ${people_n} people written · ${changed} bank field${changed === 1 ? "" : "s"} changed on the HRIS records${refused.length ? ` · ${refused.length} REFUSED` : ""}`;
+            warnings = refused.length ? [`${refused.length} line${refused.length === 1 ? "" : "s"} NOT written — wrong IFSC or 15-digit account. Fix these at the source and upload again: ${refused.join("; ")}`] : [];
+            if (cAcc15 < 0) warnings.push("No \u201cAccount No (15 digit)\u201d column in this file — the bank files pay on the 15-digit account only, so without it nobody can be paid. Add the column and upload again.");
           } catch (e) { if (e instanceof HttpError) throw e; warnings.push(`Could not read ${f.name}: ${e instanceof Error ? e.message : String(e)}`); }
         }
         if (kind === "gsheet") {

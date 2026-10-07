@@ -18,7 +18,9 @@
  * across the zip, as accounts numbers theirs.
  *
  * Who rides: every line with something to pay (a held salary pays nought
- * and stays out) whose record carries an IFSC and an account number. Who
+ * and stays out) whose record carries an IFSC and the 15-DIGIT account
+ * number — "the correct one will be the 15 digit account no" (Dr Raghu,
+ * 7 Oct 2026); the short account number is never used. Who
  * does not ride is written into NOT_IN_FILES.txt in the same zip, by name
  * and reason, so nobody is quietly left unpaid.
  */
@@ -60,7 +62,7 @@ export function buildBankFiles(rows: RegisterRow[], bankOf: (employee_id: string
     const ifsc = clean(bank?.ifsc || "").toUpperCase().replace(/\s+/g, "");
     const account = clean(bank?.account || "").replace(/\s+/g, "");
     if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) { skipped.push({ employee_id: r.employee_id, name: r.name, why: ifsc ? `IFSC "${ifsc}" is not a valid code` : "no IFSC on the record" }); continue; }
-    if (!/^\d{6,20}$/.test(account)) { skipped.push({ employee_id: r.employee_id, name: r.name, why: account ? `account "${account}" is not all digits` : "no account number on the record" }); continue; }
+    if (!/^\d{15}$/.test(account)) { skipped.push({ employee_id: r.employee_id, name: r.name, why: account ? `15-digit account "${account}" is ${account.length} characters` : "no 15-digit account number on the record" }); continue; }
     const cls = classOf(r.type);
     (byClass.get(cls) ?? byClass.set(cls, []).get(cls)!).push({ row: r, bank: { ifsc, account, nameInBank: clean(bank?.nameInBank || r.name) }, amount });
   }
