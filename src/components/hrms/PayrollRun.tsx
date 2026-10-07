@@ -10,12 +10,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtFull } from "@/lib/schedule";
+/** date AND time, in IST (Dr Raghu, 7 Oct 2026: "show the time vinay generated. and also mine approval time") */
+const fmtIst = (iso: string | null | undefined): string => {
+  if (!iso) return "—";
+  const d = new Date(iso); if (isNaN(d.getTime())) return "—";
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(d);
+  const g = (t: string) => p.find((x) => x.type === t)?.value || "";
+  return `${g("day")}-${g("month")}-${g("year")} ${g("hour")}:${g("minute")} IST`;
+};
 import { MONTHS } from "@/lib/hrms-template";
-import { PAYROLL_RULES, type MusterRow, type RegisterRow } from "@/lib/muster";
+import { PAYROLL_RULES, PAYROLL_RULES_AS_OF, type MusterRow, type RegisterRow } from "@/lib/muster";
 import { C } from "./RecordFields";
 import { inr } from "@/lib/fmt";
 
-interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; working_days: number | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[] } | null }
+interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; working_days: number | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[]; rules_as_of?: string; approval_mail?: { at: string; by: string } } | null }
 interface FileRow { id: string; kind: string; name: string; size: number | null; drive_link: string | null; uploaded_by: string | null; uploaded_at: string }
 interface Msg { id: string; employee_id: string; name: string; channel: string; direction: string; to_address: string | null; subject: string | null; body: string; status: string; error: string | null; sent_by: string | null; sent_at: string }
 interface InputRow { key: string; submitted_by: string | null; submitted_at: string | null; note: string }
@@ -169,8 +177,9 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <div className="font-bold" style={{ fontSize: 20 }}>{title} <span className="font-normal text-xs" style={{ color: "#8FA1B3" }}>payroll run</span></div>
           <div className="text-xs" style={{ color: "#8FA1B3" }}>
             Run by <b style={{ color: "#D7DEE6" }}>{who(r.uploaded_by)}</b> · run date <b style={{ color: "#D7DEE6" }}>{r.uploaded_at ? fmtFull(String(r.uploaded_at)) : "—"}</b>
-            {r.generated_at && <> · generated <b style={{ color: "#D7DEE6" }}>{fmtFull(String(r.generated_at))}</b> by {who(r.generated_by)}</>}
-            {" · "}{r.approved_by ? <span style={{ color: "#7BD389" }}>✓ approved by {who(r.approved_by)} on {fmtFull(String(r.approved_at))}</span> : <span style={{ color: "var(--amber)" }}>awaiting Raghu&apos;s approval</span>}
+            {r.generated_at && <> · generated <b style={{ color: "#D7DEE6" }}>{fmtIst(String(r.generated_at))}</b> by {who(r.generated_by)}</>}
+            {r.mapping?.approval_mail && <> · sent for approval <b style={{ color: "#D7DEE6" }}>{fmtIst(r.mapping.approval_mail.at)}</b> by {who(r.mapping.approval_mail.by)}</>}
+            {" · "}{r.approved_by ? <span style={{ color: "#7BD389" }}>✓ approved by {who(r.approved_by)} at {fmtIst(String(r.approved_at))}</span> : <span style={{ color: "var(--amber)" }}>awaiting Raghu&apos;s approval</span>}
           </div>
         </div>
         <button onClick={waPreview} disabled={busy || !d.muster} className="text-xs font-bold rounded px-3 py-2" style={{ background: d.muster ? "#25D366" : "rgba(255,255,255,0.12)", color: d.muster ? "#0B3D1E" : "#8FA1B3" }} title={d.muster ? "The attendance message to everybody on the muster, through the WhatsApp queue" : "Upload the muster first"}>💬 Send WhatsApp message</button>
@@ -183,6 +192,11 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
         {r.approved_by && (
           <a href={`/api/hrms/payroll?id=${encodeURIComponent(id)}&bank=1`} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#F3B33D", color: "#1F2328", textDecoration: "none" }}
             title="The bank's NEFT upload files for this run — management, staff and labour kept apart, each file under ₹10 lakh, with a note of anybody left out">🏦 Execute Bank Files</a>
+        )}
+        {/* MAIL FOR APPROVAL (Dr Raghu, 7 Oct 2026: "Send me an email from this to approve") — the run's figures and a link, from HR's mailbox to Raghu */}
+        {r.generated_at && !r.approved_by && (
+          <button onClick={() => act({ action: "mail_approval" }, (j) => `Mailed ${String(j.to || "Raghu")} for approval${j.note ? ` — ${j.note}` : ""}`)} disabled={busy} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#D7DEE6", color: "#1F2328" }}
+            title="E-mails Raghu the run's totals, holds and warnings with a link to this run, so he can approve it">✉ Mail Raghu to approve</button>
         )}
         {isOwner && (r.approved_by
           ? <button onClick={() => act({ action: "unapprove" }, () => "Approval withdrawn")} className="text-xs font-semibold rounded px-3 py-2" style={{ background: "rgba(255,255,255,0.12)", color: "#D7DEE6" }}>withdraw approval</button>
@@ -241,7 +255,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <Card title="WhatsApp">{d.messages.length ? Object.entries(d.counts).map(([k, v]) => <span key={k} className="mr-2" style={{ color: tone(k) }}><b>{v}</b> {k}</span>) : "No message sent from this run yet."}</Card>
           {(r.mapping?.warnings || []).length > 0 && <Card title="Warnings"><ul className="text-xs" style={{ color: "#8A5B00", paddingLeft: 16 }}>{(r.mapping?.warnings || []).map((w, i) => <li key={i}>{w}</li>)}</ul></Card>}
         </div>
-        <Rules />
+        <Rules runRulesAsOf={r.mapping?.rules_as_of ?? null} />
         </div>
       )}
 
@@ -422,8 +436,13 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                   </tr>
                 ))}
               </tbody>
-              <tfoot><tr style={{ borderTop: `2px solid ${C.line}`, fontWeight: 700 }}>
-                <td className="px-2 py-1.5" colSpan={3} style={{ position: "sticky", left: 0, background: "#fff" }}>{regRows.length} people</td>
+              {/* THE TOTAL IS SEEN AT THE BOTTOM (Dr Raghu, 7 Oct 2026: "The total should be seen at the bottom"; "This total at the bottom is
+                  including the people who are holding or excluding?") — pinned under the scroll, and it says: the holds are IN every column's total
+                  (their net is booked) and their to-pay is ₹0, so the To pay total is the bank figure */}
+              <tfoot><tr style={{ borderTop: `2px solid ${C.line}`, fontWeight: 700, position: "sticky", bottom: 0, background: "#fff", boxShadow: "0 -2px 0 #16232F", zIndex: 2 }}>
+                <td className="px-2 py-1.5" colSpan={3} style={{ position: "sticky", left: 0, background: "#fff", zIndex: 3, whiteSpace: "normal", lineHeight: 1.3 }}>
+                  {regRows.length} people{regRows.some((x) => x.hold) && <span className="font-normal" style={{ color: C.red, fontSize: 10 }}> · {regRows.filter((x) => x.hold).length} on hold — counted in every total, to pay ₹0</span>}
+                </td>
                 {["days_due", "leave_ob", "leave_earned", "compoff_days", "leave_used", "leave_encashed", "leave_cb", "paid_days", "per_day", "basic_da", "hra", "fixed_allowance", "conveyance", "medical", "ot_pay", "site_allowance", "compoff_amt", "encash_amt", "arrears", "earned", "pf", "pt", "loan", "advance", "tds", "lunch", "late_ded", "other_ded", "deductions", "net", "round_up", "to_pay"].map((k) => (
                   <td key={k} className="px-2 py-1.5 text-right tnum">{["days_due", "leave_ob", "leave_earned", "compoff_days", "leave_used", "leave_encashed", "leave_cb", "paid_days", "per_day"].includes(k) ? "" : inr(regRows.reduce((a, x) => a + (Number((x as unknown as Record<string, unknown>)[k]) || 0), 0))}</td>
                 ))}
@@ -431,7 +450,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
               </tr></tfoot>
             </table>
           </div>
-          <Rules />
+          <Rules runRulesAsOf={r.mapping?.rules_as_of ?? null} />
           </div>
         )
       )}
@@ -595,16 +614,29 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
 }
 
 /** The rules Generate runs on, beside the numbers — "in the right side show the rules we are using" (Dr Raghu, 4 Sep 2026). */
-function Rules() {
+/** THE RULES, TRACKED (Dr Raghu, 7 Oct 2026): a line changed since the rules were first given is yellow and says when */
+function Rules({ runRulesAsOf }: { runRulesAsOf: string | null }) {
+  const changed = PAYROLL_RULES.reduce((a, g) => a + g.lines.filter((l) => l.changed).length, 0);
+  const stale = runRulesAsOf !== PAYROLL_RULES_AS_OF;
   return (
     <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line, flex: "0 0 300px", position: "sticky", top: 8, maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
       <div className="text-xs font-bold mb-1" style={{ color: C.faint, letterSpacing: 0.5 }}>THE RULES WE ARE USING</div>
-      <div className="text-xs mb-2" style={{ color: C.faint }}>What Generate does with the muster and the rate list. As given on 4 Sep 2026.</div>
+      <div className="text-xs mb-1" style={{ color: C.faint }}>What Generate does with the muster and the rate list. Given 4 Sep 2026; rules as of <b>{PAYROLL_RULES_AS_OF}</b>.</div>
+      <div className="text-xs mb-2" style={{ color: C.dim }}><span style={{ background: "#FFF1A8", padding: "0 4px", borderRadius: 2 }}>yellow</span> = {changed} line{changed === 1 ? "" : "s"} changed from the rules given before, with the day.</div>
+      {stale && (
+        <div className="text-xs mb-2 rounded px-2 py-1" style={{ background: "#FDF0E7", border: "1px solid #F0C9A8", color: "#8A4520" }}>
+          This register was generated under {runRulesAsOf ? `the rules of ${runRulesAsOf}` : "older rules"}. Press Generate again to apply the rules of {PAYROLL_RULES_AS_OF}.
+        </div>
+      )}
       {PAYROLL_RULES.map((g) => (
         <div key={g.head} className="mb-2">
           <div className="text-xs font-bold" style={{ color: "var(--navy)" }}>{g.head}</div>
           <ul style={{ paddingLeft: 14, margin: "2px 0" }}>
-            {g.lines.map((l, i) => <li key={i} className="text-xs" style={{ color: C.dim, lineHeight: 1.5, marginBottom: 2 }}>{l}</li>)}
+            {g.lines.map((l, i) => (
+              <li key={i} className="text-xs" style={{ color: l.changed ? C.ink : C.dim, lineHeight: 1.5, marginBottom: 2, background: l.changed ? "#FFF1A8" : "transparent", borderRadius: 2, padding: l.changed ? "1px 3px" : 0 }}>
+                {l.text}{l.changed && <span style={{ color: "#8A6D00", fontSize: 10, marginLeft: 4 }}>changed {l.changed}</span>}
+              </li>
+            ))}
           </ul>
         </div>
       ))}

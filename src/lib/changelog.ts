@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.29",
+    date: "2026-10-07",
+    module: "Payroll: times in IST, mail Raghu to approve, totals pinned, the rules tracked in yellow",
+    items: [
+      "TIMES, NOT JUST DATES (\u201cshow the time vinay generated. and also mine approval time\u201d). The run header now says when it was generated and when it was approved to the minute, IST.",
+      "MAIL RAGHU TO APPROVE (\u201cSend me an email from this to approve\u201d). A button on a generated, unapproved run e-mails Dr Raghu the figures \u2014 lines, earned, deductions, net, to pay, the holds by name, who generated it and when, the rules it was generated under, the warnings \u2014 and a link that opens the run itself (/hrms#payroll:\u2026). Goes from HR\u2019s mailbox as every HRMS mail does; the header then says when it was sent and by whom.",
+      "THE TOTAL AT THE BOTTOM (\u201cThe total should be seen at the bottom\u201d; \u201cThis total at the bottom is including the people who are holding or excluding?\u201d). The totals row is pinned under the register\u2019s scroll, and it answers: the holds are counted in every total (their net is booked) and their to-pay is \u20b90, so the To pay total is the bank figure.",
+      "THE RULES, TRACKED (\u201cupdate them whenever we update any rules \u2026 whatever is different from before, please highlight that in yellow\u201d). The rules panel carries the day each rule last changed; a changed line is yellow with its date (seven lines today: pay days by the month, per day, site allowance from the muster only, staff-only leave fill with the floors, nobody present nobody paid, hold means nothing extra, net vs to-pay). Every run is stamped with the rules it was generated under, and the panel says so when that is older than today\u2019s.",
+    ],
+  },
+  {
     v: "6.3.0.28",
     date: "2026-10-07",
     module: "Payroll: site allowance is the muster\u2019s figure only \u2014 no longer doubled",

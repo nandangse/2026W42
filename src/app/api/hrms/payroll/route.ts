@@ -7,7 +7,7 @@ import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { driveConfig, uploadToFolder, trashFile } from "@/lib/drive";
 import { readEssl, type EsslPunch } from "@/lib/essl";
-import { parseMuster, parseRates, generateRegister, musterVars, OPTIONAL_MUSTER_VARS, type Muster, type Rates, type RegisterRow, workingDaysFor } from "@/lib/muster";
+import { parseMuster, parseRates, generateRegister, musterVars, OPTIONAL_MUSTER_VARS, type Muster, type Rates, type RegisterRow, workingDaysFor, PAYROLL_RULES_AS_OF } from "@/lib/muster";
 import { buildBankFiles } from "@/lib/bank-files";
 import { buildSalaryXlsx, salaryXlsxName, fyOf } from "@/lib/salary-xlsx";
 import { totalsFor } from "@/lib/salary-sheet";
@@ -252,6 +252,51 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, id: data.id });
     }
 
+    /* MAIL FOR APPROVAL (Dr Raghu, 7 Oct 2026: "Send me an email from this
+       to approve"). The run's figures — lines, earned, deductions, net, to
+       pay, holds, warnings, who generated it and when (IST) — and a link that
+       opens this run, from HR's mailbox to Raghu. The send is noted on the
+       run so the header says when it went and who sent it. */
+    if (action === "mail_approval") {
+      const id = String(body.id || "");
+      const r = await runRow(admin, id);
+      const rows = (r.rows ?? []) as RegisterRow[];
+      if (!rows.length) throw new HttpError(400, "Nothing generated yet — press Generate first.");
+      if (r.approved_by) throw new HttpError(409, "Already approved.");
+      const month = Number(r.month), year = Number(r.year), label = `${MONTHS[month - 1]} ${year}`;
+      const ist = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "") + " IST" : "—");
+      const sum = (k: keyof RegisterRow) => rows.reduce((a, x) => a + (Number(x[k]) || 0), 0);
+      const inr = (n: number) => Math.round(n).toLocaleString("en-IN");
+      const holds = rows.filter((x) => x.hold);
+      const warnings = ((r.mapping as { warnings?: string[] } | null)?.warnings ?? []) as string[];
+      const link = `https://genie.nandan.co.in/hrms#payroll:${id}`;
+      const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+      const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1F2328;line-height:1.5">
+<p>Dr Raghu,</p>
+<p>The <b>${esc(label)}</b> payroll run is generated and waits for your approval.</p>
+<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;border:1px solid #D7DEE6">
+<tr><td style="border:1px solid #D7DEE6">Lines</td><td style="border:1px solid #D7DEE6;text-align:right"><b>${rows.length}</b></td></tr>
+<tr><td style="border:1px solid #D7DEE6">Earned</td><td style="border:1px solid #D7DEE6;text-align:right">₹${inr(sum("earned"))}</td></tr>
+<tr><td style="border:1px solid #D7DEE6">Deductions</td><td style="border:1px solid #D7DEE6;text-align:right">₹${inr(sum("deductions"))}</td></tr>
+<tr><td style="border:1px solid #D7DEE6">Net (booked)</td><td style="border:1px solid #D7DEE6;text-align:right"><b>₹${inr(sum("net"))}</b></td></tr>
+<tr><td style="border:1px solid #D7DEE6">To pay (bank)</td><td style="border:1px solid #D7DEE6;text-align:right"><b>₹${inr(sum("to_pay"))}</b></td></tr>
+<tr><td style="border:1px solid #D7DEE6">On hold</td><td style="border:1px solid #D7DEE6;text-align:right">${holds.length}${holds.length ? ` — ${esc(holds.map((h) => `${h.employee_id} ${h.name}`).join(", "))}` : ""}</td></tr>
+<tr><td style="border:1px solid #D7DEE6">Generated</td><td style="border:1px solid #D7DEE6;text-align:right">${esc(ist(r.generated_at as string | null))} by ${esc(String(r.generated_by || "").split("·")[0].trim())}</td></tr>
+<tr><td style="border:1px solid #D7DEE6">Rules as of</td><td style="border:1px solid #D7DEE6;text-align:right">${esc((r.mapping as { rules_as_of?: string } | null)?.rules_as_of || "before 7 Oct 2026")}</td></tr>
+</table>
+${warnings.length ? `<p><b>${warnings.length} warning${warnings.length === 1 ? "" : "s"} on the run:</b></p><ul>${warnings.slice(0, 12).map((w) => `<li>${esc(w)}</li>`).join("")}${warnings.length > 12 ? `<li>… and ${warnings.length - 12} more on the run</li>` : ""}</ul>` : "<p>No warnings on the run.</p>"}
+<p><a href="${link}" style="display:inline-block;background:#2A6B39;color:#fff;padding:10px 16px;border-radius:4px;text-decoration:none;font-weight:bold">Open the run and approve</a></p>
+<p style="color:#6B7280;font-size:12px">${esc(link)}<br>Sent from Genie HRMS by ${esc(stamp)}.</p>
+</div>`;
+      const { hrmsSender } = await import("@/lib/hrms-mail-from");
+      const { gmailSend } = await import("@/crm/gmail");
+      const snd = await hrmsSender({ email: me.email });
+      await gmailSend(snd.token, snd.fromEmail, RAGHU_EMAIL, `Payroll ${label} — ready for your approval · net ₹${inr(sum("net"))}`, html, undefined, undefined, snd.fromName);
+      const mapping = { ...((r.mapping as Record<string, unknown> | null) ?? {}), approval_mail: { at: now, by: stamp } };
+      await admin.from("hrms_salary_sheet").update({ mapping, updated_at: now }).eq("id", id);
+      return NextResponse.json({ ok: true, to: RAGHU_EMAIL, note: snd.note });
+    }
+
     if (action === "approve" || action === "unapprove") {
       if (!owner) throw new HttpError(403, `Approval is ${RAGHU_EMAIL}'s.`);
       const id = String(body.id || "");
@@ -440,7 +485,7 @@ export async function POST(req: Request) {
       }, workingDays, month);
       const typeOf = (eid: string | null) => (eid ? byId.get(eid)?.type || null : null);
       const totals = totalsFor(rows.map((x) => ({ employee_id: x.employee_id, name: x.name, type: x.type, earned: x.earned, deductions: x.deductions, net: x.net, attendance: x.attendance, paid_days: x.paid_days, gross: x.gross, basic_da: x.basic_da, hra: x.hra, fixed_allowance: x.fixed_allowance, conveyance: x.conveyance, site_allowance: x.site_allowance, pf: x.pf, pt: x.pt, other_ded: x.other_ded, loan: x.loan, advance: x.advance, tds: x.tds, arrears: x.arrears, hold: x.hold })), typeOf);
-      const { error } = await admin.from("hrms_salary_sheet").update({ rows, ...totals, generated_at: now, generated_by: stamp, updated_at: now, mapping: { source: "generated", rate_source: wantSystem ? "system" : "list", muster: muster.columns, rates: rates?.columns || null, warnings: [...muster.warnings, ...(rates?.warnings || []), ...warnings] } }).eq("id", id);
+      const { error } = await admin.from("hrms_salary_sheet").update({ rows, ...totals, generated_at: now, generated_by: stamp, updated_at: now, mapping: { source: "generated", rules_as_of: PAYROLL_RULES_AS_OF, rate_source: wantSystem ? "system" : "list", muster: muster.columns, rates: rates?.columns || null, warnings: [...muster.warnings, ...(rates?.warnings || []), ...warnings] } }).eq("id", id);
       if (error) throw new Error(error.message);
       return NextResponse.json({ ok: true, lines: rows.length, warnings, totals, rateSource: wantSystem ? "system" : rates?.columns?.source || "record", fromSystem: systemCount });
     }

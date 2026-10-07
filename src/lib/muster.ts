@@ -501,38 +501,51 @@ export function musterVars(m: MusterRow | undefined, monthLabel: string): Record
 export const OPTIONAL_MUSTER_VARS = new Set(["compoff", "ot", "late_marks", "lunch", "advance", "leave_encash", "loan_deduction", "loan_taken", "site_allowance"]);
 
 /** The rules Generate runs on, in the words the screen shows beside the register (Dr Raghu, 4 Sep 2026). */
-export const PAYROLL_RULES: { head: string; lines: string[] }[] = [
+/**
+ * THE RULES, TRACKED (Dr Raghu, 7 Oct 2026: "the rules: update them whenever
+ * we update any rules. Keep tracking that up now, because every time we
+ * change the rule, it has to be updated. Track, and whatever is different
+ * from before, please highlight that in yellow"). Every line carries the
+ * date it last changed; the panel paints a changed line yellow and names the
+ * day. PAYROLL_RULES_AS_OF is stamped on each run when it is generated, so a
+ * run made under older rules says so until it is generated again.
+ */
+export const PAYROLL_RULES_AS_OF = "7 Oct 2026";
+export type RuleLine = { text: string; changed?: string };
+export const PAYROLL_RULES: { head: string; lines: RuleLine[] }[] = [
   { head: "Days", lines: [
-    "Pay days: the calendar month for Staff and Management; 26 for Labour and contract types.",
-    "Days due = present + week offs + MO/ST, from the muster.",
-    "Paid days = days due + leave used + comp off used, up to pay days.",
+    { text: "Pay days: the calendar days of the month for Staff and Management — 30 in September, 28 in February, 31 only when the month has 31; 26 for Labour, Labour - Contract and the other contract types.", changed: "7 Oct 2026" },
+    { text: "Days due = present + week offs + MO/ST, from the muster." },
+    { text: "Paid days = days due + leave used + comp off used, up to pay days." },
+    { text: "Nobody present, nobody paid: a month with 0 attendance earns nothing, deducts nothing, uses no leave, and goes on hold.", changed: "7 Oct 2026" },
+    { text: "On hold (Status HOLD, F&F due): attendance earnings only — no leave filled in, no comp off used or encashed, no leave encashment, no arrears. To pay is ₹0 until the hold is lifted.", changed: "7 Oct 2026" },
   ] },
   { head: "Leave", lines: [
-    "Earned this month = present ÷ 10 for Staff, ÷ 20 for workers. None for Management and contract types.",
-    "Comp off is added to the leave balance first.",
-    "A shortfall against pay days is filled from leave, when the balance is at or above the minimum (15 Staff, 8 workers), then from comp off.",
-    "Comp off not used is encashed at the per-day rate. Leave encashment likewise.",
-    "Closing balance = opening + earned + comp off − used − encashed. Opening comes from last month's register, else the record.",
+    { text: "Earned this month = present ÷ 10 for Staff, ÷ 20 for workers. None for Management and contract types." },
+    { text: "Comp off is added to the leave balance first." },
+    { text: "Staff only: a shortfall against pay days is filled from leave, but only from what sits above the 15-day floor, then from comp off. Workers' leave (floor 8) is never spent without approval — the short days stay unpaid and the run names the people.", changed: "7 Oct 2026" },
+    { text: "Comp off not used is encashed at the per-day rate. Leave encashment likewise." },
+    { text: "Closing balance = opening + earned + comp off − used − encashed. Opening comes from last month's register, else the record." },
   ] },
   { head: "Per day", lines: [
-    "Per day = (gross + allowances, without conveyance) ÷ 26, for everyone.",
+    { text: "Per day = gross ÷ pay days: 26 for Labour and Labour - Contract, the calendar days of the month for everybody else — never a fixed 31 or 26.", changed: "7 Oct 2026" },
   ] },
   { head: "Earnings", lines: [
-    "Basic & DA = rate × paid days ÷ pay days.",
-    "HRA = 20% of earned basic, Staff and workers alike; none for Management and contract types.",
-    "Workers' OT = hours × basic ÷ 208, always single. The HRA is the first part of it; the balance is carried in Site Allowance. OT below the HRA is an Other Deduction.",
-    "Site allowance, like fixed: in full at 7 or more days present, else pro rata. It is taken from the rate list where that carries one, otherwise from the muster — one source, never both added together.",
-    "Fixed allowance in full at 7 or more days present, else pro rata.",
-    "Conveyance = rate × present ÷ the company's working days that month (calendar days less Sundays and the third Saturday, or what HR set on the run). A day worked beyond them earns conveyance too.",
-    "Medical, like fixed: in full at 7 or more days present, else pro rata.",
-    "Arrears as the muster carries them.",
+    { text: "Basic & DA = rate × paid days ÷ pay days." },
+    { text: "HRA = 20% of earned basic, Staff and workers alike; none for Management and contract types." },
+    { text: "Workers' OT = hours × basic ÷ 208, always single. The HRA is the first part of it; the balance is carried in Site Allowance. OT below the HRA is an Other Deduction." },
+    { text: "Site allowance is the muster's figure, and only that — the rate list's standing site figure is not paid (where the rate list carries one, the run says so). For Labour and Labour - Contract the OT above HRA rides on top.", changed: "7 Oct 2026" },
+    { text: "Fixed allowance in full at 7 or more days present, else pro rata." },
+    { text: "Conveyance = rate × present ÷ the company's working days that month (calendar days less Sundays and the third Saturday, or what HR set on the run). A day worked beyond them earns conveyance too." },
+    { text: "Medical, like fixed: in full at 7 or more days present, else pro rata." },
+    { text: "Arrears as the muster carries them (none while on hold)." },
   ] },
   { head: "Deductions", lines: [
-    "PF = 12% of earned basic, capped at ₹1,800. Not for Management and contract types.",
-    "PT: ₹200 above ₹10,000 earnings (₹300 in February), ₹175 from ₹7,500. Not for the exempt types, and not for women earning up to ₹25,000.",
-    "ESI is never deducted from workers; the company bears it.",
-    "Advance, loan deduction, TDS and lunch as the muster carries them.",
-    "Late deduction = late marks × per day.",
-    "To pay = net, rounded up to the rupee.",
+    { text: "PF = 12% of earned basic, capped at ₹1,800. Not for Management and contract types." },
+    { text: "PT: ₹200 above ₹10,000 earnings (₹300 in February), ₹175 from ₹7,500. Not for the exempt types, and not for women earning up to ₹25,000." },
+    { text: "ESI is never deducted from workers; the company bears it." },
+    { text: "Advance, loan deduction, TDS and lunch as the muster carries them." },
+    { text: "Late deduction = late marks × per day." },
+    { text: "Net = earnings − deductions, booked as it is. To pay = net rounded UP to the next rupee, shown with the round-up as its own column; ₹0 for anyone on hold or with no attendance.", changed: "7 Oct 2026" },
   ] },
 ];

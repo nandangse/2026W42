@@ -34,6 +34,11 @@ export default function Payroll({ who: me, isOwner }: { who: string; isOwner: bo
     catch (e) { setMsg(e instanceof Error ? e.message : String(e)); setRows([]); }
   }, []);
   useEffect(() => { load(); }, [load]);
+  // #payroll:<run id> — the approval mail's link opens the run itself (7 Oct 2026)
+  useEffect(() => {
+    const m = /^#payroll:([0-9a-f-]{36})$/i.exec(window.location.hash || "");
+    if (m) setOpenId(m[1]);
+  }, []);
 
   const act = async (body: Record<string, unknown>, ok: string) => {
     setMsg("");
