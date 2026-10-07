@@ -39,6 +39,44 @@ const PRESENT = new Set(["P", "ST", "C"]);          // at work: present, site, c
 const OFF = new Set(["WO", "H", "PH", "HO"]);       // not expected: weekly off, holiday
 const SITE = new Set(["ST"]);                       // at work, but away from the gate
 
+const HEADS: [string, string][] = [
+  ["basic_da", "Basic & DA"], ["hra", "HRA"], ["fixed_allowance", "Fixed"], ["conveyance", "Conveyance"], ["medical", "Medical"], ["site_allowance", "Site"],
+  ["compoff_amt", "Comp-off ₹"], ["encash_amt", "Encashment ₹"], ["arrears", "Arrears"], ["earned", "Total earned"],
+  ["pf", "PF"], ["pt", "PT"], ["lunch", "Lunch"], ["advance", "Advance"], ["loan", "Loan"], ["tds", "TDS"], ["late_ded", "Late"], ["other_ded", "Other"], ["deductions", "Total deductions"],
+  ["paid_days", "Payment days"], ["leave_used", "Leave used"],
+];
+export interface PayCompare {
+  ready: boolean; why?: string;
+  compared: number; matched: number; holds: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number | null; status: string }[];
+  mismatches: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number; diff: number; heads: { head: string; genie: number; sheet: number; diff: number }[] }[];
+  genie_total: number; sheet_total: number; not_in_sheet: number;
+}
+function comparePay(register: Record<string, unknown>[], musterRows: Record<string, unknown>[]): PayCompare {
+  const sheetOf = new Map(musterRows.map((m) => [String(m.employee_id), m]));
+  const withSheet = musterRows.filter((m) => m.sheet && typeof m.sheet === "object").length;
+  if (!register.length) return { ready: false, why: "Nothing generated yet — press Generate, then this compares the register with the sheet.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, not_in_sheet: 0 };
+  if (!withSheet) return { ready: false, why: "The uploaded muster carries no computed figures to compare against — upload the Salary tab (or press Re-read on it) and the comparison writes itself.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, not_in_sheet: 0 };
+  const N = (v: unknown) => Math.round((Number(v) || 0) * 100) / 100;
+  const out: PayCompare = { ready: true, compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, not_in_sheet: 0 };
+  for (const r of register) {
+    const id = String(r.employee_id), m = sheetOf.get(id);
+    const sh = (m?.sheet ?? null) as Record<string, number> | null;
+    const genieNet = N(r.net), sheetNet = sh ? N(sh.net) : null;
+    out.genie_total += genieNet; if (sheetNet != null) out.sheet_total += sheetNet;
+    const name = String(r.name || m?.name || id), type = String(r.type || m?.category || "");
+    if (r.hold) { out.holds.push({ employee_id: id, name, type, genie_net: genieNet, sheet_net: sheetNet, status: String(m?.status || "HOLD") }); continue; }
+    if (!sh) { out.not_in_sheet++; continue; }
+    out.compared++;
+    const diff = Math.round(genieNet - sheetNet!);
+    if (Math.abs(diff) < 1) { out.matched++; continue; }
+    const heads = HEADS.map(([k, label]) => ({ head: label, genie: N(r[k]), sheet: N(sh[k]), diff: Math.round(N(r[k]) - N(sh[k])) })).filter((h) => Math.abs(h.diff) >= 1);
+    out.mismatches.push({ employee_id: id, name, type, genie_net: genieNet, sheet_net: sheetNet!, diff, heads });
+  }
+  out.mismatches.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  out.holds.sort((a, b) => a.name.localeCompare(b.name));
+  return out;
+}
+
 export async function GET(req: Request) {
   try {
     await requireHrms();
@@ -47,12 +85,21 @@ export async function GET(req: Request) {
     if (!id) throw new HttpError(400, "Which run?");
 
     const { data: run } = await admin.from("hrms_salary_sheet")
-      .select("id, month, year, status, muster").eq("id", id).maybeSingle();
+      .select("id, month, year, status, muster, rows").eq("id", id).maybeSingle();
     if (!run) throw new HttpError(404, "No such payroll run.");
     const muster = (run.muster ?? {}) as { days?: number; rows?: Record<string, unknown>[] };
     const rows = Array.isArray(muster.rows) ? muster.rows : [];
+    /* NET PAY, GENIE AGAINST THE SHEET (Dr Raghu, 7 Oct 2026: "the changes
+       in this where the net pay is different from the calculated net pay of
+       the Excel sheet: please put those into observations one by one … Any
+       hold ones, please put them into the list saying that these are hold.
+       Anybody whose amounts are not matching, please make sure that is
+       done"). The register's figures beside the Salary tab's own, person by
+       person: the holds first, then every mismatch with the heads that
+       differ, largest gap first. */
+    const pay = comparePay((run.rows ?? []) as Record<string, unknown>[], rows);
     if (!rows.length)
-      return NextResponse.json({ ok: true, ready: false, why: "This run has no muster yet — upload it first and the observation writes itself." });
+      return NextResponse.json({ ok: true, ready: false, pay, why: "This run has no muster yet — upload it first and the observation writes itself." });
 
     const month = Number(run.month), year = Number(run.year);
     const days = Number(muster.days) || new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -69,7 +116,7 @@ export async function GET(req: Request) {
         .order("for_date").range(off, off + 999);
       if (error) {
         if (/does not exist|schema cache/i.test(error.message))
-          return NextResponse.json({ ok: true, ready: false, why: "Run migration 0163 — the biometric punches have nowhere to live yet." });
+          return NextResponse.json({ ok: true, ready: false, pay, why: "Run migration 0163 — the biometric punches have nowhere to live yet." });
         throw new Error(error.message);
       }
       if (!data?.length) break;
@@ -151,7 +198,7 @@ export async function GET(req: Request) {
     const neverSeen = people.filter((p) => p.never_on_machine);
 
     return NextResponse.json({
-      ok: true, ready: true,
+      ok: true, ready: true, pay,
       month, year, days,
       totals: {
         people: people.length,

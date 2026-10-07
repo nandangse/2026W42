@@ -25,6 +25,11 @@ export interface MusterRow {
   loan_taken: number | null; advance: number | null; site_allowance: number | null; leave_encash: number | null;
   loan_ded: number | null; arrears: number | null; tds: number | null; other_ded: number | null;
   location: string | null; designation: string | null; department: string | null; mobile: string | null;
+  /** THE SHEET'S OWN ANSWER (7 Oct 2026) — when the upload is the Salary tab,
+      what the Google Sheet computed for this person, head by head, so the
+      register can be laid beside it: Total Earnings, Total Deductions, Net
+      payment, To be paid Salary and every earning and deduction column. */
+  sheet?: Record<string, number> | null;
 }
 export interface Muster {
   month: number | null; year: number | null; days: number;
@@ -117,8 +122,19 @@ export function parseMuster(grid: unknown[][]): Muster {
      first and last day as dd/mm/yyyy, and "Days in Month" beside the count */
   let daysInMonth = dayCols.length;
   let typeCol: number | undefined;
+  /* the Salary tab's computed columns, by their exact names; a name that
+     appears twice (Advance, Loan Deducted) takes its LAST column — the
+     deduction side, which is the one the register compares against */
+  const SHEET_HEADS: Record<string, string> = {
+    "total earnings": "earned", "total deductions": "deductions", "net payment": "net", "to be paid salary": "to_pay", "round up": "round_up",
+    "earned basic and da": "basic_da", "hra": "hra", "fixed allowance": "fixed_allowance", "conveyance": "conveyance", "medical allowance": "medical",
+    "site allowance": "site_allowance", "comp off amt": "compoff_amt", "leave encashment amount": "encash_amt", "arrears payable": "arrears",
+    "pf": "pf", "pt": "pt", "esi": "esi", "lunch": "lunch", "advance": "advance", "loan deduction": "loan", "tds deduction": "tds", "late deduction": "late_ded", "other deductions": "other_ded",
+    "payment days": "paid_days", "leave utilized": "leave_used", "leave cb": "leave_cb", "loan cb": "loan_cb",
+  };
+  const sheetCols: Record<string, number> = {};
   if (salaryTab) {
-    headers.forEach((h, i) => { if (norm(h) === "type") typeCol = i; });
+    headers.forEach((h, i) => { if (norm(h) === "type") typeCol = i; const k = SHEET_HEADS[norm(h)]; if (k) sheetCols[k] = i; });
     const scan = [grid[headerRow + 1] || [], ...grid.slice(0, headerRow)];
     for (const row of scan) {
       for (const c of row) {
@@ -169,6 +185,7 @@ export function parseMuster(grid: unknown[][]): Muster {
       loan_ded: n(at("loan_ded")), arrears: n(at("arrears")), tds: n(at("tds")), other_ded: n(at("other_ded")),
       location: String(at("location") ?? "").trim() || null, designation: String(at("designation") ?? "").trim() || null,
       department: String(at("department") ?? "").trim() || null, mobile: String(at("mobile") ?? "").replace(/\D/g, "") || null,
+      sheet: salaryTab ? Object.fromEntries(Object.entries(sheetCols).map(([k, i]) => [k, n(line[i]) ?? 0])) : null,
     });
   }
   if (!rows.length) warnings.push("No lines with a four-digit Emp. Id were read.");

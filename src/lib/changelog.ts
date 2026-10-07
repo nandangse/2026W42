@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.25",
+    date: "2026-10-07",
+    module: "Payroll observation: Genie\u2019s net against the sheet\u2019s, person by person",
+    items: [
+      "NET PAY, GENIE AGAINST THE SHEET (\u201cthe changes in this where the net pay is different from the calculated net pay of the Excel sheet: please put those into observations one by one \u2026 Any hold ones, please put them into the list saying that these are hold. Anybody whose amounts are not matching, please make sure that is done\u201d). The Salary tab\u2019s own computed figures \u2014 total earnings, total deductions, net payment, to be paid, and every earning and deduction column \u2014 now ride on each muster line when that tab is uploaded. The Observation tab opens with them: how many lines match the sheet to the rupee, how many do not, the holds listed first with both figures and to-pay nought, then every mismatch one by one \u2014 Genie\u2019s net, the sheet\u2019s, the difference, and the heads where the two differ, largest gap first. Press Re-read on the muster once so the sheet\u2019s figures are captured.",
+    ],
+  },
+  {
     v: "6.3.0.24",
     date: "2026-10-07",
     module: "Payroll: Approve makes the finalised salary sheet as Excel; Round Up is a column",

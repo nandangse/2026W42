@@ -48,7 +48,14 @@ type ObsPerson = {
   paid_present: number; seen_at_gate: number; site_days: number;
   never_on_machine: boolean; unexplained: number; flags: ObsFlag[]; flag_count: number;
 };
+type PayCompare = {
+  ready: boolean; why?: string; compared: number; matched: number;
+  holds: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number | null; status: string }[];
+  mismatches: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number; diff: number; heads: { head: string; genie: number; sheet: number; diff: number }[] }[];
+  genie_total: number; sheet_total: number; not_in_sheet: number;
+};
 type ObsData = {
+  pay?: PayCompare;
   ok: boolean; ready: boolean; why?: string;
   month?: number; year?: number; days?: number;
   totals?: {
@@ -421,6 +428,58 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
             <span className="text-xs font-normal" style={{ color: C.dim }}> · the muster HR declared, against what the machine at the gate saw</span>
           </div>
           {obsBusy && <div className="text-xs" style={{ color: C.dim }}>Reading both sides…</div>}
+          {/* NET PAY — GENIE AGAINST THE SHEET (Dr Raghu, 7 Oct 2026): the holds, then every
+              mismatch one by one with the heads that differ, largest first */}
+          {obs?.pay && (
+            <div className="rounded border p-3 mb-3" style={{ borderColor: C.line, background: "#FBFAF6" }}>
+              <div className="font-bold text-sm mb-1" style={{ color: C.ink }}>Net pay — Genie against the sheet</div>
+              {!obs.pay.ready ? <div className="text-xs" style={{ color: "#8A5B00" }}>{obs.pay.why}</div> : (
+                <>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {([
+                      ["Compared", obs.pay.compared, C.ink], ["Match to the rupee", obs.pay.matched, "#2A6B39"], ["Do not match", obs.pay.mismatches.length, obs.pay.mismatches.length ? "#8E2C20" : "#2A6B39"],
+                      ["On hold", obs.pay.holds.length, "#B26A00"], ["Genie net", Math.round(obs.pay.genie_total), C.ink], ["Sheet net", Math.round(obs.pay.sheet_total), C.ink], ["Difference", Math.round(obs.pay.genie_total - obs.pay.sheet_total), Math.abs(obs.pay.genie_total - obs.pay.sheet_total) >= 1 ? "#8E2C20" : "#2A6B39"],
+                    ] as [string, number, string][]).map(([label, n, col]) => (
+                      <div key={label} className="rounded px-3 py-2" style={{ border: `1px solid ${C.line}`, minWidth: 120, background: "#fff" }}>
+                        <div className="tnum font-bold" style={{ fontSize: 18, color: col, lineHeight: 1.1 }}>{/net|Difference/i.test(label) ? `₹${inr(n)}` : n.toLocaleString("en-IN")}</div>
+                        <div style={{ fontSize: 11, color: C.dim }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {obs.pay.holds.length > 0 && (
+                    <div className="mb-2">
+                      <div className="text-xs font-bold mb-1" style={{ color: "#B26A00" }}>ON HOLD — {obs.pay.holds.length}: attendance earnings only, nothing paid until lifted</div>
+                      <div className="text-xs" style={{ color: C.ink, lineHeight: 1.7 }}>
+                        {obs.pay.holds.filter((h) => !q || h.name.toLowerCase().includes(q.toLowerCase()) || h.employee_id.includes(q)).map((h) => (
+                          <div key={h.employee_id}><b>{h.employee_id}</b> {h.name} <span style={{ color: C.faint }}>· {h.type} · {h.status}</span> — Genie net ₹{inr(h.genie_net)}{h.sheet_net != null ? ` · sheet ₹${inr(h.sheet_net)}` : ""} · <b>to pay ₹0</b></div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {obs.pay.mismatches.length === 0 ? <div className="text-xs" style={{ color: "#2A6B39" }}>Every line that is not on hold matches the sheet to the rupee.</div> : (
+                    <div style={{ maxHeight: "48vh", overflow: "auto" }}>
+                      <table className="w-full text-xs genie-table">
+                        <thead><tr><th style={TH}>Employee</th><th style={TH}>Type</th><th style={{ ...TH, textAlign: "right" }}>Genie net</th><th style={{ ...TH, textAlign: "right" }}>Sheet net</th><th style={{ ...TH, textAlign: "right" }}>Difference</th><th style={TH}>Where it differs (Genie vs sheet)</th></tr></thead>
+                        <tbody>
+                          {obs.pay.mismatches.filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q)).map((m) => (
+                            <tr key={m.employee_id} style={{ borderTop: "1px solid #EEECE6" }}>
+                              <td className="px-2 py-1"><b>{m.employee_id}</b> {m.name}</td>
+                              <td className="px-2 py-1" style={{ color: C.faint }}>{m.type}</td>
+                              <td className="px-2 py-1 text-right tnum">₹{inr(m.genie_net)}</td>
+                              <td className="px-2 py-1 text-right tnum">₹{inr(m.sheet_net)}</td>
+                              <td className="px-2 py-1 text-right tnum font-bold" style={{ color: m.diff > 0 ? "#2A6B39" : "#8E2C20" }}>{m.diff > 0 ? "+" : ""}₹{inr(m.diff)}</td>
+                              <td className="px-2 py-1" style={{ color: C.dim, whiteSpace: "normal" }}>{m.heads.length ? m.heads.map((h) => `${h.head} ${inr(h.genie)} vs ${inr(h.sheet)} (${h.diff > 0 ? "+" : ""}${inr(h.diff)})`).join(" · ") : "same heads — the sheet's own net differs from its parts"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {obs.pay.not_in_sheet > 0 && <div className="text-xs mt-1" style={{ color: C.dim }}>{obs.pay.not_in_sheet} on the register with no line in the sheet.</div>}
+                </>
+              )}
+            </div>
+          )}
           {obs && !obs.ready && (
             <div className="rounded p-2 text-xs" style={{ background: "#FDF0E7", border: "1px solid #F0C9A8", color: "#8A4520" }}>{obs.why}</div>
           )}
