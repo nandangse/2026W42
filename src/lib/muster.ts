@@ -482,7 +482,16 @@ export function generateRegister(
     const exempt = NO_STATUTORY.has(t);
     const pf = !exempt && eBasic > 0 ? Math.min(Math.round(eBasic * 0.12), 1800) : 0;
     const female = /^f/i.test(String(rec?.get("gender") ?? ""));
-    const pt = exempt || (female && earned <= 25000) ? 0 : earned > 10000 ? (month === 2 ? 300 : 200) : earned >= 7500 ? 175 : 0;   // Maharashtra: 300 in February for the top slab; women up to 25,000 exempt
+    /* PT STOPS AT 65 (Dr Raghu, 7 Oct 2026: "PT is also linked to the age …
+       when the age is above 65, there is no PT" — Maharashtra exempts senior
+       citizens of 65 and over). Age is taken at the month's end from the
+       record's date of birth. Peter Dsouza, 68, was being charged ₹200. */
+    const dobRaw = String(rec?.get("dob") ?? "");
+    const dob = /^\d{4}-\d{2}-\d{2}/.test(dobRaw) ? new Date(dobRaw.slice(0, 10) + "T00:00:00Z") : null;
+    const monthEnd = month ? new Date(Date.UTC(muster.year ?? new Date().getUTCFullYear(), month, 0)) : new Date();
+    const age = dob ? (monthEnd.getTime() - dob.getTime()) / (365.25 * 86400000) : null;
+    const senior = age != null && age >= 65;
+    const pt = exempt || senior || (female && earned <= 25000) ? 0 : earned > 10000 ? (month === 2 ? 300 : 200) : earned >= 7500 ? 175 : 0;   // Maharashtra: 300 in February for the top slab; women up to 25,000 exempt; 65+ exempt
     const loan = m.loan_ded ?? 0, advance = m.advance ?? 0, tds = m.tds ?? 0, lunch = m.lunch ?? 0;
     const lateDed = Math.round((m.late ?? 0) * perDay);
     const other = (m.other_ded ?? 0) + otShort;
@@ -579,7 +588,7 @@ export const PAYROLL_RULES: { head: string; lines: RuleLine[] }[] = [
   ] },
   { head: "Deductions", lines: [
     { text: "PF = 12% of earned basic, capped at ₹1,800. Not for Management and contract types." },
-    { text: "PT: ₹200 above ₹10,000 earnings (₹300 in February), ₹175 from ₹7,500. Not for the exempt types, and not for women earning up to ₹25,000." },
+    { text: "PT: ₹200 above ₹10,000 earnings (₹300 in February), ₹175 from ₹7,500. Not for the exempt types, not for women earning up to ₹25,000, and not from the age of 65 (age at the month's end, from the record's date of birth).", changed: "7 Oct 2026" },
     { text: "ESI is never deducted from workers; the company bears it." },
     { text: "Advance, loan deduction, TDS and lunch as the muster carries them." },
     { text: "Late deduction = late marks × per day." },

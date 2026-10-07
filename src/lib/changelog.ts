@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.43",
+    date: "2026-10-07",
+    module: "Payroll: no PT from the age of 65",
+    items: [
+      "PETER\u2019S \u20b9200 (\u201cPT is also linked to the age. When the age is above 65, there is no PT. Check the formula of the PT column and utilise that also as a rule\u201d). Maharashtra exempts senior citizens of 65 and over; Genie now takes the age at the month\u2019s end from the record\u2019s date of birth and deducts no PT from 65. Peter Jerome Dsouza (b. 1958) is the one person on September\u2019s roll it touches; Jagdishchandra Kumar was already exempt as Management. Rules panel updated.",
+    ],
+  },
+  {
     v: "6.3.0.42",
     date: "2026-10-07",
     module: "Rules: encashment may be fractional, leave utilised never",
