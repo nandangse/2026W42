@@ -23,7 +23,7 @@ import { PAYROLL_RULES, PAYROLL_RULES_AS_OF, type MusterRow, type RegisterRow } 
 import { C } from "./RecordFields";
 import { inr } from "@/lib/fmt";
 
-interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; working_days: number | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[]; rules_as_of?: string; approval_mail?: { at: string; by: string } } | null }
+interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; working_days: number | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[]; rules_as_of?: string; approval_mail?: { at: string; by: string }; bank_mail?: { at: string; by: string; to: string; files: number; total: number } } | null }
 interface FileRow { id: string; kind: string; name: string; size: number | null; drive_link: string | null; uploaded_by: string | null; uploaded_at: string }
 interface Msg { id: string; employee_id: string; name: string; channel: string; direction: string; to_address: string | null; subject: string | null; body: string; status: string; error: string | null; sent_by: string | null; sent_at: string }
 interface InputRow { key: string; submitted_by: string | null; submitted_at: string | null; note: string }
@@ -117,6 +117,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
   const [sort, setSort] = useState<{ k: string; dir: 1 | -1 } | null>(null);
   // THE PERSON LIGHTBOX (Dr Raghu, 7 Oct 2026): click an employee ID anywhere on the run → his salary structure
   const [person, setPerson] = useState<string | null>(null);
+  const [bankMail, setBankMail] = useState(false);
 
   const load = useCallback(async () => {
     try { setD(await api.get(`/api/hrms/payroll?id=${encodeURIComponent(id)}`)); }
@@ -187,6 +188,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <div className="text-xs" style={{ color: "#8FA1B3" }}>
             Run by <b style={{ color: "#D7DEE6" }}>{who(r.uploaded_by)}</b> · run date <b style={{ color: "#D7DEE6" }}>{r.uploaded_at ? fmtFull(String(r.uploaded_at)) : "—"}</b>
             {r.generated_at && <> · generated <b style={{ color: "#D7DEE6" }}>{fmtIst(String(r.generated_at))}</b> by {who(r.generated_by)}</>}
+            {r.mapping?.bank_mail && <> · bank files mailed <b style={{ color: "#D7DEE6" }}>{fmtIst(r.mapping.bank_mail.at)}</b> by {who(r.mapping.bank_mail.by)}</>}
             {r.mapping?.approval_mail && <> · sent for approval <b style={{ color: "#D7DEE6" }}>{fmtIst(r.mapping.approval_mail.at)}</b> by {who(r.mapping.approval_mail.by)}</>}
             {" · "}{r.approved_by ? <span style={{ color: "#7BD389" }}>✓ approved by {who(r.approved_by)} at {fmtIst(String(r.approved_at))}</span> : <span style={{ color: "var(--amber)" }}>awaiting Raghu&apos;s approval</span>}
           </div>
@@ -202,6 +204,11 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <a href={`/api/hrms/payroll?id=${encodeURIComponent(id)}&bank=1`} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#F3B33D", color: "#1F2328", textDecoration: "none" }}
             title="The bank's NEFT upload files for this run — management, staff and labour kept apart, each file under ₹10 lakh, with a note of anybody left out">🏦 Execute Bank Files</a>
         )}
+        {/* THE ENVELOPE (Dr Raghu, 7 Oct 2026): Vinay's mail to accounts with the zip attached — drafted, his to edit, his to send */}
+        {r.approved_by && (
+          <button onClick={() => setBankMail(true)} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#F3B33D", color: "#1F2328" }}
+            title="Mail the bank execution files to accounts — To suresh@ and accounts@, cc Raghu and Tushar, the zip attached; you see and edit the mail before it goes">✉</button>
+        )}
         {/* MAIL FOR APPROVAL (Dr Raghu, 7 Oct 2026: "Send me an email from this to approve") — the run's figures and a link, from HR's mailbox to Raghu */}
         {r.generated_at && !r.approved_by && (
           <button onClick={() => act({ action: "mail_approval" }, (j) => `Mailed ${String(j.to || "Raghu")} for approval${j.note ? ` — ${j.note}` : ""}`)} disabled={busy} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#D7DEE6", color: "#1F2328" }}
@@ -213,6 +220,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
       </div>
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</div>}
       {person && <PersonCard runId={id} eid={person} onClose={() => setPerson(null)} />}
+      {bankMail && <BankMail runId={id} onClose={() => setBankMail(false)} onSent={(m) => { setMsg(m); setBankMail(false); load(); }} />}
 
       {/* ── the WhatsApp preview ── */}
       {waOpen && wa && (
@@ -659,6 +667,54 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
 }
 
 /** The rules Generate runs on, beside the numbers — "in the right side show the rules we are using" (Dr Raghu, 4 Sep 2026). */
+
+/** THE MAIL TO ACCOUNTS (Dr Raghu, 7 Oct 2026): "To: suresh@nandan.co.in; accounts@nandan.co.in · cc: raghu@nandan.co.in;
+    tushar@nandan.co.in · Sub: Bank Execution Files for <Month> year … Open the popup so this is created by him and the zip
+    file is attached and then he sends!!!" */
+interface BankDraft { to: string; cc: string; subject: string; body: string; files: { name: string; lines: number; total: number }[]; total: number; lines: number; skipped: { employee_id: string; name: string; why: string }[]; zipName: string }
+function BankMail({ runId, onClose, onSent }: { runId: string; onClose: () => void; onSent: (msg: string) => void }) {
+  const [d, setD] = useState<BankDraft | null>(null);
+  const [f, setF] = useState({ to: "", cc: "", subject: "", body: "" });
+  const [err, setErr] = useState(""); const [sending, setSending] = useState(false);
+  useEffect(() => { api.get(`/api/hrms/payroll?id=${encodeURIComponent(runId)}&bank_draft=1`).then((j) => { const x = j as BankDraft; setD(x); setF({ to: x.to, cc: x.cc, subject: x.subject, body: x.body }); }).catch((e) => setErr(e instanceof Error ? e.message : String(e))); }, [runId]);
+  const send = async () => {
+    if (!window.confirm(`Send the bank execution files to ${f.to}?`)) return;
+    setSending(true); setErr("");
+    try { const j = await api.post("/api/hrms/payroll", { action: "bank_mail", id: runId, ...f }) as { to: string; from: string; note?: string | null; files: number; total: number }; onSent(`Bank files mailed to ${j.to} from ${j.from} — ${j.files} files, ₹${inr(j.total)}${j.note ? ` — ${j.note}` : ""} ✓`); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); setSending(false); }
+  };
+  const F = { border: `1px solid ${C.line}`, borderRadius: 4, padding: "6px 8px", fontSize: 13, width: "100%" } as const;
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.55)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg" style={{ width: "min(760px, 100%)", maxHeight: "92vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+        <div className="px-4 py-3 flex items-center gap-3" style={{ background: "var(--navy)", color: "#fff" }}>
+          <div className="font-bold" style={{ flex: 1, fontSize: 16 }}>✉ Bank execution files — to accounts</div>
+          <button onClick={onClose} className="text-xs font-bold rounded px-2 py-1" style={{ background: "rgba(255,255,255,0.12)", color: "#D7DEE6" }}>✕</button>
+        </div>
+        <div className="p-4" style={{ display: "grid", gap: 8 }}>
+          {err && <div className="text-xs" style={{ color: C.red }}>{err}</div>}
+          {!d && !err && <div className="text-xs" style={{ color: C.dim }}>Making the files…</div>}
+          {d && (
+            <>
+              <label className="text-xs" style={{ color: C.dim }}>To<input style={F} value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></label>
+              <label className="text-xs" style={{ color: C.dim }}>Cc<input style={F} value={f.cc} onChange={(e) => setF({ ...f, cc: e.target.value })} /></label>
+              <label className="text-xs" style={{ color: C.dim }}>Subject<input style={F} value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} /></label>
+              <label className="text-xs" style={{ color: C.dim }}>Message<textarea style={{ ...F, minHeight: 260, fontFamily: "inherit", lineHeight: 1.5 }} value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} /></label>
+              <div className="text-xs rounded px-3 py-2" style={{ background: "#F3F7FB", border: `1px solid ${C.line}` }}>
+                📎 <b>{d.zipName}</b> — {d.files.length} file{d.files.length === 1 ? "" : "s"}, {d.lines} payments, ₹{inr(d.total)}{d.skipped.length ? <span style={{ color: C.red }}> · {d.skipped.length} not in any file (NOT_IN_FILES.txt): {d.skipped.slice(0, 4).map((s) => `${s.employee_id} ${s.name}`).join(", ")}{d.skipped.length > 4 ? " …" : ""}</span> : ""}
+              </div>
+              <div className="text-xs" style={{ color: C.faint }}>Goes from Vinay&apos;s connected Gmail, as every HRMS mail does. Edit anything above, then send.</div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={onClose} className="text-xs font-semibold rounded px-3 py-2" style={{ background: "#F4F2EC", color: C.ink }}>Cancel</button>
+                <button onClick={send} disabled={sending} className="text-xs font-bold rounded px-3 py-2" style={{ background: C.green, color: "#fff" }}>{sending ? "Sending…" : "Send with the zip attached"}</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** an employee ID that opens the person's salary structure */
 function Pid({ id, open }: { id: string; open: (id: string) => void }) {

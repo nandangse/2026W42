@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.45",
+    date: "2026-10-07",
+    module: "Bank files: the envelope to accounts; account numbers kept as text",
+    items: [
+      "THE ENVELOPE (\u201cmake an envelope icon for Vinay \u2026 Open the popup so this is created by him and the zip file is attached and then he sends!!!\u201d). On an approved run, \u2709 opens the mail drafted in his words \u2014 To suresh@ and accounts@, cc Raghu and Tushar, \u201cBank Execution Files for <Month Year>\u201d, each file\u2019s name, count and amount, the total, the link to the approved run \u2014 the zip attached. He edits what he likes and sends; it goes from his Gmail as every HRMS mail does, and the run header records when and by whom.",
+      "IFSC AND ACCOUNT, AS GIVEN (\u201cthe IFSC is very critical. So is the account numbers. Any 0 before the number is to be given as is, as text\u201d). The approved-bank-details upload reads every cell as text, so a leading zero on an account number stays; the IFSC is written exactly as given (trimmed, upper case), never altered.",
+    ],
+  },
+  {
     v: "6.3.0.44",
     date: "2026-10-07",
     module: "Approved bank details upload \u2192 the HRIS record; the bank files read the record",

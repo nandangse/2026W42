@@ -54,6 +54,43 @@ const gridOf = (buf: Buffer, name: string): unknown[][] => {
   const ws = wb.Sheets[wb.SheetNames[0]];
   return XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false }) as unknown[][];
 };
+/** every cell AS TEXT — for bank details, where an account number's leading zero is part of the number (Dr Raghu, 7 Oct 2026: "Any 0 before the number is to be given as is, as text") */
+const gridText = (buf: Buffer, name: string): string[][] => {
+  const wb = XLSX.read(buf, { type: "buffer", raw: /\.csv$/i.test(name), cellText: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return (XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false, raw: false }) as unknown[][]).map((row) => row.map((c) => String(c ?? "")));
+};
+
+/** THE BANK FILES AS ONE ZIP — for the download and for the mail to accounts */
+async function bankZip(admin: ReturnType<typeof adminClient>, r: Record<string, unknown>, id: string, stamp: string) {
+  if (!r.approved_at && !/frozen/i.test(String(r.status))) throw new HttpError(409, "Approve the run first — the bank files are made from the approved register.");
+  const rows = (r.rows ?? []) as RegisterRow[];
+  if (!rows.length) throw new HttpError(400, "Nothing generated on this run yet.");
+  const ppl = await people(admin, rows.map((x) => x.employee_id));
+  const bankOf = new Map(ppl.map((p) => [p.id, { ifsc: String(p.value.ifsc || ""), account: String(p.value.account_15 || p.value.account_no || ""), nameInBank: String(p.value.name_in_bank || p.name || "") }]));
+  const built = buildBankFiles(rows, (eid) => bankOf.get(eid) ?? null, Number(r.month), Number(r.year));
+  const JSZip = (await import("jszip")).default;
+  const zip = new JSZip();
+  for (const f of built.files) zip.file(f.name, f.text);
+  zip.file("NOT_IN_FILES.txt", built.notInFiles);
+  const bytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+  const tag = `${label(Number(r.month), Number(r.year)).replace(/\s+/g, "_")}`;
+  const name = `bank_files_${tag}.zip`;
+  try { await admin.from("hrms_payroll_file").insert({ sheet_id: id, kind: "bank", name, mime: "application/zip", size: bytes.byteLength, parsed: { files: built.files.map((f) => ({ name: f.name, lines: f.lines, total: f.total, fileNo: f.fileNo })), skipped: built.skipped, total: built.total, lines: built.lines }, uploaded_by: stamp }); } catch { /* the file still goes */ }
+  return { bytes, built, name };
+}
+/** the mail Vinay sends accounts with the zip — his words, as he gave them (Dr Raghu, 7 Oct 2026) */
+function bankMailDraft(r: Record<string, unknown>, id: string, built: { files: { name: string; lines: number; total: number }[]; total: number; lines: number }) {
+  const month = Number(r.month), year = Number(r.year);
+  const inr = (n: number) => Math.round(n).toLocaleString("en-IN");
+  const lines = built.files.map((f) => `${f.name} - ${f.lines} - Rs ${inr(f.total)}`).join("\n");
+  return {
+    to: "suresh@nandan.co.in; accounts@nandan.co.in",
+    cc: "raghu@nandan.co.in; tushar@nandan.co.in",
+    subject: `Bank Execution Files for ${label(month, year)}`,
+    body: `Dear Suresh\n\nPlease execute the salaries which have been checked and approved by Raghu Sir.\n\nFile Name - Nos - Amount\n${lines}\n\nTotal: Rs ${inr(built.total)} (${built.lines} payments in ${built.files.length} file${built.files.length === 1 ? "" : "s"})\n\nThe details are in the approved HRMS: https://genie.nandan.co.in/hrms#payroll:${id}\n\nThanks\nVinay`,
+  };
+}
 
 export async function GET(req: Request) {
   try {
@@ -97,20 +134,18 @@ export async function GET(req: Request) {
 
     if (id && new URL(req.url).searchParams.get("bank") === "1") {
       const r = await runRow(admin, id);
+      const { bytes, name } = await bankZip(admin, r as unknown as Record<string, unknown>, id, stamp);
+      return new Response(new Uint8Array(bytes), { headers: { "content-type": "application/zip", "content-disposition": `attachment; filename="${name}"` } });
+    }
+    /* THE MAIL TO ACCOUNTS, DRAFTED (Dr Raghu, 7 Oct 2026: "make an envelope icon for Vinay … Open the popup so this is created by him and the zip file is attached and then he sends") */
+    if (id && new URL(req.url).searchParams.get("bank_draft") === "1") {
+      const r = await runRow(admin, id);
       if (!r.approved_at && !/frozen/i.test(String(r.status))) throw new HttpError(409, "Approve the run first — the bank files are made from the approved register.");
       const rows = (r.rows ?? []) as RegisterRow[];
-      if (!rows.length) throw new HttpError(400, "Nothing generated on this run yet.");
       const ppl = await people(admin, rows.map((x) => x.employee_id));
       const bankOf = new Map(ppl.map((p) => [p.id, { ifsc: String(p.value.ifsc || ""), account: String(p.value.account_15 || p.value.account_no || ""), nameInBank: String(p.value.name_in_bank || p.name || "") }]));
       const built = buildBankFiles(rows, (eid) => bankOf.get(eid) ?? null, Number(r.month), Number(r.year));
-      const JSZip = (await import("jszip")).default;
-      const zip = new JSZip();
-      for (const f of built.files) zip.file(f.name, f.text);
-      zip.file("NOT_IN_FILES.txt", built.notInFiles);
-      const bytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
-      const tag = `${label(Number(r.month), Number(r.year)).replace(/\s+/g, "_")}`;
-      try { await admin.from("hrms_payroll_file").insert({ sheet_id: id, kind: "bank", name: `bank_files_${tag}.zip`, mime: "application/zip", size: bytes.byteLength, parsed: { files: built.files.map((f) => ({ name: f.name, lines: f.lines, total: f.total, fileNo: f.fileNo })), skipped: built.skipped, total: built.total, lines: built.lines }, uploaded_by: stamp }); } catch { /* the download still goes */ }
-      return new Response(new Uint8Array(bytes), { headers: { "content-type": "application/zip", "content-disposition": `attachment; filename="bank_files_${tag}.zip"` } });
+      return NextResponse.json({ ok: true, ...bankMailDraft(r as unknown as Record<string, unknown>, id, built), files: built.files.map((f) => ({ name: f.name, lines: f.lines, total: f.total })), total: built.total, lines: built.lines, skipped: built.skipped, zipName: `bank_files_${label(Number(r.month), Number(r.year)).replace(/\s+/g, "_")}.zip` });
     }
 
     if (id) {
@@ -244,7 +279,7 @@ export async function POST(req: Request) {
            nothing else. */
         if (kind === "bankdetails") {
           try {
-            const grid = gridOf(buf, f.name);
+            const grid = gridText(buf, f.name);   // as text: a leading zero on an account number stays
             const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
             let hr = 0, best = -1;
             for (let i = 0; i < Math.min(grid.length, 15); i++) { const sc = (grid[i] || []).filter((c) => /ifsc|account|bank|^id$|emp/.test(norm(c))).length; if (sc > best) { best = sc; hr = i; } }
@@ -380,6 +415,28 @@ ${warnings.length ? `<p><b>${warnings.length} warning${warnings.length === 1 ? "
       const mapping = { ...((r.mapping as Record<string, unknown> | null) ?? {}), approval_mail: { at: now, by: stamp } };
       await admin.from("hrms_salary_sheet").update({ mapping, updated_at: now }).eq("id", id);
       return NextResponse.json({ ok: true, to: RAGHU_EMAIL, note: snd.note });
+    }
+
+    /* SEND THE BANK FILES TO ACCOUNTS — from Vinay's mailbox, the zip attached, his text as he edited it in the popup (7 Oct 2026) */
+    if (action === "bank_mail") {
+      const id = String(body.id || "");
+      const r = await runRow(admin, id);
+      const { bytes, built, name } = await bankZip(admin, r as unknown as Record<string, unknown>, id, stamp);
+      const draft = bankMailDraft(r as unknown as Record<string, unknown>, id, built);
+      const to = String(body.to || draft.to).split(/[;,]/).map((s) => s.trim()).filter(Boolean).join(", ");
+      const cc = String(body.cc ?? draft.cc).split(/[;,]/).map((s) => s.trim()).filter(Boolean).join(", ");
+      const subject = String(body.subject || draft.subject);
+      const text = String(body.body || draft.body);
+      if (!to) throw new HttpError(400, "Who is it to?");
+      const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+      const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1F2328;line-height:1.5;white-space:pre-wrap">${esc(text)}</div>`;
+      const { hrmsSender } = await import("@/lib/hrms-mail-from");
+      const { gmailSendMixed } = await import("@/crm/gmail");
+      const snd = await hrmsSender({ email: me.email });
+      await gmailSendMixed(snd.token, snd.fromEmail, to, subject, html, [{ name, mime: "application/zip", base64: Buffer.from(bytes).toString("base64") }], cc || undefined, undefined, snd.fromName);
+      const mapping = { ...((r.mapping as Record<string, unknown> | null) ?? {}), bank_mail: { at: now, by: stamp, to, cc, files: built.files.length, total: built.total } };
+      await admin.from("hrms_salary_sheet").update({ mapping, updated_at: now }).eq("id", id);
+      return NextResponse.json({ ok: true, to, cc, from: snd.fromEmail, note: snd.note, files: built.files.length, total: built.total });
     }
 
     if (action === "approve" || action === "unapprove") {
