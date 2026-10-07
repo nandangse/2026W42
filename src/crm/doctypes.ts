@@ -170,7 +170,10 @@ export const DOCTYPES: Doctype[] = [
     orderBy: { column: "sort_order", ascending: true },
     blurb: "The default texts a quotation starts from (Dr Raghu, 30 Aug 2026): Terms & Conditions sets and Covering Letter flavours. Edit here once, and every new quote picks it up.",
     fields: [
-      { name: "kind", label: "Kind", type: "select", required: true, inList: true, options: ["terms", "letter"], help: "terms = Terms & Conditions; letter = Covering Letter." },
+      /* every kind the quote document reads (7 Oct 2026) — the select used to
+         know only terms and letter, so an About or Cover template opened
+         showing "letter" and would have been saved as one */
+      { name: "kind", label: "Kind", type: "select", required: true, inList: true, options: ["cover", "letter", "terms", "about", "back"], help: "cover = front page; letter = Covering Letter; terms = Terms & Conditions; about = About Nandan; back = back page." },
       { name: "name", label: "Name", type: "text", required: true, inList: true },
       { name: "sort_order", label: "Order", type: "number", inList: true, default: 0 },
       { name: "content", label: "Default text", type: "textarea", big: true, rich: true },

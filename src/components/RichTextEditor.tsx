@@ -96,7 +96,9 @@ export function RichContent({ text, legacy, thumbs }: { text: string; legacy: (s
 
 const COLORS = ["var(--navy)", "var(--red)", "var(--accent)", "var(--green)", "var(--blue)", "#7C3AED"];
 
-export default function RichTextEditor({ initial, onSave, onCancel, busy, minHeight = 220, placeholder, onUploadImage, live, onChangeHtml }: {
+export default function RichTextEditor({ initial, onSave, onCancel, busy, minHeight = 220, placeholder, onUploadImage, live, onChangeHtml, variables }: {
+  /** {{name}} placeholders this text may use — shown as a dropdown on the right of the toolbar */
+  variables?: { key: string; what: string }[];
   initial: string; onSave?: (html: string) => void; onCancel?: () => void; busy?: boolean; minHeight?: number; placeholder?: string;
   /** Where a pasted or picked image goes — returns its URL. Without it,
    *  image paste is refused rather than bloating the record with base64. */
@@ -139,6 +141,15 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
   }, [initial]);
 
   const cmd = (c: string, v?: string) => { ref.current?.focus(); document.execCommand(c, false, v); };
+  /* a <select> takes the focus, and with it the caret; keep the range and put it back */
+  const savedRange = useRef<Range | null>(null);
+  const saveSel = () => { const sel = window.getSelection(); if (sel && sel.rangeCount && ref.current?.contains(sel.anchorNode)) savedRange.current = sel.getRangeAt(0).cloneRange(); };
+  const restoreSel = () => {
+    ref.current?.focus();
+    const r = savedRange.current; if (!r) return;
+    const sel = window.getSelection(); if (!sel) return;
+    sel.removeAllRanges(); sel.addRange(r);
+  };
   const TB = ({ label, title, onClick, strong, style }: { label: React.ReactNode; title: string; onClick: () => void; strong?: boolean; style?: React.CSSProperties }) => (
     <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClick} title={title}
       className="rounded border px-2 py-0.5 text-xs" style={{ borderColor: "var(--line)", background: "#fff", fontWeight: strong ? 800 : 500, ...style }}>{label}</button>
@@ -149,15 +160,32 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
     cmd("insertHTML", `<table className="genie-table" border="1"><tbody>${`<tr>${cell.repeat(3)}</tr>`.repeat(2)}</tbody></table><br>`);
   };
   const fileInput = useRef<HTMLInputElement | null>(null);
+  /* EVERY BOX TAKES A PASTED PICTURE (Dr Raghu, 7 Oct 2026: "a provision in
+     all the rich text fields where I can paste an image … it can save it on
+     the server as a public link"). A screen that has its own place for
+     pictures (a record's attachments, a product's images) still uses it;
+     every other box sends the picture to /api/rich-image and gets a public
+     link back. Nothing is ever kept as a base64 blob in the text. */
+  const uploadDefault = async (f: File): Promise<string> => {
+    const fd = new FormData(); fd.append("file", f);
+    const r = await fetch("/api/rich-image", { method: "POST", body: fd });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "The picture would not upload.");
+    return String(j.url);
+  };
   const uploadAndInsert = async (f: File) => {
-    if (!onUploadImage) { window.alert("Pictures attach through 📎 on this screen."); return; }
-    try { const url = await onUploadImage(f); if (url) cmd("insertImage", url); }
+    try { const url = await (onUploadImage ?? uploadDefault)(f); if (url) cmd("insertImage", url); }
     catch (e) { window.alert(e instanceof Error ? e.message : String(e)); }
   };
-  const insertPicture = () => {
-    if (onUploadImage) { fileInput.current?.click(); return; }
-    const u = window.prompt("Picture URL (https://…, or an attachment link from this record):", "https://");
+  const insertPicture = () => fileInput.current?.click();
+  const insertPictureByUrl = () => {
+    const u = window.prompt("Picture URL (https://…):", "https://");
     if (u && /^(https?:|\/)/i.test(u)) cmd("insertImage", u);
+  };
+  /* a picture dropped onto the box uploads the same way */
+  const onDrop = (e: React.DragEvent) => {
+    const f = [...(e.dataTransfer?.files || [])].find((x) => x.type.startsWith("image/"));
+    if (f) { e.preventDefault(); void uploadAndInsert(f); }
   };
   // a PASTED image becomes an UPLOAD, never a base64 blob in the database
   const onPaste = (e: React.ClipboardEvent) => {
@@ -193,10 +221,22 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
           </span>
         )}
         <TB label="🔗 Link" title="Turn the selection into a link" onClick={() => { const u = window.prompt("Link to:", "https://"); if (u) cmd("createLink", u); }} />
-        <TB label="🖼 Picture" title="Insert a picture by URL" onClick={insertPicture} />
+        <TB label="🖼 Picture" title="Insert a picture from your computer — or just paste one into the text" onClick={insertPicture} />
+        <TB label="🖼 URL" title="Insert a picture by its web address" onClick={insertPictureByUrl} />
         <TB label="⊞ Table" title="Insert a 2×3 table" onClick={insertTable} />
         <TB label="🖼−" title="Shrink the selected picture (click a picture first)" onClick={() => resizeImg(-1)} />
         <TB label="🖼+" title="Grow the selected picture" onClick={() => resizeImg(1)} />
+        {/* THE VARIABLES, TO HAND (Dr Raghu, 7 Oct 2026: "show the variables in a
+            convenient place so that it can be dropped down on the right side").
+            Pick one and {{its_name}} lands where the caret is. */}
+        {variables && variables.length > 0 && (
+          <select className="ml-auto rounded border px-2 py-0.5 text-xs" style={{ borderColor: "var(--line)", background: "#fff", maxWidth: 260 }}
+            value="" onMouseDown={() => { saveSel(); }} title="Insert a variable at the caret — it is filled in when the document is made"
+            onChange={(e) => { const k = e.target.value; if (k) { restoreSel(); cmd("insertText", `{{${k}}}`); } e.target.value = ""; }}>
+            <option value="">{"{{ variables }} …"}</option>
+            {variables.map((v) => <option key={v.key} value={v.key}>{`{{${v.key}}}`} — {v.what}</option>)}
+          </select>
+        )}
       </div>
       <input ref={fileInput} type="file" accept="image/*" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadAndInsert(f); e.target.value = ""; }} />
@@ -204,7 +244,7 @@ export default function RichTextEditor({ initial, onSave, onCancel, busy, minHei
           clickable box role="button"; on a contentEditable that made Enter a
           press rather than a new line (Dr Raghu, 6 Sep 2026: "the enter is
           not working in the text box"). */}
-      <div ref={ref} contentEditable suppressContentEditableWarning onPaste={onPaste} onClick={pickImg}
+      <div ref={ref} contentEditable suppressContentEditableWarning onPaste={onPaste} onDrop={onDrop} onClick={pickImg}
         onInput={live && onChangeHtml ? () => onChangeHtml(ref.current?.innerHTML || "") : undefined}
         data-placeholder={placeholder || ""}
         className="w-full rounded border p-3 text-sm rich-html"

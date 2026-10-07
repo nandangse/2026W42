@@ -1,6 +1,7 @@
 "use client";
 // split out of CrmApp.tsx (Genie 5.0.1.1) — one file per tab, loaded when opened
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { QUOTE_VARIABLES } from "@/crm/quote-vars";
 import { swallow } from "@/lib/swallow";
 
 import { doctypeBySlug, type Doctype, type Field } from "@/crm/doctypes";
@@ -2545,6 +2546,7 @@ export function RecordForm({
               /* the COMMON rich editor, live — an HTML page, not raw markup
                  (Dr Raghu, 30 Aug 2026: "we need to have an HTML page here") */
               <RichTextEditor live initial={String(form[f.name] ?? "")}
+                variables={dt.name === "quote_template" ? QUOTE_VARIABLES : undefined}
                 onChangeHtml={(v) => set(f.name, v)} minHeight={f.big ? 220 : 130} />
             ) : f.type === "textarea" && f.name === "enquiry_info" ? (
               <RichTextArea value={String(form[f.name] ?? "")} onChange={(v) => set(f.name, v)} rows={f.big ? 8 : 3} />

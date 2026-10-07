@@ -50,6 +50,18 @@ export async function quoteVars(db: SupabaseClient, q: QuoteRow): Promise<Record
 }
 
 /** The names a template may use, for the hint shown beside the editor. */
+export const QUOTE_VARIABLES: { key: string; what: string }[] = [
+  { key: "quote_no", what: "the quotation number" },
+  { key: "quote_date", what: "the date of the quote" },
+  { key: "customer", what: "the customer's company" },
+  { key: "contact", what: "the person it is addressed to" },
+  { key: "sales_person", what: "the salesperson's name" },
+  { key: "authorized_by", what: "who authorises it" },
+  { key: "subject", what: "the subject line" },
+  { key: "valid_until", what: "valid until" },
+  { key: "delivery", what: "delivery, in weeks" },
+  { key: "company", what: "Nandan GSE Pvt Ltd" },
+];
 export const QUOTE_VAR_NAMES = [
   "quote_no", "quote_date", "customer", "contact", "sales_person",
   "authorized_by", "subject", "valid_until", "delivery", "company",

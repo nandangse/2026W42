@@ -1,6 +1,7 @@
 "use client";
 // split out of CrmApp.tsx (Genie 5.0.1.1) — one file per tab, loaded when opened
 import { useCallback, useEffect, useRef, useState } from "react";
+import { QUOTE_VARIABLES } from "@/crm/quote-vars";
 import { swallow } from "@/lib/swallow";
 
 import RichTextEditor, { RichContent } from "../../RichTextEditor";
@@ -355,7 +356,7 @@ export function QuoteTemplateTab({ row, onSaved, kind }: { row: Row; onSaved: (r
         </div>
       </div>
       {editing ? (
-        <RichTextEditor initial={stored} busy={busy === "save"} minHeight={300}
+        <RichTextEditor initial={stored} busy={busy === "save"} minHeight={300} variables={QUOTE_VARIABLES}
           onUploadImage={async (f) => {
             const fd = new FormData();
             fd.append("target_type", "quotation"); fd.append("target_id", rid); fd.append("file", f);

@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.15",
+    date: "2026-10-07",
+    module: "Every rich-text box takes a pasted picture; the quote template knows all five kinds",
+    items: [
+      "PASTE A PICTURE, GET A LINK (\u201ca provision in all the rich text fields where I can paste an image. Every time, I cannot upload it from a URL. Once I paste it, it can save it on the server as a public link\u201d). Paste or drop a picture into any rich-text box \u2014 a quote template, a letter, the About page, a product description, a mail body, minutes \u2014 and it is kept on the server as a public link and placed in the text at once. The Picture button opens your computer\u2019s files; a second button takes a web address when that is what you have. Screens with their own picture store keep using it.",
+      "THE VARIABLES, TO HAND (\u201cshow the variables in a convenient place so that it can be dropped down on the right side\u201d). On a quote template and on a quote\u2019s own letter and terms, a dropdown sits at the right of the toolbar: pick {{customer}}, {{quote_no}}, {{quote_date}}, {{contact}}, {{sales_person}}, {{authorized_by}}, {{subject}}, {{valid_until}}, {{delivery}} or {{company}} and it lands where the caret is, to be filled in when the document is made.",
+      "THE QUOTE TEMPLATE\u2019S KIND knows cover, letter, terms, about and back. It knew only terms and letter, so an About or Cover template opened showing \u2018letter\u2019 and would have been saved as one.",
+    ],
+  },
+  {
     v: "6.3.0.14",
     date: "2026-10-07",
     module: "Quotation PDF: the press lays the pages; the document is named; the lines are tighter",
