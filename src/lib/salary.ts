@@ -53,16 +53,29 @@ export const CONTRACT_TYPES_SET = CONTRACT_TDS;
  */
 export const NO_HRA_NO_MEDICAL = new Set(["Labour", "Labour - Contract"]);
 
+/** Calendar days in a month; with no month given, the current month in IST. */
+export const daysInMonthOf = (month?: number | null, year?: number | null): number => {
+  if (month && year) return new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const now = new Date(Date.now() + 5.5 * 3600 * 1000);
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+};
+
 /**
- * PAY DAYS IN A MONTH, and so the per-day rate (Dr Raghu, 7 Sep 2026):
- * "per day = gross/26 for labour and labour - contract, for rest 31."
+ * PAY DAYS IN A MONTH, and so the per-day rate. Workers — Labour and
+ * Labour - Contract — are on a 26-day month (Dr Raghu, 7 Sep 2026). Everybody
+ * else is on the calendar month: 30 in September, 28 in February, 31 only
+ * when the month has 31 (Dr Raghu, 7 Oct 2026: "the calculation is being
+ * done with a hard-coded 31, which is wrong. It should be divided by the
+ * number of days that are there in that month. If it is February, it will be
+ * divided by 28 … Only for workers, it is hard-coded to 26"). Pass the month
+ * when you have it; a standing figure with no month uses the current month.
  */
-export const payDaysFor = (type: string | null | undefined): 26 | 31 =>
-  NO_HRA_NO_MEDICAL.has(String(type || "")) ? 26 : 31;
+export const payDaysFor = (type: string | null | undefined, month?: number | null, year?: number | null): number =>
+  NO_HRA_NO_MEDICAL.has(String(type || "")) ? 26 : daysInMonthOf(month, year);
 
 /** The per-day rate on a gross, by his rule. */
-export const perDayOf = (gross: number | null | undefined, type: string | null | undefined): number | null =>
-  gross == null || !Number.isFinite(Number(gross)) ? null : Number(gross) / payDaysFor(type);
+export const perDayOf = (gross: number | null | undefined, type: string | null | undefined, month?: number | null, year?: number | null): number | null =>
+  gross == null || !Number.isFinite(Number(gross)) ? null : Number(gross) / payDaysFor(type, month, year);
 
 /** The annual bonus belongs to Staff and Labour alone (same day). */
 const BONUS_TYPES = new Set(["Staff", "Labour"]);

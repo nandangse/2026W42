@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.27",
+    date: "2026-10-07",
+    module: "Payroll: pay days are the month\u2019s own days \u2014 26 only for workers",
+    items: [
+      "NO HARD-CODED 31 (\u201cthe calculation is being done with a hard-coded 31, which is wrong. It should be divided by the number of days that are there in that month. If it is February, it will be divided by 28 \u2026 Only for workers, it is hard-coded to 26\u201d). The per-day rate in the payroll engine divided every staff and management gross by a fixed 31 whatever the month \u2014 September\u2019s comp-off, leave encashment and late deductions were all a thirtieth light. It now divides by the calendar days of the run\u2019s own month (30 in September, 28 in February, 31 only when there are 31); workers stay on 26. The same rule now holds on the salary rate list\u2019s per-day, the appraisal card and Excel, the F&F statement\u2019s leave encashment (exit month\u2019s days, not a fixed 26 for staff) and the slip\u2019s comp-off fallback, which no longer guesses a divisor at all when the sheet gives none. Verified by running the engine for September 2026 (\u00f730), February 2027 (\u00f728) and October 2026 (\u00f731) beside a worker at \u00f726.",
+    ],
+  },
+  {
     v: "6.3.0.26",
     date: "2026-10-07",
     module: "Payroll: the salary register sorts on any column; to-pay compared too",

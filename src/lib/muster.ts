@@ -1,4 +1,3 @@
-import { payDaysFor } from "./salary";
 /**
  * The attendance MUSTER and the SALARY RATE LIST, read from what HR uploads
  * (Dr Raghu, 4 Sep 2026: "upload the Muster, the salary rate list here.
@@ -240,8 +239,10 @@ export function parseRates(grid: unknown[][]): Rates {
  *     balance first. A shortfall against pay days is filled from the balance
  *     (leave first, when the balance is at or above the 15 / 8 minimum, then
  *     comp off); what comp off is left is encashed at the per-day rate.
- *   · Per day = (gross + allowances, WITHOUT conveyance) ÷ 26, for everyone.
- *     Leave encashment and comp off are paid at it.
+ *   · Per day = gross ÷ pay days: 26 for workers, the calendar days of the
+ *     month for everybody else (superseding the 4 Sep "÷ 26 for everyone"
+ *     on 7 Sep, and the fixed 31 on 7 Oct 2026). Leave encashment and comp
+ *     off are paid at it.
  *   · Earned basic = rate × payment days ÷ pay days.
  *   · HRA = 20% of earned basic for Staff and for workers alike. For workers
  *     it is the first part of their OT: OT pay = hours × basic ÷ 208, always
@@ -326,14 +327,18 @@ export function generateRegister(
      * THE PER-DAY IS THE IDP'S (Dr Raghu, 7 Sep 2026: "the per-day rate as
      * done in the IDP is the right one — please use that, the latest one").
      *
-     * That is the gross over the person's own pay days: 26 for Labour and
-     * Labour - Contract, 31 for everybody else. It replaces the older rule
-     * here, which took basic + HRA + fixed + medical over 26 for everyone and
-     * left conveyance out — so two screens quoted two different per-days for
-     * the same person. This one number now drives comp-off encashment, leave
-     * encashment and the late deduction, which is where it is actually spent.
+     * That is the gross over the person's own pay days: 26 for workers, the
+     * calendar days of THIS month for everybody else — 30 in September, 28 in
+     * February (Dr Raghu, 7 Oct 2026: "the calculation is being done with a
+     * hard-coded 31, which is wrong … Only for workers, it is hard-coded to
+     * 26"). Until today it divided by a fixed 31 whatever the month. It
+     * replaces the older rule here, which took basic + HRA + fixed + medical
+     * over 26 for everyone and left conveyance out — so two screens quoted
+     * two different per-days for the same person. This one number drives
+     * comp-off encashment, leave encashment and the late deduction, which is
+     * where it is actually spent.
      */
-    const perDay = gross / payDaysFor(t);
+    const perDay = gross / payDays;
 
     // ── leave and payment days ──
     const led = ledger(m.employee_id);

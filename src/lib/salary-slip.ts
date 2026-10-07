@@ -149,14 +149,18 @@ export function extractSlips(grid: unknown[][]): Slip[] {
     // (Dr Raghu, 5 Sep 2026). The sheet's slip export carries the comp-off
     // DAYS but not always the amount column; comp off is paid at the per-day
     // rate, so days × per day is the amount when the column is absent.
-    const perDay0 = slip.per_day || (slip.gross_rate ? slip.gross_rate / 26 : 0);
+    // per day: the sheet's own, else gross over its pay days — 26 for workers, the sheet's Pay Days for
+    // everybody else; with neither known the amount is left uncomputed rather than guessed from a fixed
+    // divisor (Dr Raghu, 7 Oct 2026: "the number of days that are there in that month")
+    const payDays0 = slip.days_in_month || (SIX_AND_TWENTY.test(String(slip.category || "")) ? 26 : 0);
+    const perDay0 = slip.per_day || (slip.gross_rate && payDays0 ? slip.gross_rate / payDays0 : 0);
     if ((slip.compoff_amt == null || slip.compoff_amt === 0) && (slip.compoff_days ?? 0) > 0 && perDay0)
       slip.compoff_amt = Math.round((slip.compoff_days ?? 0) * perDay0);
     const compAmt = slip.compoff_amt ?? 0;
     if (compAmt || slip.compoff_days) {
       slip.leave_encash_amt = slip.leave_encash ?? 0;
       slip.leave_encash = (slip.leave_encash ?? 0) + compAmt;
-      const perDay = slip.per_day || (slip.gross_rate ? slip.gross_rate / 26 : 0);
+      const perDay = perDay0;
       slip.compoff_encashed_days = perDay ? Math.round((compAmt / perDay) * 100) / 100 : (slip.compoff_days ?? 0);
       slip.leave_encashed = (slip.leave_encashed ?? 0) + (slip.compoff_encashed_days ?? 0);
     }
@@ -315,7 +319,7 @@ export function slipsFromRegister(
      * whenever the column is absent — the same fallback the uploaded-sheet
      * path has had since 5 Sep. This path never got it.
      */
-    const perDayOf = N(r.per_day) ?? (N(r.gross) ? (N(r.gross) as number) / 26 : 0);
+    const perDayOf = N(r.per_day) ?? (N(r.gross) ? (N(r.gross) as number) / (slipPayDays(T(r.type) || T(g("type")), N(r.pay_days), daysInMonth) || 26) : 0);
     const encashComp = N(r.compoff_amt) ?? (compDays > 0 && perDayOf ? Math.round(compDays * perDayOf) : 0) ?? 0;
     const encashedDays = N(r.leave_encashed) ?? 0;   // the sheet's own Leave Encashed
     const net = N(r.net) ?? 0;

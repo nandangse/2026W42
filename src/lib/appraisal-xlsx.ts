@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { payDaysFor } from "@/lib/salary";
 
 /**
  * THE EMPLOYEE MASTER SHEET, AS HE PASTES IT (Dr Raghu, 7 Sep 2026).
@@ -50,7 +51,7 @@ export async function buildAppraisalWorkbook(rows: ExportRow[], title: string): 
   ws.addRow([...LEFT, "", ...RIGHT, ...TAIL]);
 
   for (const r of rows) {
-    const days = r.payDays || (/labour/i.test(String(r.type || "")) ? 26 : 31);
+    const days = r.payDays || payDaysFor(String(r.type || ""));   // 26 for workers, the calendar month otherwise — never a fixed 31 (7 Oct 2026)
     const o = r.oldParts, p = r.newParts;
     const og = r.prevGross, ng = r.newGross;
     const opd = og != null && days ? og / days : null;

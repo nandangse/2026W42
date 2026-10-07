@@ -24,9 +24,10 @@ export const maxDuration = 120;
  *
  * Gross and per-day are worked out on save: gross = basic + HRA + fixed +
  * conveyance + medical; per day = gross ÷ 26 for Labour and Labour - Contract,
- * ÷ 31 for everybody else (Dr Raghu, 7 Sep 2026). Payroll's own per-day —
- * (basic + HRA + fixed + medical) ÷ 26, conveyance not counted — is his rule
- * of 4 Sep for encashment and is untouched.
+ * ÷ the calendar days of the current month for everybody else (Dr Raghu,
+ * 7 Sep and 7 Oct 2026 — never a fixed 31). The payroll run recomputes its
+ * own per-day from the gross over the run's own month, so this stored figure
+ * is the rate card's, not the month's.
  */
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/[₹,\s]/g, "")); return Number.isFinite(n) ? n : 0; };
 const derive = (r: { basic_da: number; hra: number; fixed_allowance: number; conveyance: number; medical_allowance: number }, type?: string | null) => {

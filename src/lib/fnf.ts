@@ -18,7 +18,7 @@
  * prints the number used and says "as entered" where it was.
  */
 import { LOGO } from "@/lib/logo";
-import { NO_STATUTORY, CONTRACT_TYPES_SET } from "@/lib/salary";
+import { NO_STATUTORY, CONTRACT_TYPES_SET, NO_HRA_NO_MEDICAL } from "@/lib/salary";
 import { esc } from "@/lib/fmt";
 
 export const FNF_STATUS = ["Open", "Calculated", "Letters issued", "Paid", "Closed"] as const;
@@ -122,8 +122,10 @@ export function computeFnf(r: FnfRow): Statement {
   const exempt = NO_STATUTORY.has(t);
   const contract = CONTRACT_TYPES_SET.has(t);
   const gross = num(r.last_gross), basic = num(r.basic_da);
-  const perDay = gross / 26;
   const monthDays = r.month_days || daysInMonth(r.exit_date);
+  // per day: 26 for workers, the calendar days of the exit month for everybody else (Dr Raghu, 7 Oct 2026 — never a fixed divisor)
+  const payDays = NO_HRA_NO_MEDICAL.has(t) ? 26 : monthDays || 30;
+  const perDay = gross / payDays;
   const paidDays = r.paid_days == null ? (r.exit_date ? Number(r.exit_date.slice(8, 10)) : 0) : num(r.paid_days);
   const ov = r.overrides || {};
   const use = (key: string, computed: number) => {
@@ -139,7 +141,7 @@ export function computeFnf(r: FnfRow): Statement {
   E.push({ key: "salary", label: `Salary for ${paidDays} of ${monthDays} days`, amount: sal.amount, basis: `gross ${inr(gross)} × ${paidDays}/${monthDays}`, overridden: sal.overridden });
 
   const leave = use("leave_encash", perDay * num(r.leave_balance));
-  E.push({ key: "leave_encash", label: `Leave encashment — ${num(r.leave_balance)} days`, amount: leave.amount, basis: `${num(r.leave_balance)} days × ${inr(perDay)} per day (gross / 26)`, overridden: leave.overridden });
+  E.push({ key: "leave_encash", label: `Leave encashment — ${num(r.leave_balance)} days`, amount: leave.amount, basis: `${num(r.leave_balance)} days × ${inr(perDay)} per day (gross / ${payDays})`, overridden: leave.overridden });
 
   const years = num(r.gratuity_years) || yearsOfService(r.doj, r.exit_date);
   const gratComputed = !contract && years >= 5 ? (15 / 26) * basic * Math.floor(years + 0.5) : 0;
