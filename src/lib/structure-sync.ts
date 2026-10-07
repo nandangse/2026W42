@@ -17,6 +17,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { payDaysFor } from "@/lib/salary";
 import { hrmsTables } from "@/lib/hrms";
+import { people } from "@/lib/hrms-wa";
 
 const N = (v: unknown) => Number(v) || 0;
 export const fyOfDate = (iso: string | null | undefined): string => {
@@ -36,6 +37,9 @@ export async function backflushStructure(admin: SupabaseClient, structureId: str
   const fy = fyOfDate(st.effective_from as string | null);
   if (!list.length) return { records: 0, history: 0, changed: 0, fy, title: String(st.title) };
   const T = await hrmsTables(admin);
+  // a line with no Type takes the HRIS's, so the displayed per-day divides right (7 Oct 2026)
+  const untyped = list.filter((r) => !r.type).map((r) => String(r.employee_id));
+  const hrisType = new Map((untyped.length ? await people(admin, untyped) : []).map((p) => [p.id, p.type || null]));
   const { data: cur } = await admin.from(T.edits).select("employee_id, field, value").in("employee_id", list.map((r) => String(r.employee_id)));
   const curVal = new Map((cur || []).map((e) => [`${e.employee_id}|${e.field}`, e.value == null ? null : String(e.value)]));
   const now = new Date().toISOString();
@@ -45,7 +49,7 @@ export async function backflushStructure(admin: SupabaseClient, structureId: str
     const id = String(r.employee_id), gross = N(r.gross);
     const want: Record<string, number> = {
       basic_da: N(r.basic_da), hra: N(r.hra), fixed_allowance: N(r.fixed_allowance), conveyance: N(r.conveyance), medical_allowance: N(r.medical_allowance),
-      gross, per_day_rate: Math.round(gross / payDaysFor(r.type)),
+      gross, per_day_rate: Math.round(gross / payDaysFor(r.type || hrisType.get(id) || null)),
     };
     for (const [field, v] of Object.entries(want)) {
       const value = String(Math.round(v));

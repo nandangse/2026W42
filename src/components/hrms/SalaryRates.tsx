@@ -133,12 +133,12 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
                 Sep 2026: "check it and update it"). A pressed button, not a
                 quiet background fix: it rewrites every rate on the list, and
                 every rate change carries who made it and when. */}
-            {isOwner && !s.frozen_at && (
+            {isOwner && (
               <button onClick={async () => {
                 if (!window.confirm(`Pull every Type from the HRIS and work the per-day rates out again?\n\nPer day = Gross ÷ 26 for Labour and Labour - Contract, ÷ 31 for the rest — the displayed rate. Lines already right are left alone.`)) return;
                 try {
-                  const j = await api.post("/api/hrms/rates", { action: "sync_types", structure_id: s.id }) as { checked: number; changed: number; noType: number };
-                  setMsg(`${j.changed} of ${j.checked} lines updated${j.noType ? `; ${j.noType} have no Type on their HRIS record` : ""}.`);
+                  const j = await api.post("/api/hrms/rates", { action: "sync_types", structure_id: s.id }) as { checked: number; changed: number; noType: number; backflushed: { records: number } | null };
+                  setMsg(`${j.changed} of ${j.checked} lines updated${j.noType ? `; ${j.noType} have no Type on their HRIS record` : ""}${j.backflushed ? `; ${j.backflushed.records} HRIS records backflushed` : ""}.`);
                   load(cur);
                 } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
               }} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }}

@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.38",
+    date: "2026-10-07",
+    module: "Salary Rate List: an import takes the Type from the HRIS; Types & per day works on a signed list",
+    items: [
+      "211 LINES, NO TYPE. The Change (1).csv imported onto the Live list carried no Type column, so every line showed \u201c\u2014\u201d and every worker\u2019s displayed per-day divided by 31. An import now takes each person\u2019s Type (and name, when the file has none) from the HRIS master, as a saved line already did. \u27f3 Types & per day is allowed on a frozen, signed list \u2014 Type and per-day are derived, not a rate change \u2014 and when the list is Live it backflushes into the HRIS records afterwards. The backflush itself takes the HRIS Type where a line has none.",
+    ],
+  },
+  {
     v: "6.3.0.37",
     date: "2026-10-07",
     module: "The latest signed Salary Structure is the rate \u2014 it backflushes into the HRIS; appraisals no longer write over it",

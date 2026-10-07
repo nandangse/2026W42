@@ -81,12 +81,19 @@ export async function POST(req: Request) {
       const cId = col(/^emp(loyee)? ?id$/, /^id$/, /^emp$/), cName = col(/^name$/), cType = col(/^type$/, /^category$/), cDept = col(/^department$/), cDesig = col(/^designation$/), cMgr = col(/reporting/),
         cBasic = col(/basic/), cHra = col(/^hra/), cFixed = col(/fixed/), cConv = col(/conve/), cMed = col(/medical/);
       if (cId < 0 || cBasic < 0) throw new HttpError(400, "The file needs at least an Employee ID column and a Basic and DA column.");
+      // THE TYPE IS THE HRIS'S (7 Oct 2026): a rate file seldom carries one, and 211 lines imported
+      // with no Type showed "—" and divided every worker's per-day by 31. The master decides.
+      const ids = grid.slice(hr + 1).map((L) => String((L || [])[cId] ?? "").trim()).filter((id) => /^\d{4}$/.test(id));
+      const roll = ids.length ? await people(admin, ids) : [];
+      const hrisType = new Map(roll.map((p) => [p.id, p.type || null]));
+      const hrisName = new Map(roll.map((p) => [p.id, p.name]));
       const rows: Record<string, unknown>[] = [];
       for (let i = hr + 1; i < grid.length; i++) {
         const L = grid[i] || []; const id = String(L[cId] ?? "").trim();
         if (!/^\d{4}$/.test(id)) continue;
         const r = { basic_da: num(L[cBasic]), hra: cHra >= 0 ? num(L[cHra]) : 0, fixed_allowance: cFixed >= 0 ? num(L[cFixed]) : 0, conveyance: cConv >= 0 ? num(L[cConv]) : 0, medical_allowance: cMed >= 0 ? num(L[cMed]) : 0 };
-        rows.push({ structure_id: sid, employee_id: id, name: cName >= 0 ? String(L[cName] || "") : null, type: cType >= 0 ? String(L[cType] || "") : null, department: cDept >= 0 ? String(L[cDept] || "") : null, designation: cDesig >= 0 ? String(L[cDesig] || "") : null, reporting_manager: cMgr >= 0 ? String(L[cMgr] || "") : null, ...r, ...derive(r, cType >= 0 ? String(L[cType] || "") : null), note: `imported from ${f.name}`, updated_by: stamp, updated_at: now });
+        const type = hrisType.get(id) || (cType >= 0 ? String(L[cType] || "") || null : null);
+        rows.push({ structure_id: sid, employee_id: id, name: (cName >= 0 ? String(L[cName] || "") : "") || hrisName.get(id) || null, type, department: cDept >= 0 ? String(L[cDept] || "") : null, designation: cDesig >= 0 ? String(L[cDesig] || "") : null, reporting_manager: cMgr >= 0 ? String(L[cMgr] || "") : null, ...r, ...derive(r, type), note: `imported from ${f.name}`, updated_by: stamp, updated_at: now });
       }
       if (!rows.length) throw new HttpError(400, "No lines with a four-digit Employee ID were read.");
       const { error } = await admin.from("hrms_salary_rate").upsert(rows, { onConflict: "structure_id,employee_id" });
@@ -245,8 +252,8 @@ export async function POST(req: Request) {
     if (action === "sync_types") {
       const sid = String(body.structure_id || "");
       if (!sid) throw new HttpError(400, "Which structure?");
-      const { data: st } = await admin.from("hrms_salary_structure").select("frozen_at, title").eq("id", sid).maybeSingle();
-      if (st?.frozen_at) throw new HttpError(409, `${st.title} is frozen and signed. Take the freeze off first.`);
+      // allowed on a signed list: Type and per-day are DERIVED from the HRIS and the gross, not a rate change (7 Oct 2026)
+      const { data: st } = await admin.from("hrms_salary_structure").select("status, title").eq("id", sid).maybeSingle();
       const { data: lines } = await admin.from("hrms_salary_rate")
         .select("id, employee_id, type, basic_da, hra, fixed_allowance, conveyance, medical_allowance, gross, per_day").eq("structure_id", sid);
       const rows = lines || [];
@@ -266,7 +273,9 @@ export async function POST(req: Request) {
         changed++;
       }
       await admin.from("hrms_salary_structure").update({ updated_at: now }).eq("id", sid);
-      return NextResponse.json({ ok: true, checked: rows.length, changed, noType });
+      let back: { records: number; changed: number } | null = null;
+      if (st?.status === "Live" && changed) { try { const { backflushStructure } = await import("@/lib/structure-sync"); back = await backflushStructure(admin, sid, stamp); } catch (e) { swallow("hrms/rates sync_types backflush", e); } }
+      return NextResponse.json({ ok: true, checked: rows.length, changed, noType, backflushed: back });
     }
 
     if (action === "remove_rate") {
