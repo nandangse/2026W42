@@ -208,6 +208,21 @@ export async function POST(req: Request) {
             warnings.push(e instanceof Error ? e.message : String(e));
           }
         }
+        /* THE GOOGLE SHEET'S SALARY TAB, FOR COMPARISON ONLY (7 Oct 2026). The
+           muster carries attendance; the Salary tab carries what the sheet
+           computed. When the muster uploaded is the real Muster tab, the
+           Observation's Genie-against-the-sheet needs the Salary tab beside
+           it — it rides as its own upload and never touches the run's muster. */
+        if (kind === "gsheet") {
+          try {
+            const g = parseMuster(gridOf(buf, f.name));
+            const withSheet = g.rows.filter((x) => x.sheet).length;
+            parsed = g;
+            summary = `${g.rows.length} people · ${withSheet} with the sheet's computed figures`;
+            warnings = [...g.warnings];
+            if (!withSheet) warnings.push(`${f.name} does not look like the Salary tab — no computed columns (Total Earnings, Net payment, To be paid Salary) were found, so there is nothing to compare against.`);
+          } catch (e) { warnings.push(`Could not read ${f.name}: ${e instanceof Error ? e.message : String(e)}`); }
+        }
         if (kind === "muster" || kind === "rates") {
           try {
             const grid = gridOf(buf, f.name);
@@ -370,7 +385,7 @@ ${warnings.length ? `<p><b>${warnings.length} warning${warnings.length === 1 ? "
     /** SUBMIT AN INPUT — the signature on one of the run's forms (0140). */
     if (action === "submit_input" || action === "unsubmit_input") {
       const key = String(body.key || "");
-      if (!/^(essl|rates|muster|advance|loan|lunch|site)$/.test(key)) throw new HttpError(400, "Which input?");
+      if (!/^(essl|rates|muster|gsheet|advance|loan|lunch|site)$/.test(key)) throw new HttpError(400, "Which input?");
       const sheetId = String(body.id || "");
       await runRow(admin, sheetId);
       const signed = action === "submit_input";

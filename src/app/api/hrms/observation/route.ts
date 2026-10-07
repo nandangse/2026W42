@@ -56,7 +56,7 @@ function comparePay(register: Record<string, unknown>[], musterRows: Record<stri
   const sheetOf = new Map(musterRows.map((m) => [String(m.employee_id), m]));
   const withSheet = musterRows.filter((m) => m.sheet && typeof m.sheet === "object").length;
   if (!register.length) return { ready: false, why: "Nothing generated yet — press Generate, then this compares the register with the sheet.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, not_in_sheet: 0 };
-  if (!withSheet) return { ready: false, why: "The uploaded muster carries no computed figures to compare against — upload the Salary tab (or press Re-read on it) and the comparison writes itself.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, not_in_sheet: 0 };
+  if (!withSheet) return { ready: false, why: "Nothing to compare against yet — upload the Google Sheet's Salary tab (CSV or Excel) under \u201cGoogle Sheet \u2014 Salary tab\u201d on the Uploads tab, and the comparison writes itself. The muster alone carries attendance, not the sheet's computed figures.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, not_in_sheet: 0 };
   const N = (v: unknown) => Math.round((Number(v) || 0) * 100) / 100;
   const out: PayCompare = { ready: true, compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, not_in_sheet: 0 };
   for (const r of register) {
@@ -106,7 +106,16 @@ export async function GET(req: Request) {
        done"). The register's figures beside the Salary tab's own, person by
        person: the holds first, then every mismatch with the heads that
        differ, largest gap first. */
-    const pay = comparePay((run.rows ?? []) as Record<string, unknown>[], rows);
+    /* THE SHEET SIDE: the muster's own lines when the upload was the Salary
+       tab; otherwise the newest "Google Sheet — Salary tab" upload on the run
+       (7 Oct 2026 — the real Muster tab carries no computed figures). */
+    let sheetRows: Record<string, unknown>[] = rows.some((m) => m.sheet && typeof m.sheet === "object") ? rows : [];
+    if (!sheetRows.length) {
+      const { data: gs } = await admin.from("hrms_payroll_file").select("parsed").eq("sheet_id", id).eq("kind", "gsheet").not("parsed", "is", null).order("uploaded_at", { ascending: false }).limit(1).maybeSingle();
+      const pr = (gs?.parsed as { rows?: Record<string, unknown>[] } | null)?.rows;
+      if (Array.isArray(pr) && pr.some((m) => m.sheet)) sheetRows = pr;
+    }
+    const pay = comparePay((run.rows ?? []) as Record<string, unknown>[], sheetRows.length ? sheetRows : rows);
     if (!rows.length)
       return NextResponse.json({ ok: true, ready: false, pay, why: "This run has no muster yet — upload it first and the observation writes itself." });
 

@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.30",
+    date: "2026-10-07",
+    module: "Payroll: the Google Sheet\u2019s Salary tab rides as its own upload, for the comparison",
+    items: [
+      "SALARY TAB BESIDE THE MUSTER (\u201ccool lets run and see now\u201d \u2014 and the muster uploaded this time was the real Muster tab, which carries attendance and none of the sheet\u2019s computed figures, so the Observation had nothing to compare against). A new upload on the run, \u201cGoogle Sheet \u2014 Salary tab\u201d: the Salary tab as CSV or Excel, read for its computed columns only. The Observation\u2019s Genie-against-the-sheet uses it whenever the muster itself carries no figures; it never touches the run\u2019s muster or register. Upload the muster for the attendance, the Salary tab for the comparison, Generate once.",
+    ],
+  },
+  {
     v: "6.3.0.29",
     date: "2026-10-07",
     module: "Payroll: times in IST, mail Raghu to approve, totals pinned, the rules tracked in yellow",
