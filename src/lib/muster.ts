@@ -423,13 +423,20 @@ export function generateRegister(
      * muster's figure was thrown away wherever the rate list also spoke;
      * that was wrong, and this is the correction.
      */
+    /* SITE ALLOWANCE IS THE MUSTER'S FIGURE, AND ONLY THAT (Dr Raghu, 7 Oct
+       2026: "6050 Niran: his site allowance in the sheet is 2,500, but in
+       this, it has come to 5,000 … the site allowance is actually coming from
+       the salary sheet, from the muster only. Only for labour [and labour
+       contract], the site allowance is the calculation from the formula of
+       their overtime"). The rate list's standing site figure was being paid
+       ON TOP of the muster's — the same 2,500 twice. It is not paid any more;
+       where the rate list carries one, the run says so, so the rate list can
+       be cleaned. For Labour and Labour - Contract the OT above HRA rides on
+       top, as it has since 4 Sep — that is OT money, not pro-rated by days. */
     const siteFromRate = rr?.site ?? 0;
     const siteFromMuster = m.site_allowance ?? 0;
-    if (siteFromRate > 0 && siteFromMuster > 0) siteClash.push(m.employee_id);
-    const eSiteRate = m.present >= 7 ? siteFromRate : Math.round(siteFromRate * m.present / 26);
-    const eSite = eSiteRate + siteFromMuster;
-    // a worker's OT above his HRA has been carried in site allowance since
-    // 4 Sep; that is OT money and is not pro-rated by days on site
+    if (siteFromRate > 0) siteClash.push(m.employee_id);
+    const eSite = siteFromMuster;
     const site = worker ? eSite + Math.max(0, otPay - hra) : eSite;
     const otShort = worker && otPay < hra ? hra - otPay : 0;
     const compAmt = Math.round(compEncash * perDay);
@@ -466,7 +473,7 @@ export function generateRegister(
     };
   });
   if (siteClash.length)
-    warnings.push(`${siteClash.length} ${siteClash.length === 1 ? "person" : "people"} drew an actual site allowance from the muster ON TOP of the structure's (${siteClash.slice(0, 8).join(", ")}${siteClash.length > 8 ? " …" : ""}) — both are paid, as Dr Raghu directed on 7 Oct 2026.`);
+    warnings.push(`${siteClash.length} ${siteClash.length === 1 ? "person has" : "people have"} a standing site allowance on the rate list (${siteClash.slice(0, 8).join(", ")}${siteClash.length > 8 ? " …" : ""}) — NOT paid: site allowance is the muster's figure only (Dr Raghu, 7 Oct 2026). Clear it from the rate list.`);
   const held = rows.filter((r) => r.hold && r.present > 0);
   if (held.length)
     warnings.push(`${held.length} on HOLD (${held.slice(0, 10).map((r) => r.employee_id).join(", ")}${held.length > 10 ? " …" : ""}): earnings from attendance only — no leave spent, no comp-off or leave encashed, no arrears — and to-pay shown as nought until the hold is lifted.`);

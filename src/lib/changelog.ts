@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.28",
+    date: "2026-10-07",
+    module: "Payroll: site allowance is the muster\u2019s figure only \u2014 no longer doubled",
+    items: [
+      "NIRAN\u2019S 5,000 (\u201c6050 Niran: his site allowance in the sheet is 2,500, but in this, it has come to 5,000. What is the error in this? \u2026 the site allowance is actually coming from the salary sheet, from the muster only. Only for labour [and labour contract], the site allowance is the calculation from the formula of their overtime\u201d). The engine was paying the rate list\u2019s standing site allowance and the muster\u2019s actual one both \u2014 the same 2,500 twice. Now the muster\u2019s figure is the site allowance, full stop; Labour and Labour - Contract add their OT above HRA on top as before. Where the rate list still carries a site figure the run warns and names the people, so the rate list can be cleaned \u2014 it is not paid.",
+    ],
+  },
+  {
     v: "6.3.0.27",
     date: "2026-10-07",
     module: "Payroll: pay days are the month\u2019s own days \u2014 26 only for workers",
