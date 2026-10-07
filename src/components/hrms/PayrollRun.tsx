@@ -23,7 +23,7 @@ import { PAYROLL_RULES, PAYROLL_RULES_AS_OF, type MusterRow, type RegisterRow } 
 import { C } from "./RecordFields";
 import { inr } from "@/lib/fmt";
 
-interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; working_days: number | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[]; rules_as_of?: string; approval_mail?: { at: string; by: string }; bank_mail?: { at: string; by: string; to: string; files: number; total: number } } | null }
+interface Run { id: string; month: number; year: number; status: string; uploaded_by: string | null; uploaded_at: string | null; approved_by: string | null; approved_at: string | null; run_note: string | null; working_days: number | null; generated_at: string | null; generated_by: string | null; wa_batch_id: string | null; drive_folder_link: string | null; total_count: number | null; net_payable: number | null; earned_pay: number | null; deductions: number | null; mapping: { warnings?: string[]; rules_as_of?: string; approval_mail?: { at: string; by: string }; bank_mail?: { at: string; by: string; to: string; files: number; total: number }; management_mail?: { at: string; by: string; to: string } } | null }
 interface FileRow { id: string; kind: string; name: string; size: number | null; drive_link: string | null; uploaded_by: string | null; uploaded_at: string }
 interface Msg { id: string; employee_id: string; name: string; channel: string; direction: string; to_address: string | null; subject: string | null; body: string; status: string; error: string | null; sent_by: string | null; sent_at: string }
 interface InputRow { key: string; submitted_by: string | null; submitted_at: string | null; note: string }
@@ -188,6 +188,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           <div className="text-xs" style={{ color: "#8FA1B3" }}>
             Run by <b style={{ color: "#D7DEE6" }}>{who(r.uploaded_by)}</b> · run date <b style={{ color: "#D7DEE6" }}>{r.uploaded_at ? fmtFull(String(r.uploaded_at)) : "—"}</b>
             {r.generated_at && <> · generated <b style={{ color: "#D7DEE6" }}>{fmtIst(String(r.generated_at))}</b> by {who(r.generated_by)}</>}
+            {r.mapping?.management_mail && <> · sheet to management <b style={{ color: "#D7DEE6" }}>{fmtIst(r.mapping.management_mail.at)}</b> by {who(r.mapping.management_mail.by)}</>}
             {r.mapping?.bank_mail && <> · bank files mailed <b style={{ color: "#D7DEE6" }}>{fmtIst(r.mapping.bank_mail.at)}</b> by {who(r.mapping.bank_mail.by)}</>}
             {r.mapping?.approval_mail && <> · sent for approval <b style={{ color: "#D7DEE6" }}>{fmtIst(r.mapping.approval_mail.at)}</b> by {who(r.mapping.approval_mail.by)}</>}
             {" · "}{r.approved_by ? <span style={{ color: "#7BD389" }}>✓ approved by {who(r.approved_by)} at {fmtIst(String(r.approved_at))}</span> : <span style={{ color: "var(--amber)" }}>awaiting Raghu&apos;s approval</span>}

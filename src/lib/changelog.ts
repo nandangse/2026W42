@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.50",
+    date: "2026-10-07",
+    module: "Finalise Frozen Sheet to Management \u2014 the register PDF, mailed by Vinay",
+    items: [
+      "TO MANAGEMENT, THE SAME DAY (\u201cmake one more button which says Finalise Frozen Sheet to Management. Vinay gets an email to send to jc.kumar@, raghu@, tushar@, cc HR \u2026 with the PDF of this document attached\u201d). On the Salary Register page, beside Save as PDF: a green button that drafts the covering letter in his words \u2014 the month, the number of employees (paid and on hold), the total payment, given to Accounts and confirmed dispatched, slips e-mailed and WhatsApp to follow, the same-day undertaking, the invitation for more reports or suggestions to execute through Raghu Sir in Genie \u2014 Vinay edits and sends; the register with the three-month MIS and the rules page is pressed to PDF at send time and attached; it goes from his Gmail; the run header records when. Only once the run is approved.",
+    ],
+  },
+  {
     v: "6.3.0.49",
     date: "2026-10-07",
     module: "Bank files named with their header number",

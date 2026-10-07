@@ -9,7 +9,8 @@
  * sheet's own lines — a column the sheet did not carry is named as absent,
  * not padded with zeroes that would read as "nothing was deducted".
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import MailPopup from "./MailPopup";
 import { LOGO } from "@/lib/logo";
 import { LEDGER_COLUMNS, MONTHS, REGISTER_COLUMNS, otOf, type SheetRow } from "@/lib/salary-sheet";
 import { inr } from "@/lib/fmt";
@@ -45,6 +46,9 @@ function colSum(rows: SheetRow[], key: keyof SheetRow): number | null {
 }
 
 export default function SalaryRegisterPrint({ sheet, mis }: { sheet: Sheet; mis?: Mis | null }) {
+  // FINALISE FROZEN SHEET TO MANAGEMENT (Dr Raghu, 7 Oct 2026) — this document as PDF, mailed by Vinay
+  const [toMgmt, setToMgmt] = useState(false);
+  const [sentMsg, setSentMsg] = useState("");
   const rows = sheet.rows || [];
   const title = `${MONTHS[sheet.month - 1]} ${sheet.year}`;
 
@@ -186,10 +190,20 @@ export default function SalaryRegisterPrint({ sheet, mis }: { sheet: Sheet; mis?
         <span style={{ opacity: .7 }}>{rows.length} lines · {sheet.status}</span>
         {absent.length > 0 && <span style={{ fontSize: 11, color: "var(--amber)" }}>{absent.length} column{absent.length === 1 ? "" : "s"} not in this sheet</span>}
         <span style={{ flex: 1 }} />
+        {sentMsg && <span style={{ fontSize: 11, color: "#7BD389" }}>{sentMsg}</span>}
+        <button onClick={() => setToMgmt(true)} style={{ background: "#2A6B39", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}
+          title="Mail this document as PDF to JC Kumar, Raghu and Tushar, cc HR — drafted for Vinay to check and send">
+          Finalise Frozen Sheet to Management
+        </button>
         <button onClick={() => window.print()} style={{ background: "var(--accent)", color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", fontWeight: 700, cursor: "pointer" }}>
           Save as PDF / Print
         </button>
       </div>
+      {toMgmt && (
+        <MailPopup title="Finalised sheet to management" draftUrl={`/api/hrms/register-mail?id=${encodeURIComponent(String(sheet.id))}`} sendUrl="/api/hrms/register-mail" sendBody={{ id: sheet.id }}
+          attachment={(d) => `${String(d.pdfName)} — this document, pressed to PDF at send time · ${d.employees} employees · ₹${inr(Number(d.total) || 0)} to pay${d.approved ? "" : " · NOT YET APPROVED — approve the run first"}`}
+          onClose={() => setToMgmt(false)} onSent={(m) => { setSentMsg(m); setToMgmt(false); }} />
+      )}
 
       <div className="paper">
         {/* ═══ page 1 · the MIS ═══ */}
