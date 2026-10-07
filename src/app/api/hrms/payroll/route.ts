@@ -453,15 +453,21 @@ ${warnings.length ? `<p><b>${warnings.length} warning${warnings.length === 1 ? "
           const id = String(a.employee_id);
           const type = typeOfId.get(id) || null;
           const c = a.structure?.components;
+          /* THE COMPONENT KEYS ARE THE APPRAISAL'S OWN (7 Oct 2026). The import
+             writes fixed_allowance and medical_allowance; this read looked for
+             c.fixed and c.medical, found nothing, and paid nobody on the system
+             rates their fixed allowance or medical — 6034 lost his ₹500, every
+             worker on the Salary Revision Master lost his fixed. Both spellings
+             are read now, so neither import can starve the register again. */
           const parts = c && Object.keys(c).length
-            ? { basic_da: Number(c.basic_da) || 0, hra: Number(c.hra) || 0, fixed_allowance: Number(c.fixed) || 0, conveyance: Number(c.conveyance) || 0, medical_allowance: Number(c.medical) || 0 }
+            ? { basic_da: Number(c.basic_da) || 0, hra: Number(c.hra) || 0, fixed_allowance: Number(c.fixed_allowance ?? c.fixed) || 0, conveyance: Number(c.conveyance) || 0, medical_allowance: Number(c.medical_allowance ?? c.medical) || 0 }
             : splitGross(Number(a.new_gross), undefined, type);
           return {
             employee_id: id, name: nameOfId.get(id) || null, type,
             gross: Number(a.new_gross),
             basic_da: parts.basic_da, hra: parts.hra, fixed: parts.fixed_allowance,
             conveyance: parts.conveyance, medical: parts.medical_allowance,
-            site: c ? Number(c.site) || null : null, per_day: null,
+            site: c ? Number(c.site_allowance ?? c.site) || null : null, per_day: null,
           };
         });
         systemCount = rows2.length;

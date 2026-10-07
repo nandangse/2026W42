@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.31",
+    date: "2026-10-07",
+    module: "Payroll: fixed allowance and medical were being dropped from the system rates",
+    items: [
+      "THE FIXED ALLOWANCE THAT WENT MISSING (Dr Raghu, 7 Oct 2026, sending the 23 corrected lines: \u201cThere has been a mistake in the previous update where the gross salary of theirs has gone in as basic and DA in the rate\u201d). The appraisals and the rate list already held the right figures \u2014 6034 basic 31,740, fixed 500, conveyance 350. The fault was in Genie\u2019s reading of them: the appraisal stores its parts as fixed_allowance and medical_allowance, the payroll\u2019s system-rates path read fixed and medical, found nothing, and paid nobody on those rates a fixed allowance or medical. Both spellings are read now. Generate September again and the 23 \u2014 and everybody else on the Salary Revision Master \u2014 get their fixed allowance back.",
+    ],
+  },
+  {
     v: "6.3.0.30",
     date: "2026-10-07",
     module: "Payroll: the Google Sheet\u2019s Salary tab rides as its own upload, for the comparison",
