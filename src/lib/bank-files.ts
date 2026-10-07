@@ -13,8 +13,8 @@
  *
  * CRLF line endings, whole rupees, the beneficiary's name twice. One file
  * per class — management, staff, labour — cut again every time the running
- * total would pass ₹10,00,000, numbered 01, 02 … and named for the month:
- * sept_2026_staff_01.txt. THE FILE NUMBER IN THE HEADER IS UNIQUE FOR EVER
+ * total would pass ₹10,00,000, numbered 01, 02 … and named for the month
+ * and the header number: sept_2026_staff_01_50005.txt. THE FILE NUMBER IN THE HEADER IS UNIQUE FOR EVER
  * (Dr Raghu, 7 Oct 2026: "That 5-digit number should start with a series
  * starting from 50000, and then, for every file after that, keep
  * incrementing by 1. Whenever you generate a file, make that number very
@@ -85,7 +85,8 @@ export function buildBankFiles(rows: RegisterRow[], bankOf: (employee_id: string
       n++;
       const body = part.map((p) => `NEFT|${B.debitIfsc}|${B.debitAccount}|${p.bank.ifsc}|${p.bank.account}|INR|${p.amount}|${p.bank.nameInBank}|${p.bank.nameInBank}|${B.email}|${B.remark}`);
       const text = [`FILEHDR|${B.corporate}|${fileNo}|N|${B.remark}   `, ...body].join("\r\n") + "\r\n";
-      files.push({ name: `${monthTag(month, year)}_${cls}_${String(n).padStart(2, "0")}.txt`, text, cls, lines: part.length, total: running, fileNo });
+      // the header number in the name too, so accounts can file it (Dr Raghu, 7 Oct 2026): sept_2026_staff_01_50005.txt
+      files.push({ name: `${monthTag(month, year)}_${cls}_${String(n).padStart(2, "0")}_${fileNo}.txt`, text, cls, lines: part.length, total: running, fileNo });
       fileNo++; part = []; running = 0;
     };
     for (const p of list) {

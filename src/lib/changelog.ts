@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.49",
+    date: "2026-10-07",
+    module: "Bank files named with their header number",
+    items: [
+      "FILED BY NUMBER (\u201cname the file with that header number in that, so that it\u2019ll be easy for them to also file it in the records later on\u201d). Each file is now sept_2026_staff_01_50005.txt \u2014 month, class, part and the FILEHDR number \u2014 so the name on disk is the number the bank sees.",
+    ],
+  },
+  {
     v: "6.3.0.48",
     date: "2026-10-07",
     module: "Bank files: the account column, as given \u2014 not a 15-character test",
