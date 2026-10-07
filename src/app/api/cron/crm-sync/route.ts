@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { syncWatch } from "@/lib/sync-watch";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { beat } from "@/lib/cron-beat";
@@ -66,8 +67,17 @@ interface Job {
      stream no longer pulls a doctype marked inbound:false; its way back
      (the push) still runs. */
   inbound?: boolean;
+  /* WHOLE OR NOT AT ALL (7 Oct 2026): the columns a built row must carry.
+     A row missing one is not inserted thin and forgotten; it is counted
+     and named in the report, so the hour it happens is the hour it shows. */
+  must?: string[];
   fields: string[];
-  row: (r: Record<string, unknown>, who: Map<string, string>) => Record<string, unknown>;
+  /* THE LOOKUPS A WHOLE ROW NEEDS (7 Oct 2026): the CRM ids behind the ERP's
+     names — a company for a customer name, an opportunity for an enquiry
+     number — gathered once per batch, not once per row, and handed to the
+     row builder as `look` ("company:<name>" → id, "opp:<name>" → id). */
+  lookups?: (rows: Record<string, unknown>[], db: ReturnType<typeof crmDb>) => Promise<Map<string, string>>;
+  row: (r: Record<string, unknown>, who: Map<string, string>, look: Map<string, string>) => Record<string, unknown>;
   /* THE WAY BACK (Dr Raghu, 8 Sep 2026: "make sure that all of them are
      coming in and going out both, so that any changes made in the genie are
      also in the erp"). Absent means this doctype is pull-only. */
@@ -113,15 +123,44 @@ async function loadOppStages(db: ReturnType<typeof crmDb>) {
 const stageFor = (sales_stage: unknown) =>
   OPP_STAGE.get(String(sales_stage ?? "").trim().toLowerCase()) ?? OPP_FALLBACK;
 
+/* the ERP's quotation status in the CRM's words — the same words the 29 Aug import used */
+const quoteStatus = (st: string, docstatus: number): string => {
+  if (docstatus === 2 || /cancel/i.test(st)) return "cancelled";
+  if (/lost/i.test(st)) return "lost";
+  if (/expired/i.test(st)) return "expired";
+  if (/draft/i.test(st) || docstatus === 0) return "draft";
+  return "live";   // Open, Replied, Ordered — it went out
+};
+
+/** companies by the ERP's customer name, opportunities by the ERP's enquiry number — one query each per batch */
+async function quoteLookups(rows: Record<string, unknown>[], db: ReturnType<typeof crmDb>): Promise<Map<string, string>> {
+  const look = new Map<string, string>();
+  const custs = [...new Set(rows.map((r) => S(r.customer_name) || S(r.party_name)).filter(Boolean))];
+  for (let i = 0; i < custs.length; i += 50) {
+    const slice = custs.slice(i, i + 50);
+    const quoted = slice.map((c) => `"${c.replace(/[",]/g, "")}"`).join(",");
+    const { data } = await db.from("company").select("id, name, erp_name").or(`name.in.(${quoted}),erp_name.in.(${quoted})`).is("deleted_at", null);
+    for (const c of data ?? []) { for (const k of [S(c.erp_name), S(c.name)]) if (k && !look.has(`company:${k}`)) look.set(`company:${k}`, String(c.id)); }
+  }
+  const opps = [...new Set(rows.map((r) => S(r.opportunity)).filter(Boolean))];
+  for (let i = 0; i < opps.length; i += 100) {
+    const slice = opps.slice(i, i + 100);
+    const quoted = slice.map((c) => `"${c.replace(/[",]/g, "")}"`).join(",");
+    const { data } = await db.from("opportunity").select("id, opportunity_no, erp_opportunity_name").or(`opportunity_no.in.(${quoted}),erp_opportunity_name.in.(${quoted})`).is("deleted_at", null);
+    for (const o of data ?? []) { for (const k of [S(o.erp_opportunity_name), S(o.opportunity_no)]) if (k && !look.has(`opp:${k}`)) look.set(`opp:${k}`, String(o.id)); }
+  }
+  return look;
+}
+
 const JOBS: Job[] = [
   {
-    doctype: "Customer", table: "company", key: "erp_name", cursorKey: "sync_customer",
+    doctype: "Customer", table: "company", key: "erp_name", cursorKey: "sync_customer", must: ["erp_name", "name"],
     fields: ["name", "customer_name", "customer_group", "territory", "industry", "website", "modified"],
     row: (r) => ({ erp_name: S(r.name), name: S(r.customer_name) || S(r.name), website: S(r.website) || null }),
     push: { fields: (c) => ({ customer_name: S(c.name), website: S(c.website) || undefined }) },
   },
   {
-    doctype: "Contact", table: "person", key: "erp_name", cursorKey: "sync_contact",
+    doctype: "Contact", table: "person", key: "erp_name", cursorKey: "sync_contact", must: ["erp_name", "first_name"],
     fields: ["name", "first_name", "last_name", "designation", "email_id", "mobile_no", "phone", "company_name", "modified"],
     row: (r) => ({
       erp_name: S(r.name), first_name: S(r.first_name) || S(r.name), last_name: S(r.last_name) || null,
@@ -150,9 +189,24 @@ const JOBS: Job[] = [
     push: { fields: (c) => ({ title: S(c.name) || undefined }) },
   },
   {
-    doctype: "Quotation", table: "quotation", key: "quote_no", cursorKey: "sync_quotation",
-    fields: ["name", "customer_name", "transaction_date", "grand_total", "status", "modified"],
-    row: (r) => ({ quote_no: S(r.name), grand_total: Number(r.grand_total) || 0 }),
+    /* WHOLE, NOT A NUMBER AND A TOTAL (Dr Raghu, 7 Oct 2026: "The code is
+       also not synchronising. Please make the code pull in from there").
+       From 8 Sep to 7 Oct, 84 quotations arrived as a number and a total:
+       no date, no company, no opportunity, every one "draft" while the ERP
+       said Open. Now: the ERP's date, its customer as the company, its
+       enquiry as the opportunity, its status in the CRM's words, valid till. */
+    doctype: "Quotation", table: "quotation", key: "quote_no", cursorKey: "sync_quotation", must: ["quote_no", "quoted_on"],
+    fields: ["name", "customer_name", "party_name", "transaction_date", "valid_till", "grand_total", "status", "docstatus", "opportunity", "modified"],
+    lookups: quoteLookups,
+    row: (r, _who, look) => ({
+      quote_no: S(r.name),
+      quoted_on: S(r.transaction_date).slice(0, 10) || null,
+      valid_until: S(r.valid_till).slice(0, 10) || null,
+      grand_total: Number(r.grand_total) || 0,
+      status: quoteStatus(S(r.status), Number(r.docstatus)),
+      company_id: look.get(`company:${S(r.customer_name) || S(r.party_name)}`) ?? null,
+      opportunity_id: look.get(`opp:${S(r.opportunity)}`) ?? null,
+    }),
     push: { submittable: true, fields: () => ({}) },
   },
   {
@@ -246,6 +300,7 @@ export async function GET(req: Request) {
     await loadOppStages(db).catch(() => { /* an unreadable stage table leaves the fallback at 0, and the insert will say so */ });
 
     const report: Record<string, { read: number; added: number; had: number; upto: string }> = {};
+    const incomplete: Record<string, { count: number; names: string[] }> = {};
     const nextCfg: Record<string, string> = { ...cfg };
 
     /**
@@ -300,9 +355,16 @@ export async function GET(req: Request) {
         had = rows.length - fresh.length;
         /* A ROW THE ERP ALREADY GAVE US IS LEFT ALONE. Genie-side edits win. */
         if (fresh.length) {
-          const { error } = await db.from(job.table).insert(fresh.map((x) => job.row(x, who)));
-          if (error) throw new Error(`${job.table}: ${error.message}`);
-          added = fresh.length;
+          const look = job.lookups ? await job.lookups(fresh, db) : new Map<string, string>();
+          const built = fresh.map((x) => ({ x, row: job.row(x, who, look) }));
+          const whole = built.filter((b) => !(job.must ?? []).some((m) => !S(b.row[m])));
+          const thin = built.length - whole.length;
+          if (thin) incomplete[job.doctype] = { count: thin, names: built.filter((b) => (job.must ?? []).some((m) => !S(b.row[m]))).slice(0, 5).map((b) => S(b.x.name)) };
+          if (whole.length) {
+            const { error } = await db.from(job.table).insert(whole.map((b) => b.row));
+            if (error) throw new Error(`${job.table}: ${error.message}`);
+            added = whole.length;
+          }
         }
         for (const x of rows) if (S(x.modified) > upto) upto = S(x.modified);
         nextCfg[job.cursorKey] = upto;
@@ -403,8 +465,10 @@ export async function GET(req: Request) {
     if (!cfg.push_from) nextCfg.push_from = new Date().toISOString();
 
     await db.from("integration_setting").update({ config: nextCfg }).eq("key", "erpnext");
-    await beat("crm-sync", "done", { in: report, out, ...(skipped.length ? { unticked: skipped } : {}) });
-    return NextResponse.json({ ok: true, in: report, out,
+    /* THE WATCH — from the ERP's side: is everything it changed lately here, and whole? */
+    const watch = await syncWatch(db, base, EH).catch((e) => ({ at: new Date().toISOString(), window: "", ok: false, lines: [], error: String(e instanceof Error ? e.message : e) }));
+    await beat("crm-sync", "done", { in: report, out, watch, ...(Object.keys(incomplete).length ? { incomplete } : {}), ...(skipped.length ? { unticked: skipped } : {}) });
+    return NextResponse.json({ ok: true, in: report, out, watch, incomplete,
       push: armed ? "ARMED — the counts above were really sent to the ERP."
         : "NOT ARMED — the counts above are what WOULD be sent. Set push_on to \"yes\" in the erpnext integration config to arm it." });
   } catch (e) { return errJson(e); }

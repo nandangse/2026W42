@@ -66,7 +66,9 @@ export default function CrmApp({
       const kept = localStorage.getItem(`crm.dateview.${slug}`);
       if (kept) { setDateView(JSON.parse(kept)); return; }
     } catch (e) { swallow("crm/CrmApp", e); /* fine */ }
-    setDateView({ field: fld, preset: "ytd", from: "", to: "" });
+    /* "make it all time on the filter at all times" (Dr Raghu, 7 Oct 2026) —
+       the opportunity list opens on everything; the date bar is there to narrow it */
+    setDateView({ field: fld, preset: slug === "opportunity" ? "all" : "ytd", from: "", to: "" });
   }, [slug]);
   const applyDateView = (v: DateView | null) => {
     setDateView(v);
@@ -299,9 +301,15 @@ export default function CrmApp({
     [dt],
   );
   const visibleNames = cols ?? defaultCols;
+  /* "Reduce the width of the column of inquiry number" (Dr Raghu, 7 Oct 2026):
+     a document number is five digits; it gets 96px, pinned or not, and the
+     pinned columns after it start where it ends. */
+  const NUMBER_COLS = new Set(["opportunity_no", "quote_no", "so_no"]);
+  const pinW = (f: { name: string }) => (NUMBER_COLS.has(f.name) ? 96 : PINNED_W);
   const visible = visibleNames
     .map((n) => dt?.fields.find((f) => f.name === n))
     .filter((f): f is Field => !!f);
+  const pinLeft = (ci: number) => visible.slice(0, ci).reduce((a, f) => a + pinW(f), 0);
 
   const saveCols = (next: string[] | null) => {
     setCols(next);
@@ -1158,7 +1166,7 @@ export default function CrmApp({
                   <colgroup>
                     <col style={{ width: 30 }} />
                     {visible.map((f, ci) => (
-                      <col key={f.name} style={{ width: ci < pin ? PINNED_W : colWidths[f.name] || Math.min(colW, 220) }} />
+                      <col key={f.name} style={{ width: ci < pin ? pinW(f) : NUMBER_COLS.has(f.name) ? 96 : colWidths[f.name] || Math.min(colW, 220) }} />
                     ))}
                     <col style={{ width: 84 }} />
                   </colgroup>
@@ -1185,7 +1193,8 @@ export default function CrmApp({
                           // freezes on both axes at once.
                           position: "sticky", top: 0, zIndex: ci < pin ? 7 : 6,
                           boxShadow: `inset 0 -2px 0 ${BORDER}` + (ci < pin ? `, inset -1px 0 0 ${BORDER}` : ""),
-                          ...(ci < pin ? { left: ci * PINNED_W, width: PINNED_W, minWidth: PINNED_W }
+                          ...(ci < pin ? { left: pinLeft(ci), width: pinW(f), minWidth: pinW(f) }
+                            : NUMBER_COLS.has(f.name) ? { width: 96, minWidth: 96, maxWidth: 96 }
                             : colWidths[f.name] ? { width: colWidths[f.name], minWidth: colWidths[f.name], maxWidth: colWidths[f.name] } : null),
                         }}
                       >
@@ -1224,16 +1233,22 @@ export default function CrmApp({
                       {visible.map((f, ci) => (
                         <td
                           key={f.name}
-                          title={typeof r[f.name] === "string" && (r[f.name] as string).length > 40 ? (r[f.name] as string) : undefined}
+                          title={typeof r[f.name] === "string" && ((r[f.name] as string).length > 40 || (dt.name === "opportunity" && f.name === "name")) ? (r[f.name] as string) : undefined}
                           style={{
                             // one line per cell — the row is a scan, the
                             // lightbox is the read (Dr Raghu, 26 Aug 2026)
                             padding: "8px 12px", fontSize: 13, borderBottom: "1px solid #F0EEE8",
                             verticalAlign: "top", background: "#fff",
-                            maxWidth: ci < pin ? PINNED_W : colWidths[f.name] ?? colW,
+                            maxWidth: ci < pin ? pinW(f) : NUMBER_COLS.has(f.name) ? 96 : colWidths[f.name] ?? colW,
                             ...(ci >= pin && colWidths[f.name] ? { width: colWidths[f.name], minWidth: colWidths[f.name] } : null),
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            ...(ci < pin ? stickyCell(ci, 5) : null),
+                            ...(ci < pin ? stickyCell(ci, 5, pinLeft(ci), pinW(f)) : null),
+                            /* "Show opportunity in smaller letters and make it flow across two
+                               lines so that we can see more" (Dr Raghu, 7 Oct 2026) — the whole
+                               of it waits on the hover */
+                            ...(dt.name === "opportunity" && f.name === "name"
+                              ? { fontSize: 12, lineHeight: 1.25, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, textOverflow: "clip" }
+                              : null),
                           }}
                         >
                           <Cell field={f} value={r[f.name]} links={links} onOpenLink={openLinked} short />

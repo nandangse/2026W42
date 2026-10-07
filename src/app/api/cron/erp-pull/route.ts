@@ -87,11 +87,21 @@ export async function GET(req: Request) {
       ...(have || []).map((x) => String(x.opportunity_no)),
       ...(pushed || []).map((x) => String(x.erp_opportunity_name)),
     ]);
+    /* A KNOWN ROW WITH NO DATE IS HEALED, NOT SKIPPED (7 Oct 2026). If any
+       other path ever lands an opportunity thin again, the next hour fills
+       its number, date, company and the rest from the ERP — never touching
+       a field somebody has already filled. */
+    const thinRows = new Map<string, Record<string, unknown>>();
+    if (names.length) {
+      const { data: th } = await db.from("opportunity").select("id, erp_opportunity_name, opportunity_no, opportunity_on, company_id, contact_id, owner_id, sector_id, product_family, source, enquiry_info, expected_close_on")
+        .in("erp_opportunity_name", names).or("opportunity_on.is.null,opportunity_no.is.null");
+      for (const t of th || []) thinRows.set(String(t.erp_opportunity_name), t as Record<string, unknown>);
+    }
 
     // the lookup tables, once per run
     const [{ data: stages }, { data: sectors }] = await Promise.all([
       db.from("stage").select("id, name").eq("entity", "opportunity"),
-      db.from("sector").select("id, name"),
+      db.from("sector").select("id, name, code"),
     ]);
     const stageByName = new Map((stages || []).map((s) => [String(s.name).toLowerCase(), s.id]));
     const stageOf = (s: string) => {
@@ -99,7 +109,21 @@ export async function GET(req: Request) {
       if (k === "prospecting") return stageByName.get("suspect") ?? stageByName.get("new") ?? null;
       return stageByName.get(k) ?? stageByName.get("new") ?? null;
     };
-    const sectorByName = new Map((sectors || []).map((s) => [String(s.name).toLowerCase(), s.id]));
+    /* THE ERP SAYS "MHE", THE CRM SAID "Material Handling Equipment" (found
+       7 Oct 2026): matched by name alone, no pulled opportunity ever got a
+       sector — 31,044 were blank. By code and by name now, and when the
+       ERP has no sector, the product family's prefix (AGSE → GSE, MHE, CAR,
+       DEF) says it. */
+    const sectorByName = new Map<string, unknown>();
+    for (const se of sectors || []) { sectorByName.set(String(se.name).toLowerCase(), se.id); if (se.code) sectorByName.set(String(se.code).toLowerCase(), se.id); }
+    const PREFIX: [RegExp, string][] = [[/^(agse|gse|aae)\b/i, "gse"], [/^mhe\b/i, "mhe"], [/^car\b/i, "car"], [/^def\b/i, "def"], [/^(ser|service)\b/i, "ser"], [/^(cm|contract)\b/i, "cm"], [/^ent\b/i, "ent"]];
+    const sectorOf = (sector: unknown, family: unknown) => {
+      const s = String(sector || "").trim().toLowerCase();
+      if (s && sectorByName.has(s)) return sectorByName.get(s) ?? null;
+      const f = String(family || "").trim();
+      const hit = PREFIX.find(([re]) => re.test(f));
+      return hit ? sectorByName.get(hit[1]) ?? null : null;
+    };
     const { data: profiles } = await db.from("profile").select("id, email, full_name");
     const profByEmail = new Map((profiles || []).map((p) => [String(p.email).toLowerCase(), p.id]));
 
@@ -117,13 +141,14 @@ export async function GET(req: Request) {
       [/referral|reference/i, "referral"], [/field|visit/i, "field_visit"], [/tender|gem/i, "tender"],
     ];
     const sourceOf = (v: unknown) => { const t = String(v || "").trim(); if (!t) return null; return SOURCE.find(([re]) => re.test(t))?.[1] ?? null; };
-    let pulled = 0, skippedExisting = 0, noCompany = 0, failed = 0, firstError = "";
+    let pulled = 0, skippedExisting = 0, noCompany = 0, failed = 0, healed = 0, firstError = "";
     let maxCreation = cursor;
     for (const o of rows) {
       const no = String(o.name);
       const created = String(o.creation || "");
       if (created > maxCreation) maxCreation = created;
-      if (haveSet.has(no)) { skippedExisting++; continue; }
+      if (haveSet.has(no) && !thinRows.has(no)) { skippedExisting++; continue; }
+      const thin = thinRows.get(no);
 
       // the ERP's own customer and contact — the 1:1 the import kept
       let company_id: string | null = null;
@@ -144,12 +169,26 @@ export async function GET(req: Request) {
       const suitability = Number(String(o.custom_product_suitable_to_be_made_by_us || "").replace(/[^0-9]/g, "")) || null;
       const txn = String(o.transaction_date || "").slice(0, 10) || null;
       const close = txn ? new Date(new Date(txn + "T00:00:00Z").getTime() + 30 * 86400000).toISOString().slice(0, 10) : null;
+      if (thin) {
+        const fill: Record<string, unknown> = { opportunity_no: no, opportunity_on: txn };
+        if (!thin.expected_close_on) fill.expected_close_on = close;
+        if (!thin.company_id && company_id) fill.company_id = company_id;
+        if (!thin.contact_id && contact_id) fill.contact_id = contact_id;
+        if (!thin.owner_id) { const ow = profByEmail.get(String(o.owner || "").toLowerCase()); if (ow) fill.owner_id = ow; }
+        if (!thin.sector_id) { const se = sectorOf(o.sector, o.product_group); if (se) fill.sector_id = se; }
+        if (!thin.product_family && String(o.product_group || "").trim()) fill.product_family = String(o.product_group).trim();
+        if (!thin.source) { const so = sourceOf(o.utm_source); if (so) fill.source = so; }
+        if (!thin.enquiry_info && infoField && o[infoField]) fill.enquiry_info = htmlToRich(String(o[infoField]));
+        const { error: hErr } = await db.from("opportunity").update(fill).eq("id", String(thin.id));
+        if (!hErr) healed++; else { failed++; if (!firstError) firstError = `${no} (heal): ${hErr.message}`.slice(0, 300); }
+        continue;
+      }
       const { error } = await db.from("opportunity").insert({
         opportunity_no: no, erp_opportunity_name: no,
         name: custName || String(o.title || no).slice(0, 200),
         pipeline: "capital",
         stage_id: stageOf(String(o.sales_stage || "")),
-        sector_id: sectorByName.get(String(o.sector || "").toLowerCase()) ?? null,
+        sector_id: sectorOf(o.sector, o.product_group),
         product_family: String(o.product_group || "").trim() || null,
         source: sourceOf(o.utm_source),
         company_id, contact_id,
@@ -229,12 +268,12 @@ export async function GET(req: Request) {
 
     // move the cursors only past what we actually walked
     await db.from("integration_setting").update({ config: { ...cfg, last_pull: maxCreation, jm_cursor: jmCursorNew, issue_cursor: issueCursor, issue_start: issueStart, issue_file_cursor: fileCursor, issue_file_start: fileStart } }).eq("key", "erpnext");
-    await beat("erp-pull", "done", { last_pull: maxCreation, pulled, failed, ...(firstError ? { firstError } : {}), seva });
+    await beat("erp-pull", "done", { last_pull: maxCreation, pulled, healed, failed, ...(firstError ? { firstError } : {}), seva });
     await db.from("crm_audit").insert({
       entity: "opportunity", entity_id: null, action: "erp_pull",
-      after: { pulled, skippedExisting, noCompany, failed, ...(firstError ? { firstError } : {}), cursor: maxCreation }, by_user: null,
+      after: { pulled, skippedExisting, noCompany, healed, failed, ...(firstError ? { firstError } : {}), cursor: maxCreation }, by_user: null,
     }).then(() => null, () => null);
-    return NextResponse.json({ ok: true, pulled, skippedExisting, noCompany, failed, firstError: firstError || null, deliveredSynced: djSynced, cursor: maxCreation, jmCursor: jmCursorNew, more: rows.length === 300 });
+    return NextResponse.json({ ok: true, pulled, skippedExisting, noCompany, healed, failed, firstError: firstError || null, deliveredSynced: djSynced, cursor: maxCreation, jmCursor: jmCursorNew, more: rows.length === 300 });
   } catch (e) {
     await beat("erp-pull", "failed", { error: String(e instanceof Error ? e.message : e).slice(0, 300) });
     return errJson(e);

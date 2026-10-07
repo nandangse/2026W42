@@ -28,15 +28,27 @@ export function rowContacts(dt: Doctype, r: Row): { email: string | null; phone:
 }
 
 /** Sticky style for a pinned column: fixed width so the offsets add up. */
-export function stickyCell(ci: number, z: number): React.CSSProperties {
+export function stickyCell(ci: number, z: number, left?: number, width?: number): React.CSSProperties {
   return {
-    position: "sticky", left: ci * PINNED_W, zIndex: z,
-    width: PINNED_W, minWidth: PINNED_W,
+    position: "sticky", left: left ?? ci * PINNED_W, zIndex: z,
+    width: width ?? PINNED_W, minWidth: width ?? PINNED_W,
     boxShadow: "inset -1px 0 0 " + BORDER,
   };
 }
 
 /** Render one value the way its field type deserves. */
+const PLAIN_LINKS = new Set(["stage", "sector", "profile", "product", "tax", "terms_template"]);
+/** warmth by the stage's name — the opportunity ladder and the quotation closures share the scale */
+export function stageWarmth(name: string): { bg: string; fg: string } {
+  const n = name.toLowerCase();
+  if (/lost|regret|not target|cancel|dropped|expired/.test(n)) return { bg: "#ECECEC", fg: "#6B6B6B" };          // closed — cold ash
+  if (/won|order|accepted|submitted/.test(n)) return { bg: "#DDF3E4", fg: "#1E6B3E" };                              // won — green
+  if (/quote|hotlist|live|late handling|negotiat/.test(n)) return { bg: "#FDE2D3", fg: "#B3391E" };                 // hot
+  if (/consultative|presentation|proposal|demo|site/.test(n)) return { bg: "#FFE9C2", fg: "#8A5B00" };              // warm
+  if (/waiting|data|follow|qualif|prospect|handled/.test(n)) return { bg: "#FFF4D6", fg: "#9A6B00" };               // warming
+  return { bg: "#E6EEF6", fg: "#3A5F80" };                                                                          // new — cool
+}
+
 export function Cell({
   field, value, links, onOpenLink, short,
 }: {
@@ -80,7 +92,18 @@ export function Cell({
   if (field.type === "link" && field.link) {
     const hit = (links[field.link] || []).find((o) => o.id === String(value));
     const label = hit ? hit.label : `${String(value).slice(0, 8)}…`;
-    if (!onOpenLink) return <>{label}</>;
+    /* THE STAGE WEARS ITS WARMTH (Dr Raghu, 7 Oct 2026: "colour-code it.
+       Make the stages different colours depending upon the warmth of the
+       project") — cold grey for a fresh enquiry, through amber as it is
+       worked, hot at a quote, and the closed ones dark. */
+    if (field.link === "stage") {
+      const w = stageWarmth(label);
+      return <span title={label} style={{ display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: w.bg, color: w.fg, whiteSpace: "nowrap" }}>{label}</span>;
+    }
+    /* "Don't make all the sectors, etc., clickable because that is way too
+       much" — sector, salesperson, pipeline and product read as words; the
+       company and the people stay doors. */
+    if (!onOpenLink || PLAIN_LINKS.has(field.link)) return <>{label}</>;
     return (
       <button
         onClick={(e) => { e.stopPropagation(); onOpenLink(field.link as string, String(value)); }}

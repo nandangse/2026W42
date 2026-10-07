@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.13",
+    date: "2026-10-07",
+    module: "CRM: the sync watch; quotations whole; sectors filled; the opportunity list tidied",
+    items: [
+      "THE SYNC WATCH (\u201cCan this also be made sure that it doesn\u2019t change in the future? Also, same for customer, contact, and company.\u201d). Every hour, after the sync, Genie asks the ERP\u2019s side of the question: of every opportunity, customer, contact and quotation the ERP changed in the last two days, is each one in the CRM, and whole \u2014 an opportunity with its date and number, a company with its name, a person with a first name, a quotation with its date? The answer sits on the Synchronize to ERP screen: green when everything arrived, red with the names when anything is missing or thin. The sync also refuses to insert a row missing its must-have fields and names it instead of writing it thin; the hourly pull heals any opportunity it finds undated; and the pull now reports every refused row and why.",
+      "QUOTATIONS ARRIVE WHOLE (\u201cThe code is also not synchronising. Please make the code pull in from there\u201d). Since 8 September the sync brought a quotation in as a number and a total \u2014 no date, no company, no opportunity, every one \u2018draft\u2019 while the ERP said Open. Now the ERP\u2019s date, its customer as the company, its enquiry as the opportunity, its status in the CRM\u2019s words, and valid-till come with it. The 84 thin quotations were filled from the ERP: 78 got their company, 14 their opportunity, 77 their right status.",
+      "SECTORS FILLED (\u201cTry to create the fill-in-the-blanks of the sector\u201d). The ERP writes the sector as a code \u2014 MHE, GSE, CAR, DEF \u2014 and the CRM named its sectors in full, so no pulled opportunity ever got one: 31,044 were blank. The pull matches by code now, and falls back to the product family\u2019s prefix; 31,015 blanks were filled, 31,002 from the ERP\u2019s own sector.",
+      "THE OPPORTUNITY LIST (\u201cReduce the width of the column of inquiry number \u2026 colour-code it \u2026 Don\u2019t make all the sectors, etc., clickable \u2026 make it all time on the filter \u2026 Show opportunity in smaller letters and make it flow across two lines \u2026 A mouseover should also show all of them\u201d). The ENQ No column is 96px, pinned or not. The stage wears its warmth: cool for New, warming through Waiting for Data, warm at Consultative Presentation, hot at a quote, green when won, ash when lost or regretted. Sector, salesperson, pipeline and product read as words; company and contact stay clickable. The list opens on all time. The opportunity name is a size smaller, flows to two lines, and the whole of it shows on hover.",
+    ],
+  },
+  {
     v: "6.3.0.12",
     date: "2026-10-07",
     module: "CRM: opportunities arrive whole again — two silent faults in the hourly pulls fixed, 140 enquiries repaired",

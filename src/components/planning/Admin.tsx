@@ -96,6 +96,34 @@ export function MonthlyTargetsCard() {
    lesson as Delivered and Replied on the campaign screen.
    ══════════════════════════════════════════════════════════════════════ */
 type HourlyDoc = { key: string; label: string; doctype: string; carrier: string; where: string; hourly: boolean; on: boolean; group?: string };
+type WatchLine = { doctype: string; checked: number; missing: number; thin: number; missingNames: string[]; thinNames: string[]; error?: string };
+type Watch = { syncAt: string | null; pullAt: string | null; watch: { at: string; window: string; ok: boolean; lines: WatchLine[]; error?: string } | null; incomplete: Record<string, { count: number; names: string[] }> | null; pullFailed: number; pullHealed: number; pullError: string | null };
+
+/** DID IT ALL ARRIVE? — the sync watch, from the ERP's side (7 Oct 2026). */
+function SyncWatch({ w }: { w: Watch | null }) {
+  if (!w) return null;
+  const lines = w.watch?.lines ?? [];
+  const bad = lines.some((l) => l.missing || l.thin || l.error) || !!w.pullFailed || !!(w.incomplete && Object.keys(w.incomplete).length) || !!w.watch?.error;
+  const at = (s: string | null) => (s ? new Date(s).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "·");
+  return (
+    <div className="px-3 py-2" style={{ borderTop: "1px solid var(--line)", background: bad ? "#FDECEC" : "#EEF7F0" }}>
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span className="text-xs font-bold" style={{ color: bad ? "var(--red)" : "#1E6B3E", letterSpacing: 1.2 }}>{bad ? "SOMETHING DID NOT ARRIVE" : "EVERYTHING ARRIVED, WHOLE"}</span>
+        <span className="text-xs" style={{ color: "var(--muted)" }}>checked at {at(w.syncAt)} · what the ERP changed in the last two days, made more than two hours ago · opportunities, customers, contacts, quotations</span>
+      </div>
+      <div className="flex gap-3 flex-wrap mt-1">
+        {lines.map((l) => (
+          <span key={l.doctype} className="text-xs" style={{ color: l.missing || l.thin || l.error ? "var(--red)" : "var(--ink)" }}>
+            <b>{l.doctype}</b> {l.error ? `— ${l.error}` : <>{l.checked} checked{l.missing ? ` · ${l.missing} missing (${l.missingNames.slice(0, 3).join(", ")}${l.missing > 3 ? "…" : ""})` : ""}{l.thin ? ` · ${l.thin} thin (${l.thinNames.slice(0, 3).join(", ")}${l.thin > 3 ? "…" : ""})` : ""}{!l.missing && !l.thin ? " · all here" : ""}</>}
+          </span>
+        ))}
+        {w.watch?.error && <span className="text-xs" style={{ color: "var(--red)" }}>the watch itself failed: {w.watch.error}</span>}
+        {w.incomplete && Object.entries(w.incomplete).map(([d, x]) => <span key={d} className="text-xs" style={{ color: "var(--red)" }}><b>{d}</b> · {x.count} refused as incomplete ({x.names.join(", ")})</span>)}
+        {(w.pullFailed || w.pullHealed) ? <span className="text-xs" style={{ color: w.pullFailed ? "var(--red)" : "var(--ink)" }}><b>Opportunity pull</b> at {at(w.pullAt)}{w.pullHealed ? ` · ${w.pullHealed} healed` : ""}{w.pullFailed ? ` · ${w.pullFailed} refused — ${w.pullError || ""}` : ""}</span> : null}
+      </div>
+    </div>
+  );
+}
 
 function HourlyFromErp() {
   const [docs, setDocs] = useState<HourlyDoc[] | null>(null);
@@ -185,9 +213,10 @@ function HourlyFromErp() {
   };
 
 
+  const [watch, setWatch] = useState<Watch | null>(null);
   const load = useCallback(() => api.get("/api/erp-hourly")
-    .then((r) => { const j = r as { docs?: HourlyDoc[]; winner?: string; note?: string };
-      setDocs(j.docs || []); setWinner(j.winner || "latest"); setNote(j.note || ""); setErr(""); })
+    .then((r) => { const j = r as { docs?: HourlyDoc[]; winner?: string; note?: string; watch?: Watch | null };
+      setDocs(j.docs || []); setWinner(j.winner || "latest"); setNote(j.note || ""); setWatch(j.watch ?? null); setErr(""); })
     .catch((e) => setErr(e instanceof Error ? e.message : String(e))), []);
   useEffect(() => { load(); }, [load]);
 
@@ -236,6 +265,8 @@ function HourlyFromErp() {
         ))}
         {!docs && <div className="text-xs" style={{ color: "var(--muted)" }}>reading…</div>}
       </div>
+
+      <SyncWatch w={watch} />
 
       {/* THE RULE UNDER ALL OF IT. It is what makes a pull safe over an
           unpushed Genie edit — and therefore what lets the pull carry on

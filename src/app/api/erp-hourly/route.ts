@@ -81,11 +81,32 @@ export async function GET() {
       }
     } catch (e) { swallow("erp-hourly/last", e); /* no ledger yet */ }
 
+    /* THE WATCH (Dr Raghu, 7 Oct 2026: "make sure that it doesn't change in
+       the future … same for customer, contact, and company"): the last
+       hourly sync's answer from the ERP's side — is everything the ERP
+       changed lately here, and whole — and the last pull's refusals. Read
+       off the CRM's own heartbeat ledger; shown red when anything is wrong. */
+    let watch: Record<string, unknown> | null = null;
+    try {
+      const { crmDb, crmConfigured } = await import("@/crm/db");
+      if (crmConfigured()) {
+        const db = crmDb();
+        const [{ data: sync }, { data: pull }] = await Promise.all([
+          db.from("crm_audit").select("at, after").eq("entity", "cron").eq("entity_id", "crm-sync").eq("action", "done").order("at", { ascending: false }).limit(1).maybeSingle(),
+          db.from("crm_audit").select("at, after").eq("entity", "cron").eq("entity_id", "erp-pull").eq("action", "done").order("at", { ascending: false }).limit(1).maybeSingle(),
+        ]);
+        const sa = (sync?.after ?? {}) as Record<string, unknown>;
+        const pa = (pull?.after ?? {}) as Record<string, unknown>;
+        watch = { syncAt: sync?.at ?? null, pullAt: pull?.at ?? null, watch: sa.watch ?? null, incomplete: sa.incomplete ?? null, pullFailed: Number(pa.failed) || 0, pullHealed: Number(pa.healed) || 0, pullError: pa.firstError ?? null };
+      }
+    } catch (e) { swallow("erp-hourly/watch", e); }
+
     return NextResponse.json({
       ok: true,
       ready: s.ready,
       winner: s.winner,
       lastRun,
+      watch,
       docs: ERP_DOCS.map((d) => ({ ...d, on: d.hourly ? isOn(s.on, d.key) : false })),
       note: s.ready ? undefined : "Run Genie migration 0168 — until then every document refreshes and nothing can be turned off.",
     });
