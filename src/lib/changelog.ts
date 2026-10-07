@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.33",
+    date: "2026-10-07",
+    module: "The version badge for everybody",
+    items: [
+      "V-BADGE FOR ALL (\u201cShow the version number in Vinay\u2019s HRMS also\u201d). The orange version badge in the header was admin-only; it now shows for every user in every module, so when a fix lands the person on the screen can say which build they are on \u2014 and the tooltip tells a non-admin to hard-refresh if a fix is not showing.",
+    ],
+  },
+  {
     v: "6.3.0.32",
     date: "2026-10-07",
     module: "Payroll observation: rates, attendance, net and to-pay side by side, like a CHRO",

@@ -116,12 +116,13 @@ export default function GenieShell({
                   opening a menu (Dr Raghu, 7 Sep 2026: "i am not seeing the
                   genie version ... we discussed this, all admins need to see
                   it"). 5.0.1.0 had tucked it inside the account dropdown. */}
-              {isAdmin && (
-                <span className="tnum" style={{ background: ORANGE, color: "#fff", borderRadius: 3, padding: "1px 5px", fontSize: 10.5, fontWeight: 700, letterSpacing: 0 }}
-                  title="Genie's version — Admin → Updates says what changed">
-                  V {APP_VERSION}
-                </span>
-              )}
+              {/* EVERYBODY SEES THE VERSION (Dr Raghu, 7 Oct 2026: "Show the version
+                  number in Vinay's HRMS also") — it was admin-only; when a fix lands
+                  the person on the screen has to be able to say which build they are on */}
+              <span className="tnum" style={{ background: ORANGE, color: "#fff", borderRadius: 3, padding: "1px 5px", fontSize: 10.5, fontWeight: 700, letterSpacing: 0 }}
+                title={isAdmin ? "Genie's version — Admin → Updates says what changed" : "Genie's version — hard-refresh (⌘⇧R) if a fix you were told about is not showing"}>
+                V {APP_VERSION}
+              </span>
             </div>
             {tagline && <div className="genie-tagline truncate" style={{ fontSize: 11, color: MUTED }}>{tagline}</div>}
           </div>
