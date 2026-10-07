@@ -61,6 +61,24 @@ export async function GET(req: Request) {
     const id = new URL(req.url).searchParams.get("id");
     const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
 
+    /* ONE PERSON'S SALARY STRUCTURE (Dr Raghu, 7 Oct 2026: "On the employee ID,
+       when clicked, please open a lightbox which just shows his employee report
+       card, but basically the salary structure"): the HRIS record's Pay fields,
+       the line on the Live Salary Structure, and this run's register line. */
+    const person = new URL(req.url).searchParams.get("person");
+    if (id && person) {
+      const r = await runRow(admin, id);
+      const [p] = await people(admin, [person]);
+      const { data: live } = await admin.from("hrms_salary_structure").select("id, title, frozen_at, signed_as").eq("status", "Live").maybeSingle();
+      const { data: line } = live ? await admin.from("hrms_salary_rate").select("basic_da, hra, fixed_allowance, conveyance, medical_allowance, gross, per_day, type, note, updated_at, updated_by").eq("structure_id", live.id).eq("employee_id", person).maybeSingle() : { data: null };
+      const reg = ((r.rows ?? []) as RegisterRow[]).find((x) => x.employee_id === person) ?? null;
+      const { data: hist } = await admin.from("hrms_salary_history").select("fy, gross, by, at").eq("employee_id", person).order("fy");
+      const v = (k: string) => (p?.value[k] ?? null);
+      return NextResponse.json({ ok: true, person: p ? { id: p.id, name: p.name, type: p.type, department: p.department, designation: v("designation"), doj: v("doj"), location: v("location"), reporting_manager: v("reporting_manager"),
+        record: { basic_da: v("basic_da"), hra: v("hra"), fixed_allowance: v("fixed_allowance"), conveyance: v("conveyance"), medical_allowance: v("medical_allowance"), site_allowance: v("site_allowance"), gross: v("gross"), per_day_rate: v("per_day_rate") } } : null,
+        structure: live ? { title: live.title, frozen_at: live.frozen_at, signed_as: live.signed_as, line } : null, register: reg, history: hist ?? [] });
+    }
+
     /* EXECUTE BANK FILES (Dr Raghu, 7 Oct 2026) — the approved run as the
        bank's own upload files, zipped: see src/lib/bank-files.ts. Only once
        the run is approved; the amounts are the register's to-pay. */

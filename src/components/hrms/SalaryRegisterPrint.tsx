@@ -15,6 +15,7 @@ import { LEDGER_COLUMNS, MONTHS, REGISTER_COLUMNS, otOf, type SheetRow } from "@
 import { inr } from "@/lib/fmt";
 import SalaryMis from "./SalaryMis";
 import type { Mis } from "@/lib/salary-mis";
+import { PAYROLL_RULES, PAYROLL_RULES_AS_OF } from "@/lib/muster";
 
 interface Sheet {
   id: string; month: number; year: number; status: string;
@@ -300,6 +301,30 @@ export default function SalaryRegisterPrint({ sheet, mis }: { sheet: Sheet; mis?
 
         {/* ═══ the Salary MIS — three months, every head, beside the deliveries (7 Oct 2026) ═══ */}
         {mis && mis.months.length > 0 && <SalaryMis mis={mis} />}
+
+        {/* THE RULES, ON THE RECORD (Dr Raghu, 7 Oct 2026: "publish these rules also in the PDF that is
+            generated so that we can keep it on record too") — the rules this register was computed under,
+            a changed line marked with the day it changed */}
+        <div className="pagebreak" />
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontWeight: 800, fontSize: 13, letterSpacing: ".04em", borderBottom: "2px solid #16232F", paddingBottom: 6, marginBottom: 8 }}>
+            THE RULES THIS REGISTER WAS COMPUTED UNDER <span style={{ fontWeight: 400, fontSize: 10, color: "#6B7280" }}>· rules as of {PAYROLL_RULES_AS_OF} · given 4 Sep 2026 · a highlighted line changed on the day shown</span>
+          </div>
+          <div style={{ columns: 2, columnGap: 24, fontSize: 9.5, lineHeight: 1.45 }}>
+            {PAYROLL_RULES.map((g) => (
+              <div key={g.head} style={{ breakInside: "avoid", marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 10.5, color: "#16232F", marginBottom: 2 }}>{g.head}</div>
+                <ul style={{ margin: 0, paddingLeft: 14 }}>
+                  {g.lines.map((l, i) => (
+                    <li key={i} style={{ marginBottom: 2, background: l.changed ? "#FFF1A8" : "transparent", padding: l.changed ? "1px 3px" : 0, borderRadius: 2 }}>
+                      {l.text}{l.changed && <span style={{ color: "#8A6D00", fontSize: 8.5, marginLeft: 4 }}>changed {l.changed}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div className="pagebreak" />
 

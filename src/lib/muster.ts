@@ -399,7 +399,7 @@ export function generateRegister(
        from it, which is how 6971 (balance 13.1, below the floor) was shown
        using 1.5 days and 7002 (balance 1.7) six: those were comp-off days.
        Comp off is encashed in full, as the sheet does. */
-    const spendable = Math.min(Math.max(0, Math.round(leaveOb - minBal)), Math.max(0, Math.floor(available - minBal)));
+    const spendable = Math.min(Math.max(0, Math.floor(leaveOb - minBal)), Math.max(0, Math.floor(available - minBal)));   // whole days, never rounding up over the floor (6280, 6360 — 7 Oct 2026)
     if (shortfall > 0 && earnsLeave && !worker && !noExtras && spendable > 0) { leaveUsed = Math.min(Math.floor(shortfall), spendable); shortfall -= leaveUsed; }
     if (shortfall > 0 && worker && !noExtras && available > 0) workersShort.push(m.employee_id);
     const compUsed = 0;
@@ -411,10 +411,19 @@ export function generateRegister(
 
     // ── earnings ──
     const f = payDays > 0 ? paidDays / payDays : 0;
-    const eBasic = Math.round(basic * f);
+    /* ROUNDING AS THE SHEET ROUNDS (7 Oct 2026, read off 31 of 31 lines that
+       were a rupee apart): earned basic is taken UP to the rupee; conveyance
+       is left unrounded (rate × present ÷ working days, to the paise), so the
+       net carries paise and the to-pay rounds it up — which is why the sheet
+       pays ₹59,459 on a net of ₹59,458.33. */
+    const eBasic = Math.ceil(basic * f);
     const hra = contractish ? 0 : Math.round(eBasic * 0.2);
-    const eFixed = m.present >= 7 ? fixed : Math.round(fixed * m.present / 26);
-    const eConv = workingDays > 0 ? Math.round(conv * m.present / workingDays) : 0;   // extra days earn extra conveyance
+    /* FIXED ALLOWANCE: ALL OR NOTHING AT SEVEN DAYS (Dr Raghu, 7 Oct 2026: "if
+       somebody has a fixed allowance and their attendance is less than 7, it
+       will be 0. If it is greater than 7, then it will be full. That is the
+       final rule"). No pro rata any more. */
+    const eFixed = m.present >= 7 ? fixed : 0;
+    const eConv = workingDays > 0 ? r2(conv * m.present / workingDays) : 0;   // extra days earn extra conveyance; to the paise
     /* MEDICAL IS ALL OR NOTHING (Dr Raghu, 7 Oct 2026: "If the attendance is
        greater than zero — even if he is present for 1 day — he should get the
        full 1,250 as medical allowance, because that is an annual CTC
@@ -467,7 +476,7 @@ export function generateRegister(
     const compAmt = Math.round(compEncash * perDay);
     const encashAmt = noExtras ? 0 : Math.round((m.leave_encash ?? 0) * perDay);
     const arrears = noExtras ? 0 : (m.arrears ?? 0);
-    const earned = nobodyPresent ? 0 : eBasic + hra + eFixed + eConv + eMed + site + compAmt + encashAmt + arrears;
+    const earned = nobodyPresent ? 0 : r2(eBasic + hra + eFixed + eConv + eMed + site + compAmt + encashAmt + arrears);
 
     // ── deductions ──
     const exempt = NO_STATUTORY.has(t);
@@ -479,7 +488,7 @@ export function generateRegister(
     const other = (m.other_ded ?? 0) + otShort;
     // nothing earned, nothing deducted: a loan or advance waits for a month with pay
     const deductions = nobodyPresent ? 0 : pf + pt + loan + advance + tds + lunch + lateDed + other;
-    const net = earned - deductions;
+    const net = r2(earned - deductions);
     /* ROUNDED UP, NEVER PAID IN PAISE (Dr Raghu, 7 Oct 2026: "Have you done
        the round-up to the next integer, because we cannot give salaries as
        decimals? … the round-up should be coming as a column"). To-pay is the
@@ -559,11 +568,11 @@ export const PAYROLL_RULES: { head: string; lines: RuleLine[] }[] = [
     { text: "In the month's calculation, per day = gross ÷ the month's pay days: 26 for Labour and Labour - Contract, the calendar days of that month for everybody else (30 in September). The per-day RATE shown on the rate list, the appraisal card and the HRIS record is gross ÷ 31 (staff) or ÷ 26 (workers) — display only.", changed: "7 Oct 2026" },
   ] },
   { head: "Earnings", lines: [
-    { text: "Basic & DA = rate × paid days ÷ pay days." },
+    { text: "Basic & DA = rate × paid days ÷ pay days, taken UP to the rupee (as the sheet does). Conveyance is kept to the paise, so the net carries paise and To pay rounds it up.", changed: "7 Oct 2026" },
     { text: "HRA = 20% of earned basic, Staff and workers alike; none for Management and contract types." },
     { text: "Workers' OT = hours × basic ÷ 208, always single. The HRA is the first part of it; the balance is carried in Site Allowance. OT below the HRA is an Other Deduction." },
     { text: "Site allowance is the muster's figure, and only that — the rate list's standing site figure is not paid (where the rate list carries one, the run says so). For Labour and Labour - Contract the OT above HRA rides on top.", changed: "7 Oct 2026" },
-    { text: "Fixed allowance in full at 7 or more days present, else pro rata." },
+    { text: "Fixed allowance is all or nothing at seven days: the full figure at 7 or more days present, nothing below 7. No pro rata.", changed: "7 Oct 2026" },
     { text: "Conveyance = rate × present ÷ the company's working days that month (calendar days less Sundays and the third Saturday, or what HR set on the run). A day worked beyond them earns conveyance too." },
     { text: "Medical allowance is all or nothing: the full 1,250 for any month with attendance above zero (even one day) — it is an annual CTC head, 1,250 × 12 allowable under deduction. Nothing in a month with no attendance.", changed: "7 Oct 2026" },
     { text: "Arrears as the muster carries them (none while on hold)." },

@@ -114,6 +114,8 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
   // heading to sort by that column, click again to turn it; figures sort
   // high to low first, names A to Z first
   const [sort, setSort] = useState<{ k: string; dir: 1 | -1 } | null>(null);
+  // THE PERSON LIGHTBOX (Dr Raghu, 7 Oct 2026): click an employee ID anywhere on the run → his salary structure
+  const [person, setPerson] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try { setD(await api.get(`/api/hrms/payroll?id=${encodeURIComponent(id)}`)); }
@@ -209,6 +211,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           : <button onClick={() => { if (window.confirm(`Approve the ${title} payroll run?`)) act({ action: "approve" }, () => `${title} approved`); }} className="text-xs font-bold rounded px-3 py-2" style={{ background: C.green, color: "#fff" }}>✓ Approve</button>)}
       </div>
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: msg.includes("✓") ? C.green : C.red }}>{msg}</div>}
+      {person && <PersonCard runId={id} eid={person} onClose={() => setPerson(null)} />}
 
       {/* ── the WhatsApp preview ── */}
       {waOpen && wa && (
@@ -429,7 +432,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
               <tbody>
                 {regRows.map((x) => (
                   <tr key={x.employee_id} style={{ borderTop: "1px solid #EEECE6", opacity: x.hold ? 0.6 : 1 }}>
-                    <td className="px-2 py-1 tnum" style={{ position: "sticky", left: 0, background: "#fff", minWidth: 60, width: 60 }}>{x.employee_id}</td>
+                    <td className="px-2 py-1 tnum" style={{ position: "sticky", left: 0, background: "#fff", minWidth: 60, width: 60 }}><Pid id={x.employee_id} open={setPerson} /></td>
                     <td className="px-2 py-1 font-semibold" style={{ position: "sticky", left: 60, background: "#fff" }}>{x.name}{x.hold && <span className="ml-1" style={{ color: C.red, fontSize: 10 }}>hold</span>}</td>
                     <td className="px-2 py-1" style={{ color: C.faint }}>{x.type || ""}</td>
                     {[x.days_due, x.leave_ob, x.leave_earned, x.compoff_days, x.leave_used, x.leave_encashed, x.leave_cb, x.paid_days].map((v, i) => (
@@ -493,7 +496,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                       <div className="text-xs font-bold mb-1" style={{ color: "#B26A00" }}>ON HOLD — {obs.pay.holds.length}: attendance earnings only, nothing paid until lifted</div>
                       <div className="text-xs" style={{ color: C.ink, lineHeight: 1.7 }}>
                         {obs.pay.holds.filter((h) => !q || h.name.toLowerCase().includes(q.toLowerCase()) || h.employee_id.includes(q)).map((h) => (
-                          <div key={h.employee_id}><b>{h.employee_id}</b> {h.name} <span style={{ color: C.faint }}>· {h.type} · {h.status}</span> — Genie net ₹{inr(h.genie_net)}{h.sheet_net != null ? ` · sheet net ₹${inr(h.sheet_net)}` : ""} · <b>Genie to pay ₹0</b>{h.sheet_pay != null && h.sheet_pay > 0 && <span style={{ color: "#8E2C20" }}> · <b>but the sheet pays ₹{inr(h.sheet_pay)}</b> — settle which is right</span>}</div>
+                          <div key={h.employee_id}><Pid id={h.employee_id} open={setPerson} /> {h.name} <span style={{ color: C.faint }}>· {h.type} · {h.status}</span> — Genie net ₹{inr(h.genie_net)}{h.sheet_net != null ? ` · sheet net ₹${inr(h.sheet_net)}` : ""} · <b>Genie to pay ₹0</b>{h.sheet_pay != null && h.sheet_pay > 0 && <span style={{ color: "#8E2C20" }}> · <b>but the sheet pays ₹{inr(h.sheet_pay)}</b> — settle which is right</span>}</div>
                         ))}
                       </div>
                     </div>
@@ -535,7 +538,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                               <tbody>
                                 {sec.rows.map((m) => (
                                   <tr key={m.employee_id} style={{ borderTop: "1px solid #EEECE6" }}>
-                                    <td className="px-2 py-1"><b>{m.employee_id}</b> {m.name}</td>
+                                    <td className="px-2 py-1"><Pid id={m.employee_id} open={setPerson} /> {m.name}</td>
                                     <td className="px-2 py-1" style={{ color: C.faint }}>{m.type}</td>
                                     {sec.cols.map(([h, g, sh, d]) => { const dv = d(m); const bad = dv != null && Math.abs(dv) >= (h === "Per day" ? 2 : /days|Leave|Attendance/i.test(h) ? 0.5 : 1); return (
                                       <Fragment key={h}>
@@ -655,6 +658,94 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
 }
 
 /** The rules Generate runs on, beside the numbers — "in the right side show the rules we are using" (Dr Raghu, 4 Sep 2026). */
+
+/** an employee ID that opens the person's salary structure */
+function Pid({ id, open }: { id: string; open: (id: string) => void }) {
+  return <button onClick={() => open(id)} className="tnum font-bold" style={{ color: "var(--blue)", textDecoration: "underline dotted", background: "none", border: 0, padding: 0, cursor: "pointer" }} title="Salary structure and this month's line">{id}</button>;
+}
+
+interface PersonData {
+  person: { id: string; name: string; type: string; department: string | null; designation: string | null; doj: string | null; location: string | null; reporting_manager: string | null; record: Record<string, string | null> } | null;
+  structure: { title: string; frozen_at: string | null; signed_as: string | null; line: Record<string, unknown> | null } | null;
+  register: RegisterRow | null;
+  history: { fy: string; gross: number; by: string | null; at: string }[];
+}
+/** THE PERSON LIGHTBOX (Dr Raghu, 7 Oct 2026: "open a lightbox which just shows his employee report card, but basically the salary structure") */
+function PersonCard({ runId, eid, onClose }: { runId: string; eid: string; onClose: () => void }) {
+  const [d, setD] = useState<PersonData | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => { setD(null); setErr(""); api.get(`/api/hrms/payroll?id=${encodeURIComponent(runId)}&person=${encodeURIComponent(eid)}`).then((j) => setD(j as PersonData)).catch((e) => setErr(e instanceof Error ? e.message : String(e))); }, [runId, eid]);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
+  const n = (v: unknown) => (v == null || v === "" ? null : Number(String(v).replace(/[₹,\s]/g, "")) || 0);
+  const money = (v: unknown) => { const x = n(v); return x == null ? "—" : `₹${inr(x)}`; };
+  const p = d?.person, L = d?.structure?.line as Record<string, unknown> | null | undefined, R = d?.register, rec = p?.record;
+  const HEADS: [string, string][] = [["basic_da", "Basic & DA"], ["hra", "HRA"], ["fixed_allowance", "Fixed allowance"], ["conveyance", "Conveyance"], ["medical_allowance", "Medical"], ["gross", "Gross"], ["per_day", "Per day (display)"]];
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(22,35,47,0.55)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg" style={{ width: "min(820px, 100%)", maxHeight: "90vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+        <div className="px-4 py-3 flex items-start gap-3" style={{ background: "var(--navy)", color: "#fff" }}>
+          <div style={{ flex: 1 }}>
+            <div className="font-bold" style={{ fontSize: 18 }}>{eid} · {p?.name ?? (err ? "—" : "…")}</div>
+            <div className="text-xs" style={{ color: "#8FA1B3" }}>{[p?.type, p?.department, p?.designation, p?.location, p?.doj ? `joined ${fmtFull(String(p.doj))}` : null, p?.reporting_manager ? `reports to ${p.reporting_manager}` : null].filter(Boolean).join(" · ")}</div>
+          </div>
+          <button onClick={onClose} className="text-xs font-bold rounded px-2 py-1" style={{ background: "rgba(255,255,255,0.12)", color: "#D7DEE6" }}>✕ close</button>
+        </div>
+        {err && <div className="p-4 text-xs" style={{ color: C.red }}>{err}</div>}
+        {d && (
+          <div className="p-4">
+            <div className="text-xs font-bold mb-1" style={{ color: C.faint, letterSpacing: 0.5 }}>SALARY STRUCTURE</div>
+            <div className="text-xs mb-2" style={{ color: C.dim }}>
+              {d.structure ? <>{d.structure.title}{d.structure.frozen_at ? <> · frozen and signed by <b>{d.structure.signed_as}</b> on {fmtFull(String(d.structure.frozen_at))}</> : " · Live, not yet signed"}</> : "No Live salary structure."}
+              {L ? <> · line updated {fmtIst(String(L.updated_at))} by {who(String(L.updated_by || ""))}</> : <span style={{ color: C.red }}> · no line for this person on the list</span>}
+            </div>
+            <table className="text-xs genie-table" style={{ width: "100%" }}>
+              <thead><tr><th style={TH}>Head</th><th style={{ ...TH, textAlign: "right" }}>Salary Structure (payroll reads this)</th><th style={{ ...TH, textAlign: "right" }}>HRIS record</th><th style={{ ...TH, textAlign: "right" }}>This month earned</th></tr></thead>
+              <tbody>
+                {HEADS.map(([k, label]) => {
+                  const lv = L ? n(L[k]) : null, rv = rec ? n(rec[k === "per_day" ? "per_day_rate" : k]) : null;
+                  const ev = R ? (k === "basic_da" ? R.basic_da : k === "hra" ? R.hra : k === "fixed_allowance" ? R.fixed_allowance : k === "conveyance" ? R.conveyance : k === "medical_allowance" ? R.medical : k === "gross" ? R.earned : R.per_day) : null;
+                  const off = lv != null && rv != null && Math.abs(lv - rv) >= 1;
+                  return (
+                    <tr key={k} style={{ borderTop: "1px solid #EEECE6", fontWeight: k === "gross" ? 700 : 400 }}>
+                      <td className="px-2 py-1">{label}{k === "gross" && R ? <span className="font-normal" style={{ color: C.faint }}> · this month: total earned</span> : ""}{k === "per_day" && R ? <span className="font-normal" style={{ color: C.faint }}> · this month: ÷ the month's days</span> : ""}</td>
+                      <td className="px-2 py-1 text-right tnum">{money(lv)}</td>
+                      <td className="px-2 py-1 text-right tnum" style={off ? { background: "#FBE3E0", color: "#8E2C20", fontWeight: 700 } : undefined}>{money(rv)}{off ? " ≠" : ""}</td>
+                      <td className="px-2 py-1 text-right tnum">{money(ev)}</td>
+                    </tr>
+                  );
+                })}
+                {rec?.site_allowance && n(rec.site_allowance) ? <tr style={{ borderTop: "1px solid #EEECE6" }}><td className="px-2 py-1" style={{ color: C.faint }}>Site allowance on the record (not paid from here — the muster's figure is)</td><td /><td className="px-2 py-1 text-right tnum" style={{ color: C.faint }}>{money(rec.site_allowance)}</td><td className="px-2 py-1 text-right tnum">{R ? money(R.site_allowance) : "—"}</td></tr> : null}
+              </tbody>
+            </table>
+            {R && (
+              <>
+                <div className="text-xs font-bold mt-3 mb-1" style={{ color: C.faint, letterSpacing: 0.5 }}>THIS MONTH ON THE REGISTER</div>
+                <div className="flex flex-wrap gap-2">
+                  {([["Present", R.present], ["Days due", R.days_due], ["Pay days", R.pay_days], ["Paid days", R.paid_days], ["Leave OB", R.leave_ob], ["Leave used", R.leave_used], ["Comp off", R.compoff_days], ["Leave CB", R.leave_cb]] as [string, number][]).map(([l, v]) => (
+                    <div key={l} className="rounded px-2 py-1" style={{ border: `1px solid ${C.line}`, minWidth: 84 }}><div className="tnum font-bold" style={{ fontSize: 14 }}>{Number(v ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</div><div style={{ fontSize: 10, color: C.dim }}>{l}</div></div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {([["Earned", R.earned], ["Deductions", R.deductions], ["Net", R.net], ["To pay", R.to_pay]] as [string, number][]).map(([l, v]) => (
+                    <div key={l} className="rounded px-2 py-1" style={{ border: `1px solid ${C.line}`, minWidth: 110, background: l === "To pay" ? "#F3F7FB" : "#fff" }}><div className="tnum font-bold" style={{ fontSize: 14 }}>₹{inr(v)}</div><div style={{ fontSize: 10, color: C.dim }}>{l}{l === "To pay" && R.hold ? " · ON HOLD" : ""}</div></div>
+                  ))}
+                </div>
+                <div className="text-xs mt-1" style={{ color: C.faint }}>rate from: {R.rate_from}</div>
+              </>
+            )}
+            {d.history.length > 0 && (
+              <>
+                <div className="text-xs font-bold mt-3 mb-1" style={{ color: C.faint, letterSpacing: 0.5 }}>GROSS BY FINANCIAL YEAR</div>
+                <div className="text-xs" style={{ color: C.ink }}>{d.history.map((h) => `${h.fy}: ₹${inr(h.gross)}`).join(" · ")}</div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** THE RULES, TRACKED (Dr Raghu, 7 Oct 2026): a line changed since the rules were first given is yellow and says when */
 function Rules({ runRulesAsOf }: { runRulesAsOf: string | null }) {
   const changed = PAYROLL_RULES.reduce((a, g) => a + g.lines.filter((l) => l.changed).length, 0);

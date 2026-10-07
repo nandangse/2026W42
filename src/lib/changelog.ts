@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.41",
+    date: "2026-10-07",
+    module: "Payroll: fixed allowance at seven days, rounding as the sheet rounds, the rules printed, a person\u2019s card on every ID",
+    items: [
+      "FIXED ALLOWANCE AT SEVEN DAYS (\u201cif somebody has a fixed allowance and their attendance is less than 7, it will be 0. If it is greater than 7, then it will be full. That is the final rule\u201d). No pro rata any more \u2014 7005 at three days gets nought, as the sheet has it.",
+      "ROUNDING AS THE SHEET ROUNDS. Thirty-one of thirty-one lines a rupee apart were the sheet taking earned basic UP to the rupee while Genie rounded to nearest; and forty-seven to-pay lines a rupee apart were the sheet carrying paise in the net (conveyance to the paise) and rounding the total up. Genie now does both: basic up to the rupee, conveyance to the paise, net with paise, to-pay rounded up. Leave fills in whole days from the opening balance above the floor, never rounded up over it (6280, 6360 \u2014 one day, as the sheet).",
+      "THE RULES IN THE PDF (\u201cpublish these rules also in the PDF that is generated so that we can keep it on record too\u201d). The printed Salary Register ends with a page of the rules it was computed under, the rules-as-of date, and every changed line highlighted with the day it changed.",
+      "A PERSON ON EVERY ID (\u201cOn the employee ID, when clicked, please open a lightbox which just shows his employee report card, but basically the salary structure\u201d). Every employee ID on the register and in the observation lists opens a card: the line on the signed Salary Structure (what payroll reads), the HRIS record beside it (red where the two differ), this month\u2019s earned heads, days and leave, net and to pay, and the gross by financial year.",
+    ],
+  },
+  {
     v: "6.3.0.40",
     date: "2026-10-07",
     module: "Payroll: medical allowance is all or nothing",
