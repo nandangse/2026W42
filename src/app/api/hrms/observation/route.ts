@@ -47,18 +47,24 @@ const HEADS: [string, string][] = [
 ];
 export interface PayCompare {
   ready: boolean; why?: string;
-  compared: number; matched: number; pay_mismatched: number;
+  compared: number; matched: number; pay_mismatched: number; rate_mismatched: number; att_mismatched: number; net_mismatched: number;
   holds: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number | null; sheet_pay: number | null; status: string }[];
-  mismatches: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number; diff: number; genie_pay: number; sheet_pay: number | null; pay_diff: number; heads: { head: string; genie: number; sheet: number; diff: number }[] }[];
+  mismatches: {
+    employee_id: string; name: string; type: string;
+    genie_net: number; sheet_net: number; diff: number; genie_pay: number; sheet_pay: number | null; pay_diff: number;
+    genie_gross: number; sheet_gross: number | null; genie_per_day: number; sheet_per_day: number | null;
+    genie_att: number; sheet_att: number | null; genie_paid: number; sheet_paid: number | null;
+    heads: { head: string; genie: number; sheet: number; diff: number }[];
+  }[];
   genie_total: number; sheet_total: number; genie_pay_total: number; sheet_pay_total: number; not_in_sheet: number;
 }
 function comparePay(register: Record<string, unknown>[], musterRows: Record<string, unknown>[]): PayCompare {
   const sheetOf = new Map(musterRows.map((m) => [String(m.employee_id), m]));
   const withSheet = musterRows.filter((m) => m.sheet && typeof m.sheet === "object").length;
-  if (!register.length) return { ready: false, why: "Nothing generated yet — press Generate, then this compares the register with the sheet.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, not_in_sheet: 0 };
-  if (!withSheet) return { ready: false, why: "Nothing to compare against yet — upload the Google Sheet's Salary tab (CSV or Excel) under \u201cGoogle Sheet \u2014 Salary tab\u201d on the Uploads tab, and the comparison writes itself. The muster alone carries attendance, not the sheet's computed figures.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, not_in_sheet: 0 };
+  if (!register.length) return { ready: false, why: "Nothing generated yet — press Generate, then this compares the register with the sheet.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, rate_mismatched: 0, att_mismatched: 0, net_mismatched: 0, not_in_sheet: 0 };
+  if (!withSheet) return { ready: false, why: "Nothing to compare against yet — upload the Google Sheet's Salary tab (CSV or Excel) under \u201cGoogle Sheet \u2014 Salary tab\u201d on the Uploads tab, and the comparison writes itself. The muster alone carries attendance, not the sheet's computed figures.", compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, rate_mismatched: 0, att_mismatched: 0, net_mismatched: 0, not_in_sheet: 0 };
   const N = (v: unknown) => Math.round((Number(v) || 0) * 100) / 100;
-  const out: PayCompare = { ready: true, compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, not_in_sheet: 0 };
+  const out: PayCompare = { ready: true, compared: 0, matched: 0, holds: [], mismatches: [], genie_total: 0, sheet_total: 0, genie_pay_total: 0, sheet_pay_total: 0, pay_mismatched: 0, rate_mismatched: 0, att_mismatched: 0, net_mismatched: 0, not_in_sheet: 0 };
   for (const r of register) {
     const id = String(r.employee_id), m = sheetOf.get(id);
     const sh = (m?.sheet ?? null) as Record<string, number> | null;
@@ -76,10 +82,25 @@ function comparePay(register: Record<string, unknown>[], musterRows: Record<stri
     out.compared++;
     const diff = Math.round(genieNet - sheetNet!);
     const payDiff = sheetPay == null ? 0 : geniePay - sheetPay;
+    /* LIKE A CHRO (Dr Raghu, 7 Oct 2026: "compare the rates of the genie and
+       the sheet, attendance in the muster and the sheet, the net payable as
+       per sheet and as per your calc. Highlight those that don't match"):
+       the gross RATE and per-day, the ATTENDANCE and payment days, the NET
+       and the TO PAY — a line is listed when any one of them differs. */
+    const genieGross = Math.round(N(r.gross)), sheetGross = sh.rate_gross != null ? Math.round(N(sh.rate_gross)) : null;
+    const geniePd = Math.round(N(r.per_day)), sheetPd = sh.per_day != null ? Math.round(N(sh.per_day)) : null;
+    const genieAtt = N(r.attendance ?? r.present), sheetAtt = sh.attendance != null ? N(sh.attendance) : null;
+    const geniePaid = N(r.paid_days), sheetPaid = sh.paid_days != null ? N(sh.paid_days) : null;
+    const rateOff = sheetGross != null && Math.abs(genieGross - sheetGross) >= 1;
+    const attOff = (sheetAtt != null && Math.abs(genieAtt - sheetAtt) >= 0.5) || (sheetPaid != null && Math.abs(geniePaid - sheetPaid) >= 0.5);
     if (Math.abs(payDiff) >= 1) out.pay_mismatched++;
-    if (Math.abs(diff) < 1 && Math.abs(payDiff) < 1) { out.matched++; continue; }
+    if (Math.abs(diff) >= 1) out.net_mismatched++;
+    if (rateOff) out.rate_mismatched++;
+    if (attOff) out.att_mismatched++;
+    if (Math.abs(diff) < 1 && Math.abs(payDiff) < 1 && !rateOff && !attOff) { out.matched++; continue; }
     const heads = HEADS.map(([k, label]) => ({ head: label, genie: N(r[k]), sheet: N(sh[k]), diff: Math.round(N(r[k]) - N(sh[k])) })).filter((h) => Math.abs(h.diff) >= 1);
-    out.mismatches.push({ employee_id: id, name, type, genie_net: genieNet, sheet_net: sheetNet!, diff, genie_pay: geniePay, sheet_pay: sheetPay, pay_diff: payDiff, heads });
+    out.mismatches.push({ employee_id: id, name, type, genie_net: genieNet, sheet_net: sheetNet!, diff, genie_pay: geniePay, sheet_pay: sheetPay, pay_diff: payDiff,
+      genie_gross: genieGross, sheet_gross: sheetGross, genie_per_day: geniePd, sheet_per_day: sheetPd, genie_att: genieAtt, sheet_att: sheetAtt, genie_paid: geniePaid, sheet_paid: sheetPaid, heads });
   }
   out.mismatches.sort((a, b) => Math.max(Math.abs(b.diff), Math.abs(b.pay_diff)) - Math.max(Math.abs(a.diff), Math.abs(a.pay_diff)));
   out.holds.sort((a, b) => a.name.localeCompare(b.name));

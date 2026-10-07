@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.32",
+    date: "2026-10-07",
+    module: "Payroll observation: rates, attendance, net and to-pay side by side, like a CHRO",
+    items: [
+      "FOUR COMPARISONS, ONE TABLE (\u201ccompare the rates of the genie and the sheet, attendance in the muster and the sheet, the nett payable as per sheet and as per your calc. Highlight those that dont match \u2026 like a CHRO\u201d). The Salary tab\u2019s gross rate, per day, attendance and payment days now ride on each line beside its money. The Observation lists every person on whom any one of them differs \u2014 gross rate, per day, attendance, payment days, net, to pay \u2014 Genie and sheet side by side, the differing cells red, with tiles counting rate / attendance / net / to-pay differences separately, and the heads that differ named on the right.",
+    ],
+  },
+  {
     v: "6.3.0.31",
     date: "2026-10-07",
     module: "Payroll: fixed allowance and medical were being dropped from the system rates",

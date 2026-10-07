@@ -130,6 +130,9 @@ export function parseMuster(grid: unknown[][]): Muster {
     "site allowance": "site_allowance", "comp off amt": "compoff_amt", "leave encashment amount": "encash_amt", "arrears payable": "arrears",
     "pf": "pf", "pt": "pt", "esi": "esi", "lunch": "lunch", "advance": "advance", "loan deduction": "loan", "tds deduction": "tds", "late deduction": "late_ded", "other deductions": "other_ded",
     "payment days": "paid_days", "leave utilized": "leave_used", "leave cb": "leave_cb", "loan cb": "loan_cb",
+    // the sheet's RATES and ATTENDANCE too (Dr Raghu, 7 Oct 2026: "compare the rates of the genie and the sheet, attendance in the muster and the sheet")
+    "basic da rate": "rate_basic", "fix allowance rate": "rate_fixed", "conveyance rate": "rate_conv", "medical allowance rate": "rate_med", "gross salary rate": "rate_gross",
+    "per day": "per_day", "attendance": "attendance", "pay days": "pay_days", "payment days due": "days_due",
   };
   const sheetCols: Record<string, number> = {};
   if (salaryTab) {
