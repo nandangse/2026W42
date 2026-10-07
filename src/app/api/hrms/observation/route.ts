@@ -134,9 +134,13 @@ export async function GET(req: Request) {
     }
 
     if (!punches.length)
+      // THE OBSERVATION IS NOT THE ESSL FILE ALONE (Dr Raghu, 7 Oct 2026:
+      // "these observations are NOT for the essl file alone but wherever it
+      // is different") — the pay comparison rides regardless; only the gate
+      // comparison waits for the punches
       return NextResponse.json({
-        ok: true, ready: false,
-        why: `No ESSL punches are held for ${String(month).padStart(2, "0")}-${year}. Upload the biometric export on the Uploads tab — the observation is the comparison, so it needs both sides.`,
+        ok: true, ready: false, pay,
+        why: `Gate comparison not possible yet: no ESSL punches are held for ${String(month).padStart(2, "0")}-${year}. Upload the biometric export on the Uploads tab and the muster is checked against the machine too.`,
       });
 
     /* employee → day → { in, out } */

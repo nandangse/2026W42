@@ -440,7 +440,7 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
         <div className="bg-white rounded-lg border p-3" style={{ borderColor: C.line }}>
           <div className="font-bold mb-1" style={{ color: C.ink }}>
             CHRO observation
-            <span className="text-xs font-normal" style={{ color: C.dim }}> · the muster HR declared, against what the machine at the gate saw</span>
+            <span className="text-xs font-normal" style={{ color: C.dim }}> · wherever Genie and the sheet differ — net, to pay, holds — and the muster against the machine at the gate</span>
           </div>
           {obsBusy && <div className="text-xs" style={{ color: C.dim }}>Reading both sides…</div>}
           {/* NET PAY — GENIE AGAINST THE SHEET (Dr Raghu, 7 Oct 2026): the holds, then every
