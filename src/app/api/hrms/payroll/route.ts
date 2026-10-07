@@ -7,7 +7,8 @@ import { requireHrms, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { driveConfig, uploadToFolder, trashFile } from "@/lib/drive";
 import { readEssl, type EsslPunch } from "@/lib/essl";
-import { parseMuster, parseRates, generateRegister, musterVars, OPTIONAL_MUSTER_VARS, type Muster, type Rates, workingDaysFor } from "@/lib/muster";
+import { parseMuster, parseRates, generateRegister, musterVars, OPTIONAL_MUSTER_VARS, type Muster, type Rates, type RegisterRow, workingDaysFor } from "@/lib/muster";
+import { buildBankFiles } from "@/lib/bank-files";
 import { totalsFor } from "@/lib/salary-sheet";
 import { MONTHS } from "@/lib/hrms-template";
 import { people, renderFor, queueMessages, queueStatuses } from "@/lib/hrms-wa";
@@ -53,9 +54,31 @@ const gridOf = (buf: Buffer, name: string): unknown[][] => {
 
 export async function GET(req: Request) {
   try {
-    await requireHrms();
+    const me = await requireHrms();
     const admin = adminClient();
     const id = new URL(req.url).searchParams.get("id");
+    const stamp = me.initials ? `${me.initials} · ${me.email}` : me.email;
+
+    /* EXECUTE BANK FILES (Dr Raghu, 7 Oct 2026) — the approved run as the
+       bank's own upload files, zipped: see src/lib/bank-files.ts. Only once
+       the run is approved; the amounts are the register's to-pay. */
+    if (id && new URL(req.url).searchParams.get("bank") === "1") {
+      const r = await runRow(admin, id);
+      if (!r.approved_at && !/frozen/i.test(String(r.status))) throw new HttpError(409, "Approve the run first — the bank files are made from the approved register.");
+      const rows = (r.rows ?? []) as RegisterRow[];
+      if (!rows.length) throw new HttpError(400, "Nothing generated on this run yet.");
+      const ppl = await people(admin, rows.map((x) => x.employee_id));
+      const bankOf = new Map(ppl.map((p) => [p.id, { ifsc: String(p.value.ifsc || ""), account: String(p.value.account_15 || p.value.account_no || ""), nameInBank: String(p.value.name_in_bank || p.name || "") }]));
+      const built = buildBankFiles(rows, (eid) => bankOf.get(eid) ?? null, Number(r.month), Number(r.year));
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      for (const f of built.files) zip.file(f.name, f.text);
+      zip.file("NOT_IN_FILES.txt", built.notInFiles);
+      const bytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+      const tag = `${label(Number(r.month), Number(r.year)).replace(/\s+/g, "_")}`;
+      try { await admin.from("hrms_payroll_file").insert({ sheet_id: id, kind: "bank", name: `bank_files_${tag}.zip`, mime: "application/zip", size: bytes.byteLength, parsed: { files: built.files.map((f) => ({ name: f.name, lines: f.lines, total: f.total, fileNo: f.fileNo })), skipped: built.skipped, total: built.total, lines: built.lines }, uploaded_by: stamp }); } catch { /* the download still goes */ }
+      return new Response(new Uint8Array(bytes), { headers: { "content-type": "application/zip", "content-disposition": `attachment; filename="bank_files_${tag}.zip"` } });
+    }
 
     if (id) {
       const r = await runRow(admin, id);

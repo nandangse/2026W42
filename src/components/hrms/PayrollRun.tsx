@@ -156,6 +156,11 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
           </div>
         </div>
         <button onClick={waPreview} disabled={busy || !d.muster} className="text-xs font-bold rounded px-3 py-2" style={{ background: d.muster ? "#25D366" : "rgba(255,255,255,0.12)", color: d.muster ? "#0B3D1E" : "#8FA1B3" }} title={d.muster ? "The attendance message to everybody on the muster, through the WhatsApp queue" : "Upload the muster first"}>💬 Send WhatsApp message</button>
+        {/* EXECUTE BANK FILES (Dr Raghu, 7 Oct 2026): once approved, the bank's own upload files, one per class, under ₹10 lakh each, zipped */}
+        {r.approved_by && (
+          <a href={`/api/hrms/payroll?id=${encodeURIComponent(id)}&bank=1`} className="text-xs font-bold rounded px-3 py-2" style={{ background: "#F3B33D", color: "#1F2328", textDecoration: "none" }}
+            title="The bank's NEFT upload files for this run — management, staff and labour kept apart, each file under ₹10 lakh, with a note of anybody left out">🏦 Execute Bank Files</a>
+        )}
         {isOwner && (r.approved_by
           ? <button onClick={() => act({ action: "unapprove" }, () => "Approval withdrawn")} className="text-xs font-semibold rounded px-3 py-2" style={{ background: "rgba(255,255,255,0.12)", color: "#D7DEE6" }}>withdraw approval</button>
           : <button onClick={() => { if (window.confirm(`Approve the ${title} payroll run?`)) act({ action: "approve" }, () => `${title} approved`); }} className="text-xs font-bold rounded px-3 py-2" style={{ background: C.green, color: "#fff" }}>✓ Approve</button>)}

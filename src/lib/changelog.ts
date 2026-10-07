@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.23",
+    date: "2026-10-07",
+    module: "Payroll: Execute Bank Files — the bank\u2019s own upload files, zipped, from the approved run",
+    items: [
+      "EXECUTE BANK FILES (\u201cAll HR will do is make a download of a zip file from the system, which will be a combination of multiple txt files like this \u2026 The total within each file should not exceed \u20b910 lakh \u2026 Do not merge the classes together\u201d). Once Dr Raghu approves a run, a button on it downloads a zip of the bank\u2019s NEFT upload files in the format accounts uses today, character for character: the FILEHDR line, then one NEFT line per person with our account, theirs, the rupees, the name twice and accounts@nandan.co.in. One file per class \u2014 management, staff, labour \u2014 cut again whenever the running total would pass \u20b910,00,000, numbered 01, 02 \u2026 and named for the month: sept_2026_staff_01.txt. The header\u2019s file number runs 10000, 10001 \u2026 across the zip. The amount is the register\u2019s to-pay, so a held salary stays out. A NOT_IN_FILES.txt in the same zip names anybody left out and why \u2014 on hold, nothing to pay, no IFSC or account on the record, or a code that is not a code \u2014 so nobody is quietly unpaid. Every download is filed on the run.",
+    ],
+  },
+  {
     v: "6.3.0.22",
     date: "2026-10-07",
     module: "Payroll: the leave floor holds; the three-month Salary MIS inside the printed register",
