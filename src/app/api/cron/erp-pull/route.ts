@@ -103,7 +103,21 @@ export async function GET(req: Request) {
     const { data: profiles } = await db.from("profile").select("id, email, full_name");
     const profByEmail = new Map((profiles || []).map((p) => [String(p.email).toLowerCase(), p.id]));
 
-    let pulled = 0, skippedExisting = 0, noCompany = 0;
+    /* THE SOURCE IS AN ENUM HERE AND FREE TEXT THERE (found 7 Oct 2026).
+       The ERP says "Email", "Google Ad", "Nandan Website", "GEM Tender",
+       "Indiamart"; the CRM's lead_source knows 'email', 'google_ads',
+       'website', 'tender', 'indiamart'. Written straight across, Postgres
+       refused the row — and the refusal was swallowed below while the
+       cursor moved on, so sixteen enquiries since 29 Aug never arrived.
+       Mapped by name now; a value with no match is left empty, never
+       refused. */
+    const SOURCE: [RegExp, string][] = [
+      [/indiamart/i, "indiamart"], [/whatsapp/i, "whatsapp"], [/e-?mail/i, "email"], [/google/i, "google_ads"],
+      [/linkedin/i, "linkedin"], [/phone|call/i, "phone"], [/exhibition|expo|fair/i, "exhibition"], [/website|web/i, "website"],
+      [/referral|reference/i, "referral"], [/field|visit/i, "field_visit"], [/tender|gem/i, "tender"],
+    ];
+    const sourceOf = (v: unknown) => { const t = String(v || "").trim(); if (!t) return null; return SOURCE.find(([re]) => re.test(t))?.[1] ?? null; };
+    let pulled = 0, skippedExisting = 0, noCompany = 0, failed = 0, firstError = "";
     let maxCreation = cursor;
     for (const o of rows) {
       const no = String(o.name);
@@ -137,7 +151,7 @@ export async function GET(req: Request) {
         stage_id: stageOf(String(o.sales_stage || "")),
         sector_id: sectorByName.get(String(o.sector || "").toLowerCase()) ?? null,
         product_family: String(o.product_group || "").trim() || null,
-        source: String(o.utm_source || "").trim() || null,
+        source: sourceOf(o.utm_source),
         company_id, contact_id,
         owner_id: profByEmail.get(String(o.owner || "").toLowerCase()) ?? null,
         opportunity_on: txn, expected_close_on: close,
@@ -147,6 +161,7 @@ export async function GET(req: Request) {
         enquiry_info: infoField && o[infoField] ? htmlToRich(String(o[infoField])) : null,
       });
       if (!error) pulled++;
+      else { failed++; if (!firstError) firstError = `${no}: ${error.message}`.slice(0, 300); }
     }
 
     // ---- PHASE 2 (Dr Raghu, 30 Aug 2026): the DELIVERED LEDGER syncs from
@@ -214,12 +229,12 @@ export async function GET(req: Request) {
 
     // move the cursors only past what we actually walked
     await db.from("integration_setting").update({ config: { ...cfg, last_pull: maxCreation, jm_cursor: jmCursorNew, issue_cursor: issueCursor, issue_start: issueStart, issue_file_cursor: fileCursor, issue_file_start: fileStart } }).eq("key", "erpnext");
-    await beat("erp-pull", "done", { last_pull: maxCreation, seva });
+    await beat("erp-pull", "done", { last_pull: maxCreation, pulled, failed, ...(firstError ? { firstError } : {}), seva });
     await db.from("crm_audit").insert({
       entity: "opportunity", entity_id: null, action: "erp_pull",
-      after: { pulled, skippedExisting, noCompany, cursor: maxCreation }, by_user: null,
+      after: { pulled, skippedExisting, noCompany, failed, ...(firstError ? { firstError } : {}), cursor: maxCreation }, by_user: null,
     }).then(() => null, () => null);
-    return NextResponse.json({ ok: true, pulled, skippedExisting, noCompany, deliveredSynced: djSynced, cursor: maxCreation, jmCursor: jmCursorNew, more: rows.length === 300 });
+    return NextResponse.json({ ok: true, pulled, skippedExisting, noCompany, failed, firstError: firstError || null, deliveredSynced: djSynced, cursor: maxCreation, jmCursor: jmCursorNew, more: rows.length === 300 });
   } catch (e) {
     await beat("erp-pull", "failed", { error: String(e instanceof Error ? e.message : e).slice(0, 300) });
     return errJson(e);

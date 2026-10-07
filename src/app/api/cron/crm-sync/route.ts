@@ -57,6 +57,15 @@ interface Job {
   table: string;            // in the CRM
   key: string;              // the CRM column carrying the ERP's name
   cursorKey: string;        // where this doctype's high-water mark is kept
+  /* THE WAY IN IS SOMEBODY ELSE'S (7 Oct 2026). The hourly erp-pull brings
+     opportunities in whole — number, date, company, sector, owner, the
+     enquiry text. From 16 Sep, when this stream's inserts stopped failing,
+     it got there first every hour with a thin row (name and stage only),
+     and erp-pull then skipped the "already known" row: 124 opportunities
+     landed with no date and vanished from the year-to-date list. So this
+     stream no longer pulls a doctype marked inbound:false; its way back
+     (the push) still runs. */
+  inbound?: boolean;
   fields: string[];
   row: (r: Record<string, unknown>, who: Map<string, string>) => Record<string, unknown>;
   /* THE WAY BACK (Dr Raghu, 8 Sep 2026: "make sure that all of them are
@@ -130,6 +139,7 @@ const JOBS: Job[] = [
   },
   {
     doctype: "Opportunity", table: "opportunity", key: "erp_opportunity_name", cursorKey: "sync_opportunity",
+    inbound: false,
     fields: ["name", "customer_name", "title", "transaction_date", "sales_stage", "modified"],
     row: (r) => ({
       erp_opportunity_name: S(r.name),
@@ -263,6 +273,7 @@ export async function GET(req: Request) {
     const skipped: string[] = [];
 
     for (const job of JOBS) {
+      if (job.inbound === false) { report[job.doctype] = { read: 0, added: 0, had: 0, upto: "inbound is the hourly erp-pull's; only the way back runs here" }; continue; }
       const tick = BY_DOCTYPE[job.doctype];
       if (tick && !isOn(ticks, tick)) { skipped.push(job.doctype); continue; }
       const cursor = S(cfg[job.cursorKey]) || "2026-09-08 00:00:00";

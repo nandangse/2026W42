@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.12",
+    date: "2026-10-07",
+    module: "CRM: opportunities arrive whole again — two silent faults in the hourly pulls fixed, 140 enquiries repaired",
+    items: [
+      "WHY OPPORTUNITIES SEEMED NOT TO SYNC (\u201cwhy are opportunities not syncing?\u201d). They were arriving every hour, but without a date. Two hourly jobs pull them: the quarter-past pull brings each one whole \u2014 number, date, company, sector, owner, enquiry text \u2014 and the half-past two-way sync inserts only a name and a stage. From 16 September, when the two-way sync\u2019s inserts stopped failing, it got there first every hour and the whole pull then skipped the row as already known. 124 enquiries landed with no date and fell outside the list\u2019s year-to-date view.",
+      "THE FIX. The two-way sync no longer pulls opportunities in; the quarter-past pull owns the way in, and the sync keeps only the way back (a renamed title to the ERP). The 124 thin rows were filled from the ERP in place \u2014 ENQ number, date as the ERP has it, company, contact, owner, sector, product family, source and the enquiry text \u2014 touching nothing anyone had typed.",
+      "A SECOND FAULT, FOUND ON THE WAY. The ERP writes the enquiry source as words (Email, Google Ad, Nandan Website, GEM Tender, Indiamart) and the CRM keeps it as a fixed list (email, google_ads, website, tender, indiamart). The whole pull wrote the words straight across; Postgres refused those rows, the refusal was swallowed, and the cursor moved on. Sixteen enquiries since 29 August never arrived. They are in now, the source is mapped by name (a word with no match is left empty, never refused), 119 empty sources were filled, and the pull now reports how many rows it failed to write and why.",
+      "\u201cInbound\u201d is the one ERP source with no match on the CRM\u2019s list; five enquiries carry it and show no source.",
+    ],
+  },
+  {
     v: "6.3.0.11",
     date: "2026-10-06",
     module: "Suppliers: no cash flow in Saamaan; Supplier Payment Release to Kuber and accounts@",
