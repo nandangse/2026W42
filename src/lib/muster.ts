@@ -350,20 +350,23 @@ export function generateRegister(
      * before — a man on site for two days drew the same as a man there all
      * month.
      *
-     * AND ONE SOURCE, NEVER TWO ("if in the muster sheet another site
-     * allowance is also seen, do not double it — always make sure that you
-     * take up only one. In future you will try not to put that into the
-     * muster at all"). The rate list is the intended home, so it wins where
-     * it carries a figure; the muster is the fallback for today, when no
-     * rate list has a site column at all. Where both speak, the rate list is
-     * taken and the clash is named in the warnings rather than being added
-     * up in silence.
+     * TWO SOURCES, BOTH PAID (Dr Raghu, 7 Oct 2026: "The site allowance
+     * that comes into this, which is filled in the muster, is the actual
+     * site allowance, which could be added in addition to what is there in
+     * the calculation. Please do not discard that. For the 11 people, what
+     * you discarded is wrong."). The rate list's site figure is the
+     * STRUCTURE's allowance and earns like Fixed: whole from seven days
+     * present, pro rata below. The muster's figure is the ACTUAL amount
+     * drawn that month — days on site, as HR counted them — and is added as
+     * written, never pro-rated and never dropped. From 7 Sep to 7 Oct the
+     * muster's figure was thrown away wherever the rate list also spoke;
+     * that was wrong, and this is the correction.
      */
     const siteFromRate = rr?.site ?? 0;
     const siteFromMuster = m.site_allowance ?? 0;
     if (siteFromRate > 0 && siteFromMuster > 0) siteClash.push(m.employee_id);
-    const siteRate = siteFromRate > 0 ? siteFromRate : siteFromMuster;
-    const eSite = m.present >= 7 ? siteRate : Math.round(siteRate * m.present / 26);
+    const eSiteRate = m.present >= 7 ? siteFromRate : Math.round(siteFromRate * m.present / 26);
+    const eSite = eSiteRate + siteFromMuster;
     // a worker's OT above his HRA has been carried in site allowance since
     // 4 Sep; that is OT money and is not pro-rated by days on site
     const site = worker ? eSite + Math.max(0, otPay - hra) : eSite;
@@ -394,7 +397,7 @@ export function generateRegister(
     };
   });
   if (siteClash.length)
-    warnings.push(`Site allowance was given in BOTH the rate list and the muster for ${siteClash.length} ${siteClash.length === 1 ? "person" : "people"} (${siteClash.slice(0, 8).join(", ")}${siteClash.length > 8 ? " …" : ""}). The rate list was taken and the muster's figure ignored — it was NOT added on top.`);
+    warnings.push(`${siteClash.length} ${siteClash.length === 1 ? "person" : "people"} drew an actual site allowance from the muster ON TOP of the structure's (${siteClash.slice(0, 8).join(", ")}${siteClash.length > 8 ? " …" : ""}) — both are paid, as Dr Raghu directed on 7 Oct 2026.`);
   if (noRate) warnings.push(`${noRate} line${noRate === 1 ? "" : "s"} have no rate — neither in the rate list nor on the record — so earn nothing until one is given.`);
   return { rows, warnings };
 }

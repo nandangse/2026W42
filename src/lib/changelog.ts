@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.20",
+    date: "2026-10-07",
+    module: "Payroll: the muster\u2019s site allowance is paid on top of the structure\u2019s, never discarded",
+    items: [
+      "SITE ALLOWANCE, TWO SOURCES, BOTH PAID (\u201cThe site allowance that comes into this, which is filled in the muster, is the actual site allowance, which could be added in addition to what is there in the calculation. Please do not discard that. For the 11 people, what you discarded is wrong.\u201d). The rate list\u2019s site figure is the structure\u2019s allowance and earns like Fixed \u2014 whole from seven days present, pro rata below. The muster\u2019s figure is the actual amount drawn that month and is added as written. Since 7 September the muster\u2019s figure had been thrown away wherever the rate list also carried one; Generate now pays both and names the people in the run\u2019s notes.",
+    ],
+  },
+  {
     v: "6.3.0.19",
     date: "2026-10-07",
     module: "HRMS payroll: the Salary tab is read as a muster; Re-read a file already uploaded",
