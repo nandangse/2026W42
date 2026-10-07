@@ -135,7 +135,7 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
                 every rate change carries who made it and when. */}
             {isOwner && !s.frozen_at && (
               <button onClick={async () => {
-                if (!window.confirm(`Pull every Type from the HRIS and work the per-day rates out again?\n\nPer day = Gross ÷ 26 for Labour and Labour - Contract, ÷ 31 for the rest. Lines already right are left alone.`)) return;
+                if (!window.confirm(`Pull every Type from the HRIS and work the per-day rates out again?\n\nPer day = Gross ÷ 26 for Labour and Labour - Contract, ÷ the calendar days of the month for the rest. Lines already right are left alone.`)) return;
                 try {
                   const j = await api.post("/api/hrms/rates", { action: "sync_types", structure_id: s.id }) as { checked: number; changed: number; noType: number };
                   setMsg(`${j.changed} of ${j.checked} lines updated${j.noType ? `; ${j.noType} have no Type on their HRIS record` : ""}.`);
@@ -143,6 +143,21 @@ export default function SalaryRates({ who, isOwner }: { who: string; isOwner: bo
                 } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
               }} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }}
                 title="Types come from the HRIS; the per-day divisor follows the Type">⟳ Types &amp; per day</button>
+            )}
+            {/* SYNC FROM APPROVALS (Dr Raghu, 7 Oct 2026: "6981 Sanju's approval was done by me
+                … even in the HRIS, it is showing the same thing"). Every approved appraisal's
+                gross and split onto the Live list — approvals now write through on their own;
+                this catches up anything made before 7 Oct. */}
+            {isOwner && s.status === "Live" && !s.frozen_at && (
+              <button onClick={async () => {
+                if (!window.confirm(`Bring the Live list level with every approved appraisal?\n\nEach approved person's gross and split (basic, HRA, fixed, conveyance, medical) is written onto this list and into the ${"2026-27"} salary history, marked as from the approval.`)) return;
+                try {
+                  const j = await api.post("/api/hrms/rates", { action: "sync_from_approvals" }) as { rates: number; history: number; skipped: string[] };
+                  setMsg(`${j.rates} rates and ${j.history} history lines brought level with the approvals${j.skipped?.length ? `; ${j.skipped.length} whose parts do not add to the gross: ${j.skipped.slice(0, 5).join(", ")}` : ""}.`);
+                  load(cur);
+                } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+              }} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }}
+                title="Every approved appraisal's gross and split, written onto this Live list and the FY history">✓ Sync from approvals</button>
             )}
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="block" style={{ fontSize: 11, maxWidth: 200 }} />
             <button onClick={upload} disabled={busy} className="font-semibold rounded border px-2 py-1 bg-white" style={{ borderColor: C.line, color: "var(--blue)" }} title="Rows from a CSV or Excel, matched on Employee ID">⬆ Import</button>

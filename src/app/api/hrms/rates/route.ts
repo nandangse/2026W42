@@ -224,6 +224,13 @@ export async function POST(req: Request) {
      * quietly on a read: it rewrites 205 rates, and by his own rule every
      * change to a rate carries who made it and when.
      */
+    /** SYNC FROM APPROVALS (7 Oct 2026): every approved appraisal's gross and split onto the Live list, and the FY history */
+    if (action === "sync_from_approvals") {
+      const { syncApprovedToMaster } = await import("@/lib/appraisal-sync");
+      const r = await syncApprovedToMaster(admin, null, stamp);
+      return NextResponse.json({ ok: true, ...r });
+    }
+
     if (action === "sync_types") {
       const sid = String(body.structure_id || "");
       if (!sid) throw new HttpError(400, "Which structure?");

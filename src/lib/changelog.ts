@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.35",
+    date: "2026-10-07",
+    module: "An approved appraisal now reaches the Salary Rate List and the salary history",
+    items: [
+      "6981 SANJU, 20,800 \u2192 24,000 (\u201cSanju\u2019s approval was done by me \u2026 Even then, in the calculation sheet, it is showing the old one, and even in the HRIS, it is showing the same thing. Just check what is happening\u201d). Checked: the payroll register HAD 24,000 \u2014 it reads the approved appraisal. What showed the old figure was HRIS \u2192 Salary Rate List, a one-time import made twenty minutes before that approval, and the salary history, written at the proposal. Neither was ever told about an approval. Now every approval \u2014 Dr Raghu\u2019s own save on the card, or a tick in the queue \u2014 writes the gross and the split through to the Live rate list and the FY\u2019s history; a \u2713 Sync from approvals button on the Live list catches up anything older. Run once today: 204 rates and 204 history lines brought level (6514 28,800 \u2192 32,544 and 6981 20,800 \u2192 24,000 were the two grosses adrift; 84 lines had the right gross with the wrong split; all 204 had no Type).",
+    ],
+  },
+  {
     v: "6.3.0.34",
     date: "2026-10-07",
     module: "Payroll: leave fills in whole days above the floor; comp off is paid out, never spent on the gap",
