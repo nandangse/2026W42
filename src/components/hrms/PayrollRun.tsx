@@ -48,6 +48,7 @@ type ObsPerson = {
   paid_present: number; seen_at_gate: number; site_days: number;
   never_on_machine: boolean; unexplained: number; flags: ObsFlag[]; flag_count: number;
 };
+const REG_KEYS = ["employee_id", "name", "type", "days_due", "leave_ob", "leave_earned", "compoff_days", "leave_used", "leave_encashed", "leave_cb", "paid_days", "per_day", "basic_da", "hra", "fixed_allowance", "conveyance", "medical", "ot_pay", "site_allowance", "compoff_amt", "encash_amt", "arrears", "earned", "pf", "pt", "loan", "advance", "tds", "lunch", "late_ded", "other_ded", "deductions", "net", "round_up", "to_pay", "rate_from"];
 type PayCompare = {
   ready: boolean; why?: string; compared: number; matched: number;
   holds: { employee_id: string; name: string; type: string; genie_net: number; sheet_net: number | null; status: string }[];
@@ -95,6 +96,10 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
   const [wa, setWa] = useState<{ count: number; noPhone: number; blanks: Record<string, number>; sample: { id: string; name: string; phone: string; text: string }[]; template: string } | null>(null);
   const [waOpen, setWaOpen] = useState(false);
   const [q, setQ] = useState("");
+  // SORTABLE REGISTER (Dr Raghu, 7 Oct 2026: "make this sortable"): click a
+  // heading to sort by that column, click again to turn it; figures sort
+  // high to low first, names A to Z first
+  const [sort, setSort] = useState<{ k: string; dir: 1 | -1 } | null>(null);
 
   const load = useCallback(async () => {
     try { setD(await api.get(`/api/hrms/payroll?id=${encodeURIComponent(id)}`)); }
@@ -145,7 +150,13 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
   const title = `${MONTHS[r.month - 1]} ${r.year}`;
   const musterRows = (d.muster?.rows || []).filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q));
   const musterMonth = d?.muster?.month ? `${MONTHS[d.muster.month - 1]}${d.muster.year ? ` ${d.muster.year}` : ""}` : "";
-  const regRows = (d.register || []).filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q));
+  const regRows = (d.register || []).filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.employee_id.includes(q))
+    .sort((a, b) => {
+      if (!sort) return 0;
+      const av = (a as unknown as Record<string, unknown>)[sort.k], bv = (b as unknown as Record<string, unknown>)[sort.k];
+      if (typeof av === "string" || typeof bv === "string") return String(av ?? "").localeCompare(String(bv ?? ""), "en", { numeric: true }) * sort.dir;
+      return ((Number(av) || 0) - (Number(bv) || 0)) * sort.dir;
+    });
   const tone = (s: string) => (s === "delivered" || s === "received" ? C.green : s === "failed" ? C.red : s === "sent" ? "var(--blue)" : C.dim);
   const mark = (v: string) => ({ P: { bg: "#E6F4EA", c: C.green }, A: { bg: "#FBEDEA", c: C.red }, WO: { bg: "#F4F2EC", c: C.faint }, MO: { bg: "#DCE8F5", c: "var(--blue)" }, S: { bg: "#FFF3E8", c: C.orange } }[v] || { bg: "transparent", c: C.dim });
 
@@ -387,9 +398,13 @@ export default function PayrollRun({ id, isOwner, onBack }: { id: string; isOwne
                   — the same as the printed register, so the screen and the
                   paper name their columns the same way. */}
               <thead><tr style={{ fontSize: 10 }}>
-                {["Emp", "Name", "Type", "Due", "Leave OB", "Earned lv", "Comp off", "Lv used", "Encashed", "Leave CB", "Paid days", "Per day", "Basic & DA", "HRA", "Fixed", "Conv", "Medical", "OT pay", "Site", "Comp off ₹", "Encash ₹", "Arrears", "Earned", "PF", "PT", "Loan", "Advance", "TDS", "Lunch", "Late", "Other", "Deductions", "Net", "Round up", "To pay", "Rate from"].map((h, i) => (
-                  <th key={h} className="px-2 py-1.5" style={{ position: "sticky", top: 0, background: "#16232F", color: "#fff", fontWeight: 700, textAlign: i < 3 ? "left" : "right", zIndex: i < 2 ? 3 : 2, borderBottom: "2px solid #16232F", ...(i === 0 ? { left: 0, minWidth: 60, width: 60 } : i === 1 ? { left: 60 } : {}) }}>{h}</th>
-                ))}
+                {["Emp", "Name", "Type", "Due", "Leave OB", "Earned lv", "Comp off", "Lv used", "Encashed", "Leave CB", "Paid days", "Per day", "Basic & DA", "HRA", "Fixed", "Conv", "Medical", "OT pay", "Site", "Comp off ₹", "Encash ₹", "Arrears", "Earned", "PF", "PT", "Loan", "Advance", "TDS", "Lunch", "Late", "Other", "Deductions", "Net", "Round up", "To pay", "Rate from"].map((h, i) => {
+                  const k = REG_KEYS[i];
+                  const on = sort?.k === k;
+                  return (
+                  <th key={h} className="px-2 py-1.5" title="click to sort" onClick={() => setSort(on ? (sort!.dir === (i < 3 ? 1 : -1) ? { k, dir: sort!.dir === 1 ? -1 : 1 } : null) : { k, dir: i < 3 ? 1 : -1 })} style={{ position: "sticky", top: 0, background: on ? "#2C4A66" : "#16232F", color: "#fff", fontWeight: 700, textAlign: i < 3 ? "left" : "right", zIndex: i < 2 ? 3 : 2, borderBottom: "2px solid #16232F", cursor: "pointer", userSelect: "none", ...(i === 0 ? { left: 0, minWidth: 60, width: 60 } : i === 1 ? { left: 60 } : {}) }}>{h}{on ? (sort!.dir === 1 ? " ▲" : " ▼") : ""}</th>
+                  );
+                })}
               </tr></thead>
               <tbody>
                 {regRows.map((x) => (

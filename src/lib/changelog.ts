@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.26",
+    date: "2026-10-07",
+    module: "Payroll: the salary register sorts on any column",
+    items: [
+      "SORTABLE REGISTER (\u201cmake this sortable\u201d). Click any heading on the Salary register to sort by it \u2014 figures high to low first, names and types A to Z first \u2014 click again to turn it, a third time to let it go. The sorted column lights up and carries an arrow; the Emp and Name columns stay pinned while you scroll.",
+    ],
+  },
+  {
     v: "6.3.0.25",
     date: "2026-10-07",
     module: "Payroll observation: Genie\u2019s net against the sheet\u2019s, person by person",
