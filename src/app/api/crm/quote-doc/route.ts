@@ -414,7 +414,7 @@ export async function GET(req: Request) {
      every page it crosses; a row and a cell may break; the totals stay
      whole. */
   body { background: #fff; }
-  .page { width: auto; height: auto; min-height: 0; margin: 0; padding: 0 14mm; box-shadow: none; overflow: visible; display: block; break-after: page; }
+  .page { width: auto; height: auto; min-height: 0; margin: 0; padding: 1mm 14mm 0; box-shadow: none; overflow: visible; display: block; break-after: page; }
   .page:last-child { break-after: auto; }
   .page.sheet-centered { min-height: 240mm; display: flex; flex-direction: column; justify-content: center; }
   .body { overflow: visible; flex: none; }
@@ -426,7 +426,7 @@ export async function GET(req: Request) {
   .body h1, .body h2, .body h3 { break-after: avoid; }
   .body img { break-inside: avoid; }
   .wm.doc { position: fixed; inset: 0; }
-  @page { size: A4; margin: 22mm 0 14mm; }` : ""}
+  @page { size: A4; margin: 26mm 0 14mm; }` : ""}
 </style></head>
 <body>${press && !isFinal ? '<div class="wm doc">DRAFT</div>' : ""}${pages}
 ${wantPrint ? "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),400));</script>" : ""}

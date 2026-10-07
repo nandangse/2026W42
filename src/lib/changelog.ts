@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.16",
+    date: "2026-10-07",
+    module: "Quotation PDF: the header sits clear of the body",
+    items: [
+      "THE RULE UNDER THE LOGO ran through the first line of every page (seen on 7 Oct 2026). The press\u2019s header now has a fixed height well inside a deeper top margin, and the body starts a little lower.",
+    ],
+  },
+  {
     v: "6.3.0.15",
     date: "2026-10-07",
     module: "Every rich-text box takes a pasted picture; the quote template knows all five kinds",

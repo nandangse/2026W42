@@ -32,12 +32,14 @@ export async function GET(req: Request) {
     const dIN = (v: unknown) => (v ? String(v).slice(0, 10).split("-").reverse().join("/") : "");
     const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
     const pdf = await pressPdf(html, {
-      headerHtml: `<div style="width:100%;margin:0 14mm;padding:7mm 0 1.5mm;border-bottom:2px solid #1B3A5C;font-size:0"><img src="${LOGO}" style="height:11mm;object-fit:contain" /></div>`,
+      /* the header lives in the top margin and must end well inside it — on
+         7 Oct 2026 its rule ran through the first line of the body */
+      headerHtml: `<div style="box-sizing:border-box;width:100%;height:18mm;margin:0 14mm;padding:5mm 0 0;font-size:0;line-height:0"><div style="box-sizing:border-box;height:13mm;border-bottom:2px solid #1B3A5C;padding-bottom:1.5mm"><img src="${LOGO}" style="height:11mm;object-fit:contain;display:block" /></div></div>`,
       footerHtml: `<div style="width:100%;margin:0 14mm;padding-top:1.5mm;border-top:1px solid #1B3A5C;display:flex;justify-content:space-between;font-family:Georgia,'Times New Roman',serif;font-size:8pt;color:#444">
         <span>Quotation No: ${esc(String(q?.quote_no || ""))} &nbsp;·&nbsp; Date: ${esc(dIN(q?.quoted_on))}</span>
         <span>Private and Confidential</span>
         <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
-      marginTop: "22mm", marginBottom: "14mm",
+      marginTop: "26mm", marginBottom: "14mm",
     });
     const fileName = `${title.replace(/\//g, "-").replace(/[\\:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 150)}.pdf`;
     return new Response(new Uint8Array(pdf), {
