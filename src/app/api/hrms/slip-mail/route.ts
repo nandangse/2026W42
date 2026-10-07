@@ -213,7 +213,7 @@ export async function POST(req: Request) {
     /* Every slip in this batch pressed on ONE browser — the launch is the
        cost, and paying it per slip is what killed the request. */
     const pdfs = await pressPdfMany(slice.map(({ s }) =>
-      slipHtml(s, Number(sheet.month), Number(sheet.year), { draft: sheet.status !== "Frozen", stampUrl })));
+      slipHtml(s, Number(sheet.month), Number(sheet.year), { draft: sheet.status !== "Frozen", stampUrl, fill: true })));
     for (let i = 0; i < slice.length; i++) {
       const { s, to } = slice[i];
       try {

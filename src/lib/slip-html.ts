@@ -16,7 +16,7 @@ import { wordsOf } from "./slip-words";
 const dash = (v: string | null | undefined) => (v && v !== "N/A" ? v : "—");
 const esc = (v: unknown) => String(v ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
 
-export function slipHtml(s: Slip, month: number, year: number, opts: { draft?: boolean; stampUrl?: string } = {}): string {
+export function slipHtml(s: Slip, month: number, year: number, opts: { draft?: boolean; stampUrl?: string; fill?: boolean } = {}): string {
   const period = `${MONTHS[month - 1]} ${year}`;
   const money = (label: string, rate: number | null | undefined, earned: number | null | undefined, ded: string, dv: number | null | undefined) =>
     `<tr><td>${label}</td>
@@ -26,7 +26,13 @@ export function slipHtml(s: Slip, month: number, year: number, opts: { draft?: b
      <td class="r">${ded ? (dv == null ? "—" : inr(dv)) : ""}</td></tr>`;
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(period)} - ${esc(s.id)} - ${esc(s.name)}</title><style>
-@page { size: 210mm 148mm; margin: 0; }
+${opts.fill
+  /* FILL THE PAGE (Dr Raghu, 7 Oct 2026: "the PDF is coming out with pretty poor, very small font
+     sizes … I want the slips to look like the slips in HR Salary Slips, where the whole page is
+     filled"). The A5 slip, untouched in its format, scaled by √2 onto an A4 landscape sheet — every
+     font 41% larger, the same lines in the same places. */
+  ? "@page { size: 297mm 210mm; margin: 0; } .slip { zoom: 1.4142; }"
+  : "@page { size: 210mm 148mm; margin: 0; }"}
 html,body { margin:0; font-family: Arial, Helvetica, sans-serif; color:#16232F; }
 .slip { width:210mm; height:148mm; box-sizing:border-box; padding:4mm 5mm; font-size:7.6px; line-height:1.3;
         display:flex; flex-direction:column; position:relative; }

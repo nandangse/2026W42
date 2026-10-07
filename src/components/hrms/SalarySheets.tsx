@@ -337,6 +337,10 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
             <button onClick={() => setMailing((v) => !v)}
               className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: "#8A5B00", border: "1px solid #E7C98A", fontSize: 11.5, cursor: "pointer" }}
               title="One mail each, that person's own slip attached, to their personal address">📧 Mail slips</button>
+            {/* PAYSLIPS ON WHATSAPP, FROM VINAY'S OWN NUMBER (Dr Raghu, 7 Oct 2026) — the one-by-one screen with the SOP */}
+            <a href={`/hrms/wa-slips?sheet=${id}`} target="_blank" rel="noopener noreferrer"
+              className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: "#0B3D1E", border: "1px solid #25D366", fontSize: 11.5, textDecoration: "none" }}
+              title="Each person's slip on WhatsApp Web from Vinay's own number, one by one — the screen opens each chat with the message and the slip attached">💬 WhatsApp slips</a>
             <a href={`/hrms/salary-slips/${id}/print`} target="_blank" rel="noopener noreferrer"
               className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 11.5 }}
               title={d?.status === "Frozen"

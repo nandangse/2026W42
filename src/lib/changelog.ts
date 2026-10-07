@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.52",
+    date: "2026-10-07",
+    module: "Payslips on WhatsApp Web, one by one, from Vinay\u2019s own number \u2014 with the SOP",
+    items: [
+      "THE SLIP FILLS THE PAGE (\u201cin the mailing, I want the slips to look like the slips in HR Salary Slips, where the whole page is filled in. In the one sent in the email, the PDF is coming out with very small font sizes\u201d; \u201clet\u2019s not change the format after we finalised it\u201d). The e-mailed and WhatsApped slip is the same A5 slip, untouched in format, scaled by \u221a2 onto an A4 landscape sheet \u2014 every font 41% larger, the same lines in the same places. Printing from the Salary Slips screen is unchanged.",
+      "THE HUMAN TOUCH (\u201cwhatsapp web through chrome please \u2026 Each one will be a message and open a new tab, just attach the payslip to their whatsapp number in that tab. Vinay then only has to click on send on each \u2026 If it\u2019s possible to also send, then send at the rate of 10 per minute \u2026 then randomly increasing the send time\u201d). Salary Sheets \u2192 open the month \u2192 \ud83d\udcac WhatsApp slips: a queue of everyone with a personal mobile. Each line opens WhatsApp Web\u2019s own click-to-chat in a new tab with the message typed; the Genie WhatsApp helper \u2014 a tiny Chrome extension downloaded from that screen, loaded once \u2014 fetches that person\u2019s slip PDF with a two-hour token, attaches it, puts the message in the caption and waits for Vinay to press Send (or presses it for him when ticked), then tells Genie, which records it and opens the next after six seconds plus a random 0\u20138, growing a second every ten sent. Holds and people without a mobile are named; nobody gets a slip twice; Mark sent covers anyone done by hand. The SOP is on the screen. The message is Masters \u2192 Standard Texts \u2192 salary_slip_whatsapp (a default is used until one is written).",
+    ],
+  },
+  {
     v: "6.3.0.51",
     date: "2026-10-07",
     module: "Mass mail: each person\u2019s own salary slip attached",

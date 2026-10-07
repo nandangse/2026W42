@@ -43,7 +43,7 @@ export async function monthSlipPdfs(admin: SupabaseClient, ids: string[], month?
   const picked = all.filter((s: Slip) => want.has(s.id));
   const period = `${MONTHS[Number(sheet.month) - 1]} ${sheet.year}`;
   const stampUrl = await stampDataUri();
-  const pdfs = picked.length ? await pressPdfMany(picked.map((s) => slipHtml(s, Number(sheet.month), Number(sheet.year), { draft: sheet.status !== "Frozen", stampUrl }))) : [];
+  const pdfs = picked.length ? await pressPdfMany(picked.map((s) => slipHtml(s, Number(sheet.month), Number(sheet.year), { draft: sheet.status !== "Frozen", stampUrl, fill: true }))) : [];
   const out = new Map<string, SlipPdf>();
   picked.forEach((s, i) => out.set(s.id, { id: s.id, name: String(s.name || ""), hold: !!s.hold, base64: pdfs[i] ? pdfs[i]!.toString("base64") : null, fileName: `${period} - ${s.id} - ${s.name}.pdf` }));
   return { period, month: Number(sheet.month), year: Number(sheet.year), status: String(sheet.status), slips: out };
