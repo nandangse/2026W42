@@ -313,7 +313,8 @@ export async function POST(req: Request) {
                  bank. A 15-digit account that is not 15 digits is refused the
                  same way. */
               if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) { refused.push(`${eid}: IFSC "${ifsc || "blank"}"`); continue; }
-              if (acct15 && !/^\d{15}$/.test(acct15)) { refused.push(`${eid}: 15-digit account "${acct15}" is ${acct15.length} characters`); continue; }
+              // the account is written exactly as given (zeros kept); only a non-digit refuses it — not every bank's number is 15 long
+              if (acct15 && !/^\d{6,20}$/.test(acct15)) { refused.push(`${eid}: account "${acct15}" has characters that are not digits`); continue; }
               for (const [field, ci] of FIELDS) {
                 if (ci < 0) continue;
                 let value = String(L[ci] ?? "").trim();
@@ -329,7 +330,7 @@ export async function POST(req: Request) {
             parsed = { people: people_n, written: people_n - refused.length, changed, refused, bad, fields: FIELDS.filter(([, ci]) => ci >= 0).map(([k]) => k) };
             summary = `${people_n - refused.length} of ${people_n} people written · ${changed} bank field${changed === 1 ? "" : "s"} changed on the HRIS records${refused.length ? ` · ${refused.length} REFUSED` : ""}`;
             warnings = refused.length ? [`${refused.length} line${refused.length === 1 ? "" : "s"} NOT written — wrong IFSC or 15-digit account. Fix these at the source and upload again: ${refused.join("; ")}`] : [];
-            if (cAcc15 < 0) warnings.push("No \u201cAccount No (15 digit)\u201d column in this file — the bank files pay on the 15-digit account only, so without it nobody can be paid. Add the column and upload again.");
+            if (cAcc15 < 0) warnings.push("No \u201cAccount No (15 digit)\u201d column in this file — the bank files pay on that column only, so without it nobody can be paid. Add the column and upload again.");
           } catch (e) { if (e instanceof HttpError) throw e; warnings.push(`Could not read ${f.name}: ${e instanceof Error ? e.message : String(e)}`); }
         }
         if (kind === "gsheet") {

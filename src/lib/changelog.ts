@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.48",
+    date: "2026-10-07",
+    module: "Bank files: the account column, as given \u2014 not a 15-character test",
+    items: [
+      "98 OF 201 WOULD HAVE BEEN LEFT OUT. Vinay\u2019s approved bank details went up at 17:08 \u2014 201 people, 761 fields, every IFSC valid \u2014 and 98 of the \u2018Account No (15 digit)\u2019 values are not 15 characters, because not every bank\u2019s number is (SBI 11, HDFC 14). My 6.3.0.46 rule read \u201c15 digit\u201d as a length and would have dropped all 98 from the bank files. Corrected: the bank files pay on that column, written exactly as given, zeros and all; the only refusal is a character that is not a digit.",
+    ],
+  },
+  {
     v: "6.3.0.47",
     date: "2026-10-07",
     module: "Bank files: the header\u2019s file number runs from 50000 and never repeats",
