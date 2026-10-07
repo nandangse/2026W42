@@ -12,6 +12,11 @@ export interface PressOptions {
    * it has to come through here rather than out of the document.
    */
   footerHtml?: string;
+  /** A header on every page — the quotation carries the logo there (7 Oct 2026). */
+  headerHtml?: string;
+  /** Room for the header and footer; defaults 0 and 12mm. */
+  marginTop?: string;
+  marginBottom?: string;
   landscape?: boolean;
 }
 
@@ -55,12 +60,14 @@ export async function pressPdfMany(htmls: string[], opts: PressOptions = {}): Pr
 function pdfOptions(opts: PressOptions) {
   return {
     format: "A4" as const, printBackground: true, preferCSSPageSize: true,
-    ...(opts.footerHtml
+    ...(opts.footerHtml || opts.headerHtml
       ? {
           displayHeaderFooter: true,
-          headerTemplate: "<span></span>",
-          footerTemplate: opts.footerHtml,
-          margin: { top: 0, bottom: "12mm", left: 0, right: 0 },
+          headerTemplate: opts.headerHtml || "<span></span>",
+          footerTemplate: opts.footerHtml || "<span></span>",
+          // A header or footer needs room to stand in; zero margins would
+          // print it underneath the content.
+          margin: { top: opts.marginTop || 0, bottom: opts.marginBottom || "12mm", left: 0, right: 0 },
         }
       : { margin: { top: 0, bottom: 0, left: 0, right: 0 } }),
   };
@@ -77,14 +84,14 @@ export async function pressPdf(html: string, opts: PressOptions = {}): Promise<B
     await new Promise((z) => setTimeout(z, 800));
     const pdf = await page.pdf({
       format: "A4", printBackground: true, preferCSSPageSize: true,
-      ...(opts.footerHtml
+      ...(opts.footerHtml || opts.headerHtml
         ? {
             displayHeaderFooter: true,
-            headerTemplate: "<span></span>",
-            footerTemplate: opts.footerHtml,
-            // A footer needs room to stand in; zero margins would print it
-            // underneath the last row.
-            margin: { top: 0, bottom: "12mm", left: 0, right: 0 },
+            headerTemplate: opts.headerHtml || "<span></span>",
+            footerTemplate: opts.footerHtml || "<span></span>",
+            // A header or footer needs room to stand in; zero margins would
+            // print it underneath the content.
+            margin: { top: opts.marginTop || 0, bottom: opts.marginBottom || "12mm", left: 0, right: 0 },
           }
         : { margin: { top: 0, bottom: 0, left: 0, right: 0 } }),
     });

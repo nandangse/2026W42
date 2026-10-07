@@ -22,6 +22,13 @@ export const maxDuration = 60;
  */
 
 const ORDER = ["cover", "letter", "situational", "items", "items_split", "terms", "about", "back"] as const;
+
+/** NGSE/QTN/26-27/40712 - Tejpal Motors - Single Scissor Car Lift, with -R1 on a revision. */
+function quoteDocName(q: Record<string, unknown>, customer: string, product: string): string {
+  const rev = Number(q.revision) || 0;
+  const no = `${String(q.quote_no || "Quotation")}${rev > 0 ? `-R${rev}` : ""}`;
+  return [no, customer.trim(), product.trim().slice(0, 80)].filter(Boolean).join(" - ");
+}
 const CHARS_PER_PAGE = 1750;
 
 
@@ -59,7 +66,9 @@ function wordsWestern(n: number): string {
 }
 
 /** Split rich HTML into page-sized chunks on top-level block boundaries. */
+let PRESS = false;
 function paginate(html: string): string[] {
+  if (PRESS) return html.trim() ? [html] : [""];
   const blocks = html.split(/(?=<(?:p|h1|h2|h3|ul|ol|table|blockquote|div)[\s>])/i).filter((b) => b.trim());
   const pages: string[] = [];
   let cur = "";
@@ -81,6 +90,16 @@ export async function GET(req: Request) {
     const qid = String(u.searchParams.get("id") || "");
     if (!qid) throw new HttpError(400, "Which quotation?");
     const wantPrint = u.searchParams.get("print") === "1";
+    /* THE PRESS LAYS THE PAGES (Dr Raghu, 7 Oct 2026: "The quotation is
+       breaking across pages in a very poor manner. I don't mind the cell
+       being split across multiple pages … but it should not be like this,
+       where it will create it in its own way"). With ?press=1 nothing here
+       guesses where a page ends: every section is one flowing block,
+       Chromium breaks the pages, a table's header repeats on each, a long
+       cell runs on to the next page, and the logo and footer come from the
+       press itself. The screen keeps its A4 sheets for the preview. */
+    const press = u.searchParams.get("press") === "1";
+    PRESS = press;
     let isFinal = u.searchParams.get("final") === "1";
     const secParam = String(u.searchParams.get("sections") || "").split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -107,6 +126,11 @@ export async function GET(req: Request) {
 
     const customer = String(co?.name || "");
     const subject = String(q.subject || "").trim();
+    /* THE NAME OF THE QUOTE (Dr Raghu, 7 Oct 2026: "begin with NGSE/QTN/the
+       quote number - the customer name - the product … if it is a revision,
+       it'll have -R1") */
+    const firstItem = String((lines ?? []).find((l) => !l.is_optional)?.description || "").trim();
+    const docName = quoteDocName(q as Record<string, unknown>, customer, subject || cleanDesc(firstItem).replace(/<[^>]+>/g, ""));
     // Qtn No · Date / To / Subject — the head the FIRST page wears, and the
     // covering letter too (Dr Raghu, 30 Aug 2026)
     let ownerName = "";
@@ -231,7 +255,7 @@ export async function GET(req: Request) {
             const { img, desc } = partsOf(l);
             const plain = desc.replace(/<[^>]+>/g, "").length;
             const baseW = 1 + (img ? 1 : 0);
-            if (baseW + plain / CHARS <= CAP - 0.4) {
+            if (press || baseW + plain / CHARS <= CAP - 0.4) {
               frags.push({ sr, cell: `${cellHead(l)}${desc ? `<div class="idesc">${desc}</div>` : ""}`, l, w: baseW + plain / CHARS });
             } else {
               const pieces = splitDesc(desc, Math.max(400, Math.floor((CAP - 0.6 - baseW) * CHARS)), Math.floor((CAP - 0.6) * CHARS));
@@ -245,7 +269,7 @@ export async function GET(req: Request) {
           const pagesOfFrags: Frag[][] = [];
           let cur: Frag[] = [], used = 0;
           for (const f of frags) {
-            if (cur.length && used + f.w > CAP) { pagesOfFrags.push(cur); cur = []; used = 0; }
+            if (!press && cur.length && used + f.w > CAP) { pagesOfFrags.push(cur); cur = []; used = 0; }
             cur.push(f); used += f.w;
           }
           if (cur.length) pagesOfFrags.push(cur);
@@ -285,7 +309,7 @@ export async function GET(req: Request) {
               return `<div class="ig">${esc([group, code].filter(Boolean).join(" :: "))}</div><div class="inm">${esc(cleanDesc(l.description))}</div>`;
             };
             const comPages: typeof numbered[] = [];
-            for (let i = 0; i < numbered.length; i += 11) comPages.push(numbered.slice(i, i + 11));
+            for (let i = 0; i < numbered.length; i += press ? numbered.length || 1 : 11) comPages.push(numbered.slice(i, i + (press ? numbered.length || 1 : 11)));
             for (let pi = 0; pi < comPages.length; pi++) {
               chunks.push(`${pi === 0 ? compactHead : ""}<h2 class="sect">Commercial Offer${pi ? " (contd.)" : ""}</h2>
                 <table class="items">${COLS_FULL}<thead><tr><th>Sr No</th><th>Item</th><th class="tr">Rate</th><th>Qty</th><th class="tr">Amount</th></tr></thead>
@@ -320,19 +344,19 @@ export async function GET(req: Request) {
     const total = flat.length || 1;
 
     const pages = flat.map((p, i) => `
-      <div class="page">
-        ${isFinal ? "" : '<div class="wm">DRAFT</div>'}
-        <div class="hdr"><img src="${LOGO}" alt="Nandan GSE"/></div>
+      <div class="page${press && p.centered ? " sheet-centered" : ""}">
+        ${isFinal || press ? "" : '<div class="wm">DRAFT</div>'}
+        ${press ? "" : `<div class="hdr"><img src="${LOGO}" alt="Nandan GSE"/></div>`}
         <div class="body${p.centered ? " centered" : ""}">${p.title ? `<h2 class="sect">${esc(p.title)}</h2>` : ""}${p.html}</div>
-        <div class="ftr">
+        ${press ? "" : `<div class="ftr">
           <span>Quotation No: ${esc(q.quote_no)} &nbsp;·&nbsp; Date: ${esc(dIN(q.quoted_on))}</span>
           <span class="fc">Private and Confidential</span>
           <span class="fr">Page ${i + 1} of ${total}</span>
-        </div>
+        </div>`}
       </div>`).join("\n");
 
     const html = `<!doctype html><html><head><meta charset="utf-8"/>
-<title>${esc(q.quote_no)} — Quotation</title>
+<title>${esc(docName)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { font-family: Georgia, 'Times New Roman', serif; background: #666; }
@@ -341,9 +365,13 @@ export async function GET(req: Request) {
           box-shadow: 0 2px 12px rgba(0,0,0,.35); }
   .hdr { border-bottom: 2px solid #1B3A5C; padding-bottom: 1.5mm; margin-bottom: 4mm; }
   .hdr img { height: 11mm; object-fit: contain; }
-  .body { flex: 1; min-height: 0; font-size: 11.5pt; line-height: 1.55; color: #16232F; overflow: hidden; }
+  .body { flex: 1; min-height: 0; font-size: 11.5pt; line-height: 1.4; color: #16232F; overflow: hidden; }
   .body.centered { display: flex; flex-direction: column; justify-content: center; text-align: center; }
-  .body p { margin: 0 0 8pt; } .body h1 { font-size: 22pt; margin: 8pt 0; color: #1B3A5C; }
+  /* "way too much gap between lines" (Dr Raghu, 7 Oct 2026): a paragraph is
+     followed by a small gap, and an empty paragraph the editor left behind
+     takes no room at all */
+  .body p { margin: 0 0 5pt; }
+  .body p:empty, .body p:has(> br:only-child) { display: none; } .body h1 { font-size: 22pt; margin: 8pt 0; color: #1B3A5C; }
   .body h2 { font-size: 15pt; margin: 8pt 0; color: #1B3A5C; } .body ul, .body ol { margin: 0 0 8pt 18pt; }
   .body img { max-width: 100%; height: auto; max-height: 235mm; object-fit: contain; }
   .body table { border-collapse: collapse; margin: 6pt 0; max-width: 100%; }
@@ -380,8 +408,27 @@ export async function GET(req: Request) {
     .page:last-child { page-break-after: auto; }
   }
   @page { size: A4; margin: 0; }
+  ${press ? `
+  /* THE PRESS: flowing pages. The sheet is the content alone; the margins,
+     the logo and the footer are the press's. A table's header repeats on
+     every page it crosses; a row and a cell may break; the totals stay
+     whole. */
+  body { background: #fff; }
+  .page { width: auto; height: auto; min-height: 0; margin: 0; padding: 0 14mm; box-shadow: none; overflow: visible; display: block; break-after: page; }
+  .page:last-child { break-after: auto; }
+  .page.sheet-centered { min-height: 240mm; display: flex; flex-direction: column; justify-content: center; }
+  .body { overflow: visible; flex: none; }
+  table.items { break-inside: auto; }
+  table.items thead { display: table-header-group; }
+  table.items tr, table.items td { break-inside: auto; page-break-inside: auto; }
+  table.items tr.tot, table.items tr.grand, table.items tr.tot td, table.items tr.grand td { break-inside: avoid; }
+  h2.sect { break-after: avoid; }
+  .body h1, .body h2, .body h3 { break-after: avoid; }
+  .body img { break-inside: avoid; }
+  .wm.doc { position: fixed; inset: 0; }
+  @page { size: A4; margin: 22mm 0 14mm; }` : ""}
 </style></head>
-<body>${pages}
+<body>${press && !isFinal ? '<div class="wm doc">DRAFT</div>' : ""}${pages}
 ${wantPrint ? "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),400));</script>" : ""}
 </body></html>`;
 

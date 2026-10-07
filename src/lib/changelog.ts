@@ -89,6 +89,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.14",
+    date: "2026-10-07",
+    module: "Quotation PDF: the press lays the pages; the document is named; the lines are tighter",
+    items: [
+      "THE PRESS LAYS THE PAGES (\u201cThe quotation is breaking across pages in a very poor manner. I don\u2019t mind the cell being split across multiple pages \u2026 but it should not be like this, where it will create it in its own way\u201d). The PDF no longer guesses where a page ends from a count of characters. Every section is one flowing block and Chromium breaks the pages: a long item runs on to the next page inside its own cell, the table\u2019s header row repeats on every page it crosses, the totals never split, and headings never sit alone at a page\u2019s foot. The logo rides in the press\u2019s own header on every page; the footer carries the quotation number, the date, Private and Confidential, and Page x of y. The DRAFT watermark still rides every page. The on-screen preview keeps its A4 sheets.",
+      "THE NAME OF THE QUOTE (\u201cbegin with NGSE/QTN/the quote number - the customer name - the product \u2026 if it is a revision, it\u2019ll have -R1\u201d). The PDF downloads as NGSE-QTN-26-27-40712 - Tejpal Motors - Single Scissor Car Lift.pdf, and that is the document\u2019s title inside it too; a revision reads 40712-R1. The product is the quote\u2019s subject, else its first item.",
+      "TIGHTER LINES (\u201cthere is way too much gap between lines. In the template, it looked all right\u201d) \u2014 line height 1.4, a small gap after a paragraph, and the empty paragraphs the editor leaves behind take no room.",
+      "FOUR NEW TEMPLATES TO PICK FROM, as asked: About Nandan as one page, a covering letter, a front cover and a back page. The old ones stay.",
+    ],
+  },
+  {
     v: "6.3.0.13",
     date: "2026-10-07",
     module: "CRM: the sync watch; quotations whole; sectors filled; the opportunity list tidied",
