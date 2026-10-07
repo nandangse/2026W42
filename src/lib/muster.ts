@@ -531,6 +531,9 @@ export const OPTIONAL_MUSTER_VARS = new Set(["compoff", "ot", "late_marks", "lun
 export const PAYROLL_RULES_AS_OF = "7 Oct 2026";
 export type RuleLine = { text: string; changed?: string };
 export const PAYROLL_RULES: { head: string; lines: RuleLine[] }[] = [
+  { head: "Rates", lines: [
+    { text: "The rate is the person's HRIS record (Pay fields). An approved appraisal writes through to the record, the Salary Rate List and the salary history the moment it is approved — the record is the one place payroll reads.", changed: "7 Oct 2026" },
+  ] },
   { head: "Days", lines: [
     { text: "Pay days: the calendar days of the month for Staff and Management — 30 in September, 28 in February, 31 only when the month has 31; 26 for Labour, Labour - Contract and the other contract types.", changed: "7 Oct 2026" },
     { text: "Days due = present + week offs + MO/ST, from the muster." },

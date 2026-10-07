@@ -9,4 +9,4 @@
  * behind GET /api/updates, and changelog.ts refuses to load if its top entry
  * disagrees with this string, so the two still cannot drift.
  */
-export const APP_VERSION = "6.3.0.35";
+export const APP_VERSION = "6.3.0.36";

@@ -440,38 +440,25 @@ ${warnings.length ? `<p><b>${warnings.length} warning${warnings.length === 1 ? "
       let rates = (r.rates as Rates | null) || null;
       let systemCount = 0;
       if (wantSystem) {
-        const monthEnd = new Date(Date.UTC(Number(r.year), Number(r.month), 0)).toISOString().slice(0, 10);
-        const { data: aps } = await admin.from("hrms_appraisal")
-          .select("employee_id, new_gross, approved_at, effective_from, structure, new_designation")
-          .not("approved_at", "is", null).not("new_gross", "is", null);
-        const inForce = ((aps || []) as { employee_id: string; new_gross: number; effective_from: string | null; structure: { components?: Record<string, number> } | null }[])
-          .filter((a) => !a.effective_from || String(a.effective_from).slice(0, 10) <= monthEnd);
-        const who = await people(admin, inForce.map((a) => String(a.employee_id)));
-        const typeOfId = new Map(who.map((p) => [p.id, p.type]));
-        const nameOfId = new Map(who.map((p) => [p.id, p.name]));
-        const rows2 = inForce.map((a) => {
-          const id = String(a.employee_id);
-          const type = typeOfId.get(id) || null;
-          const c = a.structure?.components;
-          /* THE COMPONENT KEYS ARE THE APPRAISAL'S OWN (7 Oct 2026). The import
-             writes fixed_allowance and medical_allowance; this read looked for
-             c.fixed and c.medical, found nothing, and paid nobody on the system
-             rates their fixed allowance or medical — 6034 lost his ₹500, every
-             worker on the Salary Revision Master lost his fixed. Both spellings
-             are read now, so neither import can starve the register again. */
-          const parts = c && Object.keys(c).length
-            ? { basic_da: Number(c.basic_da) || 0, hra: Number(c.hra) || 0, fixed_allowance: Number(c.fixed_allowance ?? c.fixed) || 0, conveyance: Number(c.conveyance) || 0, medical_allowance: Number(c.medical_allowance ?? c.medical) || 0 }
-            : splitGross(Number(a.new_gross), undefined, type);
-          return {
-            employee_id: id, name: nameOfId.get(id) || null, type,
-            gross: Number(a.new_gross),
-            basic_da: parts.basic_da, hra: parts.hra, fixed: parts.fixed_allowance,
-            conveyance: parts.conveyance, medical: parts.medical_allowance,
-            site: c ? Number(c.site_allowance ?? c.site) || null : null, per_day: null,
-          };
-        });
+        /* THE SYSTEM RATES ARE THE HRIS RECORDS (Dr Raghu, 7 Oct 2026:
+           "Whenever there is an approval … it has to get backflushed into the
+           HRIS so that it maintains the correct record, and that's where the
+           payroll has to pull from"). Until today this read the approved
+           appraisals directly; now every approval writes through to the
+           record's Pay fields (appraisal-sync.ts), and the record is the one
+           place payroll reads. A record with no gross falls to the Live rate
+           list below, and the run says so. */
+        const roll = await people(admin, muster.rows.map((m) => m.employee_id));
+        const num0 = (v: unknown) => Number(String(v ?? "").replace(/[₹,\s]/g, "")) || 0;
+        const rows2 = roll.map((p) => {
+          const g = (k: string) => num0(p.value[k]);
+          const parts = { basic_da: g("basic_da"), hra: g("hra"), fixed: g("fixed_allowance"), conveyance: g("conveyance"), medical: g("medical_allowance") };
+          const gross = g("gross") || parts.basic_da + parts.hra + parts.fixed + parts.conveyance + parts.medical;
+          return { employee_id: p.id, name: p.name, type: p.type || null, gross: gross || null, basic_da: parts.basic_da || null, hra: parts.hra || null, fixed: parts.fixed || null, conveyance: parts.conveyance || null, medical: parts.medical || null, site: null, per_day: null };
+        }).filter((r) => r.gross);
         systemCount = rows2.length;
-        rates = { rows: rows2, columns: { source: `Genie — ${rows2.length} finalised appraisals in force on ${monthEnd}` }, warnings: [] };
+        const missing = muster.rows.length - rows2.length;
+        rates = { rows: rows2, columns: { source: `Genie — the HRIS records of ${rows2.length} people (approvals written through)` }, warnings: missing > 0 ? [`${missing} on the muster have no gross on their HRIS record — those lines take the Live rate list, or show rate "none".`] : [] };
       }
       // no rate list uploaded → the Live salary structure (HRIS → Salary Rate List) is the rate list
       if (!rates || !rates.rows?.length) {
@@ -494,7 +481,7 @@ ${warnings.length ? `<p><b>${warnings.length} warning${warnings.length === 1 ? "
         const p = byId.get(eid); if (!p) return null;
         // the record's pay fields live under the sheet's own headers in extra — read through the catalogue's keys
         const get = (k: string) => {
-          const key = ({ "Basic and DA": "basic_da", HRA: "hra", "Fixed Allowance": "fixed_allowance", Conveyance: "conveyance", "Medical Allowance": "medical_allowance", "Gross Salary": "gross_salary", "Leave as on 31st june 2026": "leave_as_on" } as Record<string, string>)[k] || k;
+          const key = ({ "Basic and DA": "basic_da", HRA: "hra", "Fixed Allowance": "fixed_allowance", Conveyance: "conveyance", "Medical Allowance": "medical_allowance", "Gross Salary": "gross", "Leave as on 31st june 2026": "leave_as_on" } as Record<string, string>)[k] || k;
           return p.value[key] ?? p.value[HEADERS[k] || k] ?? null;
         };
         return { type: p.type || null, name: p.name, get };

@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.36",
+    date: "2026-10-07",
+    module: "Approvals backflush into the HRIS record; payroll pulls from the record",
+    items: [
+      "THE RECORD IS THE SOURCE (\u201cWhenever there is an approval that is done in the salary rate list, it has to get backflushed into the HRIS so that it maintains the correct record, and that\u2019s where the payroll has to pull from\u201d). An approval now writes the person\u2019s Pay fields on the HRIS record \u2014 Basic and DA, HRA, Fixed, Conveyance, Medical, Gross, Per day rate \u2014 as approved edits, every change logged old \u2192 new, alongside the Salary Rate List and the salary history. The payroll\u2019s system rates now read those records instead of the appraisals directly; a record with no gross falls to the Live rate list and the run says so. Sync from approvals catches the record up too. Run once today for all 204 approved people (6981 Sanju\u2019s record now 24,000; 6823\u2019s 17,290).",
+    ],
+  },
+  {
     v: "6.3.0.35",
     date: "2026-10-07",
     module: "An approved appraisal now reaches the Salary Rate List and the salary history",
