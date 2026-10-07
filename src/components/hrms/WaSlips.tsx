@@ -28,6 +28,13 @@ export default function WaSlips({ sheetId }: { sheetId: string }) {
   const [current, setCurrent] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [log, setLog] = useState<string[]>([]);
+  const [helper, setHelper] = useState<string | null>(null);   // the extension's version, when installed
+  useEffect(() => {
+    const onMsg = (ev: MessageEvent) => { if (ev.source === window && ev.data?.type === "genie:wa-helper-ready") setHelper(String(ev.data.version || "?")); };
+    window.addEventListener("message", onMsg);
+    window.postMessage({ type: "genie:wa-helper?" }, "*");
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
   const sentCount = useRef(0);
   const timer = useRef<number | null>(null);
   const load = useCallback(async () => { try { setD(await api.get(`/api/hrms/wa-slips?sheet=${encodeURIComponent(sheetId)}`)); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } }, [sheetId]);
@@ -38,10 +45,20 @@ export default function WaSlips({ sheetId }: { sheetId: string }) {
   const sent = (d?.list || []).filter((r) => r.sent_at).length;
   const cannot = (d?.list || []).filter((r) => r.why);
 
-  const urlFor = (r: Row) => `https://web.whatsapp.com/send?phone=${r.phone}&text=${encodeURIComponent(r.text)}#genie=${encodeURIComponent(r.token)}&api=${encodeURIComponent(d?.api || location.origin)}&auto=${auto ? 1 : 0}&close=${closeTab ? 1 : 0}`;
+  /* NOTHING RIDES IN THE URL (7 Oct 2026: the first version put the token in the
+     hash and WhatsApp pasted it into the message). The job goes to the helper
+     through this tab; the WhatsApp tab opens on the bare number and the helper
+     attaches the slip and writes the message itself — so the text cannot be
+     sent without the slip. Without the helper, the message is pre-filled and
+     Vinay attaches the slip by hand. */
   const openOne = (r: Row) => {
     setCurrent(r.id);
-    window.open(urlFor(r), "_blank", "noopener");
+    if (helper) {
+      window.postMessage({ type: "genie:wa-job", job: { phone: r.phone, token: r.token, api: d?.api || location.origin, auto, close: closeTab, text: r.text } }, "*");
+      window.setTimeout(() => window.open(`https://web.whatsapp.com/send?phone=${r.phone}`, "_blank", "noopener"), 250);
+    } else {
+      window.open(`https://web.whatsapp.com/send?phone=${r.phone}&text=${encodeURIComponent(r.text)}`, "_blank", "noopener");
+    }
     setLog((l) => [`${ist(new Date().toISOString())} opened ${r.id} ${r.name}`, ...l].slice(0, 60));
   };
   /* THE PACE: ten a minute to begin with — six seconds between opens — and
@@ -75,6 +92,7 @@ export default function WaSlips({ sheetId }: { sheetId: string }) {
         <b style={{ fontSize: 16 }}>💬 Payslips on WhatsApp — {d?.period || "…"}</b>
         <span style={{ opacity: .75 }}>{d ? `${sent} sent · ${todo.length} to go · ${cannot.length} cannot` : ""}</span>
         <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: helper ? "#7BD389" : "#F3B33D" }}>{helper ? `helper installed ✓ v${helper}` : "helper not detected in this browser — slips must be attached by hand"}</span>
         <a href="/wa-genie.zip" style={{ color: "#D7DEE6", fontSize: 12 }} download>⬇ Genie WhatsApp helper (Chrome extension)</a>
       </div>
       {err && <div style={{ padding: "8px 16px", color: C.red, fontSize: 12 }}>{err}</div>}

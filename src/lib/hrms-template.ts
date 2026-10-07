@@ -56,7 +56,9 @@ export function employeeVars(value: Record<string, string | null>, extra: Record
     out[f.key] = v == null ? "" : f.kind === "bool" ? (v === "no" ? "no" : "yes") : String(v);
   }
   const name = String(value.name || "").trim();
-  out.first_name = name.split(/\s+/)[0] || "";
+  // a title is not a first name — "Dr Raghunandan Jagdish" is Raghunandan, not "Dr" (7 Oct 2026)
+  const words = name.split(/\s+/).filter(Boolean);
+  out.first_name = (words.length > 1 && /^(dr|mr|mrs|ms|miss|shri|smt|col|capt|prof)\.?$/i.test(words[0]) ? words[1] : words[0]) || "";
   out.today = fmtDate(new Date());
   out.cycle = "2026-27";
   return { ...out, ...extra };

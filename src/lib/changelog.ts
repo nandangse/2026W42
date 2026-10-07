@@ -89,6 +89,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.53",
+    date: "2026-10-07",
+    module: "WhatsApp slips: the job goes to the helper, not into the message; the composer stays empty until the slip is on",
+    items: [
+      "THE TOKEN IN THE MESSAGE (first live try, 18:57: the text went out with \u201c#genie=acda8f52\u2026\u201d pasted on the end and no slip attached). The first helper read its instructions from the WhatsApp URL\u2019s hash, and WhatsApp Web folded the hash into the message. Now nothing rides in the URL: the Genie screen hands the job (number, token, message, settings) to the helper through the Genie tab, the WhatsApp tab opens on the bare number, and the helper attaches the slip and writes the message as its caption \u2014 so the message cannot be sent without the slip. The screen says whether the helper is installed; without it the message is pre-filled and the slip is attached by hand. Helper v1.1.0 \u2014 download and Load unpacked again (remove the old one).",
+      "\u201cDear Dr,\u201d \u2014 a title is not a first name: Dr / Mr / Mrs / Ms / Col / Prof are skipped, so {{first_name}} for Dr Raghunandan Jagdish is Raghunandan.",
+    ],
+  },
+  {
     v: "6.3.0.52",
     date: "2026-10-07",
     module: "Payslips on WhatsApp Web, one by one, from Vinay\u2019s own number \u2014 with the SOP",
