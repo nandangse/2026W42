@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.47",
+    date: "2026-10-07",
+    module: "Bank files: the header\u2019s file number runs from 50000 and never repeats",
+    items: [
+      "FILEHDR 50000, 50001, \u2026 (\u201cThat 5-digit number should start with a series starting from 50000, and then, for every file after that, keep incrementing by 1 at the end. Whenever you generate a file, make that number very unique so that it doesn\u2019t repeat. The same number is not going to be accepted by the bank\u201d). The header number is now one above the highest ever written on any run\u2019s bank files, never below 50000 \u2014 a zip made twice carries fresh numbers both times; the number is shown beside each file in the mail to accounts. Files made before today carried 10000-series numbers and are superseded.",
+    ],
+  },
+  {
     v: "6.3.0.46",
     date: "2026-10-07",
     module: "Bank files pay on the 15-digit account only; a wrong IFSC is refused at upload",

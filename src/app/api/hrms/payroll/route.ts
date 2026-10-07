@@ -69,7 +69,12 @@ async function bankZip(admin: ReturnType<typeof adminClient>, r: Record<string, 
   const ppl = await people(admin, rows.map((x) => x.employee_id));
   // THE 15-DIGIT ACCOUNT IS THE ACCOUNT (Dr Raghu, 7 Oct 2026: "the correct one will be the 15 digit account no") — never the short one
   const bankOf = new Map(ppl.map((p) => [p.id, { ifsc: String(p.value.ifsc || ""), account: String(p.value.account_15 || ""), nameInBank: String(p.value.name_in_bank || p.name || "") }]));
-  const built = buildBankFiles(rows, (eid) => bankOf.get(eid) ?? null, Number(r.month), Number(r.year));
+  /* A FRESH FILE NUMBER EVERY TIME: one above the highest ever written on any
+     run's bank files (kept in hrms_payroll_file.parsed), never below 50000 */
+  const { data: priorZips } = await admin.from("hrms_payroll_file").select("parsed").eq("kind", "bank");
+  let highest = 50000 - 1;
+  for (const z of priorZips || []) for (const f of ((z.parsed as { files?: { fileNo?: number }[] } | null)?.files ?? [])) if (Number(f.fileNo) > highest) highest = Number(f.fileNo);
+  const built = buildBankFiles(rows, (eid) => bankOf.get(eid) ?? null, Number(r.month), Number(r.year), { firstFileNo: highest + 1 });
   const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
   for (const f of built.files) zip.file(f.name, f.text);
@@ -81,10 +86,10 @@ async function bankZip(admin: ReturnType<typeof adminClient>, r: Record<string, 
   return { bytes, built, name };
 }
 /** the mail Vinay sends accounts with the zip — his words, as he gave them (Dr Raghu, 7 Oct 2026) */
-function bankMailDraft(r: Record<string, unknown>, id: string, built: { files: { name: string; lines: number; total: number }[]; total: number; lines: number }) {
+function bankMailDraft(r: Record<string, unknown>, id: string, built: { files: { name: string; lines: number; total: number; fileNo?: number }[]; total: number; lines: number }) {
   const month = Number(r.month), year = Number(r.year);
   const inr = (n: number) => Math.round(n).toLocaleString("en-IN");
-  const lines = built.files.map((f) => `${f.name} - ${f.lines} - Rs ${inr(f.total)}`).join("\n");
+  const lines = built.files.map((f) => `${f.name}${f.fileNo ? ` (file no. ${f.fileNo})` : ""} - ${f.lines} - Rs ${inr(f.total)}`).join("\n");
   return {
     to: "suresh@nandan.co.in; accounts@nandan.co.in",
     cc: "raghu@nandan.co.in; tushar@nandan.co.in",

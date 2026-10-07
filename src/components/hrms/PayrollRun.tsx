@@ -703,7 +703,7 @@ function BankMail({ runId, onClose, onSent }: { runId: string; onClose: () => vo
               <div className="text-xs rounded px-3 py-2" style={{ background: "#F3F7FB", border: `1px solid ${C.line}` }}>
                 📎 <b>{d.zipName}</b> — {d.files.length} file{d.files.length === 1 ? "" : "s"}, {d.lines} payments, ₹{inr(d.total)}{d.skipped.length ? <span style={{ color: C.red }}> · {d.skipped.length} not in any file (NOT_IN_FILES.txt): {d.skipped.slice(0, 4).map((s) => `${s.employee_id} ${s.name}`).join(", ")}{d.skipped.length > 4 ? " …" : ""}</span> : ""}
               </div>
-              <div className="text-xs" style={{ color: C.faint }}>Goes from Vinay&apos;s connected Gmail, as every HRMS mail does. Edit anything above, then send.</div>
+              <div className="text-xs" style={{ color: C.faint }}>Goes from Vinay&apos;s connected Gmail, as every HRMS mail does. The file numbers in the headers are fresh on every generation (50000 upward, never repeated) — the ones in the attached zip are the ones that count. Edit anything above, then send.</div>
               <div className="flex gap-2 justify-end">
                 <button onClick={onClose} className="text-xs font-semibold rounded px-3 py-2" style={{ background: "#F4F2EC", color: C.ink }}>Cancel</button>
                 <button onClick={send} disabled={sending} className="text-xs font-bold rounded px-3 py-2" style={{ background: C.green, color: "#fff" }}>{sending ? "Sending…" : "Send with the zip attached"}</button>

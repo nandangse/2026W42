@@ -14,8 +14,14 @@
  * CRLF line endings, whole rupees, the beneficiary's name twice. One file
  * per class — management, staff, labour — cut again every time the running
  * total would pass ₹10,00,000, numbered 01, 02 … and named for the month:
- * sept_2026_staff_01.txt. The file number in the header runs 10000, 10001…
- * across the zip, as accounts numbers theirs.
+ * sept_2026_staff_01.txt. THE FILE NUMBER IN THE HEADER IS UNIQUE FOR EVER
+ * (Dr Raghu, 7 Oct 2026: "That 5-digit number should start with a series
+ * starting from 50000, and then, for every file after that, keep
+ * incrementing by 1. Whenever you generate a file, make that number very
+ * unique so that it doesn't repeat. The same number is not going to be
+ * accepted by the bank"). The next number is one above the highest ever
+ * written on any run's bank files, never below 50000 — so a zip made twice
+ * carries fresh numbers both times.
  *
  * Who rides: every line with something to pay (a held salary pays nought
  * and stays out) whose record carries an IFSC and the 15-DIGIT account
@@ -33,7 +39,7 @@ export const BANK = {
   debitAccount: "566805010000130",
   email: "accounts@nandan.co.in",
   remark: "Salary",
-  firstFileNo: 10000,
+  firstFileNo: 50000,   // the series starts at 50000 (Dr Raghu, 7 Oct 2026) and never repeats — see nextBankFileNo
   capPerFile: 10_00_000,
 };
 
