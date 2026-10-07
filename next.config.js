@@ -42,6 +42,13 @@ const nextConfig = {
       // shipped without the 50 MB of Chromium it unpacks at runtime.
       // ANY ROUTE THAT CALLS pressPdf BELONGS HERE.
       "/api/month-plan": ["./node_modules/@sparticuz/chromium/bin/**"],
+      // HRMS presses too (7 Oct 2026): the slips mailed one by one, the slips fetched by the
+      // WhatsApp helper, the slips attached to a mass mail, the register PDF to management.
+      // The symptom when one is missing is a 500 — "input directory …/chromium/bin does not exist".
+      "/api/hrms/slip-mail": ["./node_modules/@sparticuz/chromium/bin/**"],
+      "/api/hrms/wa-slips": ["./node_modules/@sparticuz/chromium/bin/**"],
+      "/api/hrms/mass-mail": ["./node_modules/@sparticuz/chromium/bin/**"],
+      "/api/hrms/register-mail": ["./node_modules/@sparticuz/chromium/bin/**"],
       "/api/sales/html": ["./src/sales-regrow/*.html"],
       "/api/sales/plan": [
         "./src/sales-plan/*",

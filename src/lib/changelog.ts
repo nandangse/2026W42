@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.54",
+    date: "2026-10-07",
+    module: "The slip press ships its Chromium on every HRMS road",
+    items: [
+      "500 \u2014 ATTACH THE SLIP BY HAND. The WhatsApp helper\u2019s fetch of the slip answered 500: the serverless function for /api/hrms/wa-slips had been packed without Chromium\u2019s 50 MB payload (the same fault that stopped the first quotation on 31 Aug). The route list that ships it now names every HRMS road that presses a PDF: Mail slips, the WhatsApp helper\u2019s fetch, the mass mail\u2019s per-person slip, and the register to management.",
+    ],
+  },
+  {
     v: "6.3.0.53",
     date: "2026-10-07",
     module: "WhatsApp slips: the job goes to the helper, not into the message; the composer stays empty until the slip is on",
