@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.65",
+    date: "2026-10-08",
+    module: "Email Marketing: the results strip with filters; the queue follows the list; Read; the cron counter counts everything",
+    items: [
+      "RESULTS ON TOP (\u201cshow filter on top as campaign \u2014 all, date from and to, sent from \u2014 all or choose the channels; Delivered, Opened, Read, Unsubscribed, Bounced (nos, %)\u201d). A results strip heads the Email Marketing page \u2014 campaign, dates, channel \u2014 counted in the database: Queued \u00b7 Sent \u00b7 Delivered \u00b7 Opened \u00b7 Read \u00b7 Unsubscribed \u00b7 Bounced, numbers and shares. Read = opened twice or more (a first open can be a preview). Delivered = handed over and not bounced \u2014 a number now, not \u201cnot measured\u201d.",
+      "THE QUEUE FOLLOWS THE LIST (\u201conce the list is paused and changed the queue should drop. whatever is sent should be shown anyways\u201d). On Queue / Send after a list change, queued rows for people no longer in the audience are removed; everything already sent, opened, bounced or unsubscribed stays. Done by hand today on the Fabro campaign: 85,809 old-list rows dropped, 2,515 Ambarnath rows kept, the 218 sent untouched.",
+      "BROKEN UP, QUEUED FIRST (\u201cin this also break it up like this, first is queued\u201d). The line under a campaign\u2019s table reads queued \u00b7 sent \u00b7 delivered \u00b7 opened \u00b7 read \u00b7 unsubscribed \u00b7 bounced with their shares, in the strip\u2019s order. And the cron box\u2019s \u201csent by them\u201d now sums every pass since the campaign started, not the last twelve \u2014 it read 0 while 171 had gone.",
+    ],
+  },
+  {
     v: "6.3.0.64",
     date: "2026-10-08",
     module: "Escalations tab: a task with no job no longer brings the page down",

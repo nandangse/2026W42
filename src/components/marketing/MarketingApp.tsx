@@ -419,6 +419,7 @@ function Campaigns({ seesAll }: { seesAll: boolean }) {
         <span className="ml-auto" />
         <button onClick={() => setOpen("new")} style={btn(ACCENT)}>+ New campaign</button>
       </div>
+      <MailResults campaigns={rows || []} />
 
       {/* FILTERS — every one of them narrows the cards as well as the table. */}
       <div className="rounded border p-2 mb-2 flex flex-wrap items-end gap-2" style={{ borderColor: LINE, background: "#FBFAF7" }}>
@@ -691,7 +692,9 @@ function CampaignWizard({ c, seesAll, onClose }: { c: Campaign | null; seesAll: 
           {detail?.result && detail.total > 0 && <ResultPanel r={detail.result} />}
           {detail && detail.total > 0 && (
             <div className="mt-3">
-              <div className="flex gap-3 flex-wrap text-sm">{Object.entries(detail.counts).map(([k, v]) => <span key={k}><b className="tnum">{v}</b> {k}</span>)}<span style={{ color: MUTED }}>of {detail.total}</span></div>
+              {/* the same breakdown as the strip, in the same order — queued first (8 Oct 2026: "break it up like this, first is queued") */}
+              <div className="flex gap-3 flex-wrap text-sm">{(() => { const n = (k: string) => detail.counts[k] || 0; const went = n("sent") + n("opened") + n("bounced") + n("unsubscribed"); const del = Math.max(0, went - n("bounced")); const pc = (v: number, of: number) => (of ? ` · ${Math.round((v / of) * 1000) / 10}%` : "");
+                return ([["queued", n("queued"), pc(n("queued"), detail.total)], ["sent", went, pc(went, detail.total)], ["delivered", del, pc(del, detail.total)], ["opened", n("opened"), pc(n("opened"), del)], ["read", detail.result?.read ?? 0, pc(detail.result?.read ?? 0, del)], ["unsubscribed", n("unsubscribed"), pc(n("unsubscribed"), del)], ["bounced", n("bounced"), pc(n("bounced"), went)], ...(n("failed") ? [["failed", n("failed"), ""]] : []), ...(n("skipped") ? [["skipped", n("skipped"), ""]] : [])] as [string, number, string][]).map(([k, v, p]) => <span key={k}><b className="tnum">{v}</b> {k}<span style={{ color: MUTED }}>{p}</span></span>); })()}<span style={{ color: MUTED }}>of {detail.total}</span></div>
               <div className="genie-scroll mt-2" style={{ maxHeight: 240 }}>
                 <table className="genie-table"><thead><tr><th>E-mail</th><th>Status</th><th>Sent</th><th className="num">Opens</th><th>Error</th></tr></thead>
                   <tbody>{detail.recent.map((r, i) => <tr key={i}><td>{r.email}</td><td style={{ color: r.status === "opened" ? GREEN : r.status === "failed" || r.status === "bounced" ? RED : INK }}>{r.status}</td><td className="tnum">{r.sent_at ? fmtAt(r.sent_at) : "·"}</td><td className="num tnum">{r.open_count || "·"}</td><td className="text-xs" style={{ color: RED }}>{r.error || ""}</td></tr>)}</tbody>
@@ -1340,6 +1343,7 @@ type Result = {
   sent: number; sentPc: number;
   delivered: number | null; deliveredPc: number | null;
   opened: number; openedPc: number;
+  read?: number; readPc?: number;
   clicked: number | null;
   bounced: number; bouncedPc: number;
   unsubscribed: number; unsubscribedPc: number;
@@ -1379,19 +1383,74 @@ function ResultPanel({ r }: { r: Result }) {
       <div style={{ display: "flex", flexWrap: "wrap", rowGap: 10, borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "8px 0" }}>
         <Stat label="Queued" v={r.queued} pc={r.queuedPc} why="still to go — share of the audience" />
         <Stat label="Sent" v={r.sent} pc={r.sentPc} ink={GREEN} why="handed to the channel — share of the audience" />
-        <Stat label="Delivered" v={r.delivered} pc={r.deliveredPc} why="needs Resend's email.delivered webhook; would be a share of the audience" />
+        <Stat label="Delivered" v={r.delivered} pc={r.deliveredPc} why="handed over and not bounced — share of the audience; Resend's webhook refines it where it is on" />
         <Stat label="Opened" v={r.opened} pc={r.openedPc} ink={r.opened ? GREEN : undefined} why={`share of ${base} (${reach}) — images-off readers never count`} />
-        <Stat label="Clicked" v={r.clicked} why="links are not rewritten, so clicks are not counted" />
-        <Stat label="Bounced" v={r.bounced} pc={r.bouncedPc} ink={r.bounced ? RED : undefined} why={`share of ${base} (${reach}) — arrives on the webhook, goes straight onto the unsubscribe list`} />
+        <Stat label="Read" v={r.read ?? 0} pc={r.readPc ?? 0} ink={r.read ? GREEN : undefined} why={`opened twice or more — share of ${base} (${reach}); a second open is a person reading, a first may be a preview`} />
         <Stat label="Unsub" v={r.unsubscribed} pc={r.unsubscribedPc} ink={r.unsubscribed ? "var(--warn)" : undefined} why={`share of ${base} (${reach})`} />
+        <Stat label="Bounced" v={r.bounced} pc={r.bouncedPc} ink={r.bounced ? RED : undefined} why={`share of ${base} (${reach}) — arrives on the webhook, goes straight onto the unsubscribe list`} />
         {r.failed > 0 && <Stat label="Failed" v={r.failed} pc={r.failedPc} ink={RED} why="refused outright — see the rows below" />}
         {r.skipped > 0 && <Stat label="Skipped" v={r.skipped} pc={r.skippedPc} why="already unsubscribed when their turn came" />}
       </div>
       <div className="text-xs mt-2" style={{ color: MUTED, lineHeight: 1.5 }}>
-        Queued, sent and delivered are shares of the <b>audience</b> ({r.audience}).
-        Opened, bounced and unsubscribed are shares of <b>{base}</b> ({reach})
-        {base === "sent" && <> — they move onto delivered once Resend&rsquo;s webhook is on</>}.
+        Queued, sent and delivered are shares of the <b>audience</b> ({r.audience}); delivered is what went out and did not bounce.
+        Opened, read, unsubscribed and bounced are shares of <b>{base}</b> ({reach}).
       </div>
+    </div>
+  );
+}
+
+/* THE RESULTS OF THE MAILING, FILTERED (Dr Raghu, 8 Oct 2026): campaign — all · date from/to ·
+   sent from — all or a channel; Delivered · Opened · Read · Unsubscribed · Bounced, nos and %. */
+function MailResults({ campaigns }: { campaigns: Campaign[] }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 8) + "01";
+  const [f, setF] = useState({ campaign: "", channel: "", from: monthStart, to: today });
+  const [channels, setChannels] = useState<{ id: string; email: string }[]>([]);
+  const [r, setR] = useState<{ queued: number; sent: number; delivered: number; deliveredPc: number; opened: number; openedPc: number; read: number; readPc: number; unsubscribed: number; unsubscribedPc: number; bounced: number; bouncedPc: number; failed: number } | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => { api<{ channels: { id: string; email: string }[] }>("/api/marketing/channels").then((j) => setChannels(j.channels || [])).catch(() => {}); }, []);
+  useEffect(() => {
+    const qs = new URLSearchParams({ results: "1", campaign: f.campaign, channel: f.channel, from: f.from, to: f.to });
+    api<typeof r>(`/api/marketing/campaigns?${qs}`).then((j) => { setR(j); setErr(""); }).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [f]);
+  const cell = (label: string, v: number, pc: number | null, ink?: string) => (
+    <div key={label} style={{ flex: "1 1 110px", minWidth: 100, padding: "2px 10px", borderLeft: `1px solid ${LINE}` }}>
+      <div style={{ fontSize: 10.5, color: MUTED, letterSpacing: .4, textTransform: "uppercase" }}>{label}</div>
+      <div className="tnum" style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15, color: ink || INK }}>{v.toLocaleString("en-IN")}</div>
+      <div className="tnum" style={{ fontSize: 11.5, color: MUTED }}>{pc === null ? "" : `${pc}%`}</div>
+    </div>
+  );
+  return (
+    <div className="rounded border p-3 mb-3" style={{ borderColor: LINE, background: "#FAFAF8" }}>
+      <div className="flex flex-wrap items-end gap-2 mb-2">
+        <div className="text-xs font-bold" style={{ color: MUTED, letterSpacing: .8, alignSelf: "center" }}>RESULTS</div>
+        <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Campaign
+          <select value={f.campaign} onChange={(e) => setF({ ...f, campaign: e.target.value })} style={{ ...inp, width: 220 }}>
+            <option value="">all</option>
+            {campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select></label>
+        <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>From<input type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} style={{ ...inp, width: 140 }} /></label>
+        <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>To<input type="date" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} style={{ ...inp, width: 140 }} /></label>
+        <label className="text-xs font-semibold" style={{ color: "var(--dim)" }}>Sent from
+          <select value={f.channel} onChange={(e) => setF({ ...f, channel: e.target.value })} style={{ ...inp, width: 200 }}>
+            <option value="">all channels</option>
+            {channels.map((c) => <option key={c.id} value={c.id}>{c.email}</option>)}
+          </select></label>
+      </div>
+      {err && <div className="text-xs" style={{ color: RED }}>{err}</div>}
+      {r && (
+        <div style={{ display: "flex", flexWrap: "wrap", rowGap: 10, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, padding: "8px 0" }}>
+          {cell("Queued", r.queued, null)}
+          {cell("Sent", r.sent, null, GREEN)}
+          {cell("Delivered", r.delivered, r.deliveredPc)}
+          {cell("Opened", r.opened, r.openedPc, r.opened ? GREEN : undefined)}
+          {cell("Read", r.read, r.readPc, r.read ? GREEN : undefined)}
+          {cell("Unsubscribed", r.unsubscribed, r.unsubscribedPc, r.unsubscribed ? "var(--warn)" : undefined)}
+          {cell("Bounced", r.bounced, r.bouncedPc, r.bounced ? RED : undefined)}
+          {r.failed > 0 && cell("Failed", r.failed, null, RED)}
+        </div>
+      )}
+      <div className="text-xs mt-2" style={{ color: MUTED }}>Delivered and bounced are shares of sent; opened, read and unsubscribed are shares of delivered. Read = opened twice or more. Queued ignores the dates — it has not been sent yet.</div>
     </div>
   );
 }

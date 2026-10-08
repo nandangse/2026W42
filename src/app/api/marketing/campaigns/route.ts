@@ -38,7 +38,38 @@ export async function GET(req: Request) {
   try {
     const u = await requireMarketing();
     const db = crmDb();
-    const id = new URL(req.url).searchParams.get("id");
+    const url0 = new URL(req.url);
+    /* THE RESULTS OF THE MAILING (Dr Raghu, 8 Oct 2026: "show filter on top as campaign — all,
+       date from and to, sent from — all or choose the channels; Delivered, Opened, Read,
+       Unsubscribed, Bounced (nos, %)"). Counted in the database, never paged into memory. */
+    if (url0.searchParams.get("results") === "1") {
+      const camp = url0.searchParams.get("campaign") || "", ch = url0.searchParams.get("channel") || "";
+      const from = url0.searchParams.get("from") || "", to = url0.searchParams.get("to") || "";
+      const base = () => {
+        let q = db.from("mk_send").select("id", { count: "exact", head: true });
+        if (camp) q = q.eq("campaign_id", camp);
+        if (ch) q = q.eq("channel_id", ch);
+        if (from) q = q.gte("sent_at", `${from}T00:00:00+05:30`);
+        if (to) q = q.lte("sent_at", `${to}T23:59:59+05:30`);
+        return q;
+      };
+      const cnt = async (f: (q: ReturnType<typeof base>) => ReturnType<typeof base>) => { const r = await f(base()); if (r.error) throw new Error(r.error.message); return r.count || 0; };
+      const WENT = ["sent", "opened", "bounced", "unsubscribed"];
+      const [sent, opened, read, unsub, bounced, failed] = await Promise.all([
+        cnt((q) => q.in("status", WENT)), cnt((q) => q.in("status", WENT).not("opened_at", "is", null)), cnt((q) => q.in("status", WENT).gte("open_count", 2)),
+        cnt((q) => q.eq("status", "unsubscribed")), cnt((q) => q.eq("status", "bounced")), cnt((q) => q.eq("status", "failed")),
+      ]);
+      // queued has no sent_at — counted without the date window
+      let qq = db.from("mk_send").select("id", { count: "exact", head: true }).eq("status", "queued");
+      if (camp) qq = qq.eq("campaign_id", camp); if (ch) qq = qq.eq("channel_id", ch);
+      const queued = (await qq).count || 0;
+      const delivered = Math.max(0, sent - bounced);
+      const pc = (v: number, of: number) => (of ? Math.round((v / of) * 1000) / 10 : 0);
+      return NextResponse.json({ ok: true, filters: { campaign: camp, channel: ch, from, to },
+        queued, sent, delivered, deliveredPc: pc(delivered, sent), opened, openedPc: pc(opened, delivered), read, readPc: pc(read, delivered),
+        unsubscribed: unsub, unsubscribedPc: pc(unsub, delivered), bounced, bouncedPc: pc(bounced, sent), failed });
+    }
+    const id = url0.searchParams.get("id");
     if (id) {
       const { data: c, error } = await db.from("mk_campaign").select("*").eq("id", id).maybeSingle();
       if (error) throw new Error(error.message);
@@ -102,9 +133,14 @@ export async function GET(req: Request) {
       })();
       const share = (v: number, of: number) => (of ? Math.round((v / of) * 1000) / 10 : 0);
       const pc = (v: number) => share(v, total);            // of the audience
-      const delivered: number | null = null;                // until the webhook says so
-      const reach = delivered ?? sent;                       // what engagement is measured against
+      /* DELIVERED = handed over and not bounced (8 Oct 2026: he wants a number, not "not measured";
+         Resend's webhook will refine it, Gmail gives no better word than this). READ = opened twice
+         or more — a second open is a person reading, a first may be a mail client's preview. */
+      const delivered: number | null = Math.max(0, sent - n("bounced"));
+      const reach = delivered || sent;                       // what engagement is measured against
       const rp = (v: number) => share(v, reach);
+      const { count: readN } = await db.from("mk_send").select("id", { count: "exact", head: true }).eq("campaign_id", id).gte("open_count", 2);
+      const read = readN || 0;
       const result = {
         lists: await listNames,
         audience: total,
@@ -112,13 +148,14 @@ export async function GET(req: Request) {
         sent, sentPc: pc(sent),
         delivered, deliveredPc: delivered === null ? null : pc(delivered),
         opened: n("opened"), openedPc: rp(n("opened")),
+        read, readPc: rp(read),
         clicked: null as number | null,
         bounced: n("bounced"), bouncedPc: rp(n("bounced")),
         unsubscribed: n("unsubscribed"), unsubscribedPc: rp(n("unsubscribed")),
         failed: n("failed"), failedPc: pc(n("failed")),
         skipped: n("skipped"), skippedPc: pc(n("skipped")),
-        reach, reachLabel: delivered === null ? "sent" : "delivered",
-        notMeasured: ["delivered", "clicked"],
+        reach, reachLabel: "delivered",
+        notMeasured: ["clicked"],
       };
       /**
        * IS THE CRON ACTUALLY RUNNING? (Dr Raghu, 14 Sep 2026: "can u also
@@ -135,7 +172,7 @@ export async function GET(req: Request) {
        */
       const { data: beats } = await db.from("crm_audit")
         .select("action, after, at").eq("entity", "cron").eq("entity_id", "marketing-drain")
-        .eq("action", "done").order("at", { ascending: false }).limit(12);
+        .eq("action", "done").gte("at", c.started_at || "1970-01-01").order("at", { ascending: false }).limit(2000);   // every pass since the start, not the last twelve (8 Oct 2026: "0 sent by them" while 171 had gone)
       const since = c.started_at ? new Date(c.started_at).getTime() : 0;
       const passes = (beats || []).map((x) => ({
         at: x.at as string,
@@ -423,9 +460,17 @@ export async function POST(req: Request) {
         const { error } = await db.from("mk_send").upsert(rows.slice(i, i + 500), { onConflict: "campaign_id,email", ignoreDuplicates: true });
         if (error) throw new Error(error.message);
       }
-      await db.from("mk_campaign").update({ status: "sending", started_at: c.started_at || new Date().toISOString(), counts: { queued: a.ok.length } }).eq("id", b.id);
+      /* THE QUEUE FOLLOWS THE LIST (Dr Raghu, 8 Oct 2026: "once the list is paused and changed the
+         queue should drop. whatever is sent should be shown anyways"). A queued row for somebody no
+         longer in the audience is removed; anything already sent, opened, bounced or unsubscribed stays
+         exactly as it is — it happened. */
+      const keep = new Set(a.ok.map((p) => p.id));
+      const queuedRows = await pageAll<{ id: string; person_id: string }>((f, t) => db.from("mk_send").select("id, person_id").eq("campaign_id", b.id).eq("status", "queued").range(f, t), "the queue");
+      const dropIds = queuedRows.filter((r) => !keep.has(String(r.person_id))).map((r) => r.id);
+      for (let i = 0; i < dropIds.length; i += 300) { const { error } = await db.from("mk_send").delete().in("id", dropIds.slice(i, i + 300)); if (error) throw new Error(error.message); }
+      await db.from("mk_campaign").update({ status: "sending", started_at: c.started_at || new Date().toISOString(), counts: { queued: a.ok.length, dropped: dropIds.length } }).eq("id", b.id);
       const r = b.action === "send_now" ? await drain(db, { campaignId: b.id, max: 100 }) : null;
-      return NextResponse.json({ ok: true, queued: a.ok.length, pass: r });
+      return NextResponse.json({ ok: true, queued: a.ok.length, dropped: dropIds.length, pass: r });
     }
     if (b.action === "pause") { await db.from("mk_campaign").update({ status: "paused" }).eq("id", b.id); return NextResponse.json({ ok: true }); }
     if (b.action === "resume") { await db.from("mk_campaign").update({ status: "sending" }).eq("id", b.id); return NextResponse.json({ ok: true }); }
