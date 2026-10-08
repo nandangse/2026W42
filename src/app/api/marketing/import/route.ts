@@ -39,13 +39,29 @@ export const maxDuration = 300;
  */
 
 /** Every column we know how to fill, and the header spellings that mean it. */
+/* THE DIRECTORY'S OWN SPELLINGS (Dr Raghu, 8 Oct 2026, the Ambernath Manufacturers
+   Association file: "The original file had a lot more information than just the mail ID. It had
+   company name, mobile number, phone number, etc. Please make sure that not even a single iota
+   of information is lost"). "Contact Name 1", "Mobile 1", "Email 1" matched nothing, so names and
+   phones went into the notes only and the list read "—"; "Company Name" matched but was never
+   written anywhere, and was the one thing truly dropped. Every spelling below now lands, a
+   company is made or found and linked, a second contact becomes a second person, and the whole
+   row — every column, mapped or not — is written into the notes of new and existing people alike. */
 const FIELDS: { key: string; label: string; aliases: string[] }[] = [
-  { key: "full_name", label: "Full name", aliases: ["full name", "name", "contact name", "person"] },
+  { key: "full_name", label: "Full name", aliases: ["full name", "name", "contact name", "contact name 1", "contact person", "contact person 1", "contact", "person", "name 1", "owner", "proprietor", "director", "key person"] },
   { key: "first_name", label: "First name", aliases: ["first name", "firstname", "given name"] },
   { key: "last_name", label: "Last name", aliases: ["last name", "lastname", "surname", "family name"] },
-  { key: "primary_email", label: "E-mail", aliases: ["email", "e-mail", "email 1", "personal email", "work email", "email address", "mail"] },
-  { key: "primary_phone", label: "Phone", aliases: ["phone", "mobile", "phone 1", "personal mobile", "contact number", "telephone", "cell"] },
+  { key: "primary_email", label: "E-mail", aliases: ["email", "e-mail", "email 1", "e-mail 1", "email id", "email-id", "personal email", "work email", "email address", "mail", "mail id"] },
+  { key: "primary_phone", label: "Phone", aliases: ["phone", "mobile", "mobile 1", "mobile no", "mobile no.", "mobile number", "phone 1", "phone no", "phone no.", "personal mobile", "contact number", "contact no", "contact no.", "cell", "cell 1"] },
   { key: "whatsapp_number", label: "WhatsApp", aliases: ["whatsapp", "whatsapp number", "wa"] },
+  { key: "phone2", label: "Phone 2", aliases: ["mobile 2", "phone 2", "alternate mobile", "alternate phone", "cell 2"] },
+  { key: "telephone1", label: "Telephone 1", aliases: ["telephone", "telephone 1", "landline", "landline 1", "tel", "tel 1", "office phone", "board line"] },
+  { key: "telephone2", label: "Telephone 2", aliases: ["telephone 2", "landline 2", "tel 2"] },
+  { key: "contact2", label: "Contact 2", aliases: ["contact name 2", "contact person 2", "name 2", "second contact"] },
+  { key: "email2", label: "E-mail 2", aliases: ["email 2", "e-mail 2", "alternate email", "second email"] },
+  { key: "address", label: "Address", aliases: ["address", "full address", "postal address", "office address", "works address", "factory address"] },
+  { key: "website", label: "Website", aliases: ["website", "web site", "url", "web"] },
+  { key: "activities", label: "Activities", aliases: ["activities", "activity", "products", "business", "nature of business", "line of business", "products services", "products & services", "industry", "sector"] },
   { key: "job_title", label: "Job title", aliases: ["job title", "title", "designation", "role", "position"] },
   { key: "department", label: "Department", aliases: ["department", "dept"] },
   { key: "linkedin_url", label: "LinkedIn", aliases: ["linkedin", "linkedin url", "linkedin profile"] },
@@ -73,11 +89,12 @@ function guessMap(headers: string[]): Record<number, string> {
   return out;
 }
 
-/** Everything that was NOT mapped, written as a readable block for the note. */
-function leftovers(headers: string[], row: unknown[], map: Record<number, string>, fileName: string): string | null {
+/** THE WHOLE ROW, every column, as a readable block for the note — mapped ones too (8 Oct 2026:
+    "populate them in the notes. Add as many notes as possible"). A mapped value that could not be
+    written, because the person already had one, is then still on the record in words. */
+function leftovers(headers: string[], row: unknown[], _map: Record<number, string>, fileName: string): string | null {
   const bits: string[] = [];
   headers.forEach((h, i) => {
-    if (map[i]) return;
     const v = norm(row[i]);
     if (v && norm(h)) bits.push(`${norm(h)}: ${v}`);
   });
@@ -226,7 +243,7 @@ export async function POST(req: Request) {
     const byEmail = new Map<string, { id: string; [k: string]: unknown }>();
     for (const c of chunk([...want], 300)) {
       const { data, error } = await db.from("person")
-        .select("id, primary_email, primary_phone, whatsapp_number, job_title, department, linkedin_url, city, country, full_name, notes")
+        .select("id, primary_email, primary_phone, whatsapp_number, job_title, department, linkedin_url, city, country, full_name, first_name, notes, company_id")
         .in("primary_email", c);
       if (error) throw new HttpError(500, error.message);
       for (const p of data || []) if (p.primary_email) byEmail.set(lower(p.primary_email), p as { id: string });
@@ -235,7 +252,32 @@ export async function POST(req: Request) {
     const inserts: Record<string, unknown>[] = [];
     const patches: { id: string; patch: Record<string, unknown> }[] = [];
     const memberIds: string[] = [];
-    let matched = 0, blankEmail = 0, sharedRows = 0, empty = 0;
+    let matched = 0, blankEmail = 0, sharedRows = 0, empty = 0, companiesMade = 0, companiesFound = 0, secondContacts = 0;
+
+    /* THE COMPANY IS A RECORD, NOT A WORD (8 Oct 2026). Found by name (case-blind), else made,
+       with the website, the address and the activities on it; every person on the row is linked. */
+    const companyNames = new Set<string>();
+    const colOf = (key: string) => Number(Object.entries(guessed).find(([, v]) => v === key)?.[0] ?? -1);
+    const cCompany = colOf("company_name");
+    if (cCompany >= 0) for (const r of slice) { const n = norm(r[cCompany]); if (n) companyNames.add(n.toLowerCase()); }
+    const companyByName = new Map<string, string>();
+    if (companyNames.size) {
+      for (const c of chunk([...companyNames], 150)) {
+        const or = c.map((n) => `name.ilike.${JSON.stringify(n.replace(/[%_,()]/g, " ").trim())}`).join(",");
+        const { data } = await db.from("company").select("id, name").or(or).is("deleted_at", null);
+        for (const row of data || []) companyByName.set(String(row.name).toLowerCase(), String(row.id));
+      }
+    }
+    const companyIdFor = async (name: string, extra: { website?: string; address?: string; activities?: string }): Promise<string | null> => {
+      const k = name.toLowerCase();
+      const have = companyByName.get(k);
+      if (have) { companiesFound++; return have; }
+      if (action !== "commit") { companiesMade++; companyByName.set(k, "(new)"); return null; }
+      const notes = [extra.address ? `Address: ${extra.address}` : "", extra.activities ? `Activities: ${extra.activities}` : ""].filter(Boolean).join("\n");
+      const { data, error } = await db.from("company").insert({ name, website: extra.website || null, source: "crm", created_by_email: u.email.toLowerCase(), notes: notes ? `— From ${file.name}, ${new Date().toISOString().slice(0, 10)} —\n${notes}` : null }).select("id").single();
+      if (error || !data) return null;
+      companiesMade++; companyByName.set(k, String(data.id)); return String(data.id);
+    };
 
     for (const r of slice) {
       const vals: Record<string, string> = {};
@@ -243,7 +285,9 @@ export async function POST(req: Request) {
         const v = norm(r[Number(i)]);
         if (v) vals[key] = v;
       }
-      if (!vals.full_name && !vals.first_name && !vals.primary_email) { empty++; continue; }
+      /* a row that names only a company is still a lead — the company is the contact until a person is known */
+      if (!vals.full_name && !vals.first_name && !vals.primary_email && !vals.company_name && !vals.primary_phone) { empty++; continue; }
+      const companyId = vals.company_name ? await companyIdFor(vals.company_name, { website: vals.website, address: vals.address, activities: vals.activities }) : null;
       /* person.full_name is GENERATED from first + last, so it is never
          written. A single "Name" column is split so the generated value
          reproduces it exactly: all but the final token is the first name. */
@@ -268,6 +312,9 @@ export async function POST(req: Request) {
         for (const k of ["primary_phone", "whatsapp_number", "job_title", "department", "linkedin_url", "city", "country"]) {
           if (vals[k] && !hit[k]) patch[k] = vals[k];
         }
+        if (!hit.primary_phone && !vals.primary_phone && vals.phone2) patch.primary_phone = vals.phone2;
+        if (!hit.first_name && vals.first_name) { patch.first_name = vals.first_name; if (vals.last_name) patch.last_name = vals.last_name; }
+        if (companyId && companyId !== "(new)" && !hit.company_id) patch.company_id = companyId;
         /**
          * AND THE COLUMNS WITH NOWHERE TO GO ARE ADDED TO THEIR NOTES
          * (Dr Raghu, 15 Sep 2026: "also the fields in the record that don't
@@ -294,17 +341,31 @@ export async function POST(req: Request) {
           first_name: vals.first_name || null,
           last_name: vals.last_name || null,
           primary_email: em || null,
-          primary_phone: vals.primary_phone || null,
+          primary_phone: vals.primary_phone || vals.phone2 || null,
           whatsapp_number: vals.whatsapp_number || null,
           job_title: vals.job_title || null,
           department: vals.department || null,
           linkedin_url: vals.linkedin_url || null,
           city: vals.city || null,
           country: vals.country || null,
+          company_id: companyId && companyId !== "(new)" ? companyId : null,
           source: "crm",
           created_by_email: u.email.toLowerCase(),
         };
         inserts.push({ ...row, __note: note });
+      }
+      /* A SECOND CONTACT ON THE ROW IS A SECOND PERSON (8 Oct 2026) — same company, the second
+         e-mail and the second mobile where the file gives them, the same note block */
+      if (vals.contact2 || (vals.email2 && lower(vals.email2) !== em)) {
+        const em2 = lower(vals.email2 || "");
+        const hit2 = em2 && !shared.has(em2) ? byEmail.get(em2) : undefined;
+        if (hit2) { memberIds.push(hit2.id); const p2: Record<string, unknown> = {}; if (!hit2.company_id && companyId && companyId !== "(new)") p2.company_id = companyId; if (note) { const had = String(hit2.notes || "").trim(); const body = note.split("\n").slice(1).join("\n").trim(); if (!had) p2.notes = note; else if (body && !had.includes(body)) p2.notes = `${had}\n\n${note}`; } if (Object.keys(p2).length) patches.push({ id: hit2.id, patch: p2 }); }
+        else {
+          const n2 = (vals.contact2 || "").replace(/\s+/g, " ").trim(); const i2 = n2.lastIndexOf(" ");
+          inserts.push({ first_name: n2 ? (i2 < 0 ? n2 : n2.slice(0, i2)) : null, last_name: n2 && i2 >= 0 ? n2.slice(i2 + 1) : null, primary_email: em2 || null, primary_phone: vals.phone2 || null,
+            company_id: companyId && companyId !== "(new)" ? companyId : null, source: "crm", created_by_email: u.email.toLowerCase(), __note: note });
+          secondContacts++;
+        }
       }
     }
 
@@ -335,7 +396,7 @@ export async function POST(req: Request) {
       headers,
       mapping: Object.fromEntries(Object.entries(guessed).map(([i, k]) => [headers[Number(i)] || `col ${i}`, k])),
       unmapped: headers.filter((h, i) => h && !guessed[i]),
-      matched, willInsert: inserts.length, willFill: patches.length,
+      matched, willInsert: inserts.length, willFill: patches.length, companiesMade, companiesFound, secondContacts,
       willNote: patches.filter((p) => p.patch.notes !== undefined).length,
       blankEmail, sharedAddresses: sharedRows, emptyRows: empty,
     };

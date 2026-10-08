@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.62",
+    date: "2026-10-08",
+    module: "Marketing list import: the company becomes a record, every column lands, nothing is dropped",
+    items: [
+      "NOT ONE IOTA (\u201cThe original file had a lot more information than just the mail ID. It had company name, mobile number, phone number, etc. Please make sure that not even a single iota of information is lost. If the contact already exists, populate them in the notes. Add as many notes as possible\u201d). What happened on the Ambernath directory: \u201cContact Name 1\u201d, \u201cMobile 1\u201d and \u201cEmail 1\u201d matched none of the importer\u2019s spellings, so names and phones went into the notes only and the list read \u201c\u2014\u201d; \u201cCompany Name\u201d matched but was never written anywhere \u2014 the one thing truly dropped. Now: the directory\u2019s spellings (Contact Name 1/2, Mobile 1/2, Telephone 1/2, Email 1/2, Website, Address, Activities) all land; the company is found by name or made, with website, address and activities on it, and every person on the row is linked to it; a second contact on the row becomes a second person with the second e-mail and mobile; a person already in the CRM gets their blanks filled (name, phone, company) and never a value replaced; and the WHOLE row, every column, is written into the notes of new and existing people alike, once. Re-import the same file onto the same list and the blanks fill.",
+    ],
+  },
+  {
     v: "6.3.0.61",
     date: "2026-10-08",
     module: "Software Description brought to today: effort, size, and the modules since September",
