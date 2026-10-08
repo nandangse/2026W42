@@ -85,6 +85,8 @@ export function Tasking({
   const [filterFam, setFilterFam] = useState("all");
   const [filterOwn, setFilterOwn] = useState("all");
   const [taskAll, setTaskAll] = useState(false);
+  // SHOW COMPLETED, OFF BY DEFAULT (Dr Raghu, 8 Oct 2026: "by default only the open tasks will be seen")
+  const [showDone, setShowDone] = useState(false);
   const [taskView, setTaskView] = useState<"board" | "cal">("board");
   const [calMonth, setCalMonth] = useState(TODAY.slice(0, 7));
   /**
@@ -159,8 +161,8 @@ export function Tasking({
   // "up to date" filter: only tasks due on/before the chosen date (blank = all),
   // then the who-filter above it
   const filteredTasks = useMemo(
-    () => board.tasks.filter((t) => (!dueUpTo || (t.due || "9999-12-31") <= dueUpTo) && inScope(t)),
-    [board, dueUpTo, inScope],
+    () => board.tasks.filter((t) => (showDone || !t.done) && (!dueUpTo || (t.due || "9999-12-31") <= dueUpTo) && inScope(t)),
+    [board, dueUpTo, inScope, showDone],
   );
   // group tasks by job once instead of scanning the whole task list per job
   const tasksByJob = useMemo(() => {
@@ -342,6 +344,9 @@ export function Tasking({
         </select>
         <label className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border bg-white cursor-pointer" style={{ borderColor: "#D9D6CD", color: "var(--dim)" }}>
           <input type="checkbox" checked={taskAll} onChange={(e) => setTaskAll(e.target.checked)} /> include jobs without tasks
+        </label>
+        <label className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border cursor-pointer" style={{ borderColor: showDone ? "var(--accent)" : "#D9D6CD", color: showDone ? "var(--accent)" : "var(--dim)", background: "#fff", fontWeight: showDone ? 700 : 400 }} title="Completed tasks are hidden unless this is on">
+          <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Show completed
         </label>
         <label className="text-xs flex items-center gap-1 px-2 py-1.5 rounded border bg-white" style={{ borderColor: "#D9D6CD", color: "var(--dim)" }} title="Only show tasks due on or before this date">
           due up to
@@ -909,19 +914,37 @@ export function GroupedTasks({
           color={view === "esc" ? "var(--red)" : view === "dept" ? "#0D9488" : "var(--blue)"}
           openCount={items.filter((r) => !r.t.done).length}
         >
-          {items.map(({ t, job }) => (
-            <div key={t.kind + t.id} style={{ width: 220 }}>
-              <button
-                onClick={() => onOpen(job.id)}
-                className="text-xs font-bold underline decoration-dotted truncate block text-left w-full"
-                style={{ color: "var(--blue)" }}
-                title={`${job.tag} · JOB ${jobNo(job.id)} · ${job.cust}`}
-              >
-                {jobNo(job.id)} · {job.tag}
-              </button>
-              <TaskCard t={t} onOpen={onOpenTask} onDelete={onDelete} />
-            </div>
-          ))}
+          {/* ESCALATIONS FIRST, IN THEIR OWN TWO COLUMNS (Dr Raghu, 8 Oct 2026: "Give two columns
+              for escalations, and the rest will all be the regular tasks. This way, when it is
+              split, it is there"). Worst level first on the left; everything else flows on the right. */}
+          {(() => {
+            const card = ({ t, job }: { t: Task; job: Job }) => (
+              <div key={t.kind + t.id} style={{ width: 220 }}>
+                <button
+                  onClick={() => onOpen(job.id)}
+                  className="text-xs font-bold underline decoration-dotted truncate block text-left w-full"
+                  style={{ color: "var(--blue)" }}
+                  title={`${job.tag} · JOB ${jobNo(job.id)} · ${job.cust}`}
+                >
+                  {jobNo(job.id)} · {job.tag}
+                </button>
+                <TaskCard t={t} onOpen={onOpenTask} onDelete={onDelete} />
+              </div>
+            );
+            if (view === "esc") return items.map(card);
+            const esc = items.filter((r) => escalated(r.t.esc)).sort((a, b) => String(b.t.esc).localeCompare(String(a.t.esc)) || ((a.t.due || "9999") < (b.t.due || "9999") ? -1 : 1));
+            const rest = items.filter((r) => !escalated(r.t.esc));
+            return (
+              <div className="flex gap-2 items-start w-full">
+                <div className="flex flex-wrap gap-1.5 items-start flex-shrink-0 rounded p-1.5" style={{ width: 2 * 220 + 6 + 12, minHeight: 60, background: esc.length ? "rgba(179,57,46,0.08)" : "transparent", border: `1px dashed ${esc.length ? "rgba(179,57,46,0.45)" : "#D9D6CD"}` }} title="Escalations — worst first">
+                  {esc.length ? esc.map(card) : <div className="text-xs self-center w-full text-center" style={{ color: "var(--muted)" }}>no escalations</div>}
+                </div>
+                <div className="flex flex-wrap gap-1.5 items-start flex-1 min-w-0">
+                  {rest.map(card)}
+                </div>
+              </div>
+            );
+          })()}
           {view === "projects" && (
             addingProj === label ? (
               <div style={{ width: 250 }}>
@@ -1249,8 +1272,9 @@ export function GroupBlock({
 }) {
   return (
     <div className="flex gap-2 items-stretch">
-      <div className="rounded-lg p-2 flex-shrink-0" style={{ width: 210, background: "var(--navy)", color: "#fff", borderLeft: `4px solid ${color}` }}>
-        <div className="font-bold text-sm break-words">{label}</div>
+      {/* narrower since 8 Oct 2026 ("reduce the width of that and utilise more space to the right") */}
+      <div className="rounded-lg p-2 flex-shrink-0" style={{ width: 120, background: "var(--navy)", color: "#fff", borderLeft: `4px solid ${color}` }}>
+        <div className="font-bold text-xs break-words leading-tight">{label}</div>
         <div className="text-xs opacity-70">
           {count} task{count === 1 ? "" : "s"}
           {openCount !== undefined && openCount !== count ? ` · ${openCount} open` : ""}

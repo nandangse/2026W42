@@ -89,6 +89,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.58",
+    date: "2026-10-08",
+    module: "Tasking board: escalations in their own two columns, Show completed off by default, narrower group labels",
+    items: [
+      "TWO COLUMNS FOR ESCALATIONS (\u201cGive two columns for escalations, and the rest will all be the regular tasks. This way, when it is split, it is there\u201d). On By Department, By Projects and By Escalations\u2019 sister views, each group now opens with a two-card-wide escalations pane \u2014 worst level first, red-tinted, or \u201cno escalations\u201d when there are none \u2014 and the regular tasks flow to its right.",
+      "SHOW COMPLETED, OFF (\u201cby default only the open tasks will be seen, and whenever they want to see it, if they click that, then completed will also come\u201d). A tick on the filter bar; completed tasks are hidden until it is on.",
+      "NARROWER GROUP LABEL (\u201creduce the width of that and utilise more space to the right\u201d): 210 \u2192 120 px; the cards get the rest.",
+    ],
+  },
+  {
     v: "6.3.0.57",
     date: "2026-10-08",
     module: "Public Privacy Policy and Terms pages \u2014 for Google\u2019s OAuth consent screen",
