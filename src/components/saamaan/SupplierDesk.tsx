@@ -18,9 +18,10 @@ import { useState } from "react";
 import PurchaseOrders from "./PurchaseOrders";
 import { AgeingScreen, ReportCardScreen } from "@/components/kuber/Books";
 import { PaymentRelease, SupplierPlan } from "./SupplierRelease";
+import VendorRegistrations from "./VendorRegistrations";
 import { INK, MUTED, BORDER, NAVY, ORANGE } from "@/components/ims/ui";
 
-type Tab = "list" | "release" | "card" | "outstanding" | "plan";
+type Tab = "list" | "release" | "card" | "outstanding" | "plan" | "vrf";
 
 export default function SupplierDesk({ erpBase, canKuber }: { erpBase: string; canKuber: boolean }) {
   const [tab, setTab] = useState<Tab>("list");
@@ -30,6 +31,7 @@ export default function SupplierDesk({ erpBase, canKuber }: { erpBase: string; c
     ["card", "Supplier Report Card", "graded A–D on how we pay them and how they deliver — Kuber's figures, live"],
     ["outstanding", "Supplier Outstanding", "every open supplier bill, aged, net of advances — Kuber's payables ageing, live"],
     ["plan", "Supplier Payment Plan", "what is planned to be paid to which supplier, and when — suppliers only"],
+    ["vrf", "Vendor Registrations", "what suppliers filled on genie.nandan.co.in/portal/vrf — review, approve, reject"],
   ];
   const shown = canKuber ? TABS : TABS.slice(0, 1);
   return (
@@ -51,6 +53,7 @@ export default function SupplierDesk({ erpBase, canKuber }: { erpBase: string; c
       {tab === "release" && canKuber && <PaymentRelease />}
       {/* "Ensure that there is no information in this about the cash flow in or out" (Dr Raghu, 6 Oct 2026) — suppliers only */}
       {tab === "plan" && canKuber && <SupplierPlan />}
+      {tab === "vrf" && canKuber && <VendorRegistrations />}
     </div>
   );
 }

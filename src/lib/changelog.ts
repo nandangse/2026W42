@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.67",
+    date: "2026-10-08",
+    module: "The Vendor Registration Form at /portal/vrf, open to every supplier; the purchase team reads it in Saamaan",
+    items: [
+      "MUKESH\u2019S FORM, AS IS (Dr Raghu, 8 Oct 2026: \u201cthe vendor registration form that Mukesh had made \u2026 openly available as genie.nandan.co.in/portal/vrf. Don\u2019t put any year into that \u2026 filled by existing suppliers as well as new \u2026 database accessible in the backend by the purchase team\u201d). Read off nandan.co.in field for field, in his labels and order: e-mail, supplier ID, relationship, storage / inspection / in-house / outsourced, the company block, PAN and GST with their copies, the eighteen items supplied, the brief, brochures, the bank block with the cancelled cheque, send-me-a-copy. No login; files go into the private portal bucket; a honeypot keeps bots out. Also answers at /portal/nandan-vrf. Table portal_vrf (migration 0207).",
+      "FOR THE PURCHASE TEAM. Saamaan \u2192 Suppliers \u2192 Vendor Registrations: every submission, searchable, opened in a card with all its answers and files, marked reviewed / approved / rejected with a note. The evaluation Mukesh asked for builds on these rows next.",
+    ],
+  },
+  {
     v: "6.3.0.66",
     date: "2026-10-08",
     module: "Supplier Payment Release: the total on top, week by week, open until accounts take it into plan; the purchase team can raise it",
