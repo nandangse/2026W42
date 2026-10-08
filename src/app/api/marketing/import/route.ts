@@ -268,15 +268,28 @@ export async function POST(req: Request) {
         for (const row of data || []) companyByName.set(String(row.name).toLowerCase(), String(row.id));
       }
     }
-    const companyIdFor = async (name: string, extra: { website?: string; address?: string; activities?: string }): Promise<string | null> => {
-      const k = name.toLowerCase();
-      const have = companyByName.get(k);
-      if (have) { companiesFound++; return have; }
-      if (action !== "commit") { companiesMade++; companyByName.set(k, "(new)"); return null; }
-      const notes = [extra.address ? `Address: ${extra.address}` : "", extra.activities ? `Activities: ${extra.activities}` : ""].filter(Boolean).join("\n");
-      const { data, error } = await db.from("company").insert({ name, website: extra.website || null, source: "crm", created_by_email: u.email.toLowerCase(), notes: notes ? `— From ${file.name}, ${new Date().toISOString().slice(0, 10)} —\n${notes}` : null }).select("id").single();
-      if (error || !data) return null;
-      companiesMade++; companyByName.set(k, String(data.id)); return String(data.id);
+    /* NEW COMPANIES ARE MADE IN BATCHES BEFORE THE ROWS, not one round trip each — a 1,500-row
+       slice with 1,000 unknown companies would otherwise run past the function's five minutes. */
+    const cWeb = colOf("website"), cAddr = colOf("address"), cAct = colOf("activities");
+    const newCos = new Map<string, { name: string; website?: string; address?: string; activities?: string }>();
+    if (cCompany >= 0) for (const r of slice) {
+      const n = norm(r[cCompany]); if (!n) continue; const k = n.toLowerCase();
+      if (companyByName.has(k) || newCos.has(k)) continue;
+      newCos.set(k, { name: n, website: cWeb >= 0 ? norm(r[cWeb]) : undefined, address: cAddr >= 0 ? norm(r[cAddr]) : undefined, activities: cAct >= 0 ? norm(r[cAct]) : undefined });
+    }
+    companiesFound = [...companyNames].filter((k) => companyByName.has(k)).length;
+    if (action === "commit" && newCos.size) {
+      const stamp = `— From ${file.name}, ${new Date().toISOString().slice(0, 10)} —`;
+      for (const c of chunk([...newCos.values()], 200)) {
+        const rows = c.map((x) => { const notes = [x.address ? `Address: ${x.address}` : "", x.activities ? `Activities: ${x.activities}` : ""].filter(Boolean).join("\n"); return { name: x.name, website: x.website || null, source: "crm", created_by_email: u.email.toLowerCase(), notes: notes ? `${stamp}\n${notes}` : null }; });
+        const { data, error } = await db.from("company").insert(rows).select("id, name");
+        if (error) throw new HttpError(500, `making companies: ${error.message}`);
+        for (const row of data || []) { companyByName.set(String(row.name).toLowerCase(), String(row.id)); companiesMade++; }
+      }
+    } else companiesMade = newCos.size;
+    const companyIdFor = async (name: string, _extra: { website?: string; address?: string; activities?: string }): Promise<string | null> => {
+      const id = companyByName.get(name.toLowerCase());
+      return id && id !== "(new)" ? id : null;
     };
 
     for (const r of slice) {

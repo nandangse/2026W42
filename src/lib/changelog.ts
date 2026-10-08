@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.63",
+    date: "2026-10-08",
+    module: "List import: new companies made in batches, so a big slice cannot run out of time",
+    items: [
+      "BATCHED. 6.3.0.62 made each unknown company with its own round trip inside the row loop; a slice with a thousand of them would have outlived the function. They are now collected first and inserted two hundred at a time, before the rows.",
+    ],
+  },
+  {
     v: "6.3.0.62",
     date: "2026-10-08",
     module: "Marketing list import: the company becomes a record, every column lands, nothing is dropped",
