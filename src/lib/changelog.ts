@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.59",
+    date: "2026-10-08",
+    module: "Tasking board: the escalations pane is two cards wide, properly",
+    items: [
+      "TWO, NOT ONE (\u201ctwo will need to be done\u201d). The pane was two pixels too narrow for two cards and stacked them in a single column; it is a true two-column grid now.",
+    ],
+  },
+  {
     v: "6.3.0.58",
     date: "2026-10-08",
     module: "Tasking board: escalations in their own two columns, Show completed off by default, narrower group labels",

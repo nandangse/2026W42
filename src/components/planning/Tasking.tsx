@@ -936,8 +936,9 @@ export function GroupedTasks({
             const rest = items.filter((r) => !escalated(r.t.esc));
             return (
               <div className="flex gap-2 items-start w-full">
-                <div className="flex flex-wrap gap-1.5 items-start flex-shrink-0 rounded p-1.5" style={{ width: 2 * 220 + 6 + 12, minHeight: 60, background: esc.length ? "rgba(179,57,46,0.08)" : "transparent", border: `1px dashed ${esc.length ? "rgba(179,57,46,0.45)" : "#D9D6CD"}` }} title="Escalations — worst first">
-                  {esc.length ? esc.map(card) : <div className="text-xs self-center w-full text-center" style={{ color: "var(--muted)" }}>no escalations</div>}
+                {/* a true two-column grid: the flex version was two pixels short and stacked them in one (8 Oct 2026, "two will need to be done") */}
+                <div className="flex-shrink-0 rounded p-1.5" style={{ display: "grid", gridTemplateColumns: "220px 220px", gap: 6, alignContent: "start", minHeight: 60, background: esc.length ? "rgba(179,57,46,0.08)" : "transparent", border: `1px dashed ${esc.length ? "rgba(179,57,46,0.45)" : "#D9D6CD"}` }} title="Escalations — worst first">
+                  {esc.length ? esc.map(card) : <div className="text-xs text-center" style={{ color: "var(--muted)", gridColumn: "1 / -1", alignSelf: "center" }}>no escalations</div>}
                 </div>
                 <div className="flex flex-wrap gap-1.5 items-start flex-1 min-w-0">
                   {rest.map(card)}
