@@ -91,3 +91,29 @@ export async function mayUseCrm(): Promise<boolean> {
   const u = await currentUser();
   return !!u && !u.disabled && (await granted(u.email));
 }
+
+
+/**
+ * GMAIL IS EVERYBODY'S, NOT THE CRM'S (Dr Raghu, 8 Oct 2026: Mukesh pressed Connect Gmail and was
+ * told "The CRM is not open to this account" — "This should not be in a CRM … we are using Gmail
+ * for everybody"). Any signed-in Genie account may connect its own mailbox. The mailbox row still
+ * lives in the CRM database keyed on a profile, so a profile is made here for whoever has none —
+ * the quietest role, no CRM door opened by it.
+ */
+export async function requireMailboxOwner(): Promise<{ id: string; email: string; displayName: string | null; initials: string | null; profileId: string }> {
+  const u = await currentUser();
+  if (!u) throw new HttpError(401, "Not signed in");
+  if (u.disabled) throw new HttpError(403, "Account disabled");
+  if (!crmConfigured()) throw new HttpError(503, "The mailbox store (CRM database) is not configured.");
+  const db = crmDb();
+  const { data: p } = await db.from("profile").select("id").eq("email", u.email.toLowerCase()).maybeSingle();
+  let profileId = p?.id ? String(p.id) : null;
+  if (!profileId) {
+    const { data: made, error } = await db.from("profile")
+      .upsert({ email: u.email.toLowerCase(), full_name: u.displayName || u.email.split("@")[0], initials: u.initials, role: "viewer", is_active: true }, { onConflict: "email" })
+      .select("id").single();
+    if (error || !made) throw new HttpError(503, `Could not make a mailbox profile for ${u.email}: ${error?.message || "no row"}`);
+    profileId = String(made.id);
+  }
+  return { id: u.id, email: u.email, displayName: u.displayName, initials: u.initials, profileId };
+}

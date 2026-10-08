@@ -72,16 +72,24 @@ async function buildOne(admin: ReturnType<typeof adminClient>, projectId: string
     .sort((a, b) => rev(String(a.bom_id)) - rev(String(b.bom_id)));
   out.base_bom = String(base.bom_id);
   out.drafts = drafts.map((d) => String(d.bom_id));
-  out.rbom_id = `BOM-${S(base.item_code)}-100`;
-
-  // What the RBOM already holds, if it exists.
-  const { data: head, error: hErr } = await admin.from("material_rbom").select("rbom_id, project_id").eq("rbom_id", out.rbom_id).maybeSingle();
+  /* ONE RBOM PER PROJECT, NOT PER ITEM (Dr Raghu, 8 Oct 2026: "The same build can be used with
+     multiple projects … if the project is repeated, the same build number will be repeated, so the
+     build number has to be either rebuilt or pulled in"). The first project on an item takes
+     BOM-<item>-100; a later project on the same item takes the next free number — 101, 102 … — and
+     each carries its own lines. A project that already has its RBOM keeps it. */
+  const { data: heads, error: hErr } = await admin.from("material_rbom").select("rbom_id, project_id").like("rbom_id", `BOM-${S(base.item_code)}-%`);
   if (hErr) {
     if (notInstalled(hErr.message)) throw new HttpError(503, "Run migration 0123 first — the RBOM tables don't exist yet.");
     throw new Error(hErr.message);
   }
-  if (head && String(head.project_id) !== projectId)
-    throw new HttpError(409, `${out.rbom_id} already belongs to ${head.project_id} — the same item cannot carry two RBOMs.`);
+  const mine = (heads ?? []).find((h) => String(h.project_id) === projectId);
+  if (mine) out.rbom_id = String(mine.rbom_id);
+  else {
+    const taken = new Set((heads ?? []).map((h) => Number(String(h.rbom_id).split("-").pop()) || 0));
+    let n = 100; while (taken.has(n)) n++;
+    out.rbom_id = `BOM-${S(base.item_code)}-${n}`;
+  }
+  const head = mine ?? null;
   const have = new Set<string>();
   let nextIdx = 1;
   if (head) {

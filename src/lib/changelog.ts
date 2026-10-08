@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.68",
+    date: "2026-10-08",
+    module: "Connect Gmail for any Genie account; the ERP pull survives a refused field; an RBOM number per project",
+    items: [
+      "NOT A CRM GATE (Mukesh pressed Connect Gmail: \u201cThe CRM is not open to this account\u201d; Dr Raghu: \u201cThis should not be in a CRM \u2026 we are using Gmail for everybody\u201d). Connect and the Google callback now admit any signed-in Genie account and make the mailbox profile on the spot; no CRM door is opened by it.",
+      "ERROR 417 ON THE PURCHASE ORDER AT 0 (Mukesh, 7 Oct 2026). The ERP refused the whole first page because one column, custom_remarks, no longer exists on its Purchase Order (\u201cField not permitted in query\u201d). The pull now drops a refused field and asks again, for every doctype it reads.",
+      "A BUILD NUMBER PER PROJECT (\u201cif the project is repeated, the same build number will be repeated, so the build number has to be either rebuilt or pulled in\u201d). The RBOM was keyed BOM-<item>-100, one per item, so a second project on the same item hit \u201calready belongs to\u2026\u201d. Now the first project takes -100, the next -101 and so on, each with its own lines; a project that has its RBOM keeps it.",
+    ],
+  },
+  {
     v: "6.3.0.67",
     date: "2026-10-08",
     module: "The Vendor Registration Form at /portal/vrf, open to every supplier; the purchase team reads it in Saamaan",

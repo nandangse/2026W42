@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
-import { requireCrm } from "@/crm/auth";
+import { requireMailboxOwner } from "@/crm/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { crmDb } from "@/crm/db";
 import { exchangeCode, gmailGet, verifyState, stateBack } from "@/crm/gmail";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  *  the Vault, the mailbox row keeps the uuid, the profile remembers when. */
 export async function GET(req: Request) {
   try {
-    const user = await requireCrm();
+    const user = await requireMailboxOwner();   // any Genie account, 8 Oct 2026
     const u = new URL(req.url);
     if (u.searchParams.get("error"))
       return NextResponse.redirect(`${u.origin}/crm?gmail=${encodeURIComponent(u.searchParams.get("error") as string)}`);

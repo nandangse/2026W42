@@ -41,10 +41,25 @@ async function erp() {
   if ("error" in cfg) throw new HttpError(400, cfg.error);
   return cfg;
 }
-async function erpPage(cfg: { base: string; H: Record<string, string> }, doctype: string, fields: string[], filters: unknown[] | null, start: number, size: number, orderBy = "modified asc") {
-  const u = `${cfg.base}/api/resource/${encodeURIComponent(doctype)}?fields=${encodeURIComponent(JSON.stringify(fields))}${filters ? `&filters=${encodeURIComponent(JSON.stringify(filters))}` : ""}&order_by=${encodeURIComponent(orderBy)}&limit_start=${start}&limit_page_length=${size}`;
+/** fields the ERP has refused this run — asked for again without them, and said so once (8 Oct 2026) */
+const refusedFields = new Set<string>();
+async function erpPage(cfg: { base: string; H: Record<string, string> }, doctype: string, fields: string[], filters: unknown[] | null, start: number, size: number, orderBy = "modified asc"): Promise<Doc[]> {
+  const ask = fields.filter((f) => !refusedFields.has(`${doctype}.${f}`));
+  const u = `${cfg.base}/api/resource/${encodeURIComponent(doctype)}?fields=${encodeURIComponent(JSON.stringify(ask))}${filters ? `&filters=${encodeURIComponent(JSON.stringify(filters))}` : ""}&order_by=${encodeURIComponent(orderBy)}&limit_start=${start}&limit_page_length=${size}`;
   const r = await fetch(u, { headers: cfg.H });
-  if (!r.ok) throw new Error(`The ERP answered ${r.status} on ${doctype} at ${start}: ${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) {
+    const text = await r.text();
+    /* "FIELD NOT PERMITTED IN QUERY" (Mukesh, 7 Oct 2026: "error 417 on the purchase order at 0"). A
+       custom field — custom_remarks — had gone from the ERP's Purchase Order, and the ERP refuses the
+       whole page over one unknown column. The column is dropped and the page asked for again; the
+       pull goes on, and the dropped name travels in the error only if nothing else can be done. */
+    const m = /Field not permitted in query: ([A-Za-z0-9_`.]+)/.exec(text);
+    if (r.status === 417 && m) {
+      const bad = m[1].replace(/`/g, "").split(".").pop() as string;
+      if (ask.includes(bad)) { refusedFields.add(`${doctype}.${bad}`); return erpPage(cfg, doctype, fields, filters, start, size, orderBy); }
+    }
+    throw new Error(`The ERP answered ${r.status} on ${doctype} at ${start}: ${text.slice(0, 200)}`);
+  }
   return (((await r.json()) as { data?: Doc[] }).data ?? []);
 }
 
