@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.57",
+    date: "2026-10-08",
+    module: "Public Privacy Policy and Terms pages \u2014 for Google\u2019s OAuth consent screen",
+    items: [
+      "/privacy AND /terms. Opening Genie\u2019s Gmail connection to mailboxes outside nandan.co.in (Fabro Metals\u2019 channel) means switching the Google OAuth app from Internal to External, and Google\u2019s consent screen then wants a public privacy policy and terms of service. Both now exist, in plain words, true to what Genie does with Google data (send as the mailbox, read replies to what it sent; encrypted token; delete on disconnect; Limited Use).",
+    ],
+  },
+  {
     v: "6.3.0.56",
     date: "2026-10-08",
     module: "Marketing: Connect Gmail from the Sending Channels row",
