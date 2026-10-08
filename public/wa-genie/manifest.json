@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Genie WhatsApp helper",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "On WhatsApp Web, attaches the payslip Genie asked for to the open chat and waits for Send (or presses it when Genie says so). Nandan GSE HR.",
   "host_permissions": [
     "https://web.whatsapp.com/*",

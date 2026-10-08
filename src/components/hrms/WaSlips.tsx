@@ -18,7 +18,8 @@ interface Data { period: string; status: string; template: string; list: Row[]; 
 const C = { ink: "#1F2328", dim: "#5B6470", faint: "#8B8F87", line: "#E2E0DA", green: "#2A6B39", red: "#8E2C20", amber: "#B26A00", navy: "#16232F" };
 const ist = (s: string | null) => (s ? new Date(s).toLocaleString("en-GB", { timeZone: "Asia/Kolkata", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "");
 
-export default function WaSlips({ sheetId }: { sheetId: string }) {
+export default function WaSlips({ sheetId, mode = "slip" }: { sheetId: string; mode?: "slip" | "message" }) {
+  const isMsg = mode === "message";
   const [d, setD] = useState<Data | null>(null);
   const [err, setErr] = useState("");
   const [auto, setAuto] = useState(false);          // the helper presses Send
@@ -37,7 +38,7 @@ export default function WaSlips({ sheetId }: { sheetId: string }) {
   }, []);
   const sentCount = useRef(0);
   const timer = useRef<number | null>(null);
-  const load = useCallback(async () => { try { setD(await api.get(`/api/hrms/wa-slips?sheet=${encodeURIComponent(sheetId)}`)); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } }, [sheetId]);
+  const load = useCallback(async () => { try { setD(await api.get(`/api/hrms/wa-slips?sheet=${encodeURIComponent(sheetId)}&mode=${mode}`)); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } }, [sheetId, mode]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { const t = window.setInterval(load, 6000); return () => window.clearInterval(t); }, [load]);
 
@@ -54,8 +55,9 @@ export default function WaSlips({ sheetId }: { sheetId: string }) {
   const openOne = (r: Row) => {
     setCurrent(r.id);
     if (helper) {
-      window.postMessage({ type: "genie:wa-job", job: { phone: r.phone, token: r.token, api: d?.api || location.origin, auto, close: closeTab, text: r.text } }, "*");
-      window.setTimeout(() => window.open(`https://web.whatsapp.com/send?phone=${r.phone}`, "_blank", "noopener"), 250);
+      window.postMessage({ type: "genie:wa-job", job: { phone: r.phone, token: r.token, api: d?.api || location.origin, auto, close: closeTab, text: r.text, attach: !isMsg, mode } }, "*");
+      // a text-only message rides in the URL as WhatsApp's own click-to-chat; a slip keeps the composer empty until it is attached
+      window.setTimeout(() => window.open(isMsg ? `https://web.whatsapp.com/send?phone=${r.phone}&text=${encodeURIComponent(r.text)}` : `https://web.whatsapp.com/send?phone=${r.phone}`, "_blank", "noopener"), 250);
     } else {
       window.open(`https://web.whatsapp.com/send?phone=${r.phone}&text=${encodeURIComponent(r.text)}`, "_blank", "noopener");
     }
@@ -84,15 +86,15 @@ export default function WaSlips({ sheetId }: { sheetId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, chain, d, current]);
 
-  const markSent = async (r: Row) => { try { await api.post("/api/hrms/wa-slips", { action: "sent", token: r.token, by: "marked sent on the Genie screen" }); await load(); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } };
+  const markSent = async (r: Row) => { try { await api.post("/api/hrms/wa-slips", { action: "sent", token: r.token, mode, by: "marked sent on the Genie screen" }); await load(); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } };
 
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", color: C.ink, background: "#EFEDE7", minHeight: "100vh" }}>
       <div style={{ background: C.navy, color: "#fff", padding: "10px 16px", display: "flex", gap: 14, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
-        <b style={{ fontSize: 16 }}>💬 Payslips on WhatsApp — {d?.period || "…"}</b>
+        <b style={{ fontSize: 16 }}>💬 {isMsg ? "Attendance & salary message on WhatsApp" : "Payslips on WhatsApp"} — {d?.period || "…"}</b>
         <span style={{ opacity: .75 }}>{d ? `${sent} sent · ${todo.length} to go · ${cannot.length} cannot` : ""}</span>
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 12, color: helper ? "#7BD389" : "#F3B33D" }}>{helper ? `helper installed ✓ v${helper}` : "helper not detected in this browser — slips must be attached by hand"}</span>
+        <span style={{ fontSize: 12, color: helper ? "#7BD389" : "#F3B33D" }}>{helper ? `helper installed ✓ v${helper}` : isMsg ? "helper not detected — the message still opens pre-filled; mark each sent by hand" : "helper not detected in this browser — slips must be attached by hand"}</span>
         <a href="/wa-genie.zip" style={{ color: "#D7DEE6", fontSize: 12 }} download>⬇ Genie WhatsApp helper (Chrome extension)</a>
       </div>
       {err && <div style={{ padding: "8px 16px", color: C.red, fontSize: 12 }}>{err}</div>}
@@ -137,7 +139,7 @@ export default function WaSlips({ sheetId }: { sheetId: string }) {
               <li>In Chrome, open <b>web.whatsapp.com</b> and sign in with <b>your own number</b> (scan the code). Keep that tab open.</li>
               <li>Allow pop-ups for genie.nandan.co.in (click the icon at the right of the address bar the first time it blocks one) — otherwise only one tab opens per click.</li>
               <li>Here, leave <b>“The helper presses Send”</b> OFF for the human touch. Tick <b>“Open the next one by itself”</b>. Press <b>▶ Start</b>.</li>
-              <li>A tab opens on the person's chat with the message typed and the payslip attached. Read it, press <b>Send</b>. The tab closes, Genie records it, waits a few seconds, and opens the next.</li>
+              <li>A tab opens on the person's chat with the message typed{isMsg ? "" : " and the payslip attached"}. Read it, press <b>Send</b>. The tab closes, Genie records it, waits a few seconds, and opens the next.</li>
               <li>Anyone whose tab shows a red bar: attach the slip by hand (download from Salary Slips), send, and press <b>Mark sent</b> here.</li>
               <li>Press <b>■ Stop</b> any time; <b>▶ Start</b> carries on from whoever is left — nobody gets a slip twice.</li>
             </ol>
@@ -145,7 +147,7 @@ export default function WaSlips({ sheetId }: { sheetId: string }) {
             <div style={{ marginTop: 8, color: C.amber }}>Note: this drives WhatsApp Web on Vinay's own number. WhatsApp tolerates a person sending one by one; it does not tolerate a machine blasting. Keep the helper's Send off unless the pace matters more than the number.</div>
           </div>
           <div style={{ background: "#fff", border: `1px solid ${C.line}`, borderRadius: 8, padding: 14 }}>
-            <div style={{ fontWeight: 800, letterSpacing: .4, fontSize: 11, color: C.faint, marginBottom: 6 }}>THE MESSAGE (Masters → Standard Texts → salary_slip_whatsapp)</div>
+            <div style={{ fontWeight: 800, letterSpacing: .4, fontSize: 11, color: C.faint, marginBottom: 6 }}>THE MESSAGE (Masters → Standard Texts → {isMsg ? "attendance_salary_whatsapp" : "salary_slip_whatsapp"})</div>
             <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", margin: 0, color: C.dim }}>{d?.template}</pre>
           </div>
           {log.length > 0 && <div style={{ marginTop: 12, fontSize: 11, color: C.faint }}>{log.slice(0, 12).map((l, i) => <div key={i}>{l}</div>)}</div>}

@@ -24,8 +24,9 @@
     for (let i = 0; i < 20 && !job; i++) { job = await getJob(); if (!job) await sleep(500); }
     if (!job) return;   // a chat Genie did not open — stay out of the way
     if (Date.now() - (job.at || 0) > 3 * 3600 * 1000) return;
-    const { token, api, auto, close: closeAfter, text } = job;
-    const report = (action, extra) => new Promise((r) => chrome.runtime.sendMessage({ type: "genie:report", url: api + "/api/hrms/wa-slips", body: Object.assign({ action, token, auto, text }, extra || {}) }, () => r()));
+    const { token, api, auto, close: closeAfter, text, mode } = job;
+    const attachSlip = job.attach !== false;
+    const report = (action, extra) => new Promise((r) => chrome.runtime.sendMessage({ type: "genie:report", url: api + "/api/hrms/wa-slips", body: Object.assign({ action, token, auto, text, mode }, extra || {}) }, () => r()));
     try {
       banner("opening the chat…");
       const cont = await until(() => [...document.querySelectorAll("a,button,div[role=button]")].find((e) => /continue to chat|use whatsapp web/i.test(e.textContent || "")) || any(['footer div[contenteditable="true"]', 'div[contenteditable="true"][data-tab]']), 30000);
@@ -33,6 +34,18 @@
       const composer = await until(() => any(['footer div[contenteditable="true"]', 'div[contenteditable="true"][data-tab]']), 60000);
       if (!composer) throw new Error("the chat did not open — is WhatsApp Web signed in?");
       await report("opened");
+      if (!attachSlip) {
+        // TEXT ONLY (8 Oct 2026): the message is already in the composer from the URL; wait for Send, or press it
+        const sb = await until(() => any(['[aria-label="Send"]', 'span[data-icon="send"]', 'div[role="button"][aria-label="Send"]']), 15000);
+        if (!sb) throw new Error("could not find the Send button");
+        const b = sb.closest("button,div[role=button]") || sb;
+        if (auto) { const w = rnd(1500, 4500); banner("sending in " + Math.round(w / 1000) + "s… (auto)", "#8A5B00"); await sleep(w); b.click(); }
+        else { banner("message ready — press Send in WhatsApp", "#2A6B39"); await until(() => !any(['[aria-label="Send"]', 'span[data-icon="send"]']) || !document.contains(b), 15 * 60 * 1000, 600); }
+        await sleep(1200); await report("sent"); chrome.storage.local.remove("job:" + phone);
+        banner("sent · recorded in Genie", "#2A6B39");
+        if (closeAfter) { await sleep(rnd(800, 2000)); window.close(); }
+        return;
+      }
       banner("fetching the payslip from Genie…");
       const slip = await new Promise((r) => chrome.runtime.sendMessage({ type: "genie:fetch-slip", url: api + "/api/hrms/wa-slips?slip=" + encodeURIComponent(token) }, r));
       if (!slip || !slip.ok) throw new Error("could not fetch the slip: " + (slip && slip.error));

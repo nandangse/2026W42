@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.55",
+    date: "2026-10-08",
+    module: "WhatsApp message: attendance, amount credited, the account it went to, where the slip was mailed",
+    items: [
+      "ONE MORE BUTTON (\u201cIn this also make one button WhatsApp Message \u2026 Amount credited, Sent to your account no in bank with IFSC, Salary slip emailed to your mail id\u201d). Salary Sheets \u2192 the month \u2192 \ud83d\udcac WhatsApp message: the same one-by-one road through WhatsApp Web from Vinay\u2019s own number, text only. The template is his attendance message with the credit lines added \u2014 Amount credited: Rs {{net}} \u00b7 Sent to your account no {{account_15}} in {{bank_name}} with IFSC {{ifsc}} \u00b7 Salary slip emailed to your mail id: {{personal_email}} \u2014 saved as Masters \u2192 Standard Texts \u2192 attendance_salary_whatsapp. Holds get the message too (their attendance is theirs); the ledger keeps slips and messages apart so neither is sent twice. Helper v1.2.0 handles a text-only job (reload the unpacked extension).",
+    ],
+  },
+  {
     v: "6.3.0.54",
     date: "2026-10-07",
     module: "The slip press ships its Chromium on every HRMS road",

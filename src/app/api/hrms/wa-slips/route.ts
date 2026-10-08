@@ -36,6 +36,10 @@ function readToken(t: string): { sheet: string; emp: string } {
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "content-type" };
 export async function OPTIONS() { return new Response(null, { headers: CORS }); }
 
+/* THE ATTENDANCE + CREDIT MESSAGE (Dr Raghu, 8 Oct 2026: "In this also make one button WhatsApp
+   Message … Amount credited, Sent to your account no in bank with IFSC, Salary slip emailed to your
+   mail id"). Text only, no attachment — the same one-by-one road through WhatsApp Web. */
+const DEFAULT_MESSAGE = "Dear {{name}},\n\nPlease find the records of your Attendance for {{month}}\n\nEMP. NO. {{employee_id}} , Category- {{category}}\nPresent Day - {{present_days}}\nAbsent Days - {{absent_days}}\nWeek Off - {{week_off}}\nMO & ST (Monthly Off & Statutory Holiday) - {{mo_st}}\nPayable Days - {{paid_days}}\nComp. Off - {{compoff}}\nOT - {{ot}}\n\nAmount credited: Rs {{net}}\nSent to your account no {{account_15}} in {{bank_name}} with IFSC {{ifsc}}\nSalary slip emailed to your mail id: {{personal_email}}\n\nIf there are any corrections in the Attendance, OT or any other component please reply immediately on WhatsApp. Also you can register your query on the link given below:\nhttps://genie.nandan.co.in/hrms/query\n\nThank you!\nHR\nNandan GSE";
 const DEFAULT_TEXT = "Dear {{first_name}},\n\nPlease find attached your salary slip for {{month}}.\n\nEMP. NO. {{employee_id}} · Net paid: Rs {{net}}\n\nIf anything in it needs a correction, reply here on WhatsApp or register a query at https://genie.nandan.co.in/hrms/query\n\nThank you!\nVinay · HR · Nandan GSE";
 
 export async function GET(req: Request) {
@@ -61,15 +65,17 @@ export async function GET(req: Request) {
     const rows = (sheet.rows || []) as { employee_id: string; name: string; hold?: boolean; net?: number; to_pay?: number }[];
     const ppl = await people(admin, rows.map((r) => String(r.employee_id)));
     const by = new Map(ppl.map((p) => [p.id, p]));
-    const { data: t } = await admin.from("hrms_text_master").select("body").eq("key", "salary_slip_whatsapp").maybeSingle();
-    const template = String(t?.body || DEFAULT_TEXT);
+    const mode = u.searchParams.get("mode") === "message" ? "message" : "slip";
+    const tKey = mode === "message" ? "attendance_salary_whatsapp" : "salary_slip_whatsapp";
+    const { data: t } = await admin.from("hrms_text_master").select("body").eq("key", tKey).maybeSingle();
+    const template = String(t?.body || (mode === "message" ? DEFAULT_MESSAGE : DEFAULT_TEXT));
     const period = `${MONTHS[Number(sheet.month) - 1]} ${sheet.year}`;
     // what already went this month over WhatsApp
     const { data: done } = await admin.from("hrms_communication").select("employee_id, status, sent_at, meta").eq("channel", "whatsapp").eq("direction", "out");
     const sentAt = new Map<string, string>(), openedAt = new Map<string, string>();
     for (const r of (done || []) as { employee_id: string; status: string; sent_at: string; meta: Record<string, unknown> | null }[]) {
       const m = r.meta || {};
-      if (m.wa_slip && Number(m.month) === Number(sheet.month) && Number(m.year) === Number(sheet.year)) {
+      if ((mode === "message" ? m.wa_message : m.wa_slip) && Number(m.month) === Number(sheet.month) && Number(m.year) === Number(sheet.year)) {
         if (r.status === "sent") sentAt.set(String(r.employee_id), r.sent_at);
         else if (r.status === "opened") openedAt.set(String(r.employee_id), r.sent_at);
       }
@@ -81,12 +87,12 @@ export async function GET(req: Request) {
       const phone = rendered?.phone || "";
       return {
         id: String(r.employee_id), name: r.name, hold: !!r.hold, phone, text: rendered?.text || "",
-        why: r.hold ? "on hold — no slip" : !phone || phone.length < 10 ? "no personal mobile on the record" : "",
+        why: r.hold && mode === "slip" ? "on hold — no slip" : !phone || phone.length < 10 ? "no personal mobile on the record" : "",
         sent_at: sentAt.get(String(r.employee_id)) || null, opened_at: openedAt.get(String(r.employee_id)) || null,
         token: makeToken(sheetId, String(r.employee_id)),
       };
     });
-    return NextResponse.json({ ok: true, period, month: sheet.month, year: sheet.year, status: sheet.status, template, list, api: u.origin });
+    return NextResponse.json({ ok: true, mode, period, month: sheet.month, year: sheet.year, status: sheet.status, template, list, api: u.origin });
   } catch (e) { return errJson(e); }
 }
 
@@ -106,7 +112,7 @@ export async function POST(req: Request) {
         employee_id: emp, channel: "whatsapp", direction: "out", to_address: p?.phone || null,
         subject: `Salary slip — ${MONTHS[Number(sh.month) - 1]} ${sh.year}`, body: String(body.text || "").slice(0, 2000) || null,
         status: action, sent_by: String(body.by || "Vinay · WhatsApp Web (Genie helper)"), sent_at: now,
-        meta: { wa_slip: true, month: sh.month, year: sh.year, via: "whatsapp-web", auto: !!body.auto },
+        meta: { ...(body.mode === "message" ? { wa_message: true } : { wa_slip: true }), month: sh.month, year: sh.year, via: "whatsapp-web", auto: !!body.auto },
       });
       return NextResponse.json({ ok: true }, { headers: CORS });
     }

@@ -341,6 +341,9 @@ function SheetBox({ id, onClose }: { id: string; onClose: () => void }) {
             <a href={`/hrms/wa-slips?sheet=${id}`} target="_blank" rel="noopener noreferrer"
               className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: "#0B3D1E", border: "1px solid #25D366", fontSize: 11.5, textDecoration: "none" }}
               title="Each person's slip on WhatsApp Web from Vinay's own number, one by one — the screen opens each chat with the message and the slip attached">💬 WhatsApp slips</a>
+            <a href={`/hrms/wa-slips?sheet=${id}&mode=message`} target="_blank" rel="noopener noreferrer"
+              className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: "#0B3D1E", border: "1px solid #25D366", fontSize: 11.5, textDecoration: "none" }}
+              title="The attendance, the amount credited, the account it went to and where the slip was mailed — one WhatsApp message each, no attachment, from Vinay's own number">💬 WhatsApp message</a>
             <a href={`/hrms/salary-slips/${id}/print`} target="_blank" rel="noopener noreferrer"
               className="rounded px-2 py-1 font-bold" style={{ background: "#fff", color: C.dim, border: `1px solid ${C.line}`, fontSize: 11.5 }}
               title={d?.status === "Frozen"
