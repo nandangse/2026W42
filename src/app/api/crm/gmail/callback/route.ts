@@ -26,29 +26,40 @@ export async function GET(req: Request) {
       throw new HttpError(400, "Google returned no refresh token — remove the app's access at myaccount.google.com/permissions and connect again.");
 
     const gp = await gmailGet(tok.access_token, "profile");
-    const email = String(gp.emailAddress ?? "").toLowerCase();
+    /* THE GOOGLE ACCOUNT vs THE ADDRESS GENIE SENDS AS (Dr Raghu, 8 Oct 2026: "mukesh@nandan.co.in,
+       which is an alias, should be working. The sending mail ID should be what is there in the ERP …
+       Purchase can be for people, but all of them might just connect with the same OAuth. While
+       sending the mail, it has to go with their personal genie login mail ID"). Mukesh signed in to
+       Google as purchase-head@; his Genie login and his ERP address are mukesh@. So the mailbox row is
+       the PERSON's address — the Genie login — and the Google account that authorised it is kept in
+       `username`. Four people may authorise with the same Google account and each sends as themselves;
+       Gmail honours the From line when the address is an alias ("Send mail as") on that account. */
+    const account = String(gp.emailAddress ?? "").toLowerCase();
+    const email = user.email.toLowerCase();
     const db = crmDb();
     /* COMPANY MAIL ONLY — unless the address is a configured Sending Channel (Dr Raghu, 8 Oct
        2026: "Put a button next to this only to connect to Gmail" on nimesh@fabrometals.com).
        A channel somebody has deliberately added to Marketing is spoken for; a random personal
        Gmail still is not. */
-    if (!email.endsWith("@nandan.co.in")) {
-      const { data: ch } = await db.from("mk_channel").select("id").eq("kind", "gmail").ilike("email", email).maybeSingle();
-      if (!ch) throw new HttpError(400, `${email} is not an @nandan.co.in mailbox, nor a Sending Channel set up in Marketing. Company mail only.`);
+    if (!account.endsWith("@nandan.co.in")) {
+      const { data: ch } = await db.from("mk_channel").select("id").eq("kind", "gmail").ilike("email", account).maybeSingle();
+      if (!ch) throw new HttpError(400, `${account} is not an @nandan.co.in mailbox, nor a Sending Channel set up in Marketing. Company mail only.`);
     }
-    const { data: existing } = await db.from("mailbox").select("id").eq("email_address", email).maybeSingle();
+    /* a Marketing channel connected by its own address keeps that address as the row (gse@…, nimesh@fabrometals…) */
+    const rowEmail = account !== email && !email.endsWith("@nandan.co.in") ? account : (await db.from("mk_channel").select("id").eq("kind", "gmail").ilike("email", account).maybeSingle()).data && account !== email && user.email.toLowerCase() !== account ? account : email;
+    const { data: existing } = await db.from("mailbox").select("id").eq("email_address", rowEmail).maybeSingle();
     if (existing) {
       const { error } = await db.rpc("rotate_mailbox_credential", { p_mailbox_id: existing.id, p_secret: tok.refresh_token });
       if (error) throw new HttpError(500, error.message);
       await db.from("mailbox").update({
-        profile_id: user.profileId, credential_kind: "oauth_refresh_token",
+        profile_id: user.profileId, username: account, credential_kind: "oauth_refresh_token",
         status: "active", last_error: null, last_verified_at: new Date().toISOString(),
       }).eq("id", existing.id);
     } else {
-      const { data: ref, error: verr } = await db.rpc("store_mailbox_credential", { p_email: email, p_secret: tok.refresh_token });
+      const { data: ref, error: verr } = await db.rpc("store_mailbox_credential", { p_email: rowEmail, p_secret: tok.refresh_token });
       if (verr) throw new HttpError(500, verr.message);
       const { error } = await db.from("mailbox").insert({
-        profile_id: user.profileId, email_address: email, username: email,
+        profile_id: user.profileId, email_address: rowEmail, username: account, display_name: user.displayName || null,
         credential_ref: ref, credential_kind: "oauth_refresh_token",
         status: "active", last_verified_at: new Date().toISOString(),
       });

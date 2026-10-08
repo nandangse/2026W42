@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.69",
+    date: "2026-10-08",
+    module: "A connected Gmail sends as the person\u2019s own address, whatever Google account authorised it",
+    items: [
+      "SEND AS YOURSELF (\u201cmukesh@nandan.co.in, which is an alias, should be working. The sending mail ID should be what is there in the ERP \u2026 all of them might just connect with the same OAuth. While sending the mail, it has to go with their personal genie login mail ID\u201d). Mukesh authorised with the purchase-head@ Google account; the mailbox row now carries HIS address \u2014 mukesh@, the Genie login and the ERP\u2019s \u2014 and the Google account that authorised it is kept beside it. Four purchase people may authorise with the same Google account and each sends as themselves. Mukesh\u2019s existing row was corrected by hand the same minute. Gmail honours the From line when the address is a \u201cSend mail as\u201d alias on that Google account; a Marketing channel connected by its own address (gse@, nimesh@fabrometals) keeps that address.",
+    ],
+  },
+  {
     v: "6.3.0.68",
     date: "2026-10-08",
     module: "Connect Gmail for any Genie account; the ERP pull survives a refused field; an RBOM number per project",
