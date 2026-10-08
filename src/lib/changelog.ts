@@ -66,13 +66,16 @@ import { APP_VERSION } from "./version";
  */
 export interface Effort { measuredTo: string; commits: number; days: number; windowHours: number; raghuLow: number; raghuHigh: number }
 
+/* MEASURED AGAIN, 8 Oct 2026 — the same way: every commit from 23 Jul 2026, grouped by IST
+   calendar day, the span of each day summed. 964 commits over 54 working days; the band is
+   50–73% of the window as before. (The 9 Sep figure was 746 commits / 36 days / 256.7 h.) */
 export const EFFORT: Effort = {
-  measuredTo: "2026-09-09",
-  commits: 746,
-  days: 36,
-  windowHours: 256.7,
-  raghuLow: 128,
-  raghuHigh: 188,
+  measuredTo: "2026-10-08",
+  commits: 964,
+  days: 54,
+  windowHours: 374.5,
+  raghuLow: 187,
+  raghuHigh: 273,
 };
 
 export interface UpdateEntry {
@@ -88,6 +91,14 @@ export interface UpdateEntry {
 
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
+  {
+    v: "6.3.0.61",
+    date: "2026-10-08",
+    module: "Software Description brought to today: effort, size, and the modules since September",
+    items: [
+      "MEASURED TO 8 OCTOBER (\u201cgo to the software description, as well as the hours that are spent and the different versions. Make sure it\u2019s updated today\u201d). The build window, measured the same way as every time since the 9 Sep correction: 964 commits over 54 working days from 23 July, a 374.5-hour window, Dr Raghu\u2019s own share 187\u2013273 hours. Size today: 298 API routes, 209 + 80 migrations across the two databases, 388 tables. Five modules that had grown since the last revision are now described \u2014 Payroll; Appraisals, IDP & the Salary Structure; Saamaan Inventory, Kanban & Suppliers; the Portal; the Playbooks. The release count on the page is live from this log.",
+    ],
+  },
   {
     v: "6.3.0.60",
     date: "2026-10-08",

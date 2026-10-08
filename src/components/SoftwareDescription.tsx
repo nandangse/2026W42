@@ -34,7 +34,7 @@ import type { Effort } from "@/lib/changelog";
 import { useEffect, useState } from "react";
 
 /** Last hand-revision of the prose on this page. Bump it when you edit. */
-const DOC_REVISED = "9 September 2026";
+const DOC_REVISED = "8 October 2026";
 
 const NAVY = "var(--navy)";
 const INK = "var(--ink)";
@@ -50,13 +50,13 @@ const RED = "#C0392B";
    and this block is stale.                                                 */
 const SIZE = {
   /** find src/app/api -name route.ts | wc -l */
-  apiRoutes: 228,
+  apiRoutes: 298,
   /** ls supabase/migrations/*.sql | wc -l */
-  migrations: 169,
+  migrations: 209,
   /** ls supabase-crm/migrations/*.sql | wc -l — the CRM keeps its own database */
-  crmMigrations: 64,
+  crmMigrations: 80,
   /** create-table statements across every migration of both databases, de-duplicated */
-  tables: 309,
+  tables: 388,
   /** find src/components -name '*.tsx' | wc -l */
   components: 169,
   /** find src -name '*.ts' -o -name '*.tsx' | xargs wc -l */
@@ -377,6 +377,30 @@ const MODULES: ModuleSpec[] = [
     ai: "None.",
   },
   {
+    name: "HRMS — Payroll run, register, slips & bank files",
+    space: "HRMS",
+    since: "4.4.4.3",
+    purpose: "The month's salary, run from Genie's own records: the muster and the signed Salary Structure in, the register out — with every rule written down and tracked, the Observation that lays Genie beside HR's sheet line by line, approval, the finalised Excel, the bank's NEFT files, the slips by e-mail and WhatsApp, and the MIS to management.",
+    who: "HR (Vinay), the owner approves; the register is confidential.",
+    gate: "requireHrms(); approval and the Salary Structure's signature are the owner's alone",
+    screens: ["Payroll runs", "Uploads (muster, Salary tab, bank details, ESSL)", "Attendance muster", "Salary register", "Observation — rates, attendance, leave, net, to pay", "Salary MIS (3 months)", "Rules panel", "Bank files + envelope to accounts", "Salary slips — mail / WhatsApp", "Finalise to management"],
+    data: ["hrms_salary_sheet", "hrms_payroll_file", "hrms_payroll_input", "hrms_salary_structure", "hrms_salary_rate", "hrms_salary_history", "hrms_employee_edits", "hrms_communication", "hrms_text_master"],
+    api: ["/api/hrms/payroll", "/api/hrms/observation", "/api/hrms/rates", "/api/hrms/slip-mail", "/api/hrms/wa-slips", "/api/hrms/register-mail", "/api/hrms/mass-mail"],
+    ai: "None in the calculation — every rupee follows a written rule. Claude drafts the CHRO commentary on the Salary MIS.",
+  },
+  {
+    name: "HRMS — Appraisals, IDP & the Salary Structure",
+    space: "HRMS",
+    since: "3.20.0.0",
+    purpose: "The yearly cycle: the Individual Development Plan each person fills at /idp, the manager's review, the report card the owner finalises, the appraisal letters — and the Salary Structure that results, frozen and signed, which the payroll reads and which backflushes into every record.",
+    who: "Every employee for their own IDP (personal login); managers for their people; the owner finalises and signs.",
+    gate: "requireHrms(); /idp has its own personal login; set_live, freeze and backflush are the owner's",
+    screens: ["IDP (personal)", "Appraisal summary / interviews / table", "Report card", "Salary Rate List (structures, freeze & sign, backflush)", "Offers & letters"],
+    data: ["hrms_idp", "hrms_idp_login", "hrms_appraisal", "hrms_salary_structure", "hrms_salary_rate", "hrms_salary_history", "hrms_employee_edits"],
+    api: ["/api/hrms/idp", "/api/hrms/rates", "/api/hrms/appraisal-import", "/api/hrms/idp-passwords"],
+    ai: "Claude writes the growth notes and the brief on the report card from the IDP transcript; the figures are the owner's.",
+  },
+  {
     name: "Saamaan — Items, the ERP mirror",
     space: "Saamaan",
     since: "4.4.0.0",
@@ -411,6 +435,18 @@ const MODULES: ModuleSpec[] = [
     data: ["material_mrp", "material_mrp_job", "material_mrp_plan", "material_issue", "material_slip", "material_slip_line", "manual_tasks (escalations)"],
     api: ["/api/saamaan/mrp", "/api/saamaan/slip", "/api/cron/saamaan-escalate"],
     ai: "None. Stock is not yet reduced by an issue — the stated next step.",
+  },
+  {
+    name: "Saamaan — Inventory, Kanban & Suppliers",
+    space: "Saamaan",
+    since: "6.1.0.0",
+    purpose: "Stock today by warehouse and item group, the physical count that posts back to the ERP as a Stock Reconciliation, WIP theory against actual, the DBM Kanban with its blue/green/yellow/red/black buffers and Genie's proposals, the purchase follow-up, the supplier payment release to accounts, and RFQs through the portal.",
+    who: "Stores, purchase and the owner; the ERP stays the book of record.",
+    gate: "requireSaamaan(); writes to the ERP are explicit buttons, never silent",
+    screens: ["Dashboard (pulse)", "Inventory — stock, counts, item groups, suspense", "WIP", "Kanban (DBM)", "Supplier desk — payment release, RFQs", "Masters"],
+    data: ["material_* (all)", "ERP Stock Ledger Entry / Stock Reconciliation via REST"],
+    api: ["/api/saamaan/inventory", "/api/saamaan/pulse", "/api/saamaan/kanban", "/api/saamaan/wip", "/api/saamaan/payment-release", "/api/cron/kanban-daily"],
+    ai: "Ask Genie on the inventory (Opus 5.5) answers questions over the live stock; the Kanban's proposals are arithmetic, not a model.",
   },
   {
     name: "Kuber — the books",
@@ -471,6 +507,30 @@ const MODULES: ModuleSpec[] = [
     data: ["CRM database — campaign, list, template, landing page, asset and tracking tables"],
     api: ["/api/marketing/campaigns", "/api/marketing/lists", "/api/marketing/templates", "/api/marketing/landing", "/api/marketing/leads", "/api/marketing/channels", "/api/marketing/webhook", "/api/marketing/unsubscribe", "/api/cron/marketing-drain"],
     ai: "Genie drafts campaign copy on request. Apollo imports stay OUT of the CRM by instruction — a bought list is not a contact.",
+  },
+  {
+    name: "Portal — customers & suppliers",
+    space: "Portal",
+    since: "6.0.0.0",
+    purpose: "The outside door: an organisation's own slug, its own login realm, five user types — a customer sees their jobs, issues and quotations; a supplier sees RFQs and POs and answers them.",
+    who: "Invited outside users; Genie users administer.",
+    gate: "the portal's own session, scoped to the organisation; never a Genie session",
+    screens: ["/portal/<org>", "Login", "My jobs / issues / quotes", "RFQs & POs (supplier)", "Report card"],
+    data: ["portal_org", "portal_user", "portal_session", "material_rfq*"],
+    api: ["/api/portal/*"],
+    ai: "None.",
+  },
+  {
+    name: "Playbooks",
+    space: "Planning Suite",
+    since: "3.31.0.0",
+    purpose: "Six living wikis — sales, HR, materials and the rest: documents and intelligence go in, Claude compiles the book overnight, each book carries its own version.",
+    who: "Everyone reads; owners of each book add intelligence.",
+    gate: "requireUser(); compile runs on the midnight IST cron",
+    screens: ["The books", "Add Intelligence", "Versions"],
+    data: ["playbook", "playbook_source", "playbook_version"],
+    api: ["/api/playbooks", "/api/cron/playbooks"],
+    ai: "Claude compiles the wiki from the sources; every compile is versioned and the sources stay.",
   },
   {
     name: "Notifications",
