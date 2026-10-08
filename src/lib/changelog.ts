@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.64",
+    date: "2026-10-08",
+    module: "Escalations tab: a task with no job no longer brings the page down",
+    items: [
+      "\u201cCannot read properties of null (reading \u2018slice\u2019)\u201d on the Planning Suite\u2019s Escalations tab: an escalated task that belongs to no job (raised from the Brain Dump or on a goal) reached jobNo(), which took the last four characters of a job id that was not there. It now reads \u201c\u2014\u201d for such a task, everywhere jobNo is used.",
+    ],
+  },
+  {
     v: "6.3.0.63",
     date: "2026-10-08",
     module: "List import: new companies made in batches, so a big slice cannot run out of time",

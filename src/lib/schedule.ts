@@ -60,7 +60,8 @@ export const initials = (s: string): string =>
     .join("")
     .slice(0, 3)
     .toUpperCase();
-export const jobNo = (id: string): string => id.slice(-4);
+/** the last four of a job id — and "—" for a task that has no job (a dump line, a goal task), instead of a crash (8 Oct 2026: the Escalations tab died on one) */
+export const jobNo = (id: string | null | undefined): string => (id ? String(id).slice(-4) : "—");
 
 /**
  * Two or three characters for whoever is carrying something.
