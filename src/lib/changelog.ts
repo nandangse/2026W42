@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.60",
+    date: "2026-10-08",
+    module: "Tasking board: Download as PDF \u2014 by department, each job with its escalations and tasks together",
+    items: [
+      "ON PAPER (\u201cMake a button at the top saying Download as PDF. Just keep the tasks in a way that they can be read comfortably. Make it by department on a separate page and showcase escalations and tasks of each job together, aggregated\u201d). The button takes exactly what the screen shows \u2014 same scope, same filters, completed only if Show completed is on \u2014 and lays it out for A4: one department a page with its open-task and escalation counts, each job once (jobs with escalations first), the job\u2019s escalations in red with their level, date, owner and the reason, then its tasks, in 11-point type. The browser\u2019s Save as PDF makes the file.",
+    ],
+  },
+  {
     v: "6.3.0.59",
     date: "2026-10-08",
     module: "Tasking board: the escalations pane is two cards wide, properly",

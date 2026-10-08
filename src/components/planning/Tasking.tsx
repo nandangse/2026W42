@@ -901,8 +901,60 @@ export function GroupedTasks({
       </div>
     );
 
+  /* DOWNLOAD AS PDF (Dr Raghu, 8 Oct 2026: "Make a button at the top saying Download as PDF. Just
+     keep the tasks in a way that they can be read comfortably. Make it by department on a separate
+     page and showcase escalations and tasks of each job together, aggregated"). Exactly what is on
+     the screen — same filters, same scope — laid out for paper: one department a page, each job
+     once with its escalations first and its tasks under them, 11-point type. The browser's own
+     Save as PDF does the rest. */
+  const printPdf = () => {
+    const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+    const byDept = new Map<string, { t: Task; job: Job }[]>();
+    for (const r of visible) { const k = (r.t.cat || "").trim() || "Uncategorised"; (byDept.get(k) ?? byDept.set(k, []).get(k)!).push(r); }
+    const today = new Date().toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric" });
+    const line = (t: Task) => `<li class="${escalated(t.esc) ? "esc" : "task"}${t.done ? " done" : ""}"><span class="meta">${escalated(t.esc) ? `<b class="lvl">▲ ${esc(t.esc)}</b> · ` : ""}${t.due ? `due ${esc(fmt(t.due))}` : "no date"}${t.who ? ` · ${esc(initials(t.who))}` : ""}</span><div class="txt">${esc(t.t)}${t.esc_why && escalated(t.esc) ? `<div class="why">Why: ${esc(t.esc_why)}</div>` : ""}</div></li>`;
+    const pages = [...byDept.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dept, items]) => {
+      const jobsIn = new Map<string, { job: Job; esc: Task[]; rest: Task[] }>();
+      for (const { t, job } of items) { const g = jobsIn.get(job.id) ?? jobsIn.set(job.id, { job, esc: [], rest: [] }).get(job.id)!; (escalated(t.esc) ? g.esc : g.rest).push(t); }
+      const escN = items.filter((r) => escalated(r.t.esc) && !r.t.done).length, openN = items.filter((r) => !r.t.done).length;
+      const jobsHtml = [...jobsIn.values()].sort((a, b) => (b.esc.length - a.esc.length) || jobNo(a.job.id).localeCompare(jobNo(b.job.id))).map(({ job, esc: e, rest }) => {
+        e.sort((a, b) => String(b.esc).localeCompare(String(a.esc)) || ((a.due || "9999") < (b.due || "9999") ? -1 : 1));
+        rest.sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : 1));
+        return `<section class="job"><h2>${esc(jobNo(job.id))} · ${esc(job.tag)} <span class="cust">${esc(job.cust)}${job.own ? ` · ${esc(job.own)}` : ""}${job.tdd ? ` · TDD ${esc(fmt(job.tdd))}` : ""}</span></h2>${e.length ? `<ul class="list">${e.map(line).join("")}</ul>` : ""}${rest.length ? `<ul class="list">${rest.map(line).join("")}</ul>` : ""}</section>`;
+      }).join("");
+      return `<div class="dept"><h1>${esc(dept)} <span class="sub">${openN} open task${openN === 1 ? "" : "s"} · ${escN} escalation${escN === 1 ? "" : "s"} · ${jobsIn.size} job${jobsIn.size === 1 ? "" : "s"}</span></h1>${jobsHtml}</div>`;
+    }).join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Nandan Tasking — by department — ${esc(today)}</title><style>
+@page { size: A4; margin: 14mm 14mm 16mm; }
+body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #16232F; font-size: 11pt; line-height: 1.4; margin: 0; }
+.dept { break-before: page; page-break-before: always; }
+.dept:first-child { break-before: auto; page-break-before: auto; }
+h1 { font-size: 18pt; margin: 0 0 8px; padding-bottom: 6px; border-bottom: 2px solid #16232F; }
+h1 .sub { font-size: 10pt; font-weight: 400; color: #5B6470; margin-left: 10px; }
+.job { break-inside: avoid; page-break-inside: avoid; margin: 10px 0 14px; }
+h2 { font-size: 12pt; margin: 0 0 4px; color: #1B3A5C; }
+h2 .cust { font-size: 9.5pt; font-weight: 400; color: #5B6470; }
+ul.list { list-style: none; margin: 0; padding: 0; }
+li { display: flex; gap: 10px; padding: 4px 8px; border-left: 4px solid #D9D6CD; margin: 0 0 4px; break-inside: avoid; }
+li.esc { border-left-color: #B3392E; background: #FBEDEA; }
+li.done { opacity: .55; text-decoration: line-through; }
+.meta { flex: 0 0 150px; font-size: 9.5pt; color: #5B6470; font-variant-numeric: tabular-nums; }
+.lvl { color: #B3392E; }
+.txt { flex: 1; white-space: pre-wrap; }
+.why { font-size: 9.5pt; color: #8A4520; margin-top: 2px; }
+.foot { position: fixed; bottom: 0; left: 0; right: 0; font-size: 8.5pt; color: #8B8F87; text-align: right; }
+</style></head><body>${pages || "<p>No tasks match the filters.</p>"}<div class="foot">Nandan Tasking · by department · ${esc(today)} · ${visible.filter((r) => !r.t.done).length} open tasks</div><script>window.addEventListener("load",()=>setTimeout(()=>window.print(),300))</script></body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { alert("The browser blocked the new tab — allow pop-ups for genie.nandan.co.in and try again."); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+  };
+
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <button onClick={printPdf} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: "var(--navy)", color: "#fff" }}
+          title="Exactly what is on this screen — one department a page, each job once, its escalations first, then its tasks — as a PDF through the browser's Save as PDF">⬇ Download as PDF</button>
+      </div>
       {view === "esc" && hiddenCount > 0 && (
         <div className="text-xs" style={{ color: "var(--muted)" }}>{hiddenCount} open task{hiddenCount === 1 ? "" : "s"} with no escalation are hidden in this view.</div>
       )}
