@@ -40,7 +40,7 @@ const dmy = (d: string) => `${d.slice(8, 10)}-${d.slice(5, 7)}-${d.slice(0, 4)}`
 
 async function guard() {
   const me = await requireSaamaan();
-  if (!me.isOwner && !SUPPLIER_HANDS.has(me.email.toLowerCase())) throw new HttpError(403, "Supplier payment release is Mukesh's.");
+  if (!me.isOwner && !SUPPLIER_HANDS.has(me.email.toLowerCase())) throw new HttpError(403, "Supplier payment release is the purchase team's.");
   return me;
 }
 

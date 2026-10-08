@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.66",
+    date: "2026-10-08",
+    module: "Supplier Payment Release: the total on top, week by week, open until accounts take it into plan; the purchase team can raise it",
+    items: [
+      "THE TOTAL, AND BY WEEK (\u201cwhatever the amount is, should show a total at the top so that we at least know the nature of it \u2026 week-wise: week 41, this much\u201d). The release screen opens with the open total \u2014 asked for, not yet taken into plan \u2014 how many requests, how much is wanted before today (red), and a chip per ISO week of the wanted-by date with its amount and count.",
+      "CLOSED BY ACCOUNTS, ONCE (\u201cThis should be closed by Suresh or accounts when they take it into plan. It should leave from here so that it doesn\u2019t get double-counted. It should be showing in the 13-week cash flow plan regardless\u201d). A release is open while its Kuber plan row still says planned; when accounts approve, pay or drop it in Kuber it is closed here \u2014 out of the totals, kept at the foot of the list with its fate \u2014 and stays in the cash plan, where it has been since it was raised. Nothing is counted twice.",
+      "THE PURCHASE TEAM (\u201cthe people in the purchase team can be available for doing the supplier payment release\u201d). Mukesh, Pradip, Akshay and Shailaja \u2014 the purchase hands \u2014 see the Supplier desk\u2019s release, report card, outstanding and plan tabs and may raise a release; one list of names (saamaan-hands.ts) now drives all of it.",
+    ],
+  },
+  {
     v: "6.3.0.65",
     date: "2026-10-08",
     module: "Email Marketing: the results strip with filters; the queue follows the list; Read; the cron counter counts everything",

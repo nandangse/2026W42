@@ -13,6 +13,20 @@ import { Btn, Note, INK, MUTED, BORDER, NAVY, GREEN, AMBER, useLoad } from "@/co
 const inr = (n: number | null | undefined) => (n === null || n === undefined ? "·" : Math.abs(n) >= 1e5 ? `₹${(n / 1e5).toFixed(2)} L` : `₹${Math.round(n).toLocaleString("en-IN")}`);
 const dmy = (d: string | null | undefined) => (d ? `${d.slice(8, 10)}-${d.slice(5, 7)}-${d.slice(0, 4)}` : "·");
 const istDay = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+/** ISO week number and its Monday, for "week 41 — this much" (Dr Raghu, 8 Oct 2026) */
+const isoWeekOf = (d: string): { wk: number; monday: string } => {
+  const t = new Date(`${d}T00:00:00Z`); const dow = (t.getUTCDay() + 6) % 7;
+  const monday = new Date(t.getTime() - dow * 86400000);
+  const thu = new Date(monday.getTime() + 3 * 86400000);
+  const y0 = new Date(Date.UTC(thu.getUTCFullYear(), 0, 1));
+  return { wk: Math.ceil(((thu.getTime() - y0.getTime()) / 86400000 + 1) / 7), monday: monday.toISOString().slice(0, 10) };
+};
+/* OPEN OR CLOSED (Dr Raghu, 8 Oct 2026: "This should be closed by Suresh or accounts when they take it
+   into plan. It should leave from here so that it doesn't get double-counted. It should be showing in
+   the 13-week cash flow plan regardless"). A release is OPEN while its Kuber plan row still says
+   "planned"; the moment accounts approve, pay or drop it in Kuber it is closed here — gone from the
+   totals, kept in the closed list — and lives on in the cash plan, where it was all along. */
+const isOpen = (r: { kuber: { status: string } | null }) => !r.kuber || r.kuber.status === "planned";
 
 interface Release { id: string; supplier: string; kind: string; amount: number; bill_refs: string; remarks: string; wanted_on: string | null; files: { name: string; path: string; size: number }[]; mail: string; by_email: string; at: string; kuber: { status: string; paid_on: string | null } | null }
 
@@ -78,7 +92,35 @@ export function PaymentRelease() {
       </div>
       {msg && <Note kind={msg.ok ? "info" : "warn"}>{msg.text}</Note>}
       {err && <Note kind="error">{err}</Note>}
-      <GenieTable<Release> rows={list ? list.rows : null} minWidth={1000} empty="No release raised yet."
+      {/* THE TOTAL ON TOP, AND BY WEEK (Dr Raghu, 8 Oct 2026: "whatever the amount is, should show a total at the top so that we at
+          least know the nature of it … if it is wanted by date, it should also showcase week-wise: week 41, this much") */}
+      {list && list.rows.length > 0 && (() => {
+        const open = list.rows.filter(isOpen), closed = list.rows.filter((r) => !isOpen(r));
+        const total = open.reduce((a, r) => a + Number(r.amount || 0), 0);
+        const today = istDay();
+        const overdue = open.filter((r) => r.wanted_on && r.wanted_on < today).reduce((a, r) => a + Number(r.amount || 0), 0);
+        const byWeek = new Map<string, { wk: number; monday: string; amount: number; n: number }>();
+        for (const r of open) { const d = r.wanted_on || today; const w = isoWeekOf(d); const g = byWeek.get(w.monday) ?? byWeek.set(w.monday, { ...w, amount: 0, n: 0 }).get(w.monday)!; g.amount += Number(r.amount || 0); g.n++; }
+        const weeks = [...byWeek.values()].sort((a, b) => a.monday.localeCompare(b.monday));
+        return (
+          <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: BORDER }}>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div><div className="text-xs font-bold" style={{ color: MUTED, letterSpacing: .5 }}>OPEN — ASKED, NOT YET TAKEN INTO PLAN</div><div className="tnum font-bold" style={{ fontSize: 24, color: INK }}>{inr(total)}</div><div className="text-xs" style={{ color: MUTED }}>{open.length} request{open.length === 1 ? "" : "s"}{overdue ? <> · <b style={{ color: "var(--red, #8E2C20)" }}>{inr(overdue)} wanted before today</b></> : ""}</div></div>
+              <div className="flex gap-2 flex-wrap">
+                {weeks.map((w) => (
+                  <div key={w.monday} className="rounded border px-2.5 py-1.5" style={{ borderColor: w.monday < isoWeekOf(today).monday ? "var(--red, #8E2C20)" : BORDER, background: "#FBFAF7" }}>
+                    <div className="text-xs" style={{ color: MUTED }}>week {w.wk} · {dmy(w.monday).slice(0, 5)}</div>
+                    <div className="tnum font-bold" style={{ color: INK }}>{inr(w.amount)}</div>
+                    <div className="text-xs" style={{ color: MUTED }}>{w.n} request{w.n === 1 ? "" : "s"}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="ml-auto text-xs" style={{ color: MUTED, maxWidth: 320 }}>Closed by accounts in Kuber (approved, paid or dropped): <b>{closed.length}</b>, {inr(closed.reduce((a, r) => a + Number(r.amount || 0), 0))} — out of these totals, still in the cash plan.</div>
+            </div>
+          </div>
+        );
+      })()}
+      <GenieTable<Release> rows={list ? [...list.rows].sort((a, b) => Number(isOpen(b)) - Number(isOpen(a)) || b.at.localeCompare(a.at)) : null} minWidth={1000} empty="No release raised yet."
         search={(r, q) => `${r.supplier} ${r.bill_refs} ${r.remarks}`.toLowerCase().includes(q)} searchPlaceholder="🔍 supplier, bill, remark"
         columns={[
           { key: "at", label: "Date", align: "left", sort: (r) => r.at, render: (r) => <span className="tnum">{dmy(r.at.slice(0, 10))}</span> },
@@ -89,6 +131,7 @@ export function PaymentRelease() {
           { key: "w", label: "Wanted by", align: "left", sort: (r) => r.wanted_on ?? "", render: (r) => <span className="tnum">{dmy(r.wanted_on)}</span> },
           { key: "r", label: "Remarks", align: "left", render: (r) => <span className="text-xs" style={{ color: MUTED }}>{r.remarks || "·"}</span> },
           { key: "f", label: "Files", align: "left", render: (r) => <span className="text-xs">{r.files.length ? r.files.map((x) => <a key={x.path} href={`/api/saamaan/payment-release?file=${encodeURIComponent(x.path)}`} target="_blank" rel="noreferrer" style={{ color: NAVY, marginRight: 6 }}>{x.name}</a>) : "·"}</span> },
+          { key: "st", label: "Here", align: "left", sort: (r) => (isOpen(r) ? "0" : "1"), render: (r) => <b className="text-xs" style={{ color: isOpen(r) ? AMBER : MUTED }}>{isOpen(r) ? "open — with accounts" : `closed · ${r.kuber?.status === "paid" ? `paid ${dmy(r.kuber.paid_on)}` : r.kuber?.status === "approved" ? "taken into plan" : r.kuber?.status}`}</b> },
           { key: "kb", label: "In Kuber", align: "left", sort: (r) => r.kuber?.status ?? "", render: (r) => <b className="text-xs" style={{ color: r.kuber?.status === "paid" ? GREEN : r.kuber?.status === "approved" ? NAVY : AMBER }}>{r.kuber ? (r.kuber.status === "planned" ? "awaiting approval" : r.kuber.status === "paid" ? `paid ${dmy(r.kuber.paid_on)}` : r.kuber.status) : "·"}</b> },
           { key: "m", label: "Mail", align: "left", render: (r) => <span className="text-xs" style={{ color: /^not sent/.test(r.mail) ? AMBER : MUTED }}>{r.mail || "·"}</span> },
         ]} />

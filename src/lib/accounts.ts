@@ -28,7 +28,10 @@ export const requireKuber = moduleDoor("accounts_access", "Kuber");
  * read in Saamaan → Suppliers. Everything else behind Kuber's door stays
  * behind it. One name, here, so adding a second is one line.
  */
-export const SUPPLIER_HANDS = new Set(["mukesh@nandan.co.in"]);
+/* THE PURCHASE TEAM, NOT ONE MAN (Dr Raghu, 8 Oct 2026: "the people in the purchase team can be available
+   for doing the supplier payment release"). The names are PURCHASE_HANDS in saamaan-hands.ts — one list. */
+import { PURCHASE_HANDS } from "@/lib/saamaan-hands";
+export const SUPPLIER_HANDS = new Set(PURCHASE_HANDS.map((p) => p.email.toLowerCase()));
 export const isSupplierHand = (u: AuthedUser) => u.isOwner || SUPPLIER_HANDS.has(u.email.toLowerCase());
 
 /** Kuber's door, or — for what `sideDoor` says is a supplier's view — the Saamaan tick held by a supplier hand. */

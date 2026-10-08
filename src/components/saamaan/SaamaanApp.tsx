@@ -29,6 +29,7 @@ import Wip from "./Wip";
 import Mrp, { MrpRun } from "./Mrp";
 import Kanban from "./Kanban";
 import SupplierDesk from "./SupplierDesk";
+import { PURCHASE_HANDS } from "@/lib/saamaan-hands";
 import Kitting from "./Kitting";
 import Slips from "./Slips";
 import PurchaseOrders from "./PurchaseOrders";
@@ -108,7 +109,7 @@ export default function SaamaanApp({
       case "slips": return <Slips />;
       case "po": return <PurchaseOrders erpBase={summary.erpBase} />;
       /* Mukesh's desk: the supplier list for everyone; report card, outstanding and the payment plan for the supplier hand (3 Oct 2026) */
-      case "suppliers": return <SupplierDesk erpBase={summary.erpBase} canKuber={isOwner || email.toLowerCase() === "mukesh@nandan.co.in"} />;
+      case "suppliers": return <SupplierDesk erpBase={summary.erpBase} canKuber={isOwner || PURCHASE_HANDS.some((p) => p.email.toLowerCase() === email.toLowerCase())} />;
       case "grn": return <PurchaseOrders erpBase={summary.erpBase} openOn="grn" />;
       case "pinv": return <PurchaseOrders erpBase={summary.erpBase} openOn="pinv" />;
       case "inventory": return <Inventory summary={summary} email={email} isOwner={isOwner} />;
