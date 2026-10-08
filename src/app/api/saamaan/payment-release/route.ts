@@ -137,14 +137,19 @@ export async function POST(req: Request) {
     let mail = "";
     try {
       const { mailboxByAddress, accessTokenFor, gmailSendMixed, gmailSend } = await import("@/crm/gmail");
-      let box = await mailboxByAddress(PURCHASE);
-      let replyTo: string | null = null;
-      if (!box) { box = await mailboxByAddress(me.email); replyTo = PURCHASE; }
-      if (!box) throw new Error(`neither ${PURCHASE} nor ${me.email} has a Gmail connected in Genie`);
+      /* FROM THE PERSON WHO RAISED IT (Dr Raghu, 8 Oct 2026: "While sending the mail, it has to go with
+         their personal genie login mail ID"): Mukesh's release goes from mukesh@, Pradip's from pradipp@,
+         each through whichever Google account they authorised; purchase@ is copied so the team sees it.
+         Only when the person has no Gmail connected does it fall back to purchase@'s own mailbox. */
+      let box = await mailboxByAddress(me.email);
+      let fromName = (me as { displayName?: string | null }).displayName || me.email.split("@")[0];
+      let cc: string | undefined = PURCHASE;
+      if (!box) { box = await mailboxByAddress(PURCHASE); fromName = "Nandan Purchase"; cc = undefined; }
+      if (!box) throw new Error(`neither ${me.email} nor ${PURCHASE} has a Gmail connected in Genie — Profile → ✉ Connect Gmail`);
       const token = await accessTokenFor(String(box.id));
-      if (stored.length) await gmailSendMixed(token, String(box.email_address), ACCOUNTS, title, html, stored.map((f) => ({ name: f.name, mime: f.mime, base64: f.base64 })), undefined, undefined, "Nandan Purchase", replyTo);
-      else await gmailSend(token, String(box.email_address), ACCOUNTS, title, html, undefined, undefined, "Nandan Purchase", undefined, null, replyTo);
-      mail = replyTo ? `sent from ${box.email_address} (purchase@ is not connected yet), answers to purchase@` : `sent from ${PURCHASE}`;
+      if (stored.length) await gmailSendMixed(token, String(box.email_address), ACCOUNTS, title, html, stored.map((f) => ({ name: f.name, mime: f.mime, base64: f.base64 })), cc, undefined, fromName, PURCHASE);
+      else await gmailSend(token, String(box.email_address), ACCOUNTS, title, html, cc, undefined, fromName, undefined, null, PURCHASE);
+      mail = `sent from ${box.email_address}${cc ? `, cc ${PURCHASE}` : " (the raiser has no Gmail connected)"}, answers to ${PURCHASE}`;
     } catch (e) {
       mail = `not sent — ${e instanceof Error ? e.message : String(e)}`;
     }

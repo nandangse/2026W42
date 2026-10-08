@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.70",
+    date: "2026-10-08",
+    module: "Supplier payment release mails from the person who raised it",
+    items: [
+      "FROM MUKESH, NOT FROM A BOX (\u201cWhile sending the mail, it has to go with their personal genie login mail ID\u201d). The release to accounts@ now goes from the raiser\u2019s own connected address \u2014 mukesh@, pradipp@, akshayp@, shailaja@ \u2014 with their name on it, purchase@ in copy and as the reply address; purchase@\u2019s own mailbox is the fallback only when the raiser has none connected.",
+    ],
+  },
+  {
     v: "6.3.0.69",
     date: "2026-10-08",
     module: "A connected Gmail sends as the person\u2019s own address, whatever Google account authorised it",
