@@ -35,18 +35,24 @@ export function oauthConfigured(): boolean {
 const stateSecret = () => process.env.CRM_SUPABASE_SERVICE_KEY || "no-secret";
 
 /** A signed, expiring state so the callback trusts only our own launches. */
-export function signState(profileId: string): string {
+/** the state carries the profile and, since 8 Oct 2026, where to go back to (a Genie path) once connected */
+export function signState(profileId: string, back = ""): string {
   const exp = Date.now() + 10 * 60 * 1000;
-  const body = `${profileId}|${exp}`;
+  const body = `${profileId}|${exp}|${encodeURIComponent(back)}`;
   const sig = createHmac("sha256", stateSecret()).update(body).digest("hex");
   return Buffer.from(`${body}|${sig}`).toString("base64url");
 }
+export function stateBack(state: string): string {
+  try { const parts = Buffer.from(state, "base64url").toString().split("|"); return parts.length === 4 ? decodeURIComponent(parts[2]) : ""; } catch { return ""; }
+}
 export function verifyState(state: string): string | null {
   try {
-    const [profileId, exp, sig] = Buffer.from(state, "base64url").toString().split("|");
+    const parts = Buffer.from(state, "base64url").toString().split("|");
+    const [profileId, exp] = parts; const sig = parts[parts.length - 1];
     if (Number(exp) < Date.now()) return null;
-    const want = createHmac("sha256", stateSecret()).update(`${profileId}|${exp}`).digest("hex");
-    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
+    const body = parts.length === 4 ? `${profileId}|${exp}|${parts[2]}` : `${profileId}|${exp}`;
+    const want = createHmac("sha256", stateSecret()).update(body).digest("hex");
+    if (sig.length !== want.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
     return profileId;
   } catch { return null; }
 }

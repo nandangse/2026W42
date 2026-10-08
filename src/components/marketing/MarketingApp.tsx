@@ -843,7 +843,14 @@ function Channels({ seesAll }: { seesAll: boolean }) {
       <GenieTable<Channel> rows={rows} minWidth={760} empty="No channel yet."
         columns={[
           { key: "email", label: "From", render: (r) => <span><b>{r.email}</b>{r.label ? <span className="text-xs" style={{ color: MUTED }}> · {r.label}</span> : null}{replyToReady && <span className="text-xs block" style={{ color: MUTED }}>replies → {r.reply_to || "sales@nandan.co.in"}</span>}</span> },
-          { key: "kind", label: "API", render: (r) => r.kind === "gmail" ? `Gmail · ${r.gmail || "not connected"}` : r.kind === "mailercloud" ? `Mailercloud · ${r.api_key ? "key set" : "NO KEY"}` : `Resend · ${r.api_key ? "own key" : r.resendKeyOnDeploy ? "deploy key" : "NO KEY"}` },
+          { key: "kind", label: "API", render: (r) => r.kind === "gmail"
+              ? <span className="flex items-center gap-2">Gmail · {r.gmail || "not connected"}
+                  {/* CONNECT FROM HERE (Dr Raghu, 8 Oct 2026: "Put a button next to this only to connect to Gmail") — sign in to
+                      Google AS THIS ADDRESS when asked; the connection lands on this row and the flow comes back here */}
+                  {!r.gmail && <a href={`/api/crm/gmail/connect?back=${encodeURIComponent("/marketing#channels")}`} className="text-xs font-bold rounded px-2 py-0.5" style={{ background: "var(--blue)", color: "#fff", textDecoration: "none" }}
+                    title={`Opens Google's sign-in — sign in as ${r.email} and allow Gmail. The connection then shows on this row.`}>✉ Connect Gmail</a>}
+                </span>
+              : r.kind === "mailercloud" ? `Mailercloud · ${r.api_key ? "key set" : "NO KEY"}` : `Resend · ${r.api_key ? "own key" : r.resendKeyOnDeploy ? "deploy key" : "NO KEY"}` },
           { key: "h", label: "/hour", align: "right", render: (r) => <span className="tnum">{r.sent_this_hour} / {r.hourly_limit}</span> },
           { key: "d", label: "/day", align: "right", render: (r) => <span className="tnum">{r.sent_today} / {r.daily_limit}</span> },
           { key: "active", label: "Active", render: (r) => (r.active ? "✓" : "off") },

@@ -30,8 +30,10 @@ export async function GET(req: Request) {
       .select("oauth_available").eq("id", user.id).maybeSingle();
     if (!p?.oauth_available)
       throw new HttpError(403, "Gmail connection is not enabled for you yet — an admin marks ✉ OAuth on your account first.");
-    const origin = new URL(req.url).origin;
-    return NextResponse.redirect(authUrl(origin, signState(profileId)));
+    const u = new URL(req.url);
+    // ?back=/marketing — the Sending Channels table's own connect button comes back to itself (8 Oct 2026)
+    const back = String(u.searchParams.get("back") || "");
+    return NextResponse.redirect(authUrl(u.origin, signState(profileId, /^\/[a-z0-9/_-]*(\?[^#]*)?(#.*)?$/i.test(back) ? back : "")));
   } catch (e) {
     return errJson(e);
   }

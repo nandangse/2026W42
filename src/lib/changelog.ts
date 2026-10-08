@@ -89,6 +89,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.56",
+    date: "2026-10-08",
+    module: "Marketing: Connect Gmail from the Sending Channels row",
+    items: [
+      "CONNECT FROM THE ROW (\u201cPut a button next to this only to connect to Gmail, please\u201d). A Gmail channel that is not connected carries a \u2709 Connect Gmail button: Google\u2019s sign-in opens, you sign in AS THAT ADDRESS and allow Gmail, and the flow comes back to the channels table with the row reading active. A configured Sending Channel outside @nandan.co.in (nimesh@fabrometals.com) is accepted; a stray personal Gmail still is not.",
+    ],
+  },
+  {
     v: "6.3.0.55",
     date: "2026-10-08",
     module: "WhatsApp message: attendance, amount credited, the account it went to, where the slip was mailed",

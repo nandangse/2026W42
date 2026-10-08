@@ -3,7 +3,7 @@ import { errJson, HttpError } from "@/lib/auth";
 import { requireCrm } from "@/crm/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { crmDb } from "@/crm/db";
-import { exchangeCode, gmailGet, verifyState } from "@/crm/gmail";
+import { exchangeCode, gmailGet, verifyState, stateBack } from "@/crm/gmail";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +27,15 @@ export async function GET(req: Request) {
 
     const gp = await gmailGet(tok.access_token, "profile");
     const email = String(gp.emailAddress ?? "").toLowerCase();
-    if (!email.endsWith("@nandan.co.in"))
-      throw new HttpError(400, `${email} is not an @nandan.co.in mailbox. Company mail only.`);
-
     const db = crmDb();
+    /* COMPANY MAIL ONLY — unless the address is a configured Sending Channel (Dr Raghu, 8 Oct
+       2026: "Put a button next to this only to connect to Gmail" on nimesh@fabrometals.com).
+       A channel somebody has deliberately added to Marketing is spoken for; a random personal
+       Gmail still is not. */
+    if (!email.endsWith("@nandan.co.in")) {
+      const { data: ch } = await db.from("mk_channel").select("id").eq("kind", "gmail").ilike("email", email).maybeSingle();
+      if (!ch) throw new HttpError(400, `${email} is not an @nandan.co.in mailbox, nor a Sending Channel set up in Marketing. Company mail only.`);
+    }
     const { data: existing } = await db.from("mailbox").select("id").eq("email_address", email).maybeSingle();
     if (existing) {
       const { error } = await db.rpc("rotate_mailbox_credential", { p_mailbox_id: existing.id, p_secret: tok.refresh_token });
@@ -50,7 +55,8 @@ export async function GET(req: Request) {
       if (error) throw new HttpError(500, error.message);
     }
     await adminClient().from("profiles").update({ oauth_connected_at: new Date().toISOString() }).eq("id", user.id);
-    return NextResponse.redirect(`${u.origin}/crm?gmail=connected`);
+    const back = state ? stateBack(state) : "";
+    return NextResponse.redirect(`${u.origin}${back || "/crm?gmail=connected"}`);
   } catch (e) {
     return errJson(e);
   }
