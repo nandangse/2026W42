@@ -1,3 +1,4 @@
+import { sessionSecret } from "@/lib/session-secret";
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { adminClient } from "@/lib/supabase/admin";
@@ -50,7 +51,7 @@ export const isKindleAdmin = (k: Pick<Kindler, "roles" | "is_admin">) =>
 export const isKindleTreasurer = (k: Pick<Kindler, "roles" | "is_admin">) => isKindleAdmin(k) || k.roles.includes("treasurer");
 
 /* ----------------------------------------------------------- passwords */
-const secret = () => String(process.env.SUPABASE_SERVICE_ROLE_KEY || "genie");
+const secret = () => sessionSecret();
 export const newSalt = () => randomBytes(16).toString("hex");
 export function hashPassword(pw: string, salt: string): string {
   return scryptSync(pw.normalize("NFKC"), salt, 32).toString("hex");

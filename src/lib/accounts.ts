@@ -41,7 +41,7 @@ export async function requireKuberOr(sideDoor: boolean): Promise<AuthedUser> {
   } catch (e) {
     if (!sideDoor || !(e instanceof HttpError) || e.status !== 403) throw e;
     const u = await currentUser();
-    if (!u || u.disabled) throw e;
+    if (!u || u.disabled || u.lmsOnly) throw e;
     if (!isSupplierHand(u)) throw e;
     if (!(await hasGrant(adminClient(), "material_access", u.email, u.isOwner))) throw e;
     return u;

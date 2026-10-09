@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { requireMarketing } from "@/lib/marketing";
 import { crmDb } from "@/crm/db";
+import { safeHtml } from "@/lib/safe-html";
 import { readBody } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +59,8 @@ export async function POST(req: Request) {
       const fields = (Array.isArray(b.form_fields) ? b.form_fields : ["name", "email", "phone", "company"]).map(String).filter((f) => FIELDS.has(f));
       const row = {
         slug, title: String(b.title || "").trim() || "Nandan GSE", headline: b.headline ?? null, subhead: b.subhead ?? null,
-        body_html: b.body_html ?? null, hero_url: b.hero_url ?? null, logo: b.logo !== false,
+        /* a public page on Genie's own origin: nothing that can run travels into it (audit S10) */
+        body_html: b.body_html ? safeHtml(b.body_html) : null, hero_url: b.hero_url ?? null, logo: b.logo !== false,
         theme: ["navy", "white", "orange"].includes(String(b.theme)) ? String(b.theme) : "navy",
         form_fields: fields.length ? fields : ["name", "email"], cta_label: String(b.cta_label || "Send").slice(0, 40),
         thank_you: b.thank_you ?? null, add_to_list_id: b.add_to_list_id || null, tag_name: String(b.tag_name || "Landing page").slice(0, 60),

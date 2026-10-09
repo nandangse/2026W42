@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncWatch } from "@/lib/sync-watch";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
+import { cronCaller } from "@/lib/cron-auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { beat } from "@/lib/cron-beat";
 import { isOn } from "@/lib/erp-hourly";
@@ -265,15 +266,8 @@ const unhtml = (v: unknown) => String(v ?? "")
 
 export async function GET(req: Request) {
   try {
-    const secret = process.env.CRON_SECRET;
-    const header = req.headers.get("authorization") || "";
-    const fromCron = !!secret && header === `Bearer ${secret}`;
-    if (!fromCron && req.headers.get("user-agent")?.includes("vercel-cron"))
-      await beat("crm-sync", "failed", { error: secret ? "cron call did not carry the CRON_SECRET" : "CRON_SECRET is not set on Vercel" });
-    if (!fromCron) {
-      const u = await currentUser();
-      if (!u || u.disabled) throw new HttpError(401, "The hourly cron, or a signed-in hand.");
-    }
+    /* the cron's secret, or the owner / Stratcom / the hands named (audit S12, 9 Oct 2026) */
+    const { fromCron } = await cronCaller(req, "crm-sync");
     await beat("crm-sync", "fired", { fromCron });
     if (!crmConfigured()) return NextResponse.json({ ok: false, note: "CRM not configured." });
     const db = crmDb();

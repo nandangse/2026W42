@@ -46,6 +46,7 @@ export async function mayUseMarketing(email: string, isOwner: boolean): Promise<
 export async function requireMarketing(): Promise<MarketingUser> {
   const u = await currentUser();
   if (!u || u.disabled) throw new HttpError(401, "Sign in first.");
+  if (u.lmsOnly) throw new HttpError(403, "This login opens the training library only.");
   const r = await resolveMarketing(u.email, u.isOwner);
   if (!r.ok) throw new HttpError(403, "Marketing is granted per person — the tick on Admin → Users.");
   return { ...u, marketingRole: r.role, scope: r.role === "member" ? "mine" : "all" };

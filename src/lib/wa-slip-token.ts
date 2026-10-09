@@ -1,8 +1,9 @@
-/** a two-hour, HMAC-signed token naming one person's slip on one month — the WhatsApp helper fetches with it, no login (7 Oct 2026) */
+/** a thirty-minute, HMAC-signed token naming one person's slip on one month — the WhatsApp helper fetches with it, no login (7 Oct 2026) */
+import { sessionSecret } from "@/lib/session-secret";
 import { createHmac, timingSafeEqual } from "node:crypto";
-const SECRET = () => process.env.SUPABASE_SERVICE_ROLE_KEY || "genie";
+const SECRET = () => sessionSecret();
 const sign = (s: string) => createHmac("sha256", SECRET()).update(s).digest("hex").slice(0, 32);
-export function makeToken(sheet: string, emp: string, hours = 2) {
+export function makeToken(sheet: string, emp: string, hours = 0.5) {
   const exp = Date.now() + hours * 3600 * 1000;
   const body = `${sheet}.${emp}.${exp}`;
   return `${body}.${sign(body)}`;

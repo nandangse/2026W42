@@ -19,7 +19,7 @@ const admin = createClient(url, key, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const DEFAULT_PW = process.env.SEED_PASSWORD || "nandan100";
+const DEFAULT_PW = process.env.SEED_PASSWORD || (() => { throw new Error("SEED_PASSWORD must be set — no default password (audit S15)"); })();
 
 // Spec §2 seeds: raghu + medhansh (admin), shweta (uploader). A planner is
 // added for day-one boards + acceptance testing.

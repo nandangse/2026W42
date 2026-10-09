@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
+import { cronCaller } from "@/lib/cron-auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { beat } from "@/lib/cron-beat";
 
@@ -29,12 +30,8 @@ export const maxDuration = 60;
  */
 export async function GET(req: Request) {
   try {
-    const secret = process.env.CRON_SECRET;
-    const fromCron = !!secret && (req.headers.get("authorization") || "") === `Bearer ${secret}`;
-    if (!fromCron) {
-      const u = await currentUser();
-      if (!u || u.disabled) throw new HttpError(401, "The daily cron, or a signed-in hand.");
-    }
+    /* the cron's secret, or the owner / Stratcom / the hands named (audit S12, 9 Oct 2026) */
+    const { fromCron } = await cronCaller(req, "fx");
     await beat("fx", "fired", { fromCron });
     if (!crmConfigured()) return NextResponse.json({ ok: false, note: "CRM not configured." });
     const db = crmDb();

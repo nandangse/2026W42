@@ -121,7 +121,7 @@ export async function GET() {
     return NextResponse.json({
       me: { ...k, must_change: !!meRow.data?.must_change, onboarded: !!meRow.data?.onboarded_at, admin: admins, treasurer: isKindleTreasurer(k) },
       members: members.map((m) => ({ ...m, last_login_at: admins ? m.last_login_at : undefined })),
-      family: (fam.data || []).filter((f) => admins || String(f.member_id) === k.id || true),
+      family: fam.data || [], /* every Kindler sees every family — the Directory shows them by design (1.0.0); the dead filter that said so twice is gone (audit S15) */
       settings, constitution: con.data || null,
       meetings: mtg.data || [], attendance: att.data || [], fines, tally, due, next, last, birthdays: bday, today: iso, participation,
     });

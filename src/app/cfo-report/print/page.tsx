@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
+import { resolveAccountsAccess } from "@/lib/accounts";
 import { cfoReportHtml } from "@/lib/cfo-report";
 import { cfoReportData, type CfoData } from "@/lib/cfo-report-data";
 
@@ -18,6 +19,10 @@ export default async function CfoReportPrint({ searchParams }: { searchParams: {
   const user = await currentUser();
   if (!user || user.disabled) {
     return <div style={{ padding: 40, fontFamily: "system-ui, sans-serif" }}><h1 style={{ fontSize: 20 }}>Sign in first.</h1></div>;
+  }
+  /* The same door as /api/cfo-report: the Kuber tick (audit S6, 9 Oct 2026). */
+  if (user.lmsOnly || !(await resolveAccountsAccess(adminClient(), user.email, user.isOwner))) {
+    return <div style={{ padding: 40, fontFamily: "system-ui, sans-serif" }}><h1 style={{ fontSize: 20 }}>Not allowed.</h1><p>The CFO report is behind Kuber&apos;s door — the tick on Admin → module access.</p></div>;
   }
   let data: CfoData | null = null;
   let when = "";

@@ -1,3 +1,4 @@
+import { safeQ } from "@/lib/safe-q";
 import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -344,7 +345,7 @@ export async function GET(req: Request) {
           .select("id, rbom_id, idx, item_code, item_name, item_group, qty, uom, rate, amount, description, bom_status, bom_remark, bom_no, is_sub_assembly, source_bom, added_by, added_at, updated_by, updated_at", { count: "exact" })
           .eq("rbom_id", rbomId);
         if (status !== null && status !== "") sel = sel.eq("bom_status", status);
-        if (q) sel = sel.or(`item_code.ilike.%${q}%,item_name.ilike.%${q}%,bom_remark.ilike.%${q}%,description.ilike.%${q}%`);
+        if (q) sel = sel.or(`item_code.ilike.%${safeQ(q)}%,item_name.ilike.%${safeQ(q)}%,bom_remark.ilike.%${safeQ(q)}%,description.ilike.%${safeQ(q)}%`);
         const r = await sel.order("idx").range(page * size, page * size + size - 1);
         if (r.error) throw r.error;
         const rows = (r.data ?? []) as unknown as Record<string, unknown>[];
@@ -429,7 +430,7 @@ export async function GET(req: Request) {
             .select("row_id, bom_id, idx, item_code, item_name, item_group, qty, uom, rate, amount, description, bom_status, bom_remark, bom_no, is_sub_assembly, erp_modified, erp_modified_by", { count: "exact" })
             .in("bom_id", scope);
           if (status !== null && status !== "") sel = sel.eq("bom_status", status);
-          if (q) sel = sel.or(`item_code.ilike.%${q}%,item_name.ilike.%${q}%,bom_remark.ilike.%${q}%,description.ilike.%${q}%`);
+          if (q) sel = sel.or(`item_code.ilike.%${safeQ(q)}%,item_name.ilike.%${safeQ(q)}%,bom_remark.ilike.%${safeQ(q)}%,description.ilike.%${safeQ(q)}%`);
           const r = await sel.order("bom_id").order("idx").range(page * size, page * size + size - 1);
           if (r.error) throw r.error;
           rows = (r.data ?? []) as unknown as Record<string, unknown>[];
@@ -496,7 +497,7 @@ export async function GET(req: Request) {
     let sel = admin.from("material_item").select(LIST_COLUMNS, { count: "exact" });
     if (!showDisabled) sel = sel.eq("disabled", false);
     if (groups.length) sel = sel.in("item_group", groups);
-    if (q) sel = sel.or(`item_code.ilike.%${q}%,item_name.ilike.%${q}%,description.ilike.%${q}%,drawing_no.ilike.%${q}%`);
+    if (q) sel = sel.or(`item_code.ilike.%${safeQ(q)}%,item_name.ilike.%${safeQ(q)}%,description.ilike.%${safeQ(q)}%,drawing_no.ilike.%${safeQ(q)}%`);
     const { data, error, count } = await sel.order("item_code").range(page * size, page * size + size - 1);
     if (error) {
       if (notInstalled(error.message)) return NextResponse.json({ installed: false, erpBase: base, rows: [], total: 0 });

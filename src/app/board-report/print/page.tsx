@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
+import { resolveAccountsAccess } from "@/lib/accounts";
 import { boardReportHtml } from "@/lib/board-report";
 import { boardData, type BoardData } from "@/lib/board-report-data";
 
@@ -19,6 +20,10 @@ export default async function BoardReportPrint({ searchParams }: { searchParams:
   const user = await currentUser();
   if (!user || user.disabled) {
     return <div style={{ padding: 40, fontFamily: "system-ui, sans-serif" }}><h1 style={{ fontSize: 20 }}>Sign in first.</h1></div>;
+  }
+  /* The same door as /api/board-report: the Kuber tick (audit S6, 9 Oct 2026). */
+  if (user.lmsOnly || !(await resolveAccountsAccess(adminClient(), user.email, user.isOwner))) {
+    return <div style={{ padding: 40, fontFamily: "system-ui, sans-serif" }}><h1 style={{ fontSize: 20 }}>Not allowed.</h1><p>The Board report is behind Kuber&apos;s door — the tick on Admin → module access.</p></div>;
   }
 
   let data: BoardData | null = null;

@@ -23,6 +23,15 @@ export interface AuthedUser {
   /** Their only door is the training library. See currentUser() for why it
    *  is written as a restriction rather than as eight permissions. */
   lmsOnly: boolean;
+  /**
+   * False when auth knows the person but profiles has no row for them — an
+   * account nobody on Admin → Users made. Such a login is also `disabled`,
+   * so every existing check already shuts it out; this only names why.
+   */
+  provisioned: boolean;
+  /** True when the profile read itself failed. Also `disabled`: a gate that
+   *  cannot read its list stays shut, it does not swing open (audit S2). */
+  lookupFailed: boolean;
 }
 
 /** Tiers, mirroring the SQL helpers in migration 0008. */
@@ -62,7 +71,7 @@ export async function currentUser(): Promise<AuthedUser | null> {
    * on a migration having been run.
    */
   const admin = adminClient();
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from("profiles")
     .select("role, disabled, email, initials, display_name, erp_owner, lc, stratcom, management")
     .eq("id", user.id)
@@ -74,13 +83,26 @@ export async function currentUser(): Promise<AuthedUser | null> {
     const { data } = await admin.from("profiles").select("lms_only").eq("id", user.id).maybeSingle();
     lmsOnly = !!data?.lms_only;
   }
-  const role = (profile?.role as Role) ?? "planner";
+  /**
+   * FAIL SHUT, NOT OPEN (9 Oct 2026, audit S2). Until today a profile read
+   * that errored, or a login with no profiles row at all, came back as role
+   * "planner" and not disabled — the most permissive answer, for the least
+   * known caller. Now: no row → viewer and disabled ("not provisioned");
+   * read failed → viewer and disabled ("try again"). requireUser() turns each
+   * into its own status; pages that only test `disabled` send them to login.
+   */
+  const lookupFailed = !!profileError;
+  const provisioned = !lookupFailed && !!profile;
+  const role: Role = provisioned ? ((profile?.role as Role) ?? "viewer") : "viewer";
   const email = (profile?.email || user.email || "").toLowerCase();
+  if (lookupFailed) console.error("[auth] profile read failed for", user.id, profileError?.message);
   return {
     id: user.id,
     email,
     role,
-    disabled: !!profile?.disabled,
+    disabled: !provisioned || !!profile?.disabled,
+    provisioned,
+    lookupFailed,
     initials: profile?.initials ?? null,
     displayName: profile?.display_name ?? null,
     erpOwner: profile?.erp_owner ?? null,
@@ -122,13 +144,51 @@ export class HttpError extends Error {
 export async function requireUser(): Promise<AuthedUser> {
   const u = await currentUser();
   if (!u) throw new HttpError(401, "Not signed in");
+  if (u.lookupFailed) throw new HttpError(503, "Could not read your account just now — try again.");
+  if (!u.provisioned) throw new HttpError(403, "This account has not been set up on Genie. Ask Dr Raghu.");
   if (u.disabled) throw new HttpError(403, "Account disabled");
   return u;
 }
 
+/**
+ * A LEARNER AND NOTHING ELSE, ENFORCED (9 Oct 2026, audit S3). The flag was
+ * checked by the module doors and the home page, but not by the role tiers
+ * below, so a training-only login that still carried a role reached the
+ * boards, the tasks and the files. requireUser() itself stays open to them
+ * — /api/lms and /api/me use it — and every tier above it shuts.
+ */
+export function denyLearner(u: AuthedUser): void {
+  if (u.lmsOnly) throw new HttpError(403, "This login opens the training library only.");
+}
+
 async function requireRole(...roles: Role[]): Promise<AuthedUser> {
   const u = await requireUser();
+  denyLearner(u);
   if (!roles.includes(u.role)) throw new HttpError(403, "Forbidden");
+  return u;
+}
+
+/**
+ * PLANNING IS A DOOR, AND THE API KNOWS IT TOO (9 Oct 2026, audit S1).
+ *
+ * The tick on Admin → module access (planning_access, 0161) sent a man
+ * without it to his own sheet — from the page. /api/board, the one payload
+ * every board reads, asked only for a reader role. Now it asks for the tick
+ * as well. The same two guards as the page: an owner always holds it, and a
+ * missing table (0161 not yet run) means Planning is open as it always was.
+ * Any OTHER failure reading the grant is a closed door, not an open one.
+ */
+export async function hasPlanningGrant(u: AuthedUser): Promise<boolean> {
+  if (u.isOwner) return true;
+  const { data, error } = await adminClient().from("planning_access")
+    .select("email").eq("email", u.email.toLowerCase()).maybeSingle();
+  if (error) return /does not exist|42P01|schema cache/i.test(String(error.message || ""));
+  return !!data;
+}
+
+export async function requirePlanning(): Promise<AuthedUser> {
+  const u = await requireReader();
+  if (!(await hasPlanningGrant(u))) throw new HttpError(403, "Planning is granted per person — the tick on Admin → module access.");
   return u;
 }
 
@@ -149,6 +209,7 @@ export const requireAdmin = () => requireRole("admin");
  */
 export async function requireLC(): Promise<AuthedUser> {
   const u = await requireUser();
+  denyLearner(u);
   if (!(u.isOwner || u.lc || u.stratcom))
     throw new HttpError(403, "Delivered Jobs is for the Leadership Circle.");
   return u;
@@ -162,6 +223,7 @@ export async function requireLC(): Promise<AuthedUser> {
  */
 export async function requireStratcom(): Promise<AuthedUser> {
   const u = await requireUser();
+  denyLearner(u);
   if (!(u.isOwner || u.stratcom))
     throw new HttpError(403, "Only Stratcom may change this.");
   return u;
@@ -179,6 +241,7 @@ export async function requireStratcom(): Promise<AuthedUser> {
  */
 export async function requireHrms(): Promise<AuthedUser> {
   const u = await requireUser();
+  denyLearner(u);
   const { resolveHrmsAccess } = await import("./hrms");
   if (!(await resolveHrmsAccess(adminClient(), u.email, u.isOwner)))
     throw new HttpError(403, "HRMS holds people records. Ask Dr Raghu for access.");
@@ -192,6 +255,14 @@ export const requireUploader = () => requireRole("uploader", "admin");
 export function errJson(e: unknown): NextResponse {
   if (e instanceof HttpError)
     return NextResponse.json({ error: e.message }, { status: e.status });
-  const msg = e instanceof Error ? e.message : "Internal error";
-  return NextResponse.json({ error: msg }, { status: 500 });
+  /* A database's own words (table names, column names, the shape of a
+     constraint) stay in the server log; the browser gets a sentence
+     (9 Oct 2026, audit S15). A missing-migration message is the one kind a
+     person at the screen can act on, so that one still travels. */
+  const raw = e instanceof Error ? e.message
+    : e && typeof e === "object" && "message" in e ? String((e as { message?: unknown }).message)
+    : String(e);
+  console.error("[api]", raw);
+  const actionable = /does not exist|schema cache|migration/i.test(raw);
+  return NextResponse.json({ error: actionable ? raw : "Something went wrong on the server. It has been logged." }, { status: 500 });
 }

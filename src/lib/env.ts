@@ -12,6 +12,7 @@ export const ENV_KEYS = {
   NEXT_PUBLIC_SUPABASE_URL: { required: true, feature: "Genie's database" },
   NEXT_PUBLIC_SUPABASE_ANON_KEY: { required: true, feature: "sign-in" },
   SUPABASE_SERVICE_ROLE_KEY: { required: true, feature: "every server-side read and write" },
+  SESSION_SECRET: { required: false, feature: "signing the IDP, Kindle, Portal and salary-slip logins (falls back to the service-role key; never to a fixed word)" },
   RAGHU_EMAIL: { required: false, feature: "the owner account (defaults to raghu@nandan.co.in)" },
   ANTHROPIC_API_KEY: { required: false, feature: "everything Genie writes with Claude" },
   CRM_SUPABASE_URL: { required: false, feature: "the CRM's own database" },

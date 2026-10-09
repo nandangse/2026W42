@@ -1,3 +1,4 @@
+import { safeQ } from "@/lib/safe-q";
 import { NextResponse } from "next/server";
 import { readBody } from "@/lib/validate";
 import { swallow } from "@/lib/swallow";
@@ -2463,7 +2464,7 @@ export async function GET(req: Request) {
     if (view === "vouchers") {
       const q = (url.searchParams.get("q") || "").trim();
       let query = admin.from("kuber_voucher").select("id, date, vtype, vno, party, narration").order("date", { ascending: false }).limit(500);
-      if (q) query = query.or(`party.ilike.%${q}%,narration.ilike.%${q}%,vno.ilike.%${q}%,vtype.ilike.%${q}%`);
+      if (q) query = query.or(`party.ilike.%${safeQ(q)}%,narration.ilike.%${safeQ(q)}%,vno.ilike.%${safeQ(q)}%,vtype.ilike.%${safeQ(q)}%`);
       const { data, error } = await query;
       if (error) return NextResponse.json({ rows: [] });
       return NextResponse.json({ rows: data || [] });

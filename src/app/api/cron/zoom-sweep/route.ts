@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
+import { cronCaller } from "@/lib/cron-auth";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { zoomConfig, zoomGet, ingestMeeting, attachRecording, attachSummary, uuidPath } from "@/lib/zoom";
 import { beat } from "@/lib/cron-beat";
@@ -31,16 +32,8 @@ export const maxDuration = 300;
  */
 export async function GET(req: Request) {
   try {
-    const secret = process.env.CRON_SECRET;
-    const fromCron = !!secret && (req.headers.get("authorization") || "") === `Bearer ${secret}`;
-    // beat BEFORE the door: a cron that fires and is refused must show as
-    // exactly that (4 Sep 2026 -- this is how CRON_SECRET's absence was found)
-    if (!fromCron && req.headers.get("user-agent")?.includes("vercel-cron"))
-      await beat("zoom-sweep", "failed", { error: secret ? "cron call did not carry the CRON_SECRET" : "CRON_SECRET is not set on Vercel" });
-    if (!fromCron) {
-      const u = await currentUser();
-      if (!u || u.disabled || !u.isOwner) throw new HttpError(401, "The hourly cron, or Raghu.");
-    }
+    /* the cron's secret, or the owner / Stratcom / the hands named (audit S12, 9 Oct 2026) */
+    const { fromCron } = await cronCaller(req, "zoom-sweep", { ownerOnly: true });
     await beat("zoom-sweep", "fired", { fromCron });
     /* NOT SET UP IS NOT THE SAME AS BROKEN. These used to return without a
        heartbeat, so twenty-six passes showed as "fired, never finished" —

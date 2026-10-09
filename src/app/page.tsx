@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { currentUser, RAGHU_EMAIL } from "@/lib/auth";
+import { currentUser, hasPlanningGrant, RAGHU_EMAIL } from "@/lib/auth";
 import { resolveSaamaanAccess } from "@/lib/saamaan";
 import { mayUsePlanning } from "@/lib/planning-door";
 import PlanningSuite from "@/components/PlanningSuite";
@@ -35,6 +35,8 @@ export default async function Home() {
         return <LabourHome email={user.email} displayName={user.displayName} initials={user.initials} role={user.role} />;
     } catch { /* no HRMS yet: the suite */ }
   }
+  /* A learner's only door is the library (audit S3) */
+  if (user.lmsOnly) redirect("/lms");
 
   /**
    * PLANNING IS A DOOR — AND ITS OWN WORLD (Dr Raghu, 8 Sep 2026: "in this

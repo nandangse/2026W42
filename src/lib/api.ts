@@ -7,8 +7,12 @@ async function jsonOrThrow(res: Response) {
   const ct = res.headers.get("content-type") || "";
   const body = ct.includes("application/json") ? await res.json() : await res.text();
   if (!res.ok) {
-    const msg = typeof body === "object" && body?.error ? body.error : String(body);
-    throw new Error(msg || `HTTP ${res.status}`);
+    /* Never "[object Object]" on a screen (audit D2, 9 Oct 2026): a JSON body
+       with an empty `error` used to fall through to String(body). */
+    const msg = typeof body === "object" && body !== null
+      ? String(body.error || body.message || "")
+      : String(body || "");
+    throw new Error(msg.trim() || `HTTP ${res.status}`);
   }
   return body;
 }

@@ -1,3 +1,4 @@
+import { safeQ } from "@/lib/safe-q";
 import { NextResponse } from "next/server";
 import { readBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
@@ -93,7 +94,7 @@ export async function GET(req: Request) {
 
     if (u.searchParams.get("suppliers")) {
       let sel = admin.from("material_supplier").select("name, supplier_name, supplier_group, supplier_type, gst_no, country, mobile_no, email_id, primary_address, primary_contact, status_of_supplier, rating_percentage, disabled, on_hold, erp_modified").order("supplier_name").limit(3000);
-      if (q) sel = sel.or(`name.ilike.%${q}%,supplier_name.ilike.%${q}%,gst_no.ilike.%${q}%,email_id.ilike.%${q}%,supplier_group.ilike.%${q}%`);
+      if (q) sel = sel.or(`name.ilike.%${safeQ(q)}%,supplier_name.ilike.%${safeQ(q)}%,gst_no.ilike.%${safeQ(q)}%,email_id.ilike.%${safeQ(q)}%,supplier_group.ilike.%${safeQ(q)}%`);
       const { data, error } = await sel;
       if (error) { if (missing(error.message)) return NextResponse.json({ installed: false, rows: [] }); throw new Error(error.message); }
       // how many POs and how much per supplier, from the mirror
@@ -127,7 +128,7 @@ export async function GET(req: Request) {
       if (vstat) v = v.eq("status", vstat);
       if (vfrom) v = v.gte("posting_date", vfrom);
       if (vto) v = v.lte("posting_date", vto);
-      if (q) v = v.or(`name.ilike.%${q}%,supplier_name.ilike.%${q}%,bill_no.ilike.%${q}%,project.ilike.%${q}%`);
+      if (q) v = v.or(`name.ilike.%${safeQ(q)}%,supplier_name.ilike.%${safeQ(q)}%,bill_no.ilike.%${safeQ(q)}%,project.ilike.%${safeQ(q)}%`);
       const { data: rows, count, error: ve } = await v;
       if (ve) { if (missing(ve.message)) return NextResponse.json({ installed: false, rows: [], total: 0 }); throw new Error(ve.message); }
       /* the statuses actually present, so the filter offers only real ones */
@@ -157,7 +158,7 @@ export async function GET(req: Request) {
       if (gproj) g = g.eq("project", gproj);
       if (gfrom) g = g.gte("posting_date", gfrom);
       if (gto) g = g.lte("posting_date", gto);
-      if (q) g = g.or(`name.ilike.%${q}%,supplier_name.ilike.%${q}%,project.ilike.%${q}%,set_warehouse.ilike.%${q}%`);
+      if (q) g = g.or(`name.ilike.%${safeQ(q)}%,supplier_name.ilike.%${safeQ(q)}%,project.ilike.%${safeQ(q)}%,set_warehouse.ilike.%${safeQ(q)}%`);
       const { data: rows, count, error: ge } = await g;
       if (ge) { if (missing(ge.message)) return NextResponse.json({ installed: false, rows: [], total: 0 }); throw new Error(ge.message); }
       /* what was refused, per GRN — the figure a receipt exists to carry */
@@ -198,7 +199,7 @@ export async function GET(req: Request) {
     if (supplier) sel = sel.eq("supplier", supplier);
     if (from) sel = sel.gte("transaction_date", from);
     if (to) sel = sel.lte("transaction_date", to);
-    if (q) sel = sel.or(`name.ilike.%${q}%,supplier_name.ilike.%${q}%,project.ilike.%${q}%`);
+    if (q) sel = sel.or(`name.ilike.%${safeQ(q)}%,supplier_name.ilike.%${safeQ(q)}%,project.ilike.%${safeQ(q)}%`);
     const { data, error, count } = await sel;
     if (error) { if (missing(error.message)) return NextResponse.json({ installed: false, rows: [], total: 0, statuses: {} }); throw new Error(error.message); }
     // the status spread and the cursor, for the header

@@ -42,6 +42,8 @@ export async function POST(req: Request) {
       const email = String(body.email || "").trim().toLowerCase();
       const password = String(body.password || "");
       if (!email || !password) throw new HttpError(400, "E-mail and password, please.");
+      /* five wrong tries in fifteen minutes locks the address — the /idp and portal rule, here too (audit S13, 9 Oct 2026) */
+      if (await tooManyTries(email)) throw new HttpError(429, "Too many tries. Wait fifteen minutes, or ask the facilitator for a fresh link.");
       const { data: m, error } = await admin.from("kindle_member").select("id,email,name,active,pw_salt,pw_hash,pw_version,must_change").eq("email", email).maybeSingle();
       if (error) { if (notInstalled(error)) throw new HttpError(503, "Kindle is not installed yet — migration 0187."); throw error; }
       /* the same answer whether the e-mail is unknown or the password wrong — no directory by guessing */
@@ -101,6 +103,15 @@ export async function POST(req: Request) {
 
     throw new HttpError(400, "Unknown action.");
   } catch (e) { return errJson(e); }
+}
+
+async function tooManyTries(email: string): Promise<boolean> {
+  try {
+    const since = new Date(Date.now() - 15 * 60e3).toISOString();
+    const { count } = await adminClient().from("kindle_audit").select("id", { count: "exact", head: true })
+      .eq("email", email).eq("action", "login_failed").gte("at", since);
+    return Number(count || 0) >= 5;
+  } catch { return false; }
 }
 
 async function loginCount(id: string): Promise<number> {

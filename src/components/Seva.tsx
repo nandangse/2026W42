@@ -26,6 +26,7 @@ import SevaQuotes from "@/components/seva/SevaQuotes";
 import SevaOrders from "@/components/seva/SevaOrders";
 import FieldAttendanceDesk from "@/components/seva/FieldAttendanceDesk";
 import { swallow } from "@/lib/swallow";
+import { safeHtml } from "@/lib/safe-html";
 import { dmy as fmtD, rupee } from "@/lib/fmt";
 const money = (n: unknown) => rupee(n);
 
@@ -443,7 +444,7 @@ function IssueBox({ row, masters, onClose, onSaved }: { row: Row | null; masters
           <div><L>What happened — as it was written in the ERP</L>
             <div className="border rounded px-3 py-2 text-sm seva-rich"
               style={{ ...inputCss, maxHeight: 260, overflowY: "auto", background: "#FBFAF7" }}
-              dangerouslySetInnerHTML={{ __html: String(row?.description_html) }} />
+              dangerouslySetInnerHTML={{ __html: safeHtml(row?.description_html) }} />
           </div>
         ) : (
           <div><L>What happened — the customer&apos;s words, and what was seen</L>

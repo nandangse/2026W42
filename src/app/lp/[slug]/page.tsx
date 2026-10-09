@@ -4,6 +4,7 @@ import { crmDb, crmConfigured } from "@/crm/db";
 import { LOGO } from "@/lib/logo";
 import LandingForm from "@/components/marketing/LandingForm";
 import { swallow } from "@/lib/swallow";
+import { safeHtml } from "@/lib/safe-html";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export default async function LandingPage({ params }: { params: { slug: string }
               // eslint-disable-next-line @next/next/no-img-element
               <img src={p.hero_url} alt="" style={{ width: "100%", borderRadius: 10, marginBottom: 20, display: "block" }} />
             )}
-            {p.body_html && <div className="lp-body" style={{ fontSize: 16, lineHeight: 1.65 }} dangerouslySetInnerHTML={{ __html: p.body_html }} />}
+            {p.body_html && <div className="lp-body" style={{ fontSize: 16, lineHeight: 1.65 }} dangerouslySetInnerHTML={{ __html: safeHtml(p.body_html) }} />}
           </div>
 
           <div id="ask" style={{ background: "#fff", border: "1px solid #E2E0DA", borderTop: `4px solid ${t.accent}`, borderRadius: 10, padding: 20, boxShadow: "0 8px 26px rgba(22,35,47,.08)", position: "sticky", top: 20 }}>

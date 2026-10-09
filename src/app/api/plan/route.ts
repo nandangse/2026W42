@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
 import { readBody } from "@/lib/validate";
-import { requirePlanner, errJson } from "@/lib/auth";
+import { requirePlanner, hasPlanningGrant, HttpError, errJson } from "@/lib/auth";
 import { supabaseServer } from "@/lib/supabase/server";
 import { assertJobEditable } from "@/lib/job-state";
 
 export const dynamic = "force-dynamic";
 
-// POST /api/plan — upsert a plan + its milestones. planner/admin.
+// POST /api/plan — upsert a plan + its milestones. planner/admin, holding
+// the Planning tick (audit S1, 9 Oct 2026).
 // The milestones array fully replaces the job's milestone set; done flags &
 // dates are carried in the payload so editing crew/days never wipes ✓s.
 export async function POST(req: Request) {
   try {
-    await requirePlanner();
+    const who = await requirePlanner();
+    if (!(await hasPlanningGrant(who))) throw new HttpError(403, "Planning is granted per person — the tick on Admin → module access.");
     const supabase = supabaseServer();
     const body = await readBody(req, {});
     const jobId: string = body.job_id;

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser, errJson, HttpError, RAGHU_EMAIL } from "@/lib/auth";
+import { cronCaller } from "@/lib/cron-auth";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -28,13 +29,8 @@ const DAY = 86400000;
 
 export async function GET(req: Request) {
   try {
-    const secret = process.env.CRON_SECRET;
-    const header = req.headers.get("authorization") || "";
-    const fromCron = !!secret && header === `Bearer ${secret}`;
-    if (!fromCron) {
-      const u = await currentUser();
-      if (!u || u.disabled) throw new HttpError(401, "The daily cron, or a signed-in hand.");
-    }
+    /* the cron's secret, or the owner / Stratcom / the hands named (audit S12, 9 Oct 2026) */
+    const { fromCron } = await cronCaller(req, "saamaan-escalate");
     const admin = adminClient();
     const { data: open, error } = await admin.from("material_slip").select("*").eq("status", "open").limit(1000);
     if (error) {

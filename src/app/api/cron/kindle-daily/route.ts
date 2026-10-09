@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
+import { cronCaller } from "@/lib/cron-auth";
 import { sendKindleMail } from "@/lib/kindle/mail";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +24,8 @@ export const maxDuration = 120;
  */
 export async function GET(req: Request) {
   try {
-    const secret = process.env.CRON_SECRET;
-    const fromCron = !!secret && (req.headers.get("authorization") || "") === `Bearer ${secret}`;
-    if (!fromCron) { const u = await currentUser(); if (!u || !u.isOwner) throw new HttpError(401, "The daily cron, or the owner."); }
+    /* the cron's secret, or the owner / Stratcom / the hands named (audit S12, 9 Oct 2026) */
+    const { fromCron } = await cronCaller(req, "kindle-daily", { ownerOnly: true });
     const admin = adminClient();
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
     const [y, mm, dd] = today.split("-");

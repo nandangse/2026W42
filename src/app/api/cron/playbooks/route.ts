@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser, errJson, HttpError } from "@/lib/auth";
+import { cronCaller } from "@/lib/cron-auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { compilePlaybook } from "@/lib/playbook-compile";
 
@@ -17,13 +18,8 @@ export const maxDuration = 300;
  */
 export async function GET(req: Request) {
   try {
-    const secret = process.env.CRON_SECRET;
-    const header = req.headers.get("authorization") || "";
-    const fromCron = !!secret && header === `Bearer ${secret}`;
-    if (!fromCron) {
-      const u = await currentUser();
-      if (!u || u.disabled) throw new HttpError(401, "The midnight cron, or a signed-in hand.");
-    }
+    /* the cron's secret, or the owner / Stratcom / the hands named (audit S12, 9 Oct 2026) */
+    const { fromCron } = await cronCaller(req, "playbooks");
     const admin = adminClient();
     const { data: books, error } = await admin.from("playbook").select("kind");
     if (error) return NextResponse.json({ ok: false, note: "Playbooks not installed yet (migration 0086)." });

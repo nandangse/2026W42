@@ -17,7 +17,8 @@ import { cookies } from "next/headers";
 const COOKIE = "idp_who";
 const DAYS = 14;
 
-const secret = () => String(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXTAUTH_SECRET || "genie");
+import { sessionSecret } from "@/lib/session-secret";
+const secret = () => sessionSecret();
 const sign = (body: string) => createHmac("sha256", secret()).update(body).digest("base64url");
 
 export function makeIdpCookie(employeeId: string): { name: string; value: string; maxAge: number } {

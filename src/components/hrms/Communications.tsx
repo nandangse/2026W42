@@ -18,6 +18,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { looksLikeHtml, safeHtml } from "@/lib/safe-html";
+
+/**
+ * A REPLY IS TEXT (audit S9, 9 Oct 2026). A WhatsApp answer pulled from
+ * Periskope used to be dropped in as HTML whenever it contained something
+ * tag-shaped — so a reply reading `<img src=x onerror=…>` would have run in
+ * HR's browser. Inbound is always shown as text now, newlines kept; what
+ * Genie itself sent may be rich, and goes through the sanitiser.
+ */
+function MessageBody({ body, inbound, style, className }: { body: unknown; inbound?: boolean; style?: React.CSSProperties; className?: string }) {
+  const s = String(body ?? "");
+  if (inbound || !looksLikeHtml(s)) return <div className={className} style={{ ...style, whiteSpace: "pre-wrap" }}>{s}</div>;
+  return <div className={className} style={style} dangerouslySetInnerHTML={{ __html: safeHtml(s) }} />;
+}
 import { fmtFull } from "@/lib/schedule";
 import RichTextEditor from "@/components/RichTextEditor";
 import { Pane } from "./Pane";
@@ -160,11 +174,11 @@ export default function Communications({ who }: { who: string }) {
                     ↩ {(replyOf.get(r.id) || []).length} {(replyOf.get(r.id) || []).length === 1 ? "reply" : "replies"}
                   </button>
                 )}
-                {open === r.id && <div className="mt-1" style={{ fontSize: 12.5, lineHeight: 1.5, color: r.direction === "in" ? C.green : C.ink }} dangerouslySetInnerHTML={{ __html: /<[a-z][\s\S]*>/i.test(r.body) ? r.body : String(r.body).replace(/\n/g, "<br>") }} />}
+                {open === r.id && <MessageBody body={r.body} inbound={r.direction === "in"} style={{ fontSize: 12.5, lineHeight: 1.5, color: r.direction === "in" ? C.green : C.ink }} className="mt-1" />}
                 {open === r.id && (replyOf.get(r.id) || []).map((x: Row) => (
                   <div key={x.id} className="mt-1.5 rounded px-2 py-1.5" style={{ background: "#F3FAF5", borderLeft: `3px solid ${C.green}` }}>
                     <div style={{ fontSize: 10.5, color: C.green, fontWeight: 700 }}>↩ {x.name} · {stamp(x.sent_at)}</div>
-                    <div style={{ fontSize: 12.5, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: /<[a-z][\s\S]*>/i.test(x.body) ? x.body : String(x.body).replace(/\n/g, "<br>") }} />
+                    <MessageBody body={x.body} inbound style={{ fontSize: 12.5, lineHeight: 1.5 }} />
                   </div>
                 ))}
               </div>

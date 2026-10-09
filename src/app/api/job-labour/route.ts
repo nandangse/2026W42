@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireReader, errJson, HttpError } from "@/lib/auth";
+import { requireStratcom, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ const MAX = 50000;
  */
 export async function GET() {
   try {
-    await requireReader();
+    await requireStratcom();
     const db = adminClient();
 
     const { data: rateRows, error: re } = await db.from("labour_rate").select("trade, day_rate");

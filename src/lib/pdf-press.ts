@@ -46,6 +46,7 @@ export async function pressPdfMany(htmls: string[], opts: PressOptions = {}): Pr
       let page;
       try {
         page = await browser.newPage();
+        await page.setJavaScriptEnabled(false); /* the HTML is ours to lay out, never to run (audit S15) */
         await page.setContent(html, { waitUntil: "load", timeout: 30000 });
         await new Promise((z) => setTimeout(z, 250));
         out.push(Buffer.from(await page.pdf(pdfOptions(opts))));
@@ -80,6 +81,7 @@ export async function pressPdf(html: string, opts: PressOptions = {}): Promise<B
   const browser = await puppeteer.launch({ args: chromium.args, executablePath, headless: true });
   try {
     const page = await browser.newPage();
+    await page.setJavaScriptEnabled(false); /* the HTML is ours to lay out, never to run (audit S15) */
     await page.setContent(html, { waitUntil: "load", timeout: 60000 });
     await new Promise((z) => setTimeout(z, 800));
     const pdf = await page.pdf({

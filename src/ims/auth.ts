@@ -57,6 +57,7 @@ export async function requireIms(): Promise<ImsUser> {
   const u = await currentUser();
   if (!u) throw new HttpError(401, "Not signed in");
   if (u.disabled) throw new HttpError(403, "Account disabled");
+  if (u.lmsOnly) throw new HttpError(403, "This login opens the training library only.");
 
   let imsRole: ImsRole = u.isOwner ? "ims_admin" : "member";
   let department: string | null = null;

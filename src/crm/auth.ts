@@ -58,6 +58,7 @@ export async function requireCrm(): Promise<CrmUser> {
   const u = await currentUser();
   if (!u) throw new HttpError(401, "Not signed in");
   if (u.disabled) throw new HttpError(403, "Account disabled");
+  if (u.lmsOnly) throw new HttpError(403, "This login opens the training library only.");
 
   if (!(await granted(u.email)))
     throw new HttpError(403, "The CRM is not open to this account.");
@@ -89,7 +90,7 @@ export async function requireCrm(): Promise<CrmUser> {
 /** True without throwing — for the page, which redirects rather than errors. */
 export async function mayUseCrm(): Promise<boolean> {
   const u = await currentUser();
-  return !!u && !u.disabled && (await granted(u.email));
+  return !!u && !u.disabled && !u.lmsOnly && (await granted(u.email));
 }
 
 

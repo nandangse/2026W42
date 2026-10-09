@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireReader, errJson } from "@/lib/auth";
+import { requireLC, errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { today } from "@/lib/schedule";
 import { fyStart } from "@/lib/delivered";
@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    await requireReader();
+    await requireLC();
     const on = today();
     const { data, error } = await adminClient()
       .from("delivered_jobs")

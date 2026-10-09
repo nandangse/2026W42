@@ -19,21 +19,12 @@
  * rendered is not about them.
  */
 import { useEffect, useRef, useState } from "react";
+import { safeHtml } from "@/lib/safe-html";
 
 const C = { line: "var(--line)", dim: "var(--dim)", faint: "var(--muted)" };
 
-/** Strip anything that could execute. Belt; the server has the braces. */
-export function cleanHtml(html: string): string {
-  return String(html || "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
-    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
-    .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
-    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
-    .replace(/javascript:/gi, "")
-    .trim();
-}
+/** Strip anything that could execute. One sanitiser for the whole app now (src/lib/safe-html.ts). */
+export const cleanHtml = (html: string): string => safeHtml(html);
 
 /** True when the markup carries nothing a person would call content. */
 export const isEmptyHtml = (html: string) =>

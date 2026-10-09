@@ -33,8 +33,11 @@ function readToken(t: string): { sheet: string; emp: string } {
   if ("error" in r) throw new HttpError(401, r.error);
   return r;
 }
-const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "content-type" };
-export async function OPTIONS() { return new Response(null, { headers: CORS }); }
+/* No CORS header any more (audit S13, 9 Oct 2026): the helper extension reaches here through its
+   manifest's host_permissions, which need none, and the screen is same-origin. The token lasts
+   thirty minutes now, not two hours. OPTIONS stays harmless for an old helper that still asks. */
+const CORS = {};
+export async function OPTIONS() { return new Response(null, { status: 204 }); }
 
 /* THE ATTENDANCE + CREDIT MESSAGE (Dr Raghu, 8 Oct 2026: "In this also make one button WhatsApp
    Message … Amount credited, Sent to your account no in bank with IFSC, Salary slip emailed to your
