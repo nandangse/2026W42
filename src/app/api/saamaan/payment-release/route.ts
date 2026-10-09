@@ -83,6 +83,33 @@ export async function POST(req: Request) {
   try {
     const me = await guard();
     const admin = adminClient();
+    /* SEND or CANCEL a saved release (Dr Raghu, 8 Oct 2026: "a button on the right side that will say Send
+       or Cancel … so that he can check it out once again"). JSON body { action, id }. */
+    if ((req.headers.get("content-type") || "").includes("application/json")) {
+      const b = await req.json().catch(() => ({})) as { action?: string; id?: string };
+      const id = String(b.id || ""); if (!id) throw new HttpError(400, "Which release?");
+      const { data: rel, error } = await admin.from("material_payment_release").select("*").eq("id", id).maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!rel) throw new HttpError(404, "No such release.");
+      if (b.action === "cancel") {
+        if (rel.status === "cancelled") return NextResponse.json({ ok: true, status: "cancelled" });
+        /* out of Kuber's plan too, while accounts have not taken it — never once they have */
+        let planNote = "";
+        if (rel.plan_id) {
+          const { data: pl } = await admin.from("kuber_payment_plan").select("status").eq("id", rel.plan_id).maybeSingle();
+          if (pl?.status === "planned") { await admin.from("kuber_payment_plan").update({ status: "dropped", note: `Cancelled in Saamaan by ${me.email.split("@")[0]}` }).eq("id", rel.plan_id); planNote = " · dropped from Kuber's plan"; }
+          else if (pl) planNote = ` · Kuber row left as ${pl.status} — accounts had already taken it`;
+        }
+        await admin.from("material_payment_release").update({ status: "cancelled", cancelled_at: new Date().toISOString(), cancelled_by: me.email }).eq("id", id);
+        return NextResponse.json({ ok: true, status: "cancelled", note: planNote });
+      }
+      if (b.action === "send") {
+        if (rel.status === "cancelled") throw new HttpError(409, "This release was cancelled — raise it again.");
+        if (rel.status === "sent" && rel.plan_id) throw new HttpError(409, "Already sent.");
+        return NextResponse.json({ ok: true, ...(await sendRelease(admin, me, rel as ReleaseRow)) });
+      }
+      throw new HttpError(400, "action: send or cancel");
+    }
     const form = await req.formData();
     const supplier = S(form.get("supplier"), 200);
     const kind = S(form.get("kind")) === "bill" ? "bill" : "advance";
@@ -98,64 +125,81 @@ export async function POST(req: Request) {
     const total = files.reduce((a, f) => a + f.size, 0);
     if (total > MAX_BYTES) throw new HttpError(400, "The files come to more than 12 MB — attach fewer, or smaller.");
 
-    /* 1 — the release and its files */
+    /* 1 — the release and its files, SAVED (draft): nothing in Kuber yet, nobody mailed — Send does that */
     const { data: rel, error } = await admin.from("material_payment_release").insert({
-      supplier, kind, amount, bill_refs, remarks, wanted_on: wanted, by_email: me.email,
-    }).select("id").single();
+      supplier, kind, amount, bill_refs, remarks, wanted_on: wanted, by_email: me.email, status: "draft",
+    }).select("id, no").single();
     if (error) {
       if (/does not exist|schema cache/i.test(error.message)) throw new HttpError(503, "Run migration 0205 first — releases have nowhere to live yet.");
+      if (/status|column/i.test(error.message)) throw new HttpError(503, "Run migration 0208 first — releases need their number and state.");
       throw new Error(error.message);
     }
-    const stored: { name: string; path: string; size: number; mime: string; base64: string }[] = [];
+    const stored: { name: string; path: string; size: number }[] = [];
     for (const f of files) {
       const buf = Buffer.from(await f.arrayBuffer());
       const name = f.name.replace(/[^\w.\- ]+/g, "_").slice(0, 120) || "file";
       const path = `release/${rel!.id}/${name}`;
       const { error: up } = await admin.storage.from("portal").upload(path, buf, { contentType: f.type || "application/octet-stream", upsert: true });
       if (up) throw new Error(`Could not keep ${name}: ${up.message}`);
-      stored.push({ name, path, size: f.size, mime: f.type || "application/octet-stream", base64: buf.toString("base64") });
+      stored.push({ name, path, size: f.size });
     }
-
-    /* 2 — into Kuber's payment plan, as a request awaiting approval */
-    const { data: plan, error: pErr } = await admin.from("kuber_payment_plan").insert({
-      plan_date: wanted, party: supplier, amount, purpose: kind === "advance" ? "Advance" : "Supplier bill",
-      bill_ref: bill_refs, status: "planned", note: `Payment release from Saamaan by ${me.email.split("@")[0]}${remarks ? ` — ${remarks}` : ""}${stored.length ? ` · ${stored.length} file${stored.length === 1 ? "" : "s"} attached in Saamaan` : ""}`.slice(0, 1000), by: me.email,
-    }).select("id").single();
-    if (pErr) throw new Error(`Recorded, but Kuber's payment plan would not take it: ${pErr.message}`);
-
-    /* 3 — the intimation to accounts */
-    const title = `${kind === "advance" ? "Advance Payment to" : "Payment to"} ${supplier} — ${inr(amount)}`;
-    const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#22303c;max-width:720px">
-<p>Dear Accounts,</p>
-<p>A supplier payment release has been raised in Genie. This mail is for intimation — the request is in <b>Kuber → Payment Planning → Payment Request</b>, where it is approved and paid.</p>
-<table cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-size:14px;width:100%">
-<thead><tr style="background:#1F2A37;color:#fff;text-align:left"><th>Date</th><th>Supplier name</th><th>Payment against bill number</th><th style="text-align:right">Amount</th><th>Any remarks</th></tr></thead>
-<tbody><tr style="border-bottom:1px solid #ddd"><td>${dmy(istDay())}</td><td><b>${esc(supplier)}</b></td><td>${esc(bill_refs || (kind === "advance" ? "Advance" : "—"))}</td><td style="text-align:right"><b>${esc(inr(amount))}</b></td><td>${esc(remarks || "—")}</td></tr></tbody>
-</table>
-<p style="font-size:13px;color:#555">Wanted by ${dmy(wanted)}. Raised by ${esc(me.email)}.${stored.length ? ` ${stored.length} document${stored.length === 1 ? "" : "s"} attached.` : ""}</p>
-<p style="font-size:12px;color:#888">Sent by Genie on behalf of Purchase.</p></div>`;
-    let mail = "";
-    try {
-      const { mailboxByAddress, accessTokenFor, gmailSendMixed, gmailSend } = await import("@/crm/gmail");
-      /* FROM THE PERSON WHO RAISED IT (Dr Raghu, 8 Oct 2026: "While sending the mail, it has to go with
-         their personal genie login mail ID"): Mukesh's release goes from mukesh@, Pradip's from pradipp@,
-         each through whichever Google account they authorised; purchase@ is copied so the team sees it.
-         Only when the person has no Gmail connected does it fall back to purchase@'s own mailbox. */
-      let box = await mailboxByAddress(me.email);
-      let fromName = (me as { displayName?: string | null }).displayName || me.email.split("@")[0];
-      let cc: string | undefined = PURCHASE;
-      if (!box) { box = await mailboxByAddress(PURCHASE); fromName = "Nandan Purchase"; cc = undefined; }
-      if (!box) throw new Error(`neither ${me.email} nor ${PURCHASE} has a Gmail connected in Genie — Profile → ✉ Connect Gmail`);
-      const token = await accessTokenFor(String(box.id));
-      if (stored.length) await gmailSendMixed(token, String(box.email_address), ACCOUNTS, title, html, stored.map((f) => ({ name: f.name, mime: f.mime, base64: f.base64 })), cc, undefined, fromName, PURCHASE);
-      else await gmailSend(token, String(box.email_address), ACCOUNTS, title, html, cc, undefined, fromName, undefined, null, PURCHASE);
-      mail = `sent from ${box.email_address}${cc ? `, cc ${PURCHASE}` : " (the raiser has no Gmail connected)"}, answers to ${PURCHASE}`;
-    } catch (e) {
-      mail = `not sent — ${e instanceof Error ? e.message : String(e)}`;
-    }
-    await admin.from("material_payment_release").update({ plan_id: plan!.id, mail, files: stored.map(({ name, path, size }) => ({ name, path, size })) }).eq("id", rel!.id);
-    return NextResponse.json({ ok: true, id: rel!.id, plan_id: plan!.id, mail });
+    await admin.from("material_payment_release").update({ files: stored }).eq("id", rel!.id);
+    return NextResponse.json({ ok: true, id: rel!.id, no: rel!.no, status: "draft" });
   } catch (e) {
     return errJson(e);
   }
+}
+
+type ReleaseRow = { id: string; no: string | null; supplier: string; kind: string; amount: number; bill_refs: string; remarks: string; wanted_on: string | null; files: { name: string; path: string; size: number }[]; by_email: string; status: string; plan_id: string | null };
+
+/** SEND: into Kuber's payment plan as a request, and the intimation to accounts@ from the raiser's own address. */
+async function sendRelease(admin: ReturnType<typeof adminClient>, me: { email: string; displayName?: string | null }, rel: ReleaseRow) {
+  const { supplier, kind, amount, bill_refs, remarks } = rel;
+  const wanted = rel.wanted_on || istDay();
+  const no = rel.no || rel.id.slice(0, 8).toUpperCase();
+  /* 2 — into Kuber's payment plan, as a request awaiting approval */
+  let planId = rel.plan_id;
+  if (!planId) {
+    const { data: plan, error: pErr } = await admin.from("kuber_payment_plan").insert({
+      plan_date: wanted, party: supplier, amount, purpose: kind === "advance" ? "Advance" : "Supplier bill",
+      bill_ref: bill_refs, status: "planned", note: `${no} — payment release from Saamaan by ${me.email.split("@")[0]}${remarks ? ` — ${remarks}` : ""}${rel.files.length ? ` · ${rel.files.length} file${rel.files.length === 1 ? "" : "s"} attached in Saamaan` : ""}`,
+    }).select("id").single();
+    if (pErr) throw new Error(`Kuber's payment plan would not take it: ${pErr.message}`);
+    planId = String(plan!.id);
+  }
+  /* the files, read back for the mail */
+  const stored: { name: string; mime: string; base64: string }[] = [];
+  for (const f of rel.files || []) {
+    const { data } = await admin.storage.from("portal").download(f.path);
+    if (data) stored.push({ name: f.name, mime: data.type || "application/octet-stream", base64: Buffer.from(await data.arrayBuffer()).toString("base64") });
+  }
+  /* 3 — the intimation to accounts, from the person who raised it */
+  const title = `${no} · ${kind === "advance" ? "Advance Payment to" : "Payment to"} ${supplier} — ${inr(amount)}`;
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#22303c;max-width:720px">
+<p>Dear Accounts,</p>
+<p>Supplier payment release <b>${esc(no)}</b> has been raised in Genie. This mail is for intimation — the request is in <b>Kuber → Payment Planning → Payment Request</b>, where it is approved and paid.</p>
+<table cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-size:14px;width:100%">
+<thead><tr style="background:#1F2A37;color:#fff;text-align:left"><th>No.</th><th>Date</th><th>Supplier name</th><th>Payment against bill number</th><th style="text-align:right">Amount</th><th>Any remarks</th></tr></thead>
+<tbody><tr style="border-bottom:1px solid #ddd"><td><b>${esc(no)}</b></td><td>${dmy(istDay())}</td><td><b>${esc(supplier)}</b></td><td>${esc(bill_refs || (kind === "advance" ? "Advance" : "—"))}</td><td style="text-align:right"><b>${esc(inr(amount))}</b></td><td>${esc(remarks || "—")}</td></tr></tbody>
+</table>
+<p style="font-size:13px;color:#555">Wanted by ${dmy(wanted)}. Raised by ${esc(me.email)}.${stored.length ? ` ${stored.length} document${stored.length === 1 ? "" : "s"} attached.` : ""}</p>
+<p style="font-size:12px;color:#888">Sent by Genie on behalf of Purchase.</p></div>`;
+  let mail = "";
+  try {
+    const { mailboxByAddress, accessTokenFor, gmailSendMixed, gmailSend } = await import("@/crm/gmail");
+    let box = await mailboxByAddress(me.email);
+    let fromName = me.displayName || me.email.split("@")[0];
+    let cc: string | undefined = PURCHASE;
+    if (!box) { box = await mailboxByAddress(PURCHASE); fromName = "Nandan Purchase"; cc = undefined; }
+    if (!box) throw new Error(`neither ${me.email} nor ${PURCHASE} has a Gmail connected in Genie — Profile → ✉ Connect Gmail`);
+    const token = await accessTokenFor(String(box.id));
+    if (stored.length) await gmailSendMixed(token, String(box.email_address), ACCOUNTS, title, html, stored, cc, undefined, fromName, PURCHASE);
+    else await gmailSend(token, String(box.email_address), ACCOUNTS, title, html, cc, undefined, fromName, undefined, null, PURCHASE);
+    mail = `sent from ${box.email_address}${cc ? `, cc ${PURCHASE}` : " (the raiser has no Gmail connected)"}, answers to ${PURCHASE}`;
+  } catch (e) {
+    mail = `not sent — ${e instanceof Error ? e.message : String(e)}`;
+  }
+  const now = new Date().toISOString();
+  await admin.from("material_payment_release").update({ plan_id: planId, mail, status: "sent", sent_at: now }).eq("id", rel.id);
+  return { id: rel.id, no, plan_id: planId, mail, status: "sent" };
 }

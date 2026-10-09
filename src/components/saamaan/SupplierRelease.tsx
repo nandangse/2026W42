@@ -26,9 +26,10 @@ const isoWeekOf = (d: string): { wk: number; monday: string } => {
    the 13-week cash flow plan regardless"). A release is OPEN while its Kuber plan row still says
    "planned"; the moment accounts approve, pay or drop it in Kuber it is closed here — gone from the
    totals, kept in the closed list — and lives on in the cash plan, where it was all along. */
-const isOpen = (r: { kuber: { status: string } | null }) => !r.kuber || r.kuber.status === "planned";
+const isOpen = (r: { status?: string; kuber: { status: string } | null }) => r.status !== "cancelled" && r.status !== "draft" && (!r.kuber || r.kuber.status === "planned");
+const isDraft = (r: { status?: string }) => r.status === "draft";
 
-interface Release { id: string; supplier: string; kind: string; amount: number; bill_refs: string; remarks: string; wanted_on: string | null; files: { name: string; path: string; size: number }[]; mail: string; by_email: string; at: string; kuber: { status: string; paid_on: string | null } | null }
+interface Release { id: string; no: string | null; status: string; sent_at: string | null; cancelled_at: string | null; supplier: string; kind: string; amount: number; bill_refs: string; remarks: string; wanted_on: string | null; files: { name: string; path: string; size: number }[]; mail: string; by_email: string; at: string; kuber: { status: string; paid_on: string | null } | null }
 
 export function PaymentRelease() {
   const [list, busy, reload, err] = useLoad<{ rows: Release[]; installed: boolean }>("/api/saamaan/payment-release");
@@ -38,8 +39,22 @@ export function PaymentRelease() {
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const known = useMemo(() => new Set(sup?.suppliers ?? []), [sup]);
+  /* SEND / CANCEL on the row (Dr Raghu, 8 Oct 2026): Save keeps it as a draft with its number; Send puts it
+     into Kuber's payment plan and tells accounts@; Cancel withdraws it (and drops it from Kuber's plan while
+     accounts have not taken it). */
+  const act = async (r: Release, action: "send" | "cancel") => {
+    if (action === "cancel" && !confirm(`Cancel ${r.no || "this release"} — ${r.supplier}, ₹${Math.round(r.amount).toLocaleString("en-IN")}?`)) return;
+    if (action === "send" && !confirm(`Send ${r.no || "this release"} — ${r.supplier}, ₹${Math.round(r.amount).toLocaleString("en-IN")}? It goes into Kuber's payment requests and accounts@ is told.`)) return;
+    setSending(true); setMsg(null);
+    const x = await fetch("/api/saamaan/payment-release", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, id: r.id }) });
+    const j = await x.json().catch(() => ({}));
+    setSending(false);
+    if (!x.ok) { setMsg({ ok: false, text: j.error || `The server answered ${x.status}.` }); return; }
+    setMsg({ ok: !/^not sent/.test(j.mail || ""), text: action === "send" ? `${j.no} sent — in Kuber's payment requests now. Mail: ${j.mail}.` : `${r.no || "Release"} cancelled${j.note || ""}.` });
+    reload();
+  };
   const submit = async () => {
-    if (!confirm(`Release ${f.kind === "advance" ? "an advance" : "a payment"} of ₹${Number(f.amount.replace(/,/g, "")).toLocaleString("en-IN")} to ${f.supplier}? It goes into Kuber's payment requests, and accounts@ gets the intimation.`)) return;
+    if (!confirm(`Save ${f.kind === "advance" ? "an advance" : "a payment"} release of ₹${Number(f.amount.replace(/,/g, "")).toLocaleString("en-IN")} to ${f.supplier}? It gets its number and waits on the list — press Send on it to put it into Kuber's payment requests and tell accounts@.`)) return;
     setSending(true); setMsg(null);
     const fd = new FormData();
     Object.entries(f).forEach(([k, v]) => fd.append(k, v));
@@ -48,7 +63,7 @@ export function PaymentRelease() {
     const j = await r.json().catch(() => ({}));
     setSending(false);
     if (!r.ok) { setMsg({ ok: false, text: j.error || `The server answered ${r.status}.` }); return; }
-    setMsg({ ok: !/^not sent/.test(j.mail), text: `Released — it is in Kuber's payment requests now. Mail to accounts@: ${j.mail}.` });
+    setMsg({ ok: true, text: `${j.no} saved as a draft — check it on the list, then press Send.` });
     setF({ supplier: "", kind: "advance", amount: "", bill_refs: "", remarks: "", wanted_on: istDay() }); setFiles([]);
     reload();
   };
@@ -88,7 +103,7 @@ export function PaymentRelease() {
           <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files ?? []))} className="text-xs mt-1" />
           {files.length > 0 && <span style={{ fontWeight: 400 }}>{files.length} file{files.length === 1 ? "" : "s"} · {(files.reduce((a, x) => a + x.size, 0) / 1048576).toFixed(1)} MB</span>}
         </label>
-        <div className="flex items-end"><Btn kind="primary" onClick={submit} disabled={sending || !ready}>{sending ? "Releasing…" : "Submit"}</Btn></div>
+        <div className="flex items-end"><Btn kind="primary" onClick={submit} disabled={sending || !ready}>{sending ? "Saving…" : "Save — then Send from the list"}</Btn></div>
       </div>
       {msg && <Note kind={msg.ok ? "info" : "warn"}>{msg.text}</Note>}
       {err && <Note kind="error">{err}</Note>}
@@ -105,7 +120,7 @@ export function PaymentRelease() {
         return (
           <div className="bg-white rounded-lg border p-3 mb-3" style={{ borderColor: BORDER }}>
             <div className="flex flex-wrap gap-3 items-end">
-              <div><div className="text-xs font-bold" style={{ color: MUTED, letterSpacing: .5 }}>OPEN — ASKED, NOT YET TAKEN INTO PLAN</div><div className="tnum font-bold" style={{ fontSize: 24, color: INK }}>{inr(total)}</div><div className="text-xs" style={{ color: MUTED }}>{open.length} request{open.length === 1 ? "" : "s"}{overdue ? <> · <b style={{ color: "var(--red, #8E2C20)" }}>{inr(overdue)} wanted before today</b></> : ""}</div></div>
+              <div><div className="text-xs font-bold" style={{ color: MUTED, letterSpacing: .5 }}>OPEN — SENT, NOT YET TAKEN INTO PLAN</div><div className="tnum font-bold" style={{ fontSize: 24, color: INK }}>{inr(total)}</div><div className="text-xs" style={{ color: MUTED }}>{open.length} request{open.length === 1 ? "" : "s"}{overdue ? <> · <b style={{ color: "var(--red, #8E2C20)" }}>{inr(overdue)} wanted before today</b></> : ""}{list.rows.filter(isDraft).length ? <> · <b style={{ color: AMBER }}>{list.rows.filter(isDraft).length} draft{list.rows.filter(isDraft).length === 1 ? "" : "s"} not yet sent</b></> : ""}</div></div>
               <div className="flex gap-2 flex-wrap">
                 {weeks.map((w) => (
                   <div key={w.monday} className="rounded border px-2.5 py-1.5" style={{ borderColor: w.monday < isoWeekOf(today).monday ? "var(--red, #8E2C20)" : BORDER, background: "#FBFAF7" }}>
@@ -115,14 +130,15 @@ export function PaymentRelease() {
                   </div>
                 ))}
               </div>
-              <div className="ml-auto text-xs" style={{ color: MUTED, maxWidth: 320 }}>Closed by accounts in Kuber (approved, paid or dropped): <b>{closed.length}</b>, {inr(closed.reduce((a, r) => a + Number(r.amount || 0), 0))} — out of these totals, still in the cash plan.</div>
+              <div className="ml-auto text-xs" style={{ color: MUTED, maxWidth: 320 }}>Closed (taken into plan by accounts, paid, dropped or cancelled): <b>{closed.filter((r) => !isDraft(r)).length}</b>, {inr(closed.filter((r) => !isDraft(r)).reduce((a, r) => a + Number(r.amount || 0), 0))} — out of these totals; the ones accounts took stay in the cash plan.</div>
             </div>
           </div>
         );
       })()}
-      <GenieTable<Release> rows={list ? [...list.rows].sort((a, b) => Number(isOpen(b)) - Number(isOpen(a)) || b.at.localeCompare(a.at)) : null} minWidth={1000} empty="No release raised yet."
+      <GenieTable<Release> rows={list ? [...list.rows].sort((a, b) => (Number(isDraft(b)) - Number(isDraft(a))) || (Number(isOpen(b)) - Number(isOpen(a))) || b.at.localeCompare(a.at)) : null} minWidth={1100} empty="No release raised yet."
         search={(r, q) => `${r.supplier} ${r.bill_refs} ${r.remarks}`.toLowerCase().includes(q)} searchPlaceholder="🔍 supplier, bill, remark"
         columns={[
+          { key: "no", label: "No.", align: "left", sort: (r) => r.no ?? "", render: (r) => <b className="tnum" style={{ color: INK }}>{r.no || "·"}</b> },
           { key: "at", label: "Date", align: "left", sort: (r) => r.at, render: (r) => <span className="tnum">{dmy(r.at.slice(0, 10))}</span> },
           { key: "s", label: "Supplier", align: "left", sort: (r) => r.supplier, render: (r) => <b style={{ color: INK }}>{r.supplier}</b> },
           { key: "k", label: "For", align: "left", sort: (r) => r.kind, render: (r) => <span>{r.kind === "advance" ? "Advance" : "Bill"}</span> },
@@ -131,7 +147,11 @@ export function PaymentRelease() {
           { key: "w", label: "Wanted by", align: "left", sort: (r) => r.wanted_on ?? "", render: (r) => <span className="tnum">{dmy(r.wanted_on)}</span> },
           { key: "r", label: "Remarks", align: "left", render: (r) => <span className="text-xs" style={{ color: MUTED }}>{r.remarks || "·"}</span> },
           { key: "f", label: "Files", align: "left", render: (r) => <span className="text-xs">{r.files.length ? r.files.map((x) => <a key={x.path} href={`/api/saamaan/payment-release?file=${encodeURIComponent(x.path)}`} target="_blank" rel="noreferrer" style={{ color: NAVY, marginRight: 6 }}>{x.name}</a>) : "·"}</span> },
-          { key: "st", label: "Here", align: "left", sort: (r) => (isOpen(r) ? "0" : "1"), render: (r) => <b className="text-xs" style={{ color: isOpen(r) ? AMBER : MUTED }}>{isOpen(r) ? "open — with accounts" : `closed · ${r.kuber?.status === "paid" ? `paid ${dmy(r.kuber.paid_on)}` : r.kuber?.status === "approved" ? "taken into plan" : r.kuber?.status}`}</b> },
+          { key: "st", label: "State", align: "left", sort: (r) => (isDraft(r) ? "0" : isOpen(r) ? "1" : "2"), render: (r) => <b className="text-xs" style={{ color: isDraft(r) ? AMBER : r.status === "cancelled" ? "#8E2C20" : isOpen(r) ? "var(--blue)" : MUTED }}>{isDraft(r) ? "draft — not sent" : r.status === "cancelled" ? `cancelled ${dmy(r.cancelled_at)}` : isOpen(r) ? `sent ${dmy(r.sent_at)} — with accounts` : `closed · ${r.kuber?.status === "paid" ? `paid ${dmy(r.kuber.paid_on)}` : r.kuber?.status === "approved" ? "taken into plan" : r.kuber?.status}`}</b> },
+          { key: "act", label: "", align: "right", render: (r) => (isDraft(r) || isOpen(r)) ? <span className="flex gap-1 justify-end">
+              {isDraft(r) && <button onClick={() => act(r, "send")} disabled={sending} className="rounded px-2 py-1 text-xs font-bold" style={{ background: GREEN, color: "#fff" }} title="Into Kuber's payment requests; accounts@ is told">Send</button>}
+              <button onClick={() => act(r, "cancel")} disabled={sending} className="rounded px-2 py-1 text-xs font-bold" style={{ background: "#fff", color: "#8E2C20", border: "1px solid #E7B4AE" }} title={isDraft(r) ? "Drop this draft" : "Withdraw — dropped from Kuber's plan while accounts have not taken it"}>Cancel</button>
+            </span> : null },
           { key: "kb", label: "In Kuber", align: "left", sort: (r) => r.kuber?.status ?? "", render: (r) => <b className="text-xs" style={{ color: r.kuber?.status === "paid" ? GREEN : r.kuber?.status === "approved" ? NAVY : AMBER }}>{r.kuber ? (r.kuber.status === "planned" ? "awaiting approval" : r.kuber.status === "paid" ? `paid ${dmy(r.kuber.paid_on)}` : r.kuber.status) : "·"}</b> },
           { key: "m", label: "Mail", align: "left", render: (r) => <span className="text-xs" style={{ color: /^not sent/.test(r.mail) ? AMBER : MUTED }}>{r.mail || "·"}</span> },
         ]} />

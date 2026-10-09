@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.3.0.71",
+    date: "2026-10-09",
+    module: "Supplier Payment Release: a number on each, saved first, then Send or Cancel on the row",
+    items: [
+      "SPR-00001 (\u201cgive it a number so that we can have trackability also. The number and the date will define that\u201d). Every release carries a running number \u2014 SPR-00001, SPR-00002 \u2026 in the order raised, for ever \u2014 on the list, on the mail\u2019s subject and table, and on Kuber\u2019s plan row. The releases already raised were numbered in the order they came (migration 0208).",
+      "SAVE, THEN SEND OR CANCEL (\u201ca button on the right side that will say Send or Cancel \u2026 so that he can check it out once again\u201d). Submit now SAVES the release as a draft with its number and files \u2014 nothing in Kuber yet, nobody mailed. On the row: Send puts it into Kuber\u2019s payment requests and tells accounts@ from the raiser\u2019s own address; Cancel withdraws it, and drops it from Kuber\u2019s plan while accounts have not taken it (never once they have). Drafts sit at the top of the list in amber; the open total counts only what was sent.",
+    ],
+  },
+  {
     v: "6.3.0.70",
     date: "2026-10-08",
     module: "Supplier payment release mails from the person who raised it",
