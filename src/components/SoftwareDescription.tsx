@@ -31,10 +31,11 @@
 
 import { APP_VERSION } from "@/lib/version";
 import type { Effort } from "@/lib/changelog";
+import { SECURITY_CHECKS, lastSecurityTestDate, securityCheckTotals, type CheckStatus } from "@/lib/security-checks";
 import { useEffect, useState } from "react";
 
 /** Last hand-revision of the prose on this page. Bump it when you edit. */
-const DOC_REVISED = "8 October 2026";
+const DOC_REVISED = "10 October 2026";
 
 const NAVY = "var(--navy)";
 const INK = "var(--ink)";
@@ -720,6 +721,117 @@ const TD: React.CSSProperties = {
   lineHeight: 1.55,
 };
 
+/* ═══════════════════════ the security checklist (10 Oct 2026) ══════════════ */
+
+const CHECK_CHIP: Record<CheckStatus, { bg: string; fg: string; label: string }> = {
+  pass: { bg: "#E7F3EC", fg: "#1E6B3E", label: "PASS" },
+  fail: { bg: "#FBEAE8", fg: RED, label: "FAIL" },
+  fixed: { bg: "#E8F0FA", fg: "#1B3A5C", label: "FIXED · RE-TEST" },
+  open: { bg: "#FDF6E3", fg: "#8A6A00", label: "OPEN" },
+  decision: { bg: "#F1ECF9", fg: "#5B3E8E", label: "DECISION" },
+  na: { bg: "#F4F3EF", fg: "var(--dim)", label: "NOT A DEFECT" },
+};
+
+const longDate = (iso: string | null) =>
+  iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" }) : "never";
+
+const shortDate = (iso: string | null) =>
+  iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "Asia/Kolkata" }).replace(/\//g, "-") : "—";
+
+/**
+ * Collapsible on purpose: the list is long and most readers of this page
+ * want the shape of Genie, not the test log. The heading's date is read from
+ * the list (the latest `tested`), so it cannot claim a run that did not
+ * happen. Each row is a thing a tester DOES, what must happen, and what
+ * happened last time. The data lives in src/lib/security-checks.ts.
+ */
+function SecurityChecks() {
+  const when = lastSecurityTestDate();
+  const totals = securityCheckTotals();
+  const groups = Array.from(new Set(SECURITY_CHECKS.map((c) => c.group)));
+  const [filter, setFilter] = useState<CheckStatus | "all">("all");
+  const rows = filter === "all" ? SECURITY_CHECKS : SECURITY_CHECKS.filter((c) => c.status === filter);
+  return (
+    <details className="bg-white rounded-lg border" style={{ borderColor: BORDER }}>
+      <summary className="px-4 py-3 cursor-pointer select-none" style={{ listStyle: "none" }}>
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="tnum font-bold text-xs" style={{ color: ORANGE, letterSpacing: 1 }}>15</span>
+          <h3 className="font-bold" style={{ fontSize: 15, color: INK }}>Security checks conducted on {longDate(when)}</h3>
+          <span className="text-xs" style={{ color: MUTED }}>▾ {SECURITY_CHECKS.length} checks · click to open</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {(Object.keys(CHECK_CHIP) as CheckStatus[]).filter((s) => totals[s] > 0).map((s) => (
+            <span key={s} className="text-xs font-bold" style={{ background: CHECK_CHIP[s].bg, color: CHECK_CHIP[s].fg, borderRadius: 3, padding: "1px 7px", fontSize: 10, letterSpacing: 0.6 }}>
+              {totals[s]} {CHECK_CHIP[s].label}
+            </span>
+          ))}
+        </div>
+      </summary>
+      <div className="px-4 pb-4">
+        <p className="text-xs mb-3" style={{ color: "var(--dim)", lineHeight: 1.6, maxWidth: "92ch" }}>
+          From the audit of 9 October 2026 (Maruti&apos;s fix brief and the second auditor&apos;s report; the verification of each item is in
+          <code style={{ fontFamily: "ui-monospace, monospace", fontSize: 11 }}> docs/GENIE-AUDIT-ANALYSIS-2026-10-09.md</code>).
+          A run goes down the list on the test copy: do <i>How</i>, compare with <i>Expect</i>, record the outcome and the date.
+          Repairs are bunched between runs; a repaired row says FIXED until a run proves it, and only a run turns it to PASS.
+        </p>
+        <div className="flex flex-wrap items-center gap-1.5 mb-3 print:hidden">
+          <span className="text-xs" style={{ color: MUTED }}>Show:</span>
+          {(["all", ...Object.keys(CHECK_CHIP)] as (CheckStatus | "all")[]).map((s) => (
+            <button key={s} onClick={() => setFilter(s)} className="text-xs rounded px-2 py-0.5"
+              style={{ border: "1px solid " + BORDER, background: filter === s ? NAVY : "#fff", color: filter === s ? "#fff" : INK, fontSize: 11 }}>
+              {s === "all" ? `All ${SECURITY_CHECKS.length}` : `${CHECK_CHIP[s].label} ${totals[s]}`}
+            </button>
+          ))}
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table className="genie-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 860 }}>
+            <thead>
+              <tr>
+                <th style={TH}>ID</th>
+                <th style={TH}>Check</th>
+                <th style={{ ...TH, whiteSpace: "normal" }}>How to test</th>
+                <th style={{ ...TH, whiteSpace: "normal" }}>Expect</th>
+                <th style={TH}>Status</th>
+                <th style={TH}>Tested</th>
+                <th style={TH}>Fixed in</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map((g) => {
+                const inGroup = rows.filter((c) => c.group === g);
+                if (!inGroup.length) return null;
+                return [
+                  <tr key={g + "-h"}>
+                    <td colSpan={7} style={{ ...TD, background: "#F7F6F2", fontWeight: 700, color: NAVY, letterSpacing: 0.4, fontSize: 11.5 }}>{g}</td>
+                  </tr>,
+                  ...inGroup.map((c) => (
+                    <tr key={c.id}>
+                      <td style={{ ...TD, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", whiteSpace: "nowrap", color: MUTED }}>{c.id}</td>
+                      <td style={{ ...TD, fontWeight: 600, minWidth: 180 }}>
+                        {c.title}
+                        {c.note && <div className="font-normal mt-1" style={{ color: MUTED, fontSize: 11, lineHeight: 1.5 }}>{c.note}</div>}
+                      </td>
+                      <td style={{ ...TD, minWidth: 240, color: "var(--dim)" }}>{c.how}</td>
+                      <td style={{ ...TD, minWidth: 200 }}>{c.expect}</td>
+                      <td style={{ ...TD, whiteSpace: "nowrap" }}>
+                        <span className="text-xs font-bold" style={{ background: CHECK_CHIP[c.status].bg, color: CHECK_CHIP[c.status].fg, borderRadius: 3, padding: "1px 6px", letterSpacing: 0.6, fontSize: 10 }}>
+                          {CHECK_CHIP[c.status].label}
+                        </span>
+                      </td>
+                      <td style={{ ...TD, whiteSpace: "nowrap" }} className="tnum">{shortDate(c.tested)}</td>
+                      <td style={{ ...TD, whiteSpace: "nowrap" }} className="tnum">{c.fixedIn || "—"}</td>
+                    </tr>
+                  )),
+                ];
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 /* ════════════════════════════════ the page ═════════════════════════════════ */
 
 const NO_EFFORT: Effort = { measuredTo: "", commits: 0, days: 0, windowHours: 0, raghuLow: 0, raghuHigh: 0 };
@@ -1137,6 +1249,9 @@ export default function SoftwareDescription() {
           <li><b>No alerting.</b> A failed upload, a stalled queue or a spike of errors is noticed by somebody looking, not by something telling them.</li>
         </ol>
       </Sec>
+
+      {/* ── 15. the security checklist, collapsed ── */}
+      <SecurityChecks />
 
       {/* ── how to keep this true ── */}
       <div className="rounded-lg px-4 py-3" style={{ background: "#F7F6F2", border: "1px solid " + BORDER }}>
