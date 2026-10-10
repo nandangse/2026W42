@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.8",
+    date: "2026-10-10",
+    module: "A problem's tentative date is a week out by default",
+    items: [
+      "RAISE A PROBLEM opens with the tentative date set to today plus seven (Dr Raghu, 10 Oct 2026: \u201cmake the date today + 7 by default\u201d); change it if the fix is sooner or later. The council\u2019s lightboxes also keep inside the window on a narrower screen.",
+    ],
+  },
+  {
     v: "6.4.0.7",
     date: "2026-10-10",
     module: "The KPI board: latest month first, two frozen columns, the menu folds",

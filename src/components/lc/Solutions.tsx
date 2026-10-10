@@ -7,7 +7,7 @@
  * for MTD, QTD, YTD or a date range. "A continuous problem-solving method."
  */
 import { useEffect, useState } from "react";
-import { api, btn, Card, Empty, Err, Eye, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Names, Rich, RichField, Thumbs, Who, dmy, dmyt, istToday, leaderOf, type Boot, type LcFile } from "./shared";
+import { api, btn, Card, Empty, Err, Eye, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Names, Rich, RichField, Thumbs, Who, dmy, dmyt, istPlus, istToday, leaderOf, type Boot, type LcFile } from "./shared";
 
 interface P { id: string; title: string; description: string | null; lc_summary: string | null; status: string; tentative_on: string | null; added_by: string; created_at: string; updated_at: string; closed_at: string | null; up: number; down: number; question: number; mine: string | null; solutions: number; comments: number; viewed: number; mayEdit: boolean }
 interface Full { problem: Omit<P, "up" | "down" | "question" | "solutions" | "comments"> & { up: string[]; down: string[]; question: string[]; mine: string | null; viewed: string[]; mayEdit: boolean }; solutions: { id: string; body: string; added_by: string; created_at: string; up: string[]; down: string[]; question: string[]; mine: string | null; mayEdit: boolean }[]; comments: { id: string; body: string; added_by: string; created_at: string }[]; files: LcFile[] }
@@ -92,7 +92,8 @@ export default function Solutions({ boot, arg, go }: { boot: Boot | null; arg: s
 }
 
 function Form({ p, onDone }: { p?: Full["problem"]; onDone: (id?: string) => void }) {
-  const [f, setF] = useState({ title: p?.title || "", description: p?.description || "", tentative_on: p?.tentative_on || "" });
+  /* a week from today by default (Dr Raghu, 10 Oct 2026: "make the date today + 7 by default") */
+  const [f, setF] = useState({ title: p?.title || "", description: p?.description || "", tentative_on: p?.tentative_on || istPlus(7) });
   const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const save = async () => { setErr(null); setBusy(true); try { const r = await api<{ id?: string }>("/api/lc/problems", { action: p ? "edit" : "create", id: p?.id, ...f }); onDone(r.id || p?.id); } catch (e) { setErr(String((e as Error).message)); } setBusy(false); };
   return (

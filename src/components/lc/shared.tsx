@@ -31,6 +31,8 @@ export const NAVY = "var(--navy)", ORANGE = "var(--accent)", MUTED = "var(--mute
 export const dmy = (iso?: string | null) => iso ? new Date(iso.length === 10 ? iso + "T00:00:00" : iso).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" }) : "";
 export const dmyt = (iso?: string | null) => iso ? new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
 export const istToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+/** Today in IST plus n days, as YYYY-MM-DD. */
+export const istPlus = (n: number) => { const d = new Date(istToday() + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 export const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 
 export const leaderOf = (boot: Boot | null, email?: string | null): Leader => {
@@ -82,7 +84,7 @@ export function Lightbox({ title, onClose, children, wide }: { title: React.Reac
   }, [onClose]);
   return (
     <div className="fixed inset-0 flex items-start justify-center" style={{ zIndex: 70, background: "rgba(13,22,31,.55)", padding: "4vh 12px", overflowY: "auto" }} onClick={onClose} role="presentation">
-      <div className="rounded-lg bg-white w-full" style={{ maxWidth: wide ? 1040 : 760, boxShadow: "0 24px 60px rgba(0,0,0,.35)" }} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+      <div className="rounded-lg bg-white w-full" style={{ maxWidth: wide ? 1040 : 760, minWidth: 0, boxShadow: "0 24px 60px rgba(0,0,0,.35)", overflowX: "hidden" }} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: `1px solid ${LINE}` }}>
           <h2 className="font-bold m-0 truncate" style={{ fontSize: 16, color: NAVY }}>{title}</h2>
           <button onClick={onClose} className="ml-auto rounded px-2 font-bold" style={{ color: MUTED, fontSize: 18 }} aria-label="Close">×</button>
