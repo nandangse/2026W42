@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.5",
+    date: "2026-10-10",
+    module: "Minutes: the meeting in two halves on top, the minutes full width below",
+    items: [
+      "THE TOP SLOT IN TWO HALVES (Dr Raghu, 10 Oct 2026: \u201chave a top slot split into two \u2014 left put all the content, right show agenda. Once written can be collapsed. Below message will be full\u201d). Left: when, where, who was there, the guests, the pre-reading (links, references) and the pictures and documents. Right: the Agenda, its own box. A click folds the slot to one line; a new set opens with it open, an edit with it folded, since the top is written and the minutes are the work. The minutes run full width underneath; Genie reads the agenda and the pre-reading for context and no longer writes an Agenda heading of its own. Migration 0218.",
+    ],
+  },
+  {
     v: "6.4.0.4",
     date: "2026-10-10",
     module: "A pasted picture stands small",

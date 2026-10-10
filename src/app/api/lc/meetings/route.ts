@@ -63,7 +63,7 @@ export async function POST(req: Request) {
       const held_on = String(b.held_on || "").trim();
       if (!/^\d{4}-\d{2}-\d{2}$/.test(held_on)) throw new HttpError(400, "The date.");
       const names = (v: unknown) => (Array.isArray(v) ? v : String(v || "").split(/[,\n]/)).map((x: unknown) => String(x).trim()).filter(Boolean);
-      return { held_on, from_time: time(b.from_time), to_time: time(b.to_time), location: txt(b.location), attendees: names(b.attendees), guests: names(b.guests), minutes: txt(b.minutes) };
+      return { held_on, from_time: time(b.from_time), to_time: time(b.to_time), location: txt(b.location), attendees: names(b.attendees), guests: names(b.guests), agenda: txt(b.agenda), reading: txt(b.reading), minutes: txt(b.minutes) };
     };
     const own = async (id: string) => {
       const { data: m } = await admin.from("lc_meeting").select("created_by").eq("id", id).maybeSingle();

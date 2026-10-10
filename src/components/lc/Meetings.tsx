@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, btn, Card, Empty, Err, Eye, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Rich, RichField, Who, dmy, dmyt, istToday, leaderOf, type Boot, type LcFile } from "./shared";
 import { MOM_TEMPLATE } from "@/lib/lc/mom-template";
 
-interface M { id: string; held_on: string; from_time: string | null; to_time: string | null; location: string | null; attendees: string[]; guests?: string[]; minutes?: string | null; hours: number | null; created_by: string | null; created_at: string; updated_at: string; files?: number; viewed?: string[] }
+interface M { id: string; held_on: string; from_time: string | null; to_time: string | null; location: string | null; attendees: string[]; guests?: string[]; agenda?: string | null; reading?: string | null; minutes?: string | null; hours: number | null; created_by: string | null; created_at: string; updated_at: string; files?: number; viewed?: string[] }
 interface C { id: string; body: string; added_by: string; created_at: string }
 interface Person { name: string; designation: string | null; department: string | null; email: string | null }
 
@@ -111,7 +111,12 @@ function Attendees({ value, onChange, people, boot }: { value: string[]; onChang
 function Form({ boot, m, onDone }: { boot: Boot | null; m?: M; onDone: (id?: string) => void }) {
   const people = usePeople();
   const template = boot?.settings.mom_template || MOM_TEMPLATE;
-  const [f, setF] = useState({ held_on: m?.held_on || istToday(), from_time: hhmm(m?.from_time), to_time: hhmm(m?.to_time), location: m?.location || "Nandan House, Turbhe", guests: (m?.guests || []).join(", "), minutes: m?.minutes || template });
+  const [f, setF] = useState({ held_on: m?.held_on || istToday(), from_time: hhmm(m?.from_time), to_time: hhmm(m?.to_time), location: m?.location || "Nandan House, Turbhe", guests: (m?.guests || []).join(", "), agenda: m?.agenda || "", reading: m?.reading || "", minutes: m?.minutes || template });
+  /* THE TOP SLOT (Dr Raghu, 10 Oct 2026: "a top slot split into two — left all
+     the content, right the agenda. Once written can be collapsed. Below, the
+     minutes full"). Open on a new set; folded on an edit, where the top is
+     already written and the minutes are the work. */
+  const [top, setTop] = useState(!m);
   const [attendees, setAttendees] = useState<string[]>(m ? m.attendees : (boot?.members.map((x) => x.name) || []));
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -124,19 +129,36 @@ function Form({ boot, m, onDone }: { boot: Boot | null; m?: M; onDone: (id?: str
   };
   return (
     <Lightbox title={m ? `Edit — ${dmy(m.held_on)}` : "New minutes"} onClose={() => onDone()} wide>
-      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
-        <div><label style={label}>Date</label><input type="date" style={input} value={f.held_on} onChange={(e) => setF({ ...f, held_on: e.target.value })} /></div>
-        <div><label style={label}>From</label><input type="time" style={input} value={f.from_time} onChange={(e) => setF({ ...f, from_time: e.target.value })} /></div>
-        <div><label style={label}>To</label><input type="time" style={input} value={f.to_time} onChange={(e) => setF({ ...f, to_time: e.target.value })} /></div>
-        <div><label style={label}>Hours</label><div style={{ ...input, background: "var(--paper)" }} className="tnum">{hrs ?? "—"}</div></div>
-        <div style={{ gridColumn: "span 2" }}><label style={label}>Location</label><input style={input} value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} /></div>
-      </div>
-      <label style={{ ...label, marginTop: 12 }}>Attendees — employees, from the rolls</label>
-      <Attendees value={attendees} onChange={setAttendees} people={people} boot={boot} />
-      <label style={{ ...label, marginTop: 12 }}>Guests — not on the rolls; names, comma-separated</label>
-      <input style={input} value={f.guests} onChange={(e) => setF({ ...f, guests: e.target.value })} placeholder="A customer, a consultant, a visitor…" />
-      <label style={{ ...label, marginTop: 12 }}>Minutes — the standard MoM; write under the headings, 🧞 Format with Genie tidies it after saving</label>
-      <RichField value={f.minutes} onChange={(h) => setF({ ...f, minutes: h })} minHeight={320} />
+      <button onClick={() => setTop((t) => !t)} className="w-full text-left flex items-center gap-2 rounded px-3 py-2 mb-2" style={{ background: "var(--paper)", color: NAVY, fontWeight: 700, fontSize: 13 }}>
+        <span style={{ fontSize: 11 }}>{top ? "▼" : "▶"}</span> The meeting — when, where, who, what to read · and the agenda
+        {!top && <span className="font-normal truncate" style={{ color: MUTED, fontSize: 12 }}>· {dmy(f.held_on)}{f.from_time ? ` ${f.from_time}` : ""}{f.location ? ` · ${f.location}` : ""} · {attendees.length} attending</span>}
+      </button>
+      {top && (
+        <div className="grid gap-4 lc-two" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
+          <div>
+            <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+              <div style={{ gridColumn: "span 3" }}><label style={label}>Date</label><input type="date" style={input} value={f.held_on} onChange={(e) => setF({ ...f, held_on: e.target.value })} /></div>
+              <div><label style={label}>From</label><input type="time" style={input} value={f.from_time} onChange={(e) => setF({ ...f, from_time: e.target.value })} /></div>
+              <div><label style={label}>To</label><input type="time" style={input} value={f.to_time} onChange={(e) => setF({ ...f, to_time: e.target.value })} /></div>
+              <div><label style={label}>Hours</label><div style={{ ...input, background: "var(--paper)" }} className="tnum">{hrs ?? "—"}</div></div>
+              <div style={{ gridColumn: "span 3" }}><label style={label}>Location</label><input style={input} value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} /></div>
+            </div>
+            <label style={{ ...label, marginTop: 10 }}>Attendees — employees, from the rolls</label>
+            <Attendees value={attendees} onChange={setAttendees} people={people} boot={boot} />
+            <label style={{ ...label, marginTop: 10 }}>Guests — not on the rolls; names, comma-separated</label>
+            <input style={input} value={f.guests} onChange={(e) => setF({ ...f, guests: e.target.value })} placeholder="A customer, a consultant, a visitor…" />
+            <label style={{ ...label, marginTop: 10 }}>Pre-reading — links, references, what to read before</label>
+            <RichField value={f.reading} onChange={(h) => setF({ ...f, reading: h })} minHeight={110} placeholder="A YouTube link, a note, a document…" />
+          </div>
+          <div>
+            <label style={label}>Agenda</label>
+            <RichField value={f.agenda} onChange={(h) => setF({ ...f, agenda: h })} minHeight={360} placeholder="1. … 2. … — what the meeting is for" />
+          </div>
+        </div>
+      )}
+      <label style={{ ...label, marginTop: 14 }}>Minutes — the standard MoM, full width; write under the headings, 🧞 Format with Genie tidies it after saving</label>
+      <RichField value={f.minutes} onChange={(h) => setF({ ...f, minutes: h })} minHeight={360} />
+      <style>{`@media (max-width: 900px){ .lc-two { grid-template-columns: 1fr !important; } }`}</style>
       <Err e={err} />
       <div className="flex gap-2 mt-3"><button onClick={save} disabled={busy} style={btn("primary")}>{busy ? "Saving…" : m ? "Save" : "Save — then attach files"}</button><button onClick={() => onDone()} style={btn("ghost")}>Cancel</button></div>
     </Lightbox>
@@ -161,6 +183,7 @@ function TemplateEditor({ boot, onDone }: { boot: Boot | null; onDone: () => voi
 function View({ boot, id, back }: { boot: Boot | null; id: string; back: () => void }) {
   const [d, setD] = useState<{ meeting: M; files: LcFile[]; comments: C[] } | null>(null);
   const [edit, setEdit] = useState(false); const [text, setText] = useState(""); const [genie, setGenie] = useState(false);
+  const [top, setTop] = useState(true);
   const load = () => api<{ meeting: M; files: LcFile[]; comments: C[] }>(`/api/lc/meetings?id=${id}`).then(setD).catch((e) => alert(String(e.message || e)));
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!d) return <Empty>Opening…</Empty>;
@@ -179,8 +202,6 @@ function View({ boot, id, back }: { boot: Boot | null; id: string; back: () => v
             <div className="text-sm" style={{ color: "var(--dim)" }}>
               {hhmm(m.from_time)}{m.to_time ? ` – ${hhmm(m.to_time)}` : ""}{m.hours ? ` · ${m.hours} h` : ""}{m.location ? ` · ${m.location}` : ""}
             </div>
-            <div className="text-sm mt-1"><b>Attendees:</b> {m.attendees.join(", ") || "—"}</div>
-            {(m.guests || []).length > 0 && <div className="text-sm"><b>Guests:</b> {(m.guests || []).join(", ")}</div>}
             <div className="text-xs mt-1 flex items-center gap-1 flex-wrap" style={{ color: MUTED }}>Minutes by <Who boot={boot} email={m.created_by} size={18} /> · {dmyt(m.created_at)}{m.updated_at !== m.created_at ? ` · edited ${dmyt(m.updated_at)}` : ""} · <Eye boot={boot} viewed={m.viewed || []} withList /></div>
           </div>
           {may && (
@@ -193,10 +214,27 @@ function View({ boot, id, back }: { boot: Boot | null; id: string; back: () => v
           )}
         </div>
       </Card>
+      <button onClick={() => setTop((t) => !t)} className="w-full text-left flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: "#fff", border: "1px solid var(--line)", color: NAVY, fontWeight: 700, fontSize: 13 }}>
+        <span style={{ fontSize: 11 }}>{top ? "▼" : "▶"}</span> Who was there, what was read · the agenda
+        {!top && <span className="font-normal truncate" style={{ color: MUTED, fontSize: 12 }}>· {m.attendees.length} attended{(m.guests || []).length ? ` · ${(m.guests || []).length} guest${(m.guests || []).length === 1 ? "" : "s"}` : ""}</span>}
+      </button>
+      {top && (
+        <div className="grid gap-3 lc-two" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
+          <Card title="The meeting" style={{ alignSelf: "start" }}>
+            <div className="text-sm"><b>Attendees:</b> {m.attendees.join(", ") || "—"}</div>
+            {(m.guests || []).length > 0 && <div className="text-sm mt-1"><b>Guests:</b> {(m.guests || []).join(", ")}</div>}
+            {m.reading && <div className="mt-3"><div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.4 }}>PRE-READING</div><Rich html={m.reading} small /></div>}
+            {d.files.length > 0 && <div className="mt-3"><div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.4 }}>PICTURES & DOCUMENTS</div><Files files={d.files} boot={boot} mayRemove={may} onChange={load} compact /></div>}
+          </Card>
+          <Card title="Agenda" accent="var(--accent)" style={{ alignSelf: "start" }}>
+            {m.agenda ? <Rich html={m.agenda} /> : <span className="text-sm" style={{ color: MUTED }}>No agenda written{may ? " — Edit to write it" : ""}.</span>}
+          </Card>
+        </div>
+      )}
       <Card title="Minutes">
         {m.minutes ? <Rich html={m.minutes} /> : <span className="text-sm" style={{ color: MUTED }}>Nothing written yet{may ? " — Edit to write them" : ""}.</span>}
       </Card>
-      {d.files.length > 0 && <Card title="Pictures & documents"><Files files={d.files} boot={boot} mayRemove={may} onChange={load} /></Card>}
+      <style>{`@media (max-width: 900px){ .lc-two { grid-template-columns: 1fr !important; } }`}</style>
       <Card title="Talk" right={<span className="text-xs" style={{ color: MUTED }}>{d.comments.length}</span>}>
         <div className="grid gap-2">
           {d.comments.map((c) => (

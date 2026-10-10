@@ -8,8 +8,6 @@
  * into the same headings, so minutes typed and minutes formatted read alike.
  */
 export const MOM_TEMPLATE = [
-  "<h3>Agenda</h3>",
-  "<ol><li>&nbsp;</li><li>&nbsp;</li></ol>",
   "<h3>Decisions</h3>",
   "<ol><li>&nbsp;</li></ol>",
   "<h3>Action points</h3>",
@@ -28,5 +26,5 @@ export function templateHeadings(html: string): string[] {
   const re = /<h[1-4][^>]*>([^<]+)<\/h[1-4]>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html || ""))) out.push(m[1].replace(/&nbsp;/g, " ").trim());
-  return out.length ? out : ["Agenda", "Decisions", "Action points", "Discussion", "Open questions", "Next meeting"];
+  return out.length ? out : ["Decisions", "Action points", "Discussion", "Open questions", "Next meeting"];
 }

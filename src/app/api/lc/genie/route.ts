@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       const heads = templateHeadings(tpl?.value || MOM_TEMPLATE);
       const html = toHtml(await ask(
         HOUSE + ` You are formatting the minutes of a Leaders Council meeting into the company's standard Minutes of Meeting. Keep every fact, name, number and decision exactly as given; add nothing that is not in the notes. Use EXACTLY these headings, in this order, each as <h3>: ${heads.join(" · ")}. Under "Action points" write a table with the columns #, Action, Who, By when, Status (Status is Open unless the notes say done; write — where the notes do not say). Decisions numbered. Discussion in short paragraphs or bullets, in the order of the notes. A heading with nothing under it gets one line: "Nothing recorded." If the notes mention people who are neither attendees nor guests, say so in one line at the end.`,
-        `Meeting on ${m.held_on}${m.location ? ` at ${m.location}` : ""}. Attendees (employees): ${(m.attendees || []).join(", ") || "not listed"}. Guests: ${(m.guests || []).join(", ") || "none"}.\n\nNotes:\n${raw}`,
+        `Meeting on ${m.held_on}${m.location ? ` at ${m.location}` : ""}. Attendees (employees): ${(m.attendees || []).join(", ") || "not listed"}. Guests: ${(m.guests || []).join(", ") || "none"}.\nAgenda (for context, do not repeat it as a section): ${strip(m.agenda || "") || "none written"}\nPre-reading given: ${strip(m.reading || "") || "none"}\n\nNotes:\n${raw}`,
       ));
       await admin.from("lc_meeting").update({ minutes: html, updated_at: new Date().toISOString() }).eq("id", b.id);
       return NextResponse.json({ ok: true, html });
