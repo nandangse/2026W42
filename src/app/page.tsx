@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 import { currentUser, RAGHU_EMAIL } from "@/lib/auth";
 import { resolveSaamaanAccess } from "@/lib/saamaan";
+import { mayUsePlanning } from "@/lib/planning-door";
 import PlanningSuite from "@/components/PlanningSuite";
 import MorningUpload from "@/components/MorningUpload";
 import LabourHome from "@/components/LabourHome";
+import StaffHome from "@/components/StaffHome";
 import { adminClient } from "@/lib/supabase/admin";
 import { hrmsTables } from "@/lib/hrms";
 
@@ -32,25 +34,23 @@ export default async function Home() {
       if (/labour/i.test(String(data?.type || "")))
         return <LabourHome email={user.email} displayName={user.displayName} initials={user.initials} role={user.role} />;
     } catch { /* no HRMS yet: the suite */ }
-
-    /**
-     * PLANNING IS A DOOR (Dr Raghu, 8 Sep 2026: "in this we will want to go to
-     * Planning also" — of the Apps ticks on a login).
-     *
-     * Migration 0161 seeded every login that existed when it ran, so this took
-     * nothing from anybody. Two guards keep it that way: an owner always holds
-     * it, and if the TABLE is missing — the migration not yet run — everyone
-     * passes, because an empty answer must not read as "nobody may come in".
-     * A man without the tick is sent to his own sheet, which is the room he
-     * actually wants.
-     */
-    try {
-      const admin = adminClient();
-      const { data: grant, error } = await admin.from("planning_access")
-        .select("email").eq("email", user.email.toLowerCase()).maybeSingle();
-      if (!error && !grant && !user.isOwner) redirect("/idp");
-    } catch { /* pre-0161: Planning is open, as it always was */ }
   }
+
+  /**
+   * PLANNING IS A DOOR — AND ITS OWN WORLD (Dr Raghu, 8 Sep 2026: "in this
+   * we will want to go to Planning also"; 10 Oct 2026: "It is only applicable
+   * to those people who are applied to the planning … Please stop that.
+   * Make a plain vanilla front page for them").
+   *
+   * Migration 0161 seeded every login; 0214 narrowed the grant to the
+   * planning roles and the rooms (LC, Stratcom, Management), the tick on
+   * Admin → Users adding anyone else. A login without it — a worker, the
+   * CMO, a sales login — lands on the plain page: birthdays, the thought,
+   * their own doors, nothing from the floor. Admins are not exempt: the
+   * tick decides. The owner always holds it.
+   */
+  if (!(await mayUsePlanning(adminClient(), user.email, user.isOwner)))
+    return <StaffHome email={user.email} displayName={user.displayName} initials={user.initials} role={user.role} />;
 
   /* the Saamaan tick opens the material dates and remarks (3 Oct 2026) */
   const saamaan = await resolveSaamaanAccess(adminClient(), user.email, user.isOwner).catch(() => false);

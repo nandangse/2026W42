@@ -19,7 +19,7 @@ import { LOGO } from "@/lib/logo";
 import { APP_VERSION } from "@/lib/version";
 import { swallow } from "@/lib/swallow";
 
-export type ShellModule = "main" | "crm" | "marketing" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan" | "lms" | "idp" | "portal";
+export type ShellModule = "main" | "crm" | "marketing" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan" | "lms" | "idp" | "portal" | "lc";
 
 export const MODULES: { key: ShellModule; label: string; icon: string; href: string; blurb: string }[] = [
   { key: "main", label: "Planning", icon: "🧞", href: "/", blurb: "jobs, milestones, the floor" },
@@ -39,6 +39,7 @@ export const MODULES: { key: ShellModule; label: string; icon: string; href: str
   { key: "saamaan", label: "Saamaan", icon: "📦", href: "/saamaan", blurb: "materials" },
   /* GENIE 6.0 (Dr Raghu, 3 Oct 2026): the customers' and suppliers' own door. */
   { key: "portal", label: "Portal", icon: "🚪", href: "/portal", blurb: "customers and suppliers" },
+  { key: "lc", label: "Leaders Council", icon: "🏛", href: "/lc", blurb: "the council's own room" },
 ];
 
 export interface ShellUser {
@@ -257,7 +258,8 @@ function AccountMenu({ module, user, isAdmin, menu }: { module: ShellModule; use
     window.location.href = "/login";
   };
   // every login has Planning (main), the LMS and the IDP; the rest are ticks
-  const allowed = MODULES.filter((m) => m.key === module || m.key === "main" || m.key === "lms" || !!may?.[m.key]);
+  /* Planning (main) is a tick since 10 Oct 2026 — shown while the answer loads, hidden once it says no */
+  const allowed = MODULES.filter((m) => m.key === module || m.key === "lms" || (m.key === "main" ? may === null || !!may.main : !!may?.[m.key]));
 
   const hoverIn = () => { if (closeT.current) clearTimeout(closeT.current); setMods(true); };
   const hoverOut = () => { closeT.current = setTimeout(() => setMods(false), 250); };

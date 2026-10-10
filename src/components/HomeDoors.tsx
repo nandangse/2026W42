@@ -31,6 +31,7 @@ export const DOORS: { key: string; label: string; icon: string; href: string; bl
   { key: "accounts", label: "Kuber", icon: "💰", href: "/kuber", blurb: "Books, bank, balances", color: "var(--green)" },
   { key: "vishwakarma", label: "Vishwakarma", icon: "🛠", href: "/vishwakarma", blurb: "Design", color: "#7C3AED" },
   { key: "saamaan", label: "Saamaan", icon: "📦", href: "/saamaan", blurb: "Materials", color: "#B45309" },
+  { key: "lc", label: "Leaders Council", icon: "🏛", href: "/lc", blurb: "The council's own room", color: "#0F766E" },
 ];
 
 export function useHome(): HomeData | null {

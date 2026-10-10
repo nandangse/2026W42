@@ -92,6 +92,25 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.0",
+    date: "2026-10-10",
+    module: "The Leaders Council — and Planning is its own world",
+    items: [
+      "A NINTH DOOR: THE LEADERS COUNCIL at /lc (Dr Raghu, 10 Oct 2026: “Make a new module called Leaders Council. This has to be only accessible to those who are marked in the LC … make sure that nobody else can get into this LC module”). The key is the LC mark on Admin → Groups — the mark that already existed — the owner implicit; the page sends anyone else home and every /api/lc route refuses them, so a typed address opens nothing. Nine rooms on a left navbar, the room kept in the #hash so a reload comes back to the same screen.",
+      "PHILOSOPHY, AT THE FRONT: Values, OPSP, Quarterly reports, and whatever is added next — sections of rich text with pictures and files, written by Dr Raghu, read by the council. PRINCIPLES beside it: “the definitive one, which will define what we do and what we don’t do … how decision-making is to be done” — numbered, the same shape.",
+      "MEETINGS: date, from–to with the hours worked out, the place, attendees typed in, and the minutes as rich text with pictures and documents. \uD83E\uDDDE Format with Genie turns rough notes into Decisions, Action points (who, by when), Discussion and Open questions — and can be pressed again after more is added. Talk under each set of minutes.",
+      "KNOWLEDGE, DR RAGHU’S ALONE TO ADD: references (a Drive folder, a sheet, a page), a note, and files. Every file lands in Genie’s private bucket and is then PUSHED TO THE DRIVE FOLDER he sets at the top of the room — a subfolder per room — and wears its mark: in Drive, pushing, or refused with a retry. Removing an entry from Genie never removes the Drive copy: “safely kept”.",
+      "PRESENTATIONS: who added it, who presents, the link or the uploaded file, the notes. \uD83E\uDDDE Genie summarise reads the notes, the PDF and the link, writes In brief, Key points and Asked of the council — and names the topic when none was typed.",
+      "START · STOP · CONTINUE: three columns, a + on each that asks “What do you want us to start?” — two or three sentences, then the detail and how it touches the company as rich text. Every card wears its leader’s colour (one colour per council member, the same on every board). The view opens on a click; Edit for the author and Dr Raghu; \uD83D\uDC4D \uD83D\uDC4E tally and name who. Print PDF — Dr Raghu alone — gives Start, Stop and Continue a page each.",
+      "THE SOLUTION BOARD: a problem, its description, everyone’s own solution, the LC discussion in the lightbox, and \uD83E\uDDDE Genie Summary writing the LC Solution from all of it. Status New → Under process → Needs deep dive → Deployed / Cancelled, a tentative date, Edit for the author and Dr Raghu, \uD83D\uDC4D \uD83D\uDC4E ❓ for everyone. Raised, solved, blocked, open and cancelled for MTD, QTD, YTD or any date range.",
+      "KPIs, COMPANY-WIDE: a KPI, who it is assigned to, number or currency, a target a month, and the rule a quarter is read by — sum for a flow, average for a rate, last for a level — so a quarter column is never a wrong total. One row per KPI, one column per month; click a cell to enter; by month or by quarter; green, amber, red against target. Crowdsourced for now; the numbers arrive on their own later.",
+      "HEALTH CHECK — THE ROCKEFELLER HABITS CHECKLIST, ANONYMOUS BY SHAPE: Dr Raghu opens a round a quarter; each leader ticks the forty lines once. An answer is stored as forty ticks and the round, with no name, no e-mail, not even a time; a separate note records only that a person has answered. Nothing joins the two. A round shows its score — overall and per habit, to Dr Raghu as to everyone — only once three have answered, and only as an average.",
+      "PLANNING IS ITS OWN WORLD (“It is only applicable to those people who are applied to the planning … Please stop that. Make a plain vanilla front page for them”). Migration 0161 had given the Planning tick to every login; 0214 narrows it to the planning roles and the rooms, the tick on Admin → Users adding anyone else, and what was removed is kept in planning_access_removed_0214. A login without it — a worker, the CMO, a sales login — lands on the plain page: the greeting, their own doors, how am I feeling, the thought, birthdays, their learning. Nothing from the floor. Planning leaves the Modules menu for them too.",
+      "Kindle is untouched and is not a Genie door: its ten are hard-coded on its own login, and no Genie grant reaches it.",
+      "Migrations 0213 (the lc_ tables and the private lc bucket) and 0214. Two settings: LC_DRIVE_FOLDER_ID as the fallback Drive folder; the service account must be an Editor on whichever folder is used.",
+    ],
+  },
+  {
     v: "6.3.0.71",
     date: "2026-10-09",
     module: "Supplier Payment Release: a number on each, saved first, then Send or Cancel on the row",

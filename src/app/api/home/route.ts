@@ -6,6 +6,8 @@ import { mayUseCrm } from "@/crm/auth";
 import { hasGrant } from "@/lib/grant";
 import { resolveGoalAccess } from "@/lib/goal-access";
 import { mayUseMarketing } from "@/lib/marketing";
+import { mayUsePlanning } from "@/lib/planning-door";
+import { mayUseLeadersCouncil } from "@/lib/lc/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,8 @@ export const dynamic = "force-dynamic";
  *
  *   kind     — "labour" when the HRMS record's type says so, else "staff"
  *   employee — name, designation, department, type from the HRMS record
- *   doors    — which of the eight apps open for this login
+ *   doors    — which of the apps open for this login; main is the Planning
+ *              tick (10 Oct 2026), lc the Leaders Council mark
  *   goals    — whether the goal tree opens
  */
 export async function GET() {
@@ -49,13 +52,14 @@ export async function GET() {
     if (u.lmsOnly) {
       return NextResponse.json({
         kind: "staff" as const, employee,
-        doors: { main: false, crm: false, marketing: false, hrms: false, ims: false, lms: true, accounts: false, vishwakarma: false, saamaan: false },
+        doors: { main: false, crm: false, marketing: false, hrms: false, ims: false, lms: true, accounts: false, vishwakarma: false, saamaan: false, lc: false },
         goals: false,
         me: { email: u.email, displayName: u.displayName, initials: u.initials, role: u.role, isOwner: u.isOwner, lmsOnly: true },
       });
     }
 
-    const [crm, hrms, accounts, vishwakarma, seva, ims, saamaan, goals, marketing] = await Promise.all([
+    const [planning, crm, hrms, accounts, vishwakarma, seva, ims, saamaan, goals, marketing] = await Promise.all([
+      mayUsePlanning(admin, email, u.isOwner),
       mayUseCrm(),
       hasGrant(admin, "hrms_access", email, u.isOwner),
       hasGrant(admin, "accounts_access", email, u.isOwner),
@@ -68,7 +72,7 @@ export async function GET() {
     ]);
     return NextResponse.json({
       kind, employee,
-      doors: { main: kind === "staff", crm, marketing, hrms, ims, lms: true, accounts, vishwakarma, saamaan },
+      doors: { main: kind === "staff" && planning, crm, marketing, hrms, ims, lms: true, accounts, vishwakarma, saamaan, seva, lc: mayUseLeadersCouncil(u) },
       goals: goals.see,
       me: { email: u.email, displayName: u.displayName, initials: u.initials, role: u.role, isOwner: u.isOwner },
     });
