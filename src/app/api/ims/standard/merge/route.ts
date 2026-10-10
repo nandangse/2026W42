@@ -3,7 +3,11 @@ import { readBody } from "@/lib/validate";
 import { AI, anthropicClient } from "@/lib/ai";
 import { errJson, HttpError } from "@/lib/auth";
 import { assertAiOn } from "@/lib/ai-gate";
-import { isHead, requireIms } from "@/ims/auth";
+import { isHead, requireIms, type ImsUser } from "@/ims/auth";
+
+/** THE AUDITOR WRITES (Dr Raghu, 10 Oct 2026): the auditor role, the MR and the heads may remark on a clause. */
+const mayRemark = (u: ImsUser) => u.isOwner || isHead(u) || u.imsRole === "auditor";
+const KINDS = ["Conforms", "Observation", "OFI", "Minor NC", "Major NC"];
 import { imsDb, notInstalled } from "@/ims/db";
 import { log, ok } from "@/ims/api";
 
@@ -40,9 +44,10 @@ export async function GET(req: Request) {
     const chosen = (standards ?? []).filter((s) => ids.includes(String(s.id)));
     const { data: clauses } = await db.from("ims_standard_clause").select("id, standard_id, clause_no, title, parent_clause, sort_order").in("standard_id", ids).order("sort_order");
     const cids = (clauses ?? []).map((c) => String(c.id));
-    const [{ data: notes }, { data: groups }] = await Promise.all([
+    const [{ data: notes }, { data: groups }, { data: remarks }] = await Promise.all([
       cids.length ? db.from("ims_clause_evidence_note").select("clause_id, evidence, compliance, updated_by, updated_at").in("clause_id", cids) : { data: [] },
       db.from("ims_clause_group_note").select("*"),
+      db.from("ims_clause_audit_remark").select("*").order("added_at", { ascending: false }),
     ]);
     /* merge on the clause number; the logical title is the first standard's (9001 leads the order) */
     const byNo = new Map<string, { clause_no: string; title: string; parent_clause: string | null; sort: number; per: { standard_id: string; short: string; clause_id: string; title: string; evidence: string; compliance: string | null; updated_by: string | null; updated_at: string | null }[] }>();
@@ -56,18 +61,35 @@ export async function GET(req: Request) {
       byNo.set(String(c.clause_no), row);
     }
     const key = (no: string) => no.split(".").map((x) => (/^\d+$/.test(x) ? x.padStart(3, "0") : x)).join(".");
-    const rows = [...byNo.values()].sort((a, b) => key(a.clause_no).localeCompare(key(b.clause_no))).map((r) => ({ ...r, group: (groups ?? []).find((g) => String(g.clause_no) === r.clause_no) || null }));
-    return NextResponse.json({ installed: true, standards: standards ?? [], chosen: chosen.map((s) => ({ ...s, short: short(String(s.name)) })), rows, mayWrite: isHead(me) });
+    const rows = [...byNo.values()].sort((a, b) => key(a.clause_no).localeCompare(key(b.clause_no))).map((r) => ({ ...r, group: (groups ?? []).find((g) => String(g.clause_no) === r.clause_no) || null, remarks: (remarks ?? []).filter((x) => String(x.clause_no) === r.clause_no && (!x.standard_id || ids.includes(String(x.standard_id)))) }));
+    return NextResponse.json({ installed: true, standards: standards ?? [], chosen: chosen.map((s) => ({ ...s, short: short(String(s.name)) })), rows, mayWrite: isHead(me), mayRemark: mayRemark(me), me: me.email });
   } catch (e) { return errJson(e); }
 }
 
 export async function POST(req: Request) {
   try {
     const me = await requireIms();
-    if (!isHead(me)) throw new HttpError(403, "Only the MR or a department head writes the evidence.");
-    const b = await readBody(req, { action: "string", clause_no: "string" });
-    if (b.action !== "group_save") throw new HttpError(400, "Unknown action.");
+    const b = await readBody(req, { action: "string", clause_no: "string?" });
     const db = imsDb();
+    /* THE AUDITOR'S REMARK, PER AUDIT — written once, never edited; the writer or the MR may withdraw it */
+    if (b.action === "remark_add") {
+      if (!mayRemark(me)) throw new HttpError(403, "The auditor, the MR or a department head writes a remark.");
+      const remark = String(b.remark || "").replace(/\u0000/g, "").trim(); const audit_label = String(b.audit_label || "").trim();
+      if (!b.clause_no) throw new HttpError(400, "Which clause?"); if (!audit_label) throw new HttpError(400, "Name the audit — e.g. Internal audit, Oct 2026."); if (!remark) throw new HttpError(400, "Write the remark.");
+      const kind = KINDS.includes(String(b.kind)) ? String(b.kind) : "Observation";
+      const { data, error } = await db.from("ims_clause_audit_remark").insert({ clause_no: b.clause_no, standard_id: b.standard_id || null, audit_label, kind, remark, added_by: me.email }).select("id").single();
+      if (error) throw new Error(error.message);
+      await log(me, "ims_clause_audit_remark", String(data?.id), "add", { clause: b.clause_no, audit: audit_label, kind });
+      return ok({ id: data?.id });
+    }
+    if (b.action === "remark_remove") {
+      const { data: r } = await db.from("ims_clause_audit_remark").select("id, added_by").eq("id", String(b.id || "")).maybeSingle();
+      if (!r) throw new HttpError(404, "No such remark."); if (r.added_by !== me.email && !isHead(me) && !me.isOwner) throw new HttpError(403, "Your own remark, or the MR.");
+      await db.from("ims_clause_audit_remark").delete().eq("id", r.id);
+      return ok();
+    }
+    if (!isHead(me)) throw new HttpError(403, "Only the MR or a department head writes the evidence.");
+    if (b.action !== "group_save") throw new HttpError(400, "Unknown action."); if (!b.clause_no) throw new HttpError(400, "Which clause?");
     const standardIds = (Array.isArray(b.standard_ids) ? b.standard_ids : []).map(String);
     const raw = String(b.raw ?? "").replace(/\u0000/g, "").trim();
     const { error: gErr } = await db.from("ims_clause_group_note").upsert({ clause_no: b.clause_no, raw, standard_ids: standardIds, updated_by: me.email, updated_at: new Date().toISOString() }, { onConflict: "clause_no" });

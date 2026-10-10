@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.12",
+    date: "2026-10-10",
+    module: "IMS: the auditor's remark on every clause, per audit; ticking a standard shows its clauses at once",
+    items: [
+      "THE CLAUSE-WISE REMARKS ARE THE KEY (Dr Raghu, 10 Oct 2026: \u201can internal auditor will be able to write comments for every audit\u201d). Under every clause on Clauses & evidence, a remark log: which audit (remembered on the browser from one clause to the next), the finding \u2014 Conforms, Observation, OFI, Minor NC, Major NC \u2014 for all the ticked standards or one of them, the words, who and when. Written once, never edited; the writer or the MR may withdraw one. The auditor role, the MR and the department heads write; everyone admitted reads. A clause with remarks wears a \uD83D\uDD0E count on the row, and NC when one is a non-conformity. Migration 0221.",
+      "TICKING A STANDARD SHOWS ITS CLAUSES AT ONCE (\u201con the top ticking each standard will show the clauses relevant to that\u201d) \u2014 no Merge button to press; tick several and they merge on the clause number.",
+    ],
+  },
+  {
     v: "6.4.0.11",
     date: "2026-10-10",
     module: "IMS: clauses and evidence across the standards, written once, rewritten by Genie for each",
