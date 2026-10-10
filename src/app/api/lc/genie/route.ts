@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   try {
     const u = await requireLeader();
     const admin = adminClient();
-    const b = await readBody(req, { action: "string", id: "uuid" });
+    const b = await readBody(req, { action: "string", id: "uuid?" });
     const HOUSE = "You write for the Leaders Council of Nandan GSE, an Indian manufacturer of ground support equipment. Plain English, Indian spelling, no preamble, no sign-off. Answer in clean HTML using only <h3>, <p>, <ul>, <ol>, <li>, <b>, <table>, <tr>, <th>, <td>. No markdown, no code fences.";
 
     if (b.action === "format_minutes") {
@@ -102,6 +102,40 @@ export async function POST(req: Request) {
       ));
       await admin.from("lc_problem").update({ lc_summary: html, updated_at: new Date().toISOString() }).eq("id", b.id);
       return NextResponse.json({ ok: true, html });
+    }
+    /**
+     * PRINCIPLES, WORKED INTO ONE LOGICAL SET (Dr Raghu, 10 Oct 2026: "in
+     * principles make the genie work it in such a way that's logical. It has
+     * to have all principles of the company and accountability etc").
+     *
+     * Reads every Principles section as written, and the Philosophy pages
+     * for context, and PROPOSES a complete, ordered set — purpose, the values
+     * as rules, how a decision is taken, accountability and consequences,
+     * the domain principles, what we do not do, how the page is amended.
+     * Returns the proposal; nothing is written until the owner applies it.
+     * The owner alone, because the page is his.
+     */
+    if (b.action === "structure_principles") {
+      if (!u.isOwner) throw new HttpError(403, "Only Dr Raghu works the Principles.");
+      const [{ data: pr }, { data: ph }] = await Promise.all([
+        admin.from("lc_section").select("title,body,sort").eq("kind", "principles").order("sort"),
+        admin.from("lc_section").select("title,body,sort").eq("kind", "philosophy").order("sort"),
+      ]);
+      const text = (rows: { title: string; body: string | null }[] | null) => (rows || []).map((r) => `## ${r.title}\n${strip(r.body || "") || "(not written yet)"}`).join("\n\n");
+      const raw = await ask(
+        "You are drafting the Principles of Nandan GSE for its Leaders Council — the definitive page that says what the company does and does not do, and how a decision is taken by it. Nandan GSE is an Indian manufacturer of airport ground support equipment and material-handling machines, family-led, ISO 9001 and AS9100D, with a Leaders Council that meets regularly. Write in plain English, Indian spelling, second person plural where natural (\"we\"). Keep EVERYTHING already written in the material given — reword for clarity, never drop a rule or a name — and complete what is missing so the set is whole. "
+        + "Return ONLY a JSON array, no prose, no code fence: [{\"title\": string, \"body\": string}] of 9 to 14 sections in this logical order: (1) Purpose of this page and how to use it in a decision; (2) Our values, each stated as a rule we act by; (3) How a decision is taken here — who decides what, the questions every decision must answer, speed, when it goes to the council; (4) Accountability — one owner per outcome, the scoreboard, how it is reviewed, what happens when a commitment is missed; (5) Customers and delivery; (6) Quality and safety; (7) Money and commitments — pricing, credit, spending, what we never promise; (8) People — hiring, growth, conduct, respect; (9) Communication and meetings — huddles, minutes, escalation; (10) Suppliers and partners; (11) What we do not do — a plain list; (12) How this page changes — who may amend it and how. Merge or add sections only where the material demands it. Each body is clean HTML using only <p>, <ul>, <ol>, <li>, <b>, <h4>; a body is 80–220 words; every rule is a short declarative sentence; accountability sections name a role (not a person) wherever the material allows. Where the material is silent, write the sound default for a company like this and mark that sentence with <i>(proposed)</i> so the owner can keep or strike it.",
+        `PRINCIPLES AS WRITTEN TODAY:\n${text(pr) || "(nothing yet)"}\n\nPHILOSOPHY PAGES, FOR CONTEXT:\n${text(ph) || "(nothing yet)"}`,
+        6000,
+      );
+      let sections: { title: string; body: string }[] = [];
+      try {
+        const m = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+        const arr = JSON.parse(m.slice(m.indexOf("["), m.lastIndexOf("]") + 1));
+        if (Array.isArray(arr)) sections = arr.filter((x) => x && typeof x.title === "string" && typeof x.body === "string").map((x) => ({ title: String(x.title).trim().slice(0, 140), body: String(x.body) }));
+      } catch { /* fall through */ }
+      if (sections.length < 3) throw new HttpError(502, "Genie did not return a usable set — try once more.");
+      return NextResponse.json({ ok: true, sections });
     }
     throw new HttpError(400, "Unknown action.");
   } catch (e) { return errJson(e); }

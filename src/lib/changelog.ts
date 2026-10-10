@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.1",
+    date: "2026-10-10",
+    module: "Principles: written by the council, approved by Dr Raghu, worked into one set by Genie",
+    items: [
+      "EVERY PRINCIPLE SHOWS WHO APPROVED IT AND WHEN (Dr Raghu, 10 Oct 2026: \u201cnext to each show approved by and date. Inside each have comments and the edit by raghu or the one who wrote\u201d). Anyone on the council writes a principle or a philosophy section; the author or Dr Raghu edits it; Dr Raghu approves it and the green mark sits beside the title \u2014 amber until then. An edit after approval withdraws it, because the approved text is what was read. Comments live inside each section. Migration 0215.",
+      "\U0001F9DE WORK IT WITH GENIE, on Principles, Dr Raghu alone (\u201cmake the genie work it in such a way that\u2019s logical. It has to have all principles of the company and accountability etc\u201d). Genie reads every principle as written and the Philosophy pages for context and proposes the whole set in a logical order \u2014 purpose and how to use the page, the values as rules, how a decision is taken and by whom, accountability and what happens when a commitment is missed, customers, quality and safety, money, people, communication, suppliers, what we do not do, and how the page itself is amended. Nothing already written is dropped; what was missing is drafted and marked (proposed). He reads the proposal and applies it or not; sections with the same title keep their files and comments; everything comes back unapproved.",
+      "/LC and /Lc open the council as well as /lc. The first attempt, a redirects() rule, matched case-blind and sent /lc to itself (ERR_TOO_MANY_REDIRECTS for a few minutes); it is an exact-match redirect in the middleware now.",
+    ],
+  },
+  {
     v: "6.4.0.0",
     date: "2026-10-10",
     module: "The Leaders Council — and Planning is its own world",

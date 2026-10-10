@@ -26,7 +26,7 @@ export const maxDuration = 60;
  * WHO MAY ADD: Knowledge, Philosophy and Principles are the owner's; the
  * rest take files from the author of the thing, or the owner.
  */
-const OWNER_ROOMS = new Set(["knowledge", "section"]);
+const OWNER_ROOMS = new Set(["knowledge"]); // sections: the author or the owner, like the rest (10 Oct 2026)
 const SUBFOLDER: Record<string, string> = { knowledge: "Knowledge", meeting: "Meetings", presentation: "Presentations", section: "Philosophy & Principles", problem: "Solution Board", ssc: "Start Stop Continue" };
 const MAX = 50 * 1024 * 1024;
 
@@ -55,9 +55,9 @@ async function pushToDrive(admin: ReturnType<typeof adminClient>, file: { id: st
 
 async function mayAttach(u: Awaited<ReturnType<typeof requireLeader>>, admin: ReturnType<typeof adminClient>, kind: string, id: string) {
   if (OWNER_ROOMS.has(kind)) { if (!u.isOwner) throw new HttpError(403, "Only Dr Raghu adds here."); return; }
-  const table = kind === "meeting" ? "lc_meeting" : kind === "presentation" ? "lc_presentation" : kind === "problem" ? "lc_problem" : kind === "ssc" ? "lc_ssc" : null;
+  const table = kind === "meeting" ? "lc_meeting" : kind === "presentation" ? "lc_presentation" : kind === "problem" ? "lc_problem" : kind === "ssc" ? "lc_ssc" : kind === "section" ? "lc_section" : null;
   if (!table) throw new HttpError(400, "Which room?");
-  const col = kind === "meeting" ? "created_by" : "added_by";
+  const col = kind === "meeting" || kind === "section" ? "created_by" : "added_by";
   const { data } = await admin.from(table).select(col).eq("id", id).maybeSingle();
   if (!data) throw new HttpError(404, "Nothing to attach to.");
   if (!mayEdit(u, (data as Record<string, string | null>)[col])) throw new HttpError(403, "The author, or Dr Raghu.");
