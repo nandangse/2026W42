@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.11",
+    date: "2026-10-10",
+    module: "IMS: clauses and evidence across the standards, written once, rewritten by Genie for each",
+    items: [
+      "A SECOND TAB ON STANDARDS \u2014 CLAUSES & EVIDENCE (Dr Raghu, 10 Oct 2026: \u201cshow the checkboxes for the standard, then merge the same; show combined and logical clause; next to it the single cell with the standard \u2014 9001, AS9100D, 27001, 45001; next to it a cell with the evidence. Let the man write. Then on saving automatically let Genie rewrite all\u201d). Tick the standards and Merge: the standards share the Annex SL numbering, so one row stands per clause number with the logical title; the standard cell names what each ticked standard calls that clause and how each is marked; the evidence cell is written once. Save \u2014 Genie rewrites all: one call words it for every ticked standard\u2019s own clause (environmental, safety, security, aerospace as the standard is) and writes each into that standard\u2019s clause note, where Standards and the auditor read it. Save my words only keeps the text without the rewrite; See each standard\u2019s note shows what stands behind the row. The MR and the department heads write; everyone admitted reads. Migration 0220.",
+    ],
+  },
+  {
     v: "6.4.0.10",
     date: "2026-10-10",
     module: "Every leader has a page; the council filled from its own sheets",

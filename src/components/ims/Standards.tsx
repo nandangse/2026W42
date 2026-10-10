@@ -6,6 +6,7 @@ import {
   useLoad, post, BORDER, INK, MUTED, NAVY_SOFT, GREEN, AMBER, RED,
 } from "./ui";
 import { isHead, openFile, uploadFile, type Boot, type StandardRow } from "./types";
+import MergedClauses from "./MergedClauses";
 
 interface Clause { id: string; clause_no: string; title: string; parent_clause: string | null }
 interface Link { title: string; url: string }
@@ -39,6 +40,8 @@ export default function Standards({ boot }: { boot: Boot }) {
   const [open, setOpen] = useState<Clause | null>(null);
   const [filter, setFilter] = useState("");
   const [taskFor, setTaskFor] = useState<Clause | null>(null);
+  /* TWO TABS ON TOP (Dr Raghu, 10 Oct 2026): the standards one by one, and the clauses merged across them */
+  const [tab, setTab] = useState<"standards" | "merged">("standards");
 
   const rows = d?.rows ?? [];
   const chosen = rows.find((r) => r.id === sel);
@@ -112,7 +115,14 @@ export default function Standards({ boot }: { boot: Boot }) {
       {msg && <Note kind="error">{msg}</Note>}
       {d && !d.installed && <Note kind="warn">Run the IMS migrations first.</Note>}
 
-      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+      <div className="flex gap-1 mb-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
+        {([["standards", "Standards"], ["merged", "Clauses & evidence"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)} className="px-3 py-2 text-sm font-bold" style={{ color: tab === k ? INK : MUTED, borderBottom: `3px solid ${tab === k ? "#F04E23" : "transparent"}`, marginBottom: -1 }}>{l}</button>
+        ))}
+      </div>
+      {tab === "merged" && <MergedClauses />}
+
+      {tab === "standards" && <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
         {busy && rows.length === 0 ? <Empty>Reading…</Empty> : rows.map((s) => (
           <div key={s.id} className="bg-white rounded-lg border p-3" style={{ borderColor: sel === s.id ? INK : BORDER }}>
             <div className="flex items-start justify-between gap-2">
@@ -138,9 +148,9 @@ export default function Standards({ boot }: { boot: Boot }) {
             </div>
           </div>
         ))}
-      </div>
+      </div>}
 
-      {chosen && (
+      {tab === "standards" && chosen && (
         <div className="mt-4">
           <div className="flex items-center gap-2 flex-wrap mb-2">
             <div className="text-sm font-bold" style={{ color: INK }}>{chosen.name} — clauses</div>
