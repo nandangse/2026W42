@@ -1,3 +1,4 @@
+import { relatedTo } from "@/lib/lc/related";
 import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -32,16 +33,27 @@ export async function GET(req: Request) {
     const u = await requireLeader();
     const admin = adminClient();
     const id = new URL(req.url).searchParams.get("id");
+    /* THE CHECK-IN LIGHTBOX: my check-in on this meeting (or the leader's, when Dr Raghu fills it for them) and the goals from the one before */
+    const ck = new URL(req.url).searchParams.get("checkin");
+    if (ck) {
+      const who = u.isOwner && new URL(req.url).searchParams.get("for") ? String(new URL(req.url).searchParams.get("for")).toLowerCase() : u.email;
+      const [{ data: mine }, { data: earlier }] = await Promise.all([
+        admin.from("lc_checkin").select("*").eq("meeting_id", ck).eq("email", who).maybeSingle(),
+        admin.from("lc_checkin").select("goals,plan_99,on_date,meeting_id").eq("email", who).neq("meeting_id", ck).order("on_date", { ascending: false }).limit(1),
+      ]);
+      return NextResponse.json({ mine: mine || null, previous: earlier?.[0] || null });
+    }
     if (id) {
       const { data: m, error } = await admin.from("lc_meeting").select("*").eq("id", id).maybeSingle();
       if (error) throw error; if (!m) throw new HttpError(404, "No such meeting.");
       await recordView(admin, "meeting", id, u.email);
       const viewed = (await viewsOf(admin, "meeting", [id])).map((v) => v.email);
-      const [{ data: files }, { data: comments }] = await Promise.all([
+      const [{ data: files }, { data: comments }, { data: checkins }] = await Promise.all([
         admin.from("lc_file").select("id,name,mime,bytes,path,drive_url,drive_status,uploaded_by,created_at").eq("ref_kind", "meeting").eq("ref_id", id).order("created_at"),
         admin.from("lc_comment").select("id,body,added_by,created_at").eq("ref_kind", "meeting").eq("ref_id", id).order("created_at"),
+        admin.from("lc_checkin").select("*").eq("meeting_id", id).order("created_at"),
       ]);
-      return NextResponse.json({ meeting: { ...m, hours: hours(m.from_time, m.to_time), viewed }, files: files || [], comments: comments || [] });
+      return NextResponse.json({ meeting: { ...m, hours: hours(m.from_time, m.to_time), viewed }, files: files || [], comments: comments || [], checkins: checkins || [] });
     }
     const [{ data: ms, error }, { data: files }] = await Promise.all([
       admin.from("lc_meeting").select("id,held_on,from_time,to_time,location,attendees,guests,created_by,created_at,updated_at").order("held_on", { ascending: false }).order("created_at", { ascending: false }),
@@ -90,6 +102,38 @@ export async function POST(req: Request) {
       const { error } = await admin.from("lc_meeting").delete().eq("id", id);
       if (error) throw error;
       return NextResponse.json({ ok: true });
+    }
+    /**
+     * THE LEADERS CHECK-IN (Dr Raghu, 10 Oct 2026): one per leader per meeting —
+     * T1, T2, B1, the burning issue, goals and results, the 99-day plan, the
+     * learning. The burning issue goes to the Solution Board as a problem the
+     * first time; after that the words follow it.
+     */
+    if (b.action === "checkin_save") {
+      const meeting_id = String(b.id || "");
+      const { data: m } = await admin.from("lc_meeting").select("id,held_on").eq("id", meeting_id).maybeSingle();
+      if (!m) throw new HttpError(404, "No such meeting.");
+      const clean = (v: unknown) => { const s = String(v ?? "").replace(/\u0000/g, "").trim(); return s || null; };
+      /* Dr Raghu may fill a leader's check-in for them (read out in the room); everyone else writes their own */
+      const email = u.isOwner && b.for_email ? String(b.for_email).toLowerCase() : u.email;
+      const goals = (Array.isArray(b.goals) ? b.goals : []).map((g: { goal?: unknown; result?: unknown }) => ({ goal: String(g?.goal || "").trim(), result: String(g?.result || "").trim() })).filter((g: { goal: string; result: string }) => g.goal || g.result);
+      const { data: prev } = await admin.from("lc_checkin").select("id,burning_problem_id").eq("meeting_id", meeting_id).eq("email", email).maybeSingle();
+      const burning = clean(b.burning);
+      let burning_problem_id: string | null = prev?.burning_problem_id ? String(prev.burning_problem_id) : null;
+      if (burning) {
+        const firstLine = burning.split(/\n/)[0].replace(/<[^>]+>/g, "").trim().slice(0, 160) || "Burning issue";
+        const related_to = relatedTo(b.burning_related_to);
+        if (burning_problem_id) await admin.from("lc_problem").update({ title: firstLine, related_to, description: `<p>${burning.replace(/\n/g, "<br>")}</p><p><i>Raised as the burning issue at the Leaders Council of ${m.held_on}.</i></p>`, updated_at: new Date().toISOString() }).eq("id", burning_problem_id).eq("added_by", email);
+        else {
+          const d = new Date(); d.setUTCDate(d.getUTCDate() + 7);
+          const { data: p } = await admin.from("lc_problem").insert({ title: firstLine, related_to, description: `<p>${burning.replace(/\n/g, "<br>")}</p><p><i>Raised as the burning issue at the Leaders Council of ${m.held_on}.</i></p>`, tentative_on: d.toISOString().slice(0, 10), added_by: email }).select("id").single();
+          burning_problem_id = p ? String(p.id) : null;
+        }
+      }
+      const row = { meeting_id, email, burning_related_to: relatedTo(b.burning_related_to), on_date: /^\d{4}-\d{2}-\d{2}$/.test(String(b.on_date || "")) ? String(b.on_date) : m.held_on, t1: clean(b.t1), t2: clean(b.t2), b1: clean(b.b1), burning, burning_problem_id, goals, plan_99: clean(b.plan_99), learning: clean(b.learning), updated_at: new Date().toISOString() };
+      const { error } = await admin.from("lc_checkin").upsert(row, { onConflict: "meeting_id,email" });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, burning_problem_id });
     }
     if (b.action === "comment") {
       const id = String(b.id || ""); const body = String(b.body || "").trim();

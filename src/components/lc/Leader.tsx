@@ -13,6 +13,7 @@ import { api, Card, Empty, MUTED, NAVY, ORANGE, dmy, leaderOf, type Boot, type L
 
 interface D {
   leader: L;
+  checkins: { id: string; meeting_id: string; on_date: string; t1: string | null; t2: string | null; b1: string | null; burning: string | null; burning_problem_id: string | null; goals: { goal: string; result: string }[]; plan_99: string | null; learning: string | null }[];
   ssc: { id: string; kind: string; title: string; created_at: string }[];
   problems: { id: string; title: string; status: string; created_at: string }[];
   solutions: { id: string; problem_id: string; created_at: string; problem: { id: string; title: string; status: string } | null }[];
@@ -67,6 +68,16 @@ export default function Leader({ boot, email, go }: { boot: Boot | null; email: 
       <div className="grid gap-3 lc-two" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
         <Card title="Start · Stop · Continue" right={<span className="text-xs" style={{ color: MUTED }}>{d.ssc.length}</span>}>
           {d.ssc.length === 0 ? <span className="text-sm" style={{ color: MUTED }}>Nothing on the board yet.</span> : <div className="grid gap-1">{d.ssc.map((c) => <div key={c.id} className="text-sm"><span className="rounded px-1.5 font-bold mr-1" style={{ fontSize: 10, background: "var(--paper)", color: NAVY }}>{KIND[c.kind]}</span><Link room="ssc">{c.title}</Link> <span className="text-xs" style={{ color: MUTED }}>{dmy(c.created_at)}</span></div>)}</div>}
+        </Card>
+        <Card title="Leaders check-ins (T2B1)" right={<span className="text-xs" style={{ color: MUTED }}>{d.checkins.length}</span>}>
+          {d.checkins.length === 0 ? <span className="text-sm" style={{ color: MUTED }}>No check-in yet.</span> : <div className="grid gap-2">{d.checkins.map((c) => (
+            <div key={c.id} className="text-sm rounded-lg px-3 py-2" style={{ background: "var(--soft)" }}>
+              <div className="text-xs font-bold" style={{ color: NAVY }}><Link room="meetings" arg={c.meeting_id}>{dmy(c.on_date)}</Link></div>
+              <div><b style={{ color: "var(--green)" }}>T1</b> {c.t1 || "—"} · <b style={{ color: "var(--green)" }}>T2</b> {c.t2 || "—"} · <b style={{ color: "var(--red)" }}>B1</b> {c.b1 || "—"}</div>
+              {c.burning && <div className="text-xs mt-0.5" style={{ color: MUTED }}>🔥 {c.burning_problem_id ? <Link room="solutions" arg={c.burning_problem_id}>{c.burning}</Link> : c.burning}</div>}
+              {c.goals?.length > 0 && <div className="text-xs mt-0.5" style={{ color: MUTED }}>🎯 {c.goals.map((g) => `${g.goal}${g.result ? ` → ${g.result}` : ""}`).join(" · ")}</div>}
+            </div>
+          ))}</div>}
         </Card>
         <Card title="Problems raised" right={<span className="text-xs" style={{ color: MUTED }}>{d.problems.length}</span>}>
           {d.problems.length === 0 ? <span className="text-sm" style={{ color: MUTED }}>None raised yet.</span> : <div className="grid gap-1">{d.problems.map((x) => <div key={x.id} className="text-sm"><Link room="solutions" arg={x.id}>{x.title}</Link> <span className="text-xs" style={{ color: MUTED }}>· {STATUS[x.status] || x.status} · {dmy(x.created_at)}</span></div>)}</div>}

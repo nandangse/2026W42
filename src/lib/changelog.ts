@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.14",
+    date: "2026-10-10",
+    module: "Leaders Council: the Leaders Check-in on every meeting; Related to on the Solution Board",
+    items: [
+      "LEADERS CHECK IN (Dr Raghu, 10 Oct 2026: \u201cOn top add a button saying Leaders Check in. In that: date, leader\u2019s name, Top 1 (T1), Top 2 (T2), Bottom 1 (B1), burning issue / sounding board for the meeting \u2014 will go to the Solution Board, a problem that needs to be solved, non-transactional \u2014 my goals from the last quarter audit: goal, results, add more; my plan for the next 99 days for the department and myself; any learning done\u201d). A green button on top of Meetings and on every meeting. One check-in per leader per meeting; it keeps your words when you come back. The goals come forward from your last check-in with the result blank, so the result is written against the goal. The burning issue raises a problem on the Solution Board in your name the first time it is saved \u2014 the first line is the title \u2014 and a later edit changes the words, never raises a second. Dr Raghu may fill one for a leader. Every meeting shows the round as cards by leader; the leader\u2019s own page lists their check-ins; \ud83e\uddde Format with Genie folds the round in to the minutes as a T2B1 table, with goals, plans and learning under Discussion.",
+      "RELATED TO (\u201chave a related to dropdown also\u201d): the part of the company a problem belongs to \u2014 Customers, Sales & marketing, Design & engineering, Purchase & suppliers, Production, Quality, Service & spares, Stores & logistics, Projects & delivery, People & HR, Finance & cash, IT & systems, Safety & compliance, Leadership & culture, Other. Picked on Raise / Edit a problem and on the burning issue, shown on the card and in the problem, and a filter on top of the board. Migration 0223.",
+    ],
+  },
+  {
     v: "6.4.0.13",
     date: "2026-10-10",
     module: "IMS: Internal audit — the checklist, the audit by department, the NCs and the action plan, the audit file",

@@ -6,10 +6,11 @@
  * owner, 👍 👎 ❓ and comments for everyone; problems blocked and solved
  * for MTD, QTD, YTD or a date range. "A continuous problem-solving method."
  */
+import { RELATED_TO } from "@/lib/lc/related";
 import { useEffect, useState } from "react";
 import { api, btn, Card, Empty, Err, Eye, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Names, Rich, RichField, Thumbs, Who, dmy, dmyt, istPlus, istToday, leaderOf, type Boot, type LcFile } from "./shared";
 
-interface P { id: string; title: string; description: string | null; lc_summary: string | null; status: string; tentative_on: string | null; added_by: string; created_at: string; updated_at: string; closed_at: string | null; up: number; down: number; question: number; mine: string | null; solutions: number; comments: number; viewed: number; mayEdit: boolean }
+interface P { id: string; title: string; description: string | null; lc_summary: string | null; status: string; tentative_on: string | null; related_to: string | null; added_by: string; created_at: string; updated_at: string; closed_at: string | null; up: number; down: number; question: number; mine: string | null; solutions: number; comments: number; viewed: number; mayEdit: boolean }
 interface Full { problem: Omit<P, "up" | "down" | "question" | "solutions" | "comments"> & { up: string[]; down: string[]; question: string[]; mine: string | null; viewed: string[]; mayEdit: boolean }; solutions: { id: string; body: string; added_by: string; created_at: string; up: string[]; down: string[]; question: string[]; mine: string | null; mayEdit: boolean }[]; comments: { id: string; body: string; added_by: string; created_at: string }[]; files: LcFile[] }
 interface Stats { from: string; to: string; raised: number; solved: number; blocked: number; open: number; cancelled: number }
 
@@ -34,18 +35,22 @@ export default function Solutions({ boot, arg, go }: { boot: Boot | null; arg: s
   const [d, setD] = useState<{ problems: P[]; stats: Stats } | null>(null);
   const [win, setWin] = useState<{ kind: "mtd" | "qtd" | "ytd" | "custom"; from: string; to: string }>({ kind: "qtd", ...range("qtd") });
   const [adding, setAdding] = useState(false);
-  const [show, setShow] = useState<"open" | "all">("open");
+  const [show, setShow] = useState<"open" | "all">("open"); const [rel, setRel] = useState("");
   const load = () => api<{ problems: P[]; stats: Stats }>(`/api/lc/problems?from=${win.from}&to=${win.to}`).then(setD).catch(() => setD({ problems: [], stats: { from: "", to: "", raised: 0, solved: 0, blocked: 0, open: 0, cancelled: 0 } }));
   useEffect(() => { load(); }, [win.from, win.to]); // eslint-disable-line react-hooks/exhaustive-deps
   if (arg) return <View boot={boot} id={arg} back={() => { go("solutions"); load(); }} />;
   const react = async (id: string, value: string) => { await api("/api/lc/problems", { action: "react", id, value }); load(); };
-  const list = (d?.problems || []).filter((p) => show === "all" || !["deployed", "cancelled"].includes(p.status));
+  const list = (d?.problems || []).filter((p) => (show === "all" || !["deployed", "cancelled"].includes(p.status)) && (!rel || p.related_to === rel));
   const s = d?.stats;
   const Tile = ({ n, t, c }: { n: number; t: string; c: string }) => <div className="rounded-lg bg-white px-3 py-2" style={{ border: "1px solid var(--line)", borderTop: `4px solid ${c}`, minWidth: 110 }}><div className="font-bold tnum" style={{ fontSize: 24, color: c, lineHeight: 1.1 }}>{n}</div><div className="text-xs" style={{ color: MUTED }}>{t}</div></div>;
   return (
     <div className="grid gap-3">
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={() => setAdding(true)} style={btn("primary")}>+ Raise a problem</button>
+        <select style={{ ...input, width: 190, padding: "5px 8px", fontSize: 12 }} value={rel} onChange={(e) => setRel(e.target.value)} title="Related to">
+          <option value="">Related to — all</option>
+          {RELATED_TO.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
         <span className="ml-auto" />
         {(["mtd", "qtd", "ytd"] as const).map((k) => <button key={k} onClick={() => setWin({ kind: k, ...range(k) })} style={btn(win.kind === k ? "primary" : "soft", { padding: "5px 10px", fontSize: 12 })}>{k.toUpperCase()}</button>)}
         <input type="date" style={{ ...input, width: 140, padding: "5px 8px", fontSize: 12 }} value={win.from} onChange={(e) => setWin({ kind: "custom", from: e.target.value, to: win.to })} />
@@ -79,6 +84,7 @@ export default function Solutions({ boot, arg, go }: { boot: Boot | null; arg: s
                 <Who boot={boot} email={p.added_by} size={20} />
                 <span>{dmy(p.created_at)}</span>
                 {p.tentative_on && <span>· by {dmy(p.tentative_on)}</span>}
+                {p.related_to && <span className="rounded px-1.5" style={{ background: "var(--soft)", color: NAVY, fontWeight: 600, fontSize: 10.5 }}>{p.related_to}</span>}
                 <span className="ml-auto">👁 {p.viewed} · 💡 {p.solutions} · 💬 {p.comments}{p.lc_summary ? " · 🧞" : ""}</span>
               </div>
               <div className="mt-2"><Thumbs up={p.up} down={p.down} question={p.question} mine={p.mine} onReact={(v) => react(p.id, v)} size={12} /></div>
@@ -93,7 +99,7 @@ export default function Solutions({ boot, arg, go }: { boot: Boot | null; arg: s
 
 function Form({ p, onDone }: { p?: Full["problem"]; onDone: (id?: string) => void }) {
   /* a week from today by default (Dr Raghu, 10 Oct 2026: "make the date today + 7 by default") */
-  const [f, setF] = useState({ title: p?.title || "", description: p?.description || "", tentative_on: p?.tentative_on || istPlus(7) });
+  const [f, setF] = useState({ title: p?.title || "", description: p?.description || "", tentative_on: p?.tentative_on || istPlus(7), related_to: p?.related_to || "" });
   const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const save = async () => { setErr(null); setBusy(true); try { const r = await api<{ id?: string }>("/api/lc/problems", { action: p ? "edit" : "create", id: p?.id, ...f }); onDone(r.id || p?.id); } catch (e) { setErr(String((e as Error).message)); } setBusy(false); };
   return (
@@ -102,8 +108,19 @@ function Form({ p, onDone }: { p?: Full["problem"]; onDone: (id?: string) => voi
       <input style={input} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="Dispatches slip because the packing list is made after the truck arrives" autoFocus />
       <label style={{ ...label, marginTop: 12 }}>Description — what happens, where, how often; pictures paste in</label>
       <RichField value={f.description} onChange={(h) => setF({ ...f, description: h })} minHeight={200} />
-      <label style={{ ...label, marginTop: 12 }}>Tentative date — when we expect to apply the solution</label>
-      <input type="date" style={{ ...input, width: 200 }} value={f.tentative_on} onChange={(e) => setF({ ...f, tentative_on: e.target.value })} />
+      <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
+        <div>
+          <label style={{ ...label, marginTop: 12 }}>Related to</label>
+          <select style={{ ...input, width: "100%" }} value={f.related_to} onChange={(e) => setF({ ...f, related_to: e.target.value })}>
+            <option value="">— pick the part of the company —</option>
+            {RELATED_TO.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ ...label, marginTop: 12 }}>Tentative date — when we expect to apply the solution</label>
+          <input type="date" style={{ ...input, width: "100%" }} value={f.tentative_on} onChange={(e) => setF({ ...f, tentative_on: e.target.value })} />
+        </div>
+      </div>
       <Err e={err} />
       <div className="flex gap-2 mt-3"><button onClick={save} disabled={busy} style={btn("primary")}>{busy ? "Saving…" : "Save"}</button><button onClick={() => onDone()} style={btn("ghost")}>Cancel</button></div>
     </Lightbox>
@@ -134,6 +151,7 @@ function View({ boot, id, back }: { boot: Boot | null; id: string; back: () => v
             <div className="flex items-center gap-2 flex-wrap">
               <span className="rounded px-2 font-bold" style={{ fontSize: 11, background: st.bg, color: st.colour }}>{st.label}</span>
               {p.tentative_on && <span className="text-xs" style={{ color: MUTED }}>tentative {dmy(p.tentative_on)}</span>}
+              {p.related_to && <span className="rounded px-1.5 text-xs" style={{ background: "var(--soft)", color: NAVY, fontWeight: 600 }}>{p.related_to}</span>}
               {p.closed_at && <span className="text-xs" style={{ color: MUTED }}>closed {dmy(p.closed_at)}</span>}
             </div>
             <div className="font-bold mt-1" style={{ fontSize: 20, color: NAVY, lineHeight: 1.3 }}>{p.title}</div>

@@ -14,6 +14,7 @@
  * Dr Raghu's to edit, kept once in lc_setting.
  */
 import { useEffect, useMemo, useState } from "react";
+import { CheckinForm, CheckinRound, type Checkin } from "./Checkin";
 import { api, btn, Card, Empty, Err, Eye, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Rich, RichField, Who, dmy, dmyt, istToday, leaderOf, type Boot, type LcFile } from "./shared";
 import { MOM_TEMPLATE } from "@/lib/lc/mom-template";
 
@@ -33,14 +34,15 @@ function usePeople(): Person[] {
 export default function Meetings({ boot, arg, go }: { boot: Boot | null; arg: string | null; go: (k: string, a?: string | null) => void }) {
   const [list, setList] = useState<M[] | null>(null);
   const [adding, setAdding] = useState(false);
-  const [tpl, setTpl] = useState(false);
+  const [tpl, setTpl] = useState(false); const [ck, setCk] = useState(false);
   const load = () => api<{ meetings: M[] }>("/api/lc/meetings").then((r) => setList(r.meetings)).catch(() => setList([]));
   useEffect(() => { load(); }, []);
-  if (arg) return <View boot={boot} id={arg} back={() => { go("meetings"); load(); }} />;
+  if (arg) return <View boot={boot} id={arg} back={() => { go("meetings"); load(); }} go={go} />;
   return (
     <div className="grid gap-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => setAdding(true)} style={btn("primary")}>+ New minutes</button>
+        <button onClick={() => setCk(true)} style={btn("primary", { background: "var(--green)", borderColor: "var(--green)" })} title="T1, T2, B1, the burning issue, goals and results, the 99-day plan, learning">✅ Leaders Check in</button>
+        <button onClick={() => setAdding(true)} style={btn("soft")}>+ New minutes</button>
         {boot?.me.isOwner && <button onClick={() => setTpl(true)} style={btn("soft")} title="The standard Minutes of Meeting every new set opens on">✎ MoM template</button>}
         <span className="text-xs" style={{ color: MUTED }}>{list ? `${list.length} meeting${list.length === 1 ? "" : "s"} on record` : ""}</span>
       </div>
@@ -69,6 +71,7 @@ export default function Meetings({ boot, arg, go }: { boot: Boot | null; arg: st
       )}
       {adding && <Form boot={boot} onDone={(id) => { setAdding(false); load(); if (id) go("meetings", id); }} />}
       {tpl && <TemplateEditor boot={boot} onDone={() => setTpl(false)} />}
+      {ck && <CheckinForm boot={boot} meetings={list || []} onDone={(r) => { setCk(false); if (r) go("meetings", r.meetingId); }} />}
     </div>
   );
 }
@@ -180,11 +183,11 @@ function TemplateEditor({ boot, onDone }: { boot: Boot | null; onDone: () => voi
   );
 }
 
-function View({ boot, id, back }: { boot: Boot | null; id: string; back: () => void }) {
-  const [d, setD] = useState<{ meeting: M; files: LcFile[]; comments: C[] } | null>(null);
+function View({ boot, id, back, go }: { boot: Boot | null; id: string; back: () => void; go: (k: string, a?: string | null) => void }) {
+  const [d, setD] = useState<{ meeting: M; files: LcFile[]; comments: C[]; checkins: Checkin[] } | null>(null);
   const [edit, setEdit] = useState(false); const [text, setText] = useState(""); const [genie, setGenie] = useState(false);
-  const [top, setTop] = useState(true);
-  const load = () => api<{ meeting: M; files: LcFile[]; comments: C[] }>(`/api/lc/meetings?id=${id}`).then(setD).catch((e) => alert(String(e.message || e)));
+  const [top, setTop] = useState(true); const [ck, setCk] = useState(false);
+  const load = () => api<{ meeting: M; files: LcFile[]; comments: C[]; checkins: Checkin[] }>(`/api/lc/meetings?id=${id}`).then(setD).catch((e) => alert(String(e.message || e)));
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!d) return <Empty>Opening…</Empty>;
   const m = d.meeting;
@@ -231,6 +234,7 @@ function View({ boot, id, back }: { boot: Boot | null; id: string; back: () => v
           </Card>
         </div>
       )}
+      <CheckinRound boot={boot} checkins={d.checkins || []} go={go} onCheckin={() => setCk(true)} />
       <Card title="Minutes">
         {m.minutes ? <Rich html={m.minutes} /> : <span className="text-sm" style={{ color: MUTED }}>Nothing written yet{may ? " — Edit to write them" : ""}.</span>}
       </Card>
@@ -249,6 +253,7 @@ function View({ boot, id, back }: { boot: Boot | null; id: string; back: () => v
         <div className="mt-2"><button onClick={comment} disabled={!text.trim()} style={btn("primary")}>Say it</button></div>
       </Card>
       {edit && <Form boot={boot} m={m} onDone={() => { setEdit(false); load(); }} />}
+      {ck && <CheckinForm boot={boot} meetings={[{ id: m.id, held_on: m.held_on }]} meetingId={m.id} onDone={() => { setCk(false); load(); }} />}
     </div>
   );
 }

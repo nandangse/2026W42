@@ -1,3 +1,4 @@
+import { relatedTo } from "@/lib/lc/related";
 import { NextResponse } from "next/server";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
@@ -102,14 +103,14 @@ export async function POST(req: Request) {
     };
     if (b.action === "create") {
       const title = String(b.title || "").trim(); if (!title) throw new HttpError(400, "Name the problem.");
-      const { data, error } = await admin.from("lc_problem").insert({ title, description: txt(b.description), tentative_on: date(b.tentative_on), added_by: u.email }).select("id").single();
+      const { data, error } = await admin.from("lc_problem").insert({ title, description: txt(b.description), tentative_on: date(b.tentative_on), related_to: relatedTo(b.related_to), added_by: u.email }).select("id").single();
       if (error) throw error;
       return NextResponse.json({ ok: true, id: data.id });
     }
     if (b.action === "edit") {
       const id = String(b.id || ""); await own(id);
       const title = String(b.title || "").trim(); if (!title) throw new HttpError(400, "Name the problem.");
-      const { error } = await admin.from("lc_problem").update({ title, description: txt(b.description), tentative_on: date(b.tentative_on), updated_at: new Date().toISOString() }).eq("id", id);
+      const { error } = await admin.from("lc_problem").update({ title, description: txt(b.description), tentative_on: date(b.tentative_on), related_to: relatedTo(b.related_to), updated_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }

@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     const [
       { data: ssc }, { data: problems }, { data: solutions }, { data: comments }, { data: presentations },
       { data: meetings }, { data: sections }, { data: knowledge }, { data: kpis }, { data: values },
-      { data: reactions }, { data: views }, { data: rounds }, { data: done },
+      { data: reactions }, { data: views }, { data: rounds }, { data: done }, { data: checkins },
     ] = await Promise.all([
       admin.from("lc_ssc").select("id,kind,title,created_at").eq("added_by", email).order("created_at", { ascending: false }),
       admin.from("lc_problem").select("id,title,status,created_at").eq("added_by", email).order("created_at", { ascending: false }),
@@ -40,6 +40,7 @@ export async function GET(req: Request) {
       admin.from("lc_view").select("ref_kind,ref_id,first_at,opens").eq("email", email),
       admin.from("lc_health_round").select("id,label,opened_on,closed_on").order("opened_on", { ascending: false }),
       admin.from("lc_health_done").select("round_id").eq("email", email),
+      admin.from("lc_checkin").select("id,meeting_id,on_date,t1,t2,b1,burning,burning_problem_id,goals,plan_99,learning").eq("email", email).order("on_date", { ascending: false }),
     ]);
     /* the problems their solutions and comments sit on, named */
     const pids = [...new Set([...(solutions || []).map((s) => s.problem_id), ...(comments || []).filter((c) => c.ref_kind === "problem").map((c) => c.ref_id)])];
@@ -49,6 +50,7 @@ export async function GET(req: Request) {
     const doneIds = new Set((done || []).map((d) => d.round_id));
     return NextResponse.json({
       leader,
+      checkins: checkins || [],
       ssc: ssc || [], problems: problems || [], solutions: (solutions || []).map((s) => ({ ...s, problem: (pnames || []).find((p) => p.id === s.problem_id) || null })),
       comments: (comments || []).map((c) => ({ ...c, problem: c.ref_kind === "problem" ? (pnames || []).find((p) => p.id === c.ref_id) || null : null })),
       presentations: presentations || [],
