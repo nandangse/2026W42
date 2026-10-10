@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.4",
+    date: "2026-10-10",
+    module: "A pasted picture stands small",
+    items: [
+      "A PICTURE PASTED INTO MINUTES, A PRINCIPLE, A PROBLEM OR A CARD NO LONGER FILLS THE SCREEN (Dr Raghu, 10 Oct 2026: \u201cimage is huge\u201d). It stands at most 320 pixels tall, in proportion, with a click to open it whole; a picture given a width with \uD83D\uDDBC\u2212 / \uD83D\uDDBC+ in the editor keeps that width. Headings, tables and links inside the council\u2019s rich text are dressed the same way everywhere in the room.",
+    ],
+  },
+  {
     v: "6.4.0.3",
     date: "2026-10-10",
     module: "Minutes: employees first, then guests, and the standard MoM from a template",

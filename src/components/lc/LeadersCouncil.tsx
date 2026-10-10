@@ -85,6 +85,16 @@ export default function LeadersCouncil({ email, displayName, initials, role, isO
       </div>
       <style>{`
         .lc-burger { display: none; }
+        /* A PASTED PICTURE STANDS SMALL (Dr Raghu, 10 Oct 2026: "image is
+           huge"). Capped in height, kept in proportion, a click opens it whole
+           (RichContent's thumbs). A picture given a width in the editor keeps
+           that width. */
+        .lc-wrap .rich-html img { max-width: 100%; max-height: 320px; width: auto; height: auto; border-radius: 8px; border: 1px solid var(--line); cursor: zoom-in; display: block; margin: 6px 0; }
+        .lc-wrap .rich-html img[style*="width"] { max-height: none; }
+        .lc-wrap .rich-html a { color: var(--accent); word-break: break-all; }
+        .lc-wrap .rich-html h3 { font-size: 15px; font-weight: 800; color: var(--navy); margin: 14px 0 4px; }
+        .lc-wrap .rich-html table { border-collapse: collapse; font-size: 13px; margin: 6px 0; }
+        .lc-wrap .rich-html td, .lc-wrap .rich-html th { border: 1px solid var(--line); padding: 4px 8px; }
         @media (max-width: 860px) {
           .lc-burger { display: inline-block; }
           .lc-nav { position: fixed; top: 50px; bottom: 0; left: -240px; z-index: 41; overflow-y: auto; transition: left .18s; box-shadow: 0 0 0 transparent; }
