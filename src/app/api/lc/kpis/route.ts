@@ -57,7 +57,8 @@ export async function POST(req: Request) {
       const target = b.target === undefined || b.target === null || b.target === "" ? null : Number(b.target);
       if (target !== null && !Number.isFinite(target)) throw new HttpError(400, "The target must be a number.");
       const visibility = ["all", "mancom", "stratcom", "lc", "staff"].includes(String(b.visibility)) ? String(b.visibility) : "all";
-      return { name, assigned_to: txt(b.assigned_to)?.toLowerCase() || null, type, unit: txt(b.unit), agg, target, visibility };
+      const group = ["Revenue", "Profits", "Inventory", "Cash", "People", "Other"].includes(String(b.group)) ? String(b.group) : null;
+      return { name, group, assigned_to: txt(b.assigned_to)?.toLowerCase() || null, type, unit: txt(b.unit), agg, target, visibility };
     };
     if (b.action === "create") {
       const { data: last } = await admin.from("lc_kpi").select("sort").order("sort", { ascending: false }).limit(1).maybeSingle();
@@ -70,7 +71,11 @@ export async function POST(req: Request) {
       const { data: k } = await admin.from("lc_kpi").select("created_by").eq("id", id).maybeSingle();
       if (!k) throw new HttpError(404, "No such KPI.");
       if (!mayEdit(u, k.created_by)) throw new HttpError(403, "The one who added the KPI, or Dr Raghu.");
-      if (b.action === "remove") { await admin.from("lc_kpi").delete().eq("id", id); return NextResponse.json({ ok: true }); }
+      if (b.action === "remove") {
+        const { data: kk } = await admin.from("lc_kpi").select("code").eq("id", id).maybeSingle();
+        if (kk?.code) throw new HttpError(400, "A KPI the ratios lean on is retired, not removed.");
+        await admin.from("lc_kpi").delete().eq("id", id); return NextResponse.json({ ok: true });
+      }
       const { error } = await admin.from("lc_kpi").update({ ...fields(), active: b.active === undefined ? true : !!b.active }).eq("id", id);
       if (error) throw error;
       return NextResponse.json({ ok: true });
@@ -82,6 +87,7 @@ export async function POST(req: Request) {
     }
     if (b.action === "value") {
       const id = String(b.id || ""); const m = String(b.month || "");
+      { const { data: kk } = await admin.from("lc_kpi").select("formula").eq("id", id).maybeSingle(); if (kk?.formula) throw new HttpError(400, "This figure is worked out from the others — enter those."); }
       if (!/^\d{4}-\d{2}$/.test(m)) throw new HttpError(400, "A month, YYYY-MM.");
       const month = `${m}-01`;
       if (b.value === "" || b.value === null || b.value === undefined) {

@@ -92,6 +92,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.6",
+    date: "2026-10-10",
+    module: "KPIs in Dr Raghu's five groups, the latest month at the right edge, a filter on top, a lightbox on each",
+    items: [
+      "THE KPIs ARE HIS (Dr Raghu, 10 Oct 2026): Revenue \u2014 Booking, Billing, Collections. Profits \u2014 Throughput, Throughput % of sales, OE, OE % of sales. Inventory \u2014 Purchase, Purchase % of sales, Inventory at month end. Cash \u2014 Payables, Payables > 180 days, Receivables, Receivables > 180 days, Fixed costs, Purchase of fixed assets. People \u2014 Total, Staff, Labour, Contract, Salary, Salary / Sales. Genie\u2019s earlier twenty-four, never given a figure, are gone. Migration 0219.",
+      "A RATIO IS WORKED OUT, NEVER TYPED. Throughput %, OE % and Purchase % are the figure over Billing; Salary / Sales likewise; People Total is Staff + Labour + Contract. A month\u2019s ratio comes from that month\u2019s figures, a quarter\u2019s from the quarter\u2019s sums, so a quarter percentage is never an average of percentages. They stand in italics and refuse a typed value.",
+      "THE LATEST MONTH AT THE RIGHT EDGE: six months on the board by default (twelve on a click), scrolled to the end as it opens. A FILTER ON TOP: the group, the leader, a word. Group headings run down the board.",
+      "A LIGHTBOX ON THE KPI: its months as bars against the target, every figure with who entered it and when, a click on a figure to enter it, and Edit for the one who added it or Dr Raghu.",
+    ],
+  },
+  {
     v: "6.4.0.5",
     date: "2026-10-10",
     module: "Minutes: the meeting in two halves on top, the minutes full width below",
