@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * taken as it comes — the bare id, the id with its "?usp=" tail, or the whole
  * URL — because a setting a person pastes should take what a person pastes.
  */
-const KEYS = new Set(["drive_folder"]);
+const KEYS = new Set(["drive_folder", "mom_template"]);
 
 const folderIdFrom = (v: string) => {
   const s = String(v || "").trim();

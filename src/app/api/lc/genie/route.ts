@@ -4,6 +4,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { readBody } from "@/lib/validate";
 import { AI, anthropicClient } from "@/lib/ai";
 import { mayEdit, requireLeader } from "@/lib/lc/auth";
+import { MOM_TEMPLATE, templateHeadings } from "@/lib/lc/mom-template";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -42,11 +43,13 @@ export async function POST(req: Request) {
       const { data: m } = await admin.from("lc_meeting").select("*").eq("id", b.id).maybeSingle();
       if (!m) throw new HttpError(404, "No such meeting.");
       if (!mayEdit(u, m.created_by)) throw new HttpError(403, "The one who wrote these minutes, or Dr Raghu.");
-      const raw = strip(m.minutes || "");
-      if (raw.length < 20) throw new HttpError(400, "Write the minutes first — even rough notes — then ask Genie to format them.");
+      const raw = strip(m.minutes || "").replace(/\s*(Agenda|Decisions|Action points|#\s*Action\s*Who\s*By when\s*Status|Discussion|Open questions|Next meeting|Date, place, what each one brings\.)\s*/g, " ").replace(/\b\d\s+Open\b/g, " ").trim();
+      if (raw.length < 20) throw new HttpError(400, "Write the minutes first — even rough notes under the headings — then ask Genie to format them.");
+      const { data: tpl } = await admin.from("lc_setting").select("value").eq("key", "mom_template").maybeSingle();
+      const heads = templateHeadings(tpl?.value || MOM_TEMPLATE);
       const html = toHtml(await ask(
-        HOUSE + " You are formatting the minutes of a Leaders Council meeting. Keep every fact, name, number and decision exactly as given; add nothing that is not in the notes. Structure: <h3>Decisions</h3> (numbered), <h3>Action points</h3> as a table with columns Action, Who, By when (write — where the notes do not say), <h3>Discussion</h3> (short paragraphs or bullets, in the order of the notes), <h3>Open questions</h3> if any. If the notes mention attendees who are not in the list, say so in one line at the end.",
-        `Meeting on ${m.held_on}${m.location ? ` at ${m.location}` : ""}. Attendees: ${(m.attendees || []).join(", ") || "not listed"}.\n\nNotes:\n${raw}`,
+        HOUSE + ` You are formatting the minutes of a Leaders Council meeting into the company's standard Minutes of Meeting. Keep every fact, name, number and decision exactly as given; add nothing that is not in the notes. Use EXACTLY these headings, in this order, each as <h3>: ${heads.join(" · ")}. Under "Action points" write a table with the columns #, Action, Who, By when, Status (Status is Open unless the notes say done; write — where the notes do not say). Decisions numbered. Discussion in short paragraphs or bullets, in the order of the notes. A heading with nothing under it gets one line: "Nothing recorded." If the notes mention people who are neither attendees nor guests, say so in one line at the end.`,
+        `Meeting on ${m.held_on}${m.location ? ` at ${m.location}` : ""}. Attendees (employees): ${(m.attendees || []).join(", ") || "not listed"}. Guests: ${(m.guests || []).join(", ") || "none"}.\n\nNotes:\n${raw}`,
       ));
       await admin.from("lc_meeting").update({ minutes: html, updated_at: new Date().toISOString() }).eq("id", b.id);
       return NextResponse.json({ ok: true, html });

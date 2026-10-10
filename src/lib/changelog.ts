@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.3",
+    date: "2026-10-10",
+    module: "Minutes: employees first, then guests, and the standard MoM from a template",
+    items: [
+      "ATTENDEES ARE PICKED FROM THE ROLLS (Dr Raghu, 10 Oct 2026, on the attendees box: \u201cthis should have it from writing employees first, then mention non-employees\u201d). Type a name and the HRMS roll offers it \u2014 designation and department beside \u2014 and the chosen stand as chips, the council\u2019s in their colours and pre-ticked on a new set. Guests who are not on the rolls go on a line of their own. Migration 0217.",
+      "THE STANDARD MINUTES OF MEETING (\u201cthis then can become the standard MoM in system!!! Also put in template. It will come from template\u201d). Every new set of minutes opens on the template \u2014 Agenda, Decisions, Action points as a table of #, Action, Who, By when, Status, Discussion, Open questions, Next meeting. Dr Raghu edits the template once (\u270E MoM template on Meetings) and every set after opens on his; Genie formats rough notes into exactly those headings, so minutes typed and minutes formatted read alike.",
+    ],
+  },
+  {
     v: "6.4.0.2",
     date: "2026-10-10",
     module: "The eye on every card, the company's KPIs laid out, the months before while you fill",

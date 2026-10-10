@@ -44,7 +44,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ meeting: { ...m, hours: hours(m.from_time, m.to_time), viewed }, files: files || [], comments: comments || [] });
     }
     const [{ data: ms, error }, { data: files }] = await Promise.all([
-      admin.from("lc_meeting").select("id,held_on,from_time,to_time,location,attendees,created_by,created_at,updated_at").order("held_on", { ascending: false }).order("created_at", { ascending: false }),
+      admin.from("lc_meeting").select("id,held_on,from_time,to_time,location,attendees,guests,created_by,created_at,updated_at").order("held_on", { ascending: false }).order("created_at", { ascending: false }),
       admin.from("lc_file").select("ref_id").eq("ref_kind", "meeting"),
     ]);
     if (error) throw error;
@@ -62,8 +62,8 @@ export async function POST(req: Request) {
     const fields = () => {
       const held_on = String(b.held_on || "").trim();
       if (!/^\d{4}-\d{2}-\d{2}$/.test(held_on)) throw new HttpError(400, "The date.");
-      const attendees = (Array.isArray(b.attendees) ? b.attendees : String(b.attendees || "").split(/[,\n]/)).map((x: unknown) => String(x).trim()).filter(Boolean);
-      return { held_on, from_time: time(b.from_time), to_time: time(b.to_time), location: txt(b.location), attendees, minutes: txt(b.minutes) };
+      const names = (v: unknown) => (Array.isArray(v) ? v : String(v || "").split(/[,\n]/)).map((x: unknown) => String(x).trim()).filter(Boolean);
+      return { held_on, from_time: time(b.from_time), to_time: time(b.to_time), location: txt(b.location), attendees: names(b.attendees), guests: names(b.guests), minutes: txt(b.minutes) };
     };
     const own = async (id: string) => {
       const { data: m } = await admin.from("lc_meeting").select("created_by").eq("id", id).maybeSingle();

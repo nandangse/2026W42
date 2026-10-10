@@ -1,23 +1,39 @@
 "use client";
 /**
  * Meetings (Dr Raghu, 10 Oct 2026): the council's minutes — date, from–to
- * with the hours worked out, the place, the attendees typed in, and the
- * minutes as rich text with pictures and documents. The genie button
- * formats what is written into decisions, action points and discussion;
- * press it again after adding more.
+ * with the hours worked out, the place, the attendees, and the minutes as
+ * rich text with pictures and documents. The genie button formats what is
+ * written into the standard Minutes of Meeting; press it again after
+ * adding more.
+ *
+ * Later the same day: "this should have it from writing employees first,
+ * then mention non-employees. This then can become the standard MoM in
+ * system!!! Also put in template. It will come from template." So the
+ * attendees are picked from the HRMS rolls (the council pre-ticked), the
+ * guests are a line of their own, and new minutes open on the template —
+ * Dr Raghu's to edit, kept once in lc_setting.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, btn, Card, Empty, Err, Eye, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Rich, RichField, Who, dmy, dmyt, istToday, leaderOf, type Boot, type LcFile } from "./shared";
+import { MOM_TEMPLATE } from "@/lib/lc/mom-template";
 
-interface M { id: string; held_on: string; from_time: string | null; to_time: string | null; location: string | null; attendees: string[]; minutes?: string | null; hours: number | null; created_by: string | null; created_at: string; updated_at: string; files?: number; viewed?: string[] }
+interface M { id: string; held_on: string; from_time: string | null; to_time: string | null; location: string | null; attendees: string[]; guests?: string[]; minutes?: string | null; hours: number | null; created_by: string | null; created_at: string; updated_at: string; files?: number; viewed?: string[] }
 interface C { id: string; body: string; added_by: string; created_at: string }
+interface Person { name: string; designation: string | null; department: string | null; email: string | null }
 
 const hhmm = (t?: string | null) => t ? t.slice(0, 5) : "";
 const hoursOf = (a: string, b: string) => { if (!a || !b) return null; const m = (t: string) => { const [h, mi] = t.split(":").map(Number); return h * 60 + (mi || 0); }; const d = m(b) - m(a); return d > 0 ? Math.round((d / 60) * 100) / 100 : null; };
 
+function usePeople(): Person[] {
+  const [p, setP] = useState<Person[]>([]);
+  useEffect(() => { api<{ people: Person[] }>("/api/lc/people").then((r) => setP(r.people)).catch(() => setP([])); }, []);
+  return p;
+}
+
 export default function Meetings({ boot, arg, go }: { boot: Boot | null; arg: string | null; go: (k: string, a?: string | null) => void }) {
   const [list, setList] = useState<M[] | null>(null);
   const [adding, setAdding] = useState(false);
+  const [tpl, setTpl] = useState(false);
   const load = () => api<{ meetings: M[] }>("/api/lc/meetings").then((r) => setList(r.meetings)).catch(() => setList([]));
   useEffect(() => { load(); }, []);
   if (arg) return <View boot={boot} id={arg} back={() => { go("meetings"); load(); }} />;
@@ -25,14 +41,15 @@ export default function Meetings({ boot, arg, go }: { boot: Boot | null; arg: st
     <div className="grid gap-3">
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={() => setAdding(true)} style={btn("primary")}>+ New minutes</button>
+        {boot?.me.isOwner && <button onClick={() => setTpl(true)} style={btn("soft")} title="The standard Minutes of Meeting every new set opens on">✎ MoM template</button>}
         <span className="text-xs" style={{ color: MUTED }}>{list ? `${list.length} meeting${list.length === 1 ? "" : "s"} on record` : ""}</span>
       </div>
       {list === null && <Empty>Opening…</Empty>}
-      {list && list.length === 0 && <Empty>No minutes yet. Write the first — rough notes will do; Genie formats them.</Empty>}
+      {list && list.length === 0 && <Empty>No minutes yet. Write the first — the template is already laid out; Genie tidies the notes.</Empty>}
       {list && list.length > 0 && (
         <div className="genie-scroll rounded-lg bg-white" style={{ border: "1px solid var(--line)", overflowX: "auto" }}>
           <table className="genie-table">
-            <thead><tr><th>Date</th><th>From – to</th><th className="tnum">Hours</th><th>Location</th><th>Attendees</th><th>By</th><th>Files</th></tr></thead>
+            <thead><tr><th>Date</th><th>From – to</th><th className="tnum">Hours</th><th>Location</th><th>Attendees</th><th>Guests</th><th>By</th><th>Files</th></tr></thead>
             <tbody>
               {list.map((m) => (
                 <tr key={m.id} onClick={() => go("meetings", m.id)} style={{ cursor: "pointer" }}>
@@ -41,6 +58,7 @@ export default function Meetings({ boot, arg, go }: { boot: Boot | null; arg: st
                   <td className="tnum">{m.hours ?? "—"}</td>
                   <td>{m.location || "—"}</td>
                   <td style={{ maxWidth: 360 }}>{m.attendees.join(", ") || "—"}</td>
+                  <td style={{ maxWidth: 220 }}>{(m.guests || []).join(", ") || "—"}</td>
                   <td><Who boot={boot} email={m.created_by} size={20} /></td>
                   <td className="tnum">{m.files || ""}</td>
                 </tr>
@@ -50,18 +68,57 @@ export default function Meetings({ boot, arg, go }: { boot: Boot | null; arg: st
         </div>
       )}
       {adding && <Form boot={boot} onDone={(id) => { setAdding(false); load(); if (id) go("meetings", id); }} />}
+      {tpl && <TemplateEditor boot={boot} onDone={() => setTpl(false)} />}
+    </div>
+  );
+}
+
+/** EMPLOYEES FIRST: a search box over the HRMS rolls, the chosen as chips; the council pre-ticked on a new set. */
+function Attendees({ value, onChange, people, boot }: { value: string[]; onChange: (v: string[]) => void; people: Person[]; boot: Boot | null }) {
+  const [q, setQ] = useState("");
+  const pool = useMemo(() => {
+    const names = new Map<string, Person>();
+    for (const p of people) names.set(p.name.toLowerCase(), p);
+    for (const m of boot?.members || []) if (!names.has(m.name.toLowerCase())) names.set(m.name.toLowerCase(), { name: m.name, designation: "Leaders Council", department: null, email: m.email });
+    return [...names.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [people, boot]);
+  const needle = q.trim().toLowerCase();
+  const hits = needle ? pool.filter((p) => !value.includes(p.name) && (p.name.toLowerCase().includes(needle) || (p.designation || "").toLowerCase().includes(needle) || (p.department || "").toLowerCase().includes(needle))).slice(0, 8) : [];
+  const add = (n: string) => { if (!value.includes(n)) onChange([...value, n]); setQ(""); };
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5 mb-1.5">
+        {value.map((n) => { const l = boot?.members.find((m) => m.name === n); return (
+          <span key={n} className="inline-flex items-center gap-1 rounded-full pl-1 pr-2 font-semibold" style={{ fontSize: 12, background: l ? l.colour : "var(--paper)", color: l ? "#fff" : NAVY, border: l ? "none" : "1px solid var(--line)", height: 24 }}>
+            <span className="rounded-full inline-flex items-center justify-center" style={{ width: 18, height: 18, fontSize: 9, background: "rgba(255,255,255,.25)" }}>{(l?.initials || n.slice(0, 2)).toUpperCase()}</span>{n}
+            <button onClick={() => onChange(value.filter((x) => x !== n))} style={{ opacity: .8 }} aria-label={`Remove ${n}`}>×</button>
+          </span>
+        ); })}
+        {value.length === 0 && <span className="text-xs" style={{ color: MUTED }}>Nobody picked yet.</span>}
+      </div>
+      <div className="relative">
+        <input style={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Type a name to add — ${pool.length} on the rolls`} onKeyDown={(e) => { if (e.key === "Enter" && hits[0]) { e.preventDefault(); add(hits[0].name); } }} />
+        {hits.length > 0 && (
+          <div className="absolute left-0 right-0 rounded-lg bg-white" style={{ top: "calc(100% + 4px)", border: "1px solid var(--line)", boxShadow: "0 8px 24px rgba(0,0,0,.15)", zIndex: 5 }}>
+            {hits.map((p) => <button key={p.name} onClick={() => add(p.name)} className="w-full text-left px-3 py-1.5 hover:bg-gray-50" style={{ fontSize: 13, color: NAVY }}><b>{p.name}</b> <span style={{ color: MUTED, fontSize: 11 }}>{[p.designation, p.department].filter(Boolean).join(" · ")}</span></button>)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 function Form({ boot, m, onDone }: { boot: Boot | null; m?: M; onDone: (id?: string) => void }) {
-  const [f, setF] = useState({ held_on: m?.held_on || istToday(), from_time: hhmm(m?.from_time), to_time: hhmm(m?.to_time), location: m?.location || "Nandan House, Turbhe", attendees: m?.attendees.join(", ") || (boot?.members.map((x) => x.name).join(", ") || ""), minutes: m?.minutes || "" });
+  const people = usePeople();
+  const template = boot?.settings.mom_template || MOM_TEMPLATE;
+  const [f, setF] = useState({ held_on: m?.held_on || istToday(), from_time: hhmm(m?.from_time), to_time: hhmm(m?.to_time), location: m?.location || "Nandan House, Turbhe", guests: (m?.guests || []).join(", "), minutes: m?.minutes || template });
+  const [attendees, setAttendees] = useState<string[]>(m ? m.attendees : (boot?.members.map((x) => x.name) || []));
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const hrs = hoursOf(f.from_time, f.to_time);
   const save = async () => {
     setErr(null); setBusy(true);
-    try { const r = await api<{ id?: string }>("/api/lc/meetings", { action: m ? "edit" : "create", id: m?.id, ...f, attendees: f.attendees.split(/[,\n]/).map((s) => s.trim()).filter(Boolean) }); onDone(r.id || m?.id); }
+    try { const r = await api<{ id?: string }>("/api/lc/meetings", { action: m ? "edit" : "create", id: m?.id, ...f, attendees, guests: f.guests.split(/[,\n]/).map((s) => s.trim()).filter(Boolean) }); onDone(r.id || m?.id); }
     catch (e) { setErr(String((e as Error).message)); }
     setBusy(false);
   };
@@ -74,12 +131,29 @@ function Form({ boot, m, onDone }: { boot: Boot | null; m?: M; onDone: (id?: str
         <div><label style={label}>Hours</label><div style={{ ...input, background: "var(--paper)" }} className="tnum">{hrs ?? "—"}</div></div>
         <div style={{ gridColumn: "span 2" }}><label style={label}>Location</label><input style={input} value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} /></div>
       </div>
-      <label style={{ ...label, marginTop: 12 }}>Attendees — names, comma-separated; anyone, not only the council</label>
-      <input style={input} value={f.attendees} onChange={(e) => setF({ ...f, attendees: e.target.value })} />
-      <label style={{ ...label, marginTop: 12 }}>Minutes — rough notes are fine; 🧞 Format with Genie tidies them after saving</label>
-      <RichField value={f.minutes} onChange={(h) => setF({ ...f, minutes: h })} minHeight={260} placeholder="Decisions, who does what by when, what was discussed…" />
+      <label style={{ ...label, marginTop: 12 }}>Attendees — employees, from the rolls</label>
+      <Attendees value={attendees} onChange={setAttendees} people={people} boot={boot} />
+      <label style={{ ...label, marginTop: 12 }}>Guests — not on the rolls; names, comma-separated</label>
+      <input style={input} value={f.guests} onChange={(e) => setF({ ...f, guests: e.target.value })} placeholder="A customer, a consultant, a visitor…" />
+      <label style={{ ...label, marginTop: 12 }}>Minutes — the standard MoM; write under the headings, 🧞 Format with Genie tidies it after saving</label>
+      <RichField value={f.minutes} onChange={(h) => setF({ ...f, minutes: h })} minHeight={320} />
       <Err e={err} />
       <div className="flex gap-2 mt-3"><button onClick={save} disabled={busy} style={btn("primary")}>{busy ? "Saving…" : m ? "Save" : "Save — then attach files"}</button><button onClick={() => onDone()} style={btn("ghost")}>Cancel</button></div>
+    </Lightbox>
+  );
+}
+
+/** The owner's template: edited once, every new set of minutes opens on it. */
+function TemplateEditor({ boot, onDone }: { boot: Boot | null; onDone: () => void }) {
+  const [html, setHtml] = useState(boot?.settings.mom_template || MOM_TEMPLATE);
+  const [err, setErr] = useState<string | null>(null);
+  const save = async () => { setErr(null); try { await api("/api/lc/settings", { key: "mom_template", value: html }); if (boot) boot.settings.mom_template = html; onDone(); } catch (e) { setErr(String((e as Error).message)); } };
+  return (
+    <Lightbox title="The standard Minutes of Meeting — the template" onClose={onDone} wide>
+      <div className="text-sm mb-2" style={{ color: "var(--dim)" }}>Every new set of minutes opens on this. Genie formats into these headings, so keep them as headings. Minutes already written are not touched.</div>
+      <RichField value={html} onChange={setHtml} minHeight={360} />
+      <Err e={err} />
+      <div className="flex gap-2 mt-3"><button onClick={save} style={btn("primary")}>Save the template</button><button onClick={() => setHtml(MOM_TEMPLATE)} style={btn("soft")}>Back to Genie&apos;s default</button><button onClick={onDone} style={btn("ghost")}>Cancel</button></div>
     </Lightbox>
   );
 }
@@ -106,11 +180,12 @@ function View({ boot, id, back }: { boot: Boot | null; id: string; back: () => v
               {hhmm(m.from_time)}{m.to_time ? ` – ${hhmm(m.to_time)}` : ""}{m.hours ? ` · ${m.hours} h` : ""}{m.location ? ` · ${m.location}` : ""}
             </div>
             <div className="text-sm mt-1"><b>Attendees:</b> {m.attendees.join(", ") || "—"}</div>
+            {(m.guests || []).length > 0 && <div className="text-sm"><b>Guests:</b> {(m.guests || []).join(", ")}</div>}
             <div className="text-xs mt-1 flex items-center gap-1 flex-wrap" style={{ color: MUTED }}>Minutes by <Who boot={boot} email={m.created_by} size={18} /> · {dmyt(m.created_at)}{m.updated_at !== m.created_at ? ` · edited ${dmyt(m.updated_at)}` : ""} · <Eye boot={boot} viewed={m.viewed || []} withList /></div>
           </div>
           {may && (
             <div className="flex gap-1.5 flex-wrap">
-              <button onClick={format} disabled={genie} style={btn("primary", { padding: "6px 12px", fontSize: 12 })} title="Genie formats the minutes into decisions, action points and discussion — press again after adding more">{genie ? "🧞 Formatting…" : "🧞 Format with Genie"}</button>
+              <button onClick={format} disabled={genie} style={btn("primary", { padding: "6px 12px", fontSize: 12 })} title="Genie formats the minutes into the standard MoM — press again after adding more">{genie ? "🧞 Formatting…" : "🧞 Format with Genie"}</button>
               <FileDrop refKind="meeting" refId={id} onDone={load} label="📎 Pictures & documents" />
               <button onClick={() => setEdit(true)} style={btn("soft", { padding: "6px 12px", fontSize: 12 })}>Edit</button>
               <button onClick={remove} style={btn("ghost", { padding: "6px 10px", fontSize: 12, color: MUTED })}>Remove</button>

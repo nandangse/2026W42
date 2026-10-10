@@ -13,7 +13,7 @@ export async function GET() {
   try {
     const u = await requireLeader();
     const members = await lcMembers(adminClient(), RAGHU_EMAIL);
-    const { data: setting } = await adminClient().from("lc_setting").select("key,value").in("key", ["drive_folder"]);
+    const { data: setting } = await adminClient().from("lc_setting").select("key,value").in("key", ["drive_folder", "mom_template"]);
     const settings: Record<string, string> = {};
     for (const s of setting || []) settings[s.key] = s.value || "";
     return NextResponse.json({
