@@ -12,10 +12,12 @@ export interface Leader { email: string; name: string; initials: string; colour:
 export interface Boot { members: Leader[]; me: { email: string; displayName: string | null; initials: string | null; role: string; isOwner: boolean }; settings: Record<string, string> }
 export interface LcFile { id: string; name: string; mime: string | null; bytes: number | null; path: string; drive_url: string | null; drive_status: string; drive_error?: string | null; uploaded_by: string | null; created_at: string }
 
-export async function api<T = Record<string, unknown>>(url: string, body?: unknown): Promise<T> {
+export async function api<T = Record<string, unknown>>(url: string, body?: unknown, tries = 2): Promise<T> {
   const r = await fetch(url, body === undefined ? { cache: "no-store" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  /* a gateway timeout or a cold start mid-deploy is tried once more before it is shown */
+  if ((r.status === 502 || r.status === 503 || r.status === 504) && tries > 1) { await new Promise((res) => setTimeout(res, 1500)); return api<T>(url, body, tries - 1); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error((j as { error?: string }).error || `${r.status}`);
+  if (!r.ok) throw new Error((j as { error?: string }).error || (r.status === 504 ? "Genie took too long to answer — try once more." : `${r.status}`));
   return j as T;
 }
 
@@ -105,7 +107,7 @@ export async function uploadRichImage(file: File): Promise<string> {
   const fd = new FormData(); fd.append("file", file);
   const r = await fetch("/api/rich-image", { method: "POST", body: fd });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.url) throw new Error(j.error || "The picture could not be stored.");
+  if (!r.ok || !j.url) throw new Error(j.error || (r.status === 504 ? "The picture took too long to upload — a smaller one, or try again." : "The picture could not be stored."));
   return String(j.url);
 }
 

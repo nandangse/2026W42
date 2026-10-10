@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.9",
+    date: "2026-10-10",
+    module: "A big pasted picture no longer ends in a bare 504",
+    items: [
+      "THE PICTURE UPLOADER MAY TAKE A MINUTE (Dr Raghu, 10 Oct 2026, a popup saying only \u201c504\u201d on Start \u00B7 Stop \u00B7 Continue). A large screenshot pasted into a rich text box ran past the ten seconds the upload function was allowed; it now has sixty, and when it still cannot, the message says so in words. The council\u2019s own calls try once more on a gateway timeout before showing anything.",
+    ],
+  },
+  {
     v: "6.4.0.8",
     date: "2026-10-10",
     module: "A problem's tentative date is a week out by default",

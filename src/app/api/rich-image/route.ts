@@ -4,6 +4,9 @@ import { errJson, HttpError, requireUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+/* A large pasted screenshot took longer than the default ten seconds and came back
+   as a bare "504" in a popup (Dr Raghu, 10 Oct 2026, on the Leaders Council). */
+export const maxDuration = 60;
 
 /**
  * POST /api/rich-image — a picture pasted or chosen in ANY rich-text box
