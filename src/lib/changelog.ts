@@ -92,6 +92,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.2",
+    date: "2026-10-10",
+    module: "The eye on every card, the company's KPIs laid out, the months before while you fill",
+    items: [
+      "THE EYE (Dr Raghu, 10 Oct 2026: \u201cin such boxes also show viewed with the eye icon. the ones who didn\u2019t vote are only viewed!\u201d). Opening a card on Start \u00B7 Stop \u00B7 Continue, a problem on the Solution Board, a presentation or a set of minutes records the view. Every card wears \uD83D\uDC41 with the count; inside, who viewed it, and \u2014 beside the thumbs \u2014 the names that only viewed and did not vote. Migration 0216.",
+      "THE REPRESENTATIVE KPIs OF NANDAN GSE, twenty-four of them in the order the business reads them (\u201cfill the representative KPIs that are important for Nandan GSE\u201d): enquiries, quotations and their value, orders booked, the order book; jobs delivered, sales invoiced, on-time delivery, gross margin, rework cost; collections, receivables and the overdue beyond 90 days, cash, purchases, inventory, operating expenses; headcount, attrition, training hours, safety incidents; service tickets, tickets closed in time, complaints. Each carries the rule its quarter is read by. Owners and targets are the council\u2019s to set; the months of the last two quarters are open to fill today.",
+      "VISIBILITY ON EVERY KPI (\u201cin each kpi have a part which shows visibility. Default all, then mancom (JC Kumar, Cdr Tushar and me), stratcom, LC, staff\u201d). All by default; a KPI marked for the Management committee is returned by the server only to a login with the Management mark (or the owner), Stratcom likewise \u2014 it is not hidden on the screen, it never arrives. The rooms are the marks that already exist on Admin \u2192 Groups.",
+      "THE MONTHS BEFORE, WHILE YOU FILL (\u201cthe most discrete point is monthly \u2026 while filling anything the previous months should also be seen\u201d). The cell box now shows the six months before the one being entered, so a number is typed against its own trend.",
+    ],
+  },
+  {
     v: "6.4.0.1",
     date: "2026-10-10",
     module: "Principles: written by the council, approved by Dr Raghu, worked into one set by Genie",

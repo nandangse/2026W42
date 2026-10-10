@@ -7,10 +7,10 @@
  * for MTD, QTD, YTD or a date range. "A continuous problem-solving method."
  */
 import { useEffect, useState } from "react";
-import { api, btn, Card, Empty, Err, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Names, Rich, RichField, Thumbs, Who, dmy, dmyt, istToday, leaderOf, type Boot, type LcFile } from "./shared";
+import { api, btn, Card, Empty, Err, Eye, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Names, Rich, RichField, Thumbs, Who, dmy, dmyt, istToday, leaderOf, type Boot, type LcFile } from "./shared";
 
-interface P { id: string; title: string; description: string | null; lc_summary: string | null; status: string; tentative_on: string | null; added_by: string; created_at: string; updated_at: string; closed_at: string | null; up: number; down: number; question: number; mine: string | null; solutions: number; comments: number; mayEdit: boolean }
-interface Full { problem: Omit<P, "up" | "down" | "question" | "solutions" | "comments"> & { up: string[]; down: string[]; question: string[]; mine: string | null; mayEdit: boolean }; solutions: { id: string; body: string; added_by: string; created_at: string; up: string[]; down: string[]; question: string[]; mine: string | null; mayEdit: boolean }[]; comments: { id: string; body: string; added_by: string; created_at: string }[]; files: LcFile[] }
+interface P { id: string; title: string; description: string | null; lc_summary: string | null; status: string; tentative_on: string | null; added_by: string; created_at: string; updated_at: string; closed_at: string | null; up: number; down: number; question: number; mine: string | null; solutions: number; comments: number; viewed: number; mayEdit: boolean }
+interface Full { problem: Omit<P, "up" | "down" | "question" | "solutions" | "comments"> & { up: string[]; down: string[]; question: string[]; mine: string | null; viewed: string[]; mayEdit: boolean }; solutions: { id: string; body: string; added_by: string; created_at: string; up: string[]; down: string[]; question: string[]; mine: string | null; mayEdit: boolean }[]; comments: { id: string; body: string; added_by: string; created_at: string }[]; files: LcFile[] }
 interface Stats { from: string; to: string; raised: number; solved: number; blocked: number; open: number; cancelled: number }
 
 export const STATUS: Record<string, { label: string; colour: string; bg: string }> = {
@@ -79,7 +79,7 @@ export default function Solutions({ boot, arg, go }: { boot: Boot | null; arg: s
                 <Who boot={boot} email={p.added_by} size={20} />
                 <span>{dmy(p.created_at)}</span>
                 {p.tentative_on && <span>· by {dmy(p.tentative_on)}</span>}
-                <span className="ml-auto">💡 {p.solutions} · 💬 {p.comments}{p.lc_summary ? " · 🧞" : ""}</span>
+                <span className="ml-auto">👁 {p.viewed} · 💡 {p.solutions} · 💬 {p.comments}{p.lc_summary ? " · 🧞" : ""}</span>
               </div>
               <div className="mt-2"><Thumbs up={p.up} down={p.down} question={p.question} mine={p.mine} onReact={(v) => react(p.id, v)} size={12} /></div>
             </div>
@@ -147,13 +147,12 @@ function View({ boot, id, back }: { boot: Boot | null; id: string; back: () => v
             {p.mayEdit && <button onClick={remove} style={btn("ghost", { padding: "6px 10px", fontSize: 12, color: MUTED })}>Remove</button>}
           </div>
         </div>
-        {(p.up.length + p.down.length + p.question.length) > 0 && (
-          <div className="text-xs mt-2 grid gap-0.5" style={{ color: MUTED }}>
-            {p.up.length > 0 && <div>👍 <Names boot={boot} emails={p.up} /></div>}
-            {p.down.length > 0 && <div>👎 <Names boot={boot} emails={p.down} /></div>}
-            {p.question.length > 0 && <div>❓ needs clarity — <Names boot={boot} emails={p.question} /></div>}
-          </div>
-        )}
+        <div className="text-xs mt-2 grid gap-0.5" style={{ color: MUTED }}>
+          {p.up.length > 0 && <div>👍 <Names boot={boot} emails={p.up} /></div>}
+          {p.down.length > 0 && <div>👎 <Names boot={boot} emails={p.down} /></div>}
+          {p.question.length > 0 && <div>❓ needs clarity — <Names boot={boot} emails={p.question} /></div>}
+          <div><Eye boot={boot} viewed={p.viewed || []} voted={[...p.up, ...p.down, ...p.question]} withList /></div>
+        </div>
       </Card>
       <div className="grid gap-3 lc-two" style={{ gridTemplateColumns: "minmax(0, 1.3fr) minmax(300px, 1fr)" }}>
         <div className="grid gap-3" style={{ alignContent: "start" }}>

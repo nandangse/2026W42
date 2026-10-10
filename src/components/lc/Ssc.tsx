@@ -8,9 +8,9 @@
  * box with the Leaders Council … Print PDF only by Raghu."
  */
 import { useEffect, useState } from "react";
-import { api, btn, Card, Empty, Err, input, label, Lightbox, MUTED, NAVY, Names, Rich, RichField, Thumbs, Who, dmy, leaderOf, type Boot } from "./shared";
+import { api, btn, Card, Empty, Err, Eye, input, label, Lightbox, MUTED, NAVY, Names, Rich, RichField, Thumbs, Who, dmy, leaderOf, type Boot } from "./shared";
 
-export interface SscCard { id: string; kind: "start" | "stop" | "continue"; title: string; details: string | null; added_by: string; created_at: string; updated_at: string; up: string[]; down: string[]; mine: string | null }
+export interface SscCard { id: string; kind: "start" | "stop" | "continue"; title: string; details: string | null; added_by: string; created_at: string; updated_at: string; up: string[]; down: string[]; mine: string | null; viewed: string[] }
 export const KINDS: { key: SscCard["kind"]; label: string; ask: string; colour: string; bg: string }[] = [
   { key: "start", label: "Start", ask: "What do you want us to start?", colour: "var(--green)", bg: "#E3F3E8" },
   { key: "stop", label: "Stop", ask: "What do you want us to stop?", colour: "var(--red)", bg: "#FDECEA" },
@@ -25,6 +25,7 @@ export default function Ssc({ boot, isOwner }: { boot: Boot | null; isOwner: boo
   useEffect(() => { load(); }, []);
   const react = async (id: string, value: string) => { await api("/api/lc/ssc", { action: "react", id, value }); load(); };
   const current = cards?.find((c) => c.id === open) || null;
+  const openCard = (id: string) => { setOpen(id); api("/api/lc/ssc", { action: "view", id }).then(load).catch(() => {}); };
   return (
     <div className="grid gap-3">
       <div className="flex items-center gap-2 flex-wrap">
@@ -47,12 +48,12 @@ export default function Ssc({ boot, isOwner }: { boot: Boot | null; isOwner: boo
                 {mine.map((c) => {
                   const l = leaderOf(boot, c.added_by);
                   return (
-                    <div key={c.id} role="button" tabIndex={0} onClick={() => setOpen(c.id)} onKeyDown={(e) => { if (e.key === "Enter") setOpen(c.id); }} className="text-left rounded-lg bg-white p-2.5 cursor-pointer" style={{ border: "1px solid var(--line)", borderLeft: `6px solid ${l.colour}`, boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
+                    <div key={c.id} role="button" tabIndex={0} onClick={() => openCard(c.id)} onKeyDown={(e) => { if (e.key === "Enter") openCard(c.id); }} className="text-left rounded-lg bg-white p-2.5 cursor-pointer" style={{ border: "1px solid var(--line)", borderLeft: `6px solid ${l.colour}`, boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
                       <div className="font-semibold" style={{ fontSize: 13.5, color: NAVY, lineHeight: 1.35 }}>{c.title}</div>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <Who boot={boot} email={c.added_by} size={20} />
                         <span className="text-xs tnum" style={{ color: MUTED }}>{dmy(c.created_at)}</span>
-                        <span className="ml-auto"><Thumbs up={c.up.length} down={c.down.length} mine={c.mine} onReact={(v) => react(c.id, v)} size={12} /></span>
+                        <span className="ml-auto inline-flex items-center gap-1.5"><Eye boot={boot} viewed={c.viewed || []} /><Thumbs up={c.up.length} down={c.down.length} mine={c.mine} onReact={(v) => react(c.id, v)} size={12} /></span>
                       </div>
                     </div>
                   );
@@ -111,9 +112,10 @@ function View({ boot, c, isOwner, onClose, reload }: { boot: Boot | null; c: Ssc
           <Thumbs up={c.up.length} down={c.down.length} mine={c.mine} onReact={react} />
         </span>
       </div>
-      <div className="mt-2 text-xs" style={{ color: MUTED }}>
+      <div className="mt-2 text-xs grid gap-0.5" style={{ color: MUTED }}>
         {c.up.length > 0 && <div>👍 <Names boot={boot} emails={c.up} /></div>}
         {c.down.length > 0 && <div>👎 <Names boot={boot} emails={c.down} /></div>}
+        <div><Eye boot={boot} viewed={c.viewed || []} voted={[...c.up, ...c.down]} withList /></div>
       </div>
     </Lightbox>
   );

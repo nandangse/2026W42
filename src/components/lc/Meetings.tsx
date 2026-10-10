@@ -7,9 +7,9 @@
  * press it again after adding more.
  */
 import { useEffect, useState } from "react";
-import { api, btn, Card, Empty, Err, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Rich, RichField, Who, dmy, dmyt, istToday, leaderOf, type Boot, type LcFile } from "./shared";
+import { api, btn, Card, Empty, Err, Eye, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Rich, RichField, Who, dmy, dmyt, istToday, leaderOf, type Boot, type LcFile } from "./shared";
 
-interface M { id: string; held_on: string; from_time: string | null; to_time: string | null; location: string | null; attendees: string[]; minutes?: string | null; hours: number | null; created_by: string | null; created_at: string; updated_at: string; files?: number }
+interface M { id: string; held_on: string; from_time: string | null; to_time: string | null; location: string | null; attendees: string[]; minutes?: string | null; hours: number | null; created_by: string | null; created_at: string; updated_at: string; files?: number; viewed?: string[] }
 interface C { id: string; body: string; added_by: string; created_at: string }
 
 const hhmm = (t?: string | null) => t ? t.slice(0, 5) : "";
@@ -106,7 +106,7 @@ function View({ boot, id, back }: { boot: Boot | null; id: string; back: () => v
               {hhmm(m.from_time)}{m.to_time ? ` – ${hhmm(m.to_time)}` : ""}{m.hours ? ` · ${m.hours} h` : ""}{m.location ? ` · ${m.location}` : ""}
             </div>
             <div className="text-sm mt-1"><b>Attendees:</b> {m.attendees.join(", ") || "—"}</div>
-            <div className="text-xs mt-1 flex items-center gap-1" style={{ color: MUTED }}>Minutes by <Who boot={boot} email={m.created_by} size={18} /> · {dmyt(m.created_at)}{m.updated_at !== m.created_at ? ` · edited ${dmyt(m.updated_at)}` : ""}</div>
+            <div className="text-xs mt-1 flex items-center gap-1 flex-wrap" style={{ color: MUTED }}>Minutes by <Who boot={boot} email={m.created_by} size={18} /> · {dmyt(m.created_at)}{m.updated_at !== m.created_at ? ` · edited ${dmyt(m.updated_at)}` : ""} · <Eye boot={boot} viewed={m.viewed || []} withList /></div>
           </div>
           {may && (
             <div className="flex gap-1.5 flex-wrap">

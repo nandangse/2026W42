@@ -3,6 +3,7 @@ import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { readBody } from "@/lib/validate";
 import { mayEdit, requireLeader } from "@/lib/lc/auth";
+import { recordView, viewsOf } from "@/lib/lc/views";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +28,11 @@ export async function GET() {
     ]);
     if (error) throw error;
     const me = u.email.toLowerCase();
+    const views = await viewsOf(admin, "ssc", (cards || []).map((c) => c.id));
     return NextResponse.json({
       cards: (cards || []).map((c) => {
         const rs = (reactions || []).filter((r) => r.ref_id === c.id);
-        return { ...c, up: rs.filter((r) => r.value === "up").map((r) => r.email), down: rs.filter((r) => r.value === "down").map((r) => r.email), mine: rs.find((r) => r.email === me)?.value || null };
+        return { ...c, up: rs.filter((r) => r.value === "up").map((r) => r.email), down: rs.filter((r) => r.value === "down").map((r) => r.email), mine: rs.find((r) => r.email === me)?.value || null, viewed: views.filter((v) => v.ref_id === c.id).map((v) => v.email) };
       }),
     });
   } catch (e) { return errJson(e); }
@@ -69,6 +71,7 @@ export async function POST(req: Request) {
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
+    if (b.action === "view") { await recordView(admin, "ssc", String(b.id || ""), u.email); return NextResponse.json({ ok: true }); }
     if (b.action === "react") {
       const id = String(b.id || ""); const value = String(b.value || "none");
       if (value === "none") await admin.from("lc_reaction").delete().eq("ref_kind", "ssc").eq("ref_id", id).eq("email", u.email);

@@ -14,7 +14,15 @@
 import { useEffect, useState } from "react";
 import { api, btn, Card, Empty, Err, input, inr, label, Lightbox, MUTED, NAVY, Who, leaderOf, type Boot } from "./shared";
 
-interface K { id: string; name: string; assigned_to: string | null; type: "number" | "currency"; unit: string | null; agg: "sum" | "avg" | "last"; target: number | null; sort: number; active: boolean; created_by: string | null }
+interface K { id: string; name: string; assigned_to: string | null; type: "number" | "currency"; unit: string | null; agg: "sum" | "avg" | "last"; target: number | null; sort: number; active: boolean; created_by: string | null; visibility?: string }
+/** Who may see a KPI (Dr Raghu, 10 Oct 2026). Default All; the rooms are the marks on a login. */
+const VIS: { key: string; label: string; short: string }[] = [
+  { key: "all", label: "All — everyone on the council", short: "" },
+  { key: "mancom", label: "Management committee — JC Kumar, Cdr Tushar, Dr Raghu", short: "ManCom" },
+  { key: "stratcom", label: "Stratcom", short: "Stratcom" },
+  { key: "lc", label: "Leaders Council", short: "LC" },
+  { key: "staff", label: "Staff", short: "Staff" },
+];
 interface V { kpi_id: string; month: string; value: number; note: string | null; entered_by: string | null; updated_at: string }
 
 const fy = (m: string) => { const [y, mo] = m.split("-").map(Number); return mo >= 4 ? `${y}-${String(y + 1).slice(2)}` : `${y - 1}-${String(y).slice(2)}`; };
@@ -74,7 +82,7 @@ export default function Kpis({ boot }: { boot: Boot | null }) {
                 <tr key={k.id} style={{ opacity: k.active ? 1 : 0.55 }}>
                   <td style={{ position: "sticky", left: 0, background: "#fff", zIndex: 1, borderLeft: `5px solid ${leaderOf(boot, k.assigned_to).colour}` }}>
                     <button onClick={() => setEdit(k)} className="text-left font-bold" style={{ color: NAVY, fontSize: 13 }} title="Edit the KPI">{k.name}</button>
-                    <div className="text-xs" style={{ color: MUTED }}>{k.type === "currency" ? "₹" : k.unit || "number"} · quarter = {k.agg === "sum" ? "sum of months" : k.agg === "avg" ? "average of months" : "last month"}</div>
+                    <div className="text-xs flex items-center gap-1 flex-wrap" style={{ color: MUTED }}>{k.type === "currency" ? "₹" : k.unit || "number"} · quarter = {k.agg === "sum" ? "sum of months" : k.agg === "avg" ? "average of months" : "last month"}{k.visibility && k.visibility !== "all" && <span className="rounded px-1 font-bold" style={{ fontSize: 10, background: "#FFF1E8", color: "var(--accent)" }} title={VIS.find((v) => v.key === k.visibility)?.label}>👁 {VIS.find((v) => v.key === k.visibility)?.short}</span>}</div>
                   </td>
                   <td>{k.assigned_to ? <Who boot={boot} email={k.assigned_to} size={20} /> : <span className="text-xs" style={{ color: MUTED }}>—</span>}</td>
                   <td className="tnum" style={{ color: MUTED }}>{fmt(k, k.target)}</td>
@@ -93,13 +101,13 @@ export default function Kpis({ boot }: { boot: Boot | null }) {
       )}
       <div className="text-xs" style={{ color: MUTED }}>Green: at or above target · amber: within 10% · red: below. Later these numbers arrive on their own from the ERP, Kuber and the CRM; for now the council feeds them.</div>
       {edit && <Form boot={boot} k={edit === "new" ? undefined : edit} onDone={() => { setEdit(null); load(); }} />}
-      {cell && <CellForm k={cell.k} month={cell.month} v={cell.v} onDone={() => { setCell(null); load(); }} />}
+      {cell && <CellForm k={cell.k} month={cell.month} v={cell.v} history={(d?.months || []).filter((m) => m < cell.month).slice(-6).map((m) => ({ month: m, v: val(cell.k, m) }))} onDone={() => { setCell(null); load(); }} />}
     </div>
   );
 }
 
 function Form({ boot, k, onDone }: { boot: Boot | null; k?: K; onDone: () => void }) {
-  const [f, setF] = useState({ name: k?.name || "", assigned_to: k?.assigned_to || "", type: k?.type || "number", unit: k?.unit || "", agg: k?.agg || "sum", target: k?.target ?? "", active: k?.active ?? true });
+  const [f, setF] = useState({ name: k?.name || "", assigned_to: k?.assigned_to || "", type: k?.type || "number", unit: k?.unit || "", agg: k?.agg || "sum", target: k?.target ?? "", active: k?.active ?? true, visibility: k?.visibility || "all" });
   const [err, setErr] = useState<string | null>(null);
   const may = !k || !!boot?.me.isOwner || (k.created_by || "").toLowerCase() === boot?.me.email.toLowerCase();
   const save = async () => { setErr(null); try { await api("/api/lc/kpis", { action: k ? "edit" : "create", id: k?.id, ...f }); onDone(); } catch (e) { setErr(String((e as Error).message)); } };
@@ -115,6 +123,7 @@ function Form({ boot, k, onDone }: { boot: Boot | null; k?: K; onDone: () => voi
         <div><label style={label}>Unit (for a number: nos, %, days…)</label><input style={input} value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} disabled={!may || f.type === "currency"} /></div>
         <div><label style={label}>A quarter is the</label><select style={input} value={f.agg} onChange={(e) => setF({ ...f, agg: e.target.value as K["agg"] })} disabled={!may}><option value="sum">sum of its months (sales, enquiries)</option><option value="avg">average of its months (OTD %, a rate)</option><option value="last">last month's figure (headcount, cash)</option></select></div>
         <div><label style={label}>Target per month (optional)</label><input style={input} value={f.target} onChange={(e) => setF({ ...f, target: e.target.value })} disabled={!may} inputMode="decimal" /></div>
+        <div style={{ gridColumn: "span 2" }}><label style={label}>Visibility — who may see this KPI</label><select style={input} value={f.visibility} onChange={(e) => setF({ ...f, visibility: e.target.value })} disabled={!may}>{VIS.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}</select></div>
         {k && <div><label style={label}>Status</label><select style={input} value={f.active ? "1" : "0"} onChange={(e) => setF({ ...f, active: e.target.value === "1" })} disabled={!may}><option value="1">Live</option><option value="0">Retired — kept, hidden</option></select></div>}
       </div>
       <Err e={err} />
@@ -123,7 +132,7 @@ function Form({ boot, k, onDone }: { boot: Boot | null; k?: K; onDone: () => voi
   );
 }
 
-function CellForm({ k, month, v, onDone }: { k: K; month: string; v: V | null; onDone: () => void }) {
+function CellForm({ k, month, v, history, onDone }: { k: K; month: string; v: V | null; history: { month: string; v: V | null }[]; onDone: () => void }) {
   const [value, setValue] = useState(v ? String(v.value) : ""); const [note, setNote] = useState(v?.note || "");
   const [err, setErr] = useState<string | null>(null);
   const save = async () => { setErr(null); try { await api("/api/lc/kpis", { action: "value", id: k.id, month: month.slice(0, 7), value, note }); onDone(); } catch (e) { setErr(String((e as Error).message)); } };
@@ -134,6 +143,17 @@ function CellForm({ k, month, v, onDone }: { k: K; month: string; v: V | null; o
       <label style={{ ...label, marginTop: 12 }}>A note — where the number came from (optional)</label>
       <input style={input} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Tally sales register, 30 Sep" />
       {k.target !== null && <div className="text-xs mt-2" style={{ color: MUTED }}>Target for the month: {fmt(k, k.target)}</div>}
+      {/* THE MONTHS BEFORE, WHILE FILLING (Dr Raghu, 10 Oct 2026: "the most
+          discrete point is monthly … while filling anything the previous
+          months should also be seen") */}
+      {history.length > 0 && (
+        <div className="mt-3 rounded-lg p-2.5" style={{ background: "var(--paper)" }}>
+          <div className="text-xs font-bold mb-1" style={{ color: MUTED, letterSpacing: 0.4 }}>THE MONTHS BEFORE</div>
+          <div className="grid gap-0.5">
+            {history.map((h) => <div key={h.month} className="flex justify-between text-sm tnum"><span style={{ color: "var(--dim)" }}>{mon(h.month)}</span><span className="font-bold" style={{ color: h.v ? NAVY : "#C9C4B8" }}>{h.v ? fmt(k, h.v.value) : "—"}</span></div>)}
+          </div>
+        </div>
+      )}
       <Err e={err} />
       <div className="flex gap-2 mt-3"><button onClick={save} style={btn("primary")}>Save</button><button onClick={onDone} style={btn("ghost")}>Cancel</button>{v && <button onClick={async () => { await api("/api/lc/kpis", { action: "value", id: k.id, month: month.slice(0, 7), value: "" }); onDone(); }} style={btn("ghost", { marginLeft: "auto", color: MUTED })}>Clear</button>}</div>
     </Lightbox>

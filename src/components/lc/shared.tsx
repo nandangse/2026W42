@@ -192,4 +192,22 @@ export function Thumbs({ up, down, question, mine, onReact, size = 13 }: { up: n
   );
 }
 
+/**
+ * THE EYE (Dr Raghu, 10 Oct 2026: "show viewed with the eye icon. the ones
+ * who didn't vote are only viewed!"). The count, the names on hover, and —
+ * when `voted` is given — the line of those who looked and did not vote.
+ */
+export function Eye({ boot, viewed, voted, size = 12, withList }: { boot: Boot | null; viewed: string[]; voted?: string[]; size?: number; withList?: boolean }) {
+  const v = [...new Set(viewed.map((e) => e.toLowerCase()))];
+  const only = voted ? v.filter((e) => !voted.map((x) => x.toLowerCase()).includes(e)) : [];
+  const names = (es: string[]) => es.map((e) => leaderOf(boot, e).name).join(", ");
+  return (
+    <span className="inline-flex items-center gap-1.5 flex-wrap">
+      <span className="inline-flex items-center gap-1 rounded px-1.5 tnum" style={{ fontSize: size, height: 22, border: `1px solid ${LINE}`, background: "#fff", color: DIM, fontWeight: 700 }} title={v.length ? `Viewed by ${names(v)}` : "Nobody has opened this yet"}>👁 {v.length}</span>
+      {withList && v.length > 0 && <span style={{ fontSize: 11, color: MUTED }}>viewed by {names(v)}</span>}
+      {withList && voted && only.length > 0 && <span style={{ fontSize: 11, color: "#B45309" }}>· only viewed, not voted: {names(only)}</span>}
+    </span>
+  );
+}
+
 export const Names = ({ boot, emails }: { boot: Boot | null; emails: string[] }) => emails.length ? <span style={{ fontSize: 11, color: MUTED }}>{emails.map((e) => leaderOf(boot, e).name).join(", ")}</span> : null;

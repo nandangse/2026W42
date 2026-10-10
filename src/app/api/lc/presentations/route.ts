@@ -3,6 +3,7 @@ import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { readBody } from "@/lib/validate";
 import { mayEdit, requireLeader } from "@/lib/lc/auth";
+import { recordView, viewsOf } from "@/lib/lc/views";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,8 @@ export async function GET() {
       admin.from("lc_file").select("id,ref_id,name,mime,bytes,path,drive_url,drive_status,uploaded_by,created_at").eq("ref_kind", "presentation").order("created_at"),
     ]);
     if (error) throw error;
-    return NextResponse.json({ presentations: (ps || []).map((p) => ({ ...p, files: (files || []).filter((f) => f.ref_id === p.id) })) });
+    const views = await viewsOf(admin, "presentation", (ps || []).map((p) => p.id));
+    return NextResponse.json({ presentations: (ps || []).map((p) => ({ ...p, files: (files || []).filter((f) => f.ref_id === p.id), viewed: views.filter((v) => v.ref_id === p.id).map((v) => v.email) })) });
   } catch (e) { return errJson(e); }
 }
 
@@ -42,6 +44,7 @@ export async function POST(req: Request) {
       if (!p) throw new HttpError(404, "No such presentation.");
       if (!mayEdit(u, p.added_by)) throw new HttpError(403, "The one who added it, or Dr Raghu.");
     };
+    if (b.action === "view") { await recordView(admin, "presentation", String(b.id || ""), u.email); return NextResponse.json({ ok: true }); }
     if (b.action === "create") {
       const f = fields();
       if (!f.topic && !f.file_url && !f.notes) throw new HttpError(400, "A topic, a link or a note — something to go on.");

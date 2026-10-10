@@ -24,19 +24,23 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   try {
-    await requireLeader();
+    const u = await requireLeader();
     const admin = adminClient();
     const q = new URL(req.url).searchParams;
     const n = Math.min(36, Math.max(3, Number(q.get("months") || 12)));
     const to = /^\d{4}-\d{2}$/.test(q.get("to") || "") ? q.get("to")! : new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }).slice(0, 7);
     const months: string[] = [];
     { let [y, m] = to.split("-").map(Number); for (let i = 0; i < n; i++) { months.unshift(`${y}-${String(m).padStart(2, "0")}-01`); m--; if (m === 0) { m = 12; y--; } } }
+    /* a KPI is returned only to the room it is marked for; the owner sees every one */
+    const sees = (vis: string) => u.isOwner || vis === "all" || vis === "staff" || vis === "lc" || (vis === "mancom" && u.management) || (vis === "stratcom" && u.stratcom);
     const [{ data: kpis, error }, { data: values }] = await Promise.all([
       admin.from("lc_kpi").select("*").order("sort").order("created_at"),
       admin.from("lc_kpi_value").select("kpi_id,month,value,note,entered_by,updated_at").gte("month", months[0]).lte("month", months[months.length - 1]),
     ]);
     if (error) throw error;
-    return NextResponse.json({ months, kpis: kpis || [], values: values || [] });
+    const mine = (kpis || []).filter((k) => sees(String(k.visibility || "all")));
+    const ids = new Set(mine.map((k) => k.id));
+    return NextResponse.json({ months, kpis: mine, values: (values || []).filter((v) => ids.has(v.kpi_id)), me: { management: u.management, stratcom: u.stratcom, isOwner: u.isOwner } });
   } catch (e) { return errJson(e); }
 }
 
@@ -52,7 +56,8 @@ export async function POST(req: Request) {
       const agg = ["sum", "avg", "last"].includes(String(b.agg)) ? String(b.agg) : "sum";
       const target = b.target === undefined || b.target === null || b.target === "" ? null : Number(b.target);
       if (target !== null && !Number.isFinite(target)) throw new HttpError(400, "The target must be a number.");
-      return { name, assigned_to: txt(b.assigned_to)?.toLowerCase() || null, type, unit: txt(b.unit), agg, target };
+      const visibility = ["all", "mancom", "stratcom", "lc", "staff"].includes(String(b.visibility)) ? String(b.visibility) : "all";
+      return { name, assigned_to: txt(b.assigned_to)?.toLowerCase() || null, type, unit: txt(b.unit), agg, target, visibility };
     };
     if (b.action === "create") {
       const { data: last } = await admin.from("lc_kpi").select("sort").order("sort", { ascending: false }).limit(1).maybeSingle();

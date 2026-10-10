@@ -3,6 +3,7 @@ import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { readBody } from "@/lib/validate";
 import { mayEdit, requireLeader } from "@/lib/lc/auth";
+import { recordView, viewsOf } from "@/lib/lc/views";
 
 export const dynamic = "force-dynamic";
 
@@ -28,17 +29,19 @@ const hours = (a?: string | null, b?: string | null) => {
 
 export async function GET(req: Request) {
   try {
-    await requireLeader();
+    const u = await requireLeader();
     const admin = adminClient();
     const id = new URL(req.url).searchParams.get("id");
     if (id) {
       const { data: m, error } = await admin.from("lc_meeting").select("*").eq("id", id).maybeSingle();
       if (error) throw error; if (!m) throw new HttpError(404, "No such meeting.");
+      await recordView(admin, "meeting", id, u.email);
+      const viewed = (await viewsOf(admin, "meeting", [id])).map((v) => v.email);
       const [{ data: files }, { data: comments }] = await Promise.all([
         admin.from("lc_file").select("id,name,mime,bytes,path,drive_url,drive_status,uploaded_by,created_at").eq("ref_kind", "meeting").eq("ref_id", id).order("created_at"),
         admin.from("lc_comment").select("id,body,added_by,created_at").eq("ref_kind", "meeting").eq("ref_id", id).order("created_at"),
       ]);
-      return NextResponse.json({ meeting: { ...m, hours: hours(m.from_time, m.to_time) }, files: files || [], comments: comments || [] });
+      return NextResponse.json({ meeting: { ...m, hours: hours(m.from_time, m.to_time), viewed }, files: files || [], comments: comments || [] });
     }
     const [{ data: ms, error }, { data: files }] = await Promise.all([
       admin.from("lc_meeting").select("id,held_on,from_time,to_time,location,attendees,created_by,created_at,updated_at").order("held_on", { ascending: false }).order("created_at", { ascending: false }),

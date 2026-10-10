@@ -3,6 +3,7 @@ import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { readBody } from "@/lib/validate";
 import { mayEdit, requireLeader } from "@/lib/lc/auth";
+import { recordView, viewsOf } from "@/lib/lc/views";
 
 export const dynamic = "force-dynamic";
 
@@ -50,8 +51,10 @@ export async function GET(req: Request) {
         const rs = (reactions || []).filter((r) => r.ref_kind === kind && r.ref_id === rid);
         return { up: rs.filter((r) => r.value === "up").map((r) => r.email), down: rs.filter((r) => r.value === "down").map((r) => r.email), question: rs.filter((r) => r.value === "question").map((r) => r.email), mine: rs.find((r) => r.email === me)?.value || null };
       };
+      await recordView(admin, "problem", id, u.email);
+      const viewed = (await viewsOf(admin, "problem", [id])).map((v) => v.email);
       return NextResponse.json({
-        problem: { ...p, ...tally("problem", id), mayEdit: mayEdit(u, p.added_by) },
+        problem: { ...p, ...tally("problem", id), viewed, mayEdit: mayEdit(u, p.added_by) },
         solutions: (solutions || []).map((s) => ({ ...s, ...tally("solution", s.id), mayEdit: mayEdit(u, s.added_by) })),
         comments: comments || [], files: files || [],
       });
@@ -64,6 +67,7 @@ export async function GET(req: Request) {
       admin.from("lc_comment").select("ref_id").eq("ref_kind", "problem"),
     ]);
     if (error) throw error;
+    const views = await viewsOf(admin, "problem", (ps || []).map((p) => p.id));
     const inRange = (d: string | null) => !!d && (!from || d.slice(0, 10) >= from) && (!to || d.slice(0, 10) <= to);
     const all = ps || [];
     const stats = {
@@ -77,7 +81,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       problems: all.map((p) => {
         const rs = (reactions || []).filter((r) => r.ref_id === p.id);
-        return { ...p, up: rs.filter((r) => r.value === "up").length, down: rs.filter((r) => r.value === "down").length, question: rs.filter((r) => r.value === "question").length, mine: rs.find((r) => r.email === me)?.value || null, solutions: (solutions || []).filter((s) => s.problem_id === p.id).length, comments: (comments || []).filter((c) => c.ref_id === p.id).length, mayEdit: mayEdit(u, p.added_by) };
+        return { ...p, up: rs.filter((r) => r.value === "up").length, down: rs.filter((r) => r.value === "down").length, question: rs.filter((r) => r.value === "question").length, mine: rs.find((r) => r.email === me)?.value || null, solutions: (solutions || []).filter((s) => s.problem_id === p.id).length, comments: (comments || []).filter((c) => c.ref_id === p.id).length, viewed: views.filter((v) => v.ref_id === p.id).length, mayEdit: mayEdit(u, p.added_by) };
       }),
       stats, today: istToday(),
     });

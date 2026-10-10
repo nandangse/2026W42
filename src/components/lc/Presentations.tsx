@@ -5,9 +5,9 @@
  * summarise, Topic. Genie will also automatically put in the topic."
  */
 import { useEffect, useRef, useState } from "react";
-import { api, btn, Card, Empty, Err, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Rich, RichField, Who, dmy, istToday, leaderOf, type Boot, type LcFile } from "./shared";
+import { api, btn, Card, Empty, Err, Eye, FileDrop, Files, input, label, Lightbox, MUTED, NAVY, ORANGE, Rich, RichField, Who, dmy, istToday, leaderOf, type Boot, type LcFile } from "./shared";
 
-interface P { id: string; topic: string | null; presenter: string | null; file_url: string | null; summary: string | null; notes: string | null; presented_on: string | null; added_by: string | null; created_at: string; files: LcFile[] }
+interface P { id: string; topic: string | null; presenter: string | null; file_url: string | null; summary: string | null; notes: string | null; presented_on: string | null; added_by: string | null; created_at: string; files: LcFile[]; viewed: string[] }
 
 function embed(url: string): string | null {
   const yt = /(?:youtube\.com\/(?:watch\?v=|live\/|shorts\/)|youtu\.be\/)([\w-]{6,})/.exec(url); if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
@@ -37,7 +37,7 @@ export default function Presentations({ boot, arg, go }: { boot: Boot | null; ar
               {p.file_url && <span className="rounded px-1.5 font-bold" style={{ fontSize: 10, background: "var(--paper)", color: NAVY }}>🔗 link</span>}
               {p.files.map((f) => <span key={f.id} className="rounded px-1.5 font-bold" style={{ fontSize: 10, background: "var(--paper)", color: NAVY }}>{/pdf/i.test(f.name) ? "PDF" : /ppt/i.test(f.name) ? "Deck" : "File"}</span>)}
               {p.summary && <span className="rounded px-1.5 font-bold" style={{ fontSize: 10, background: "#E3F3E8", color: "var(--green)" }}>🧞 summarised</span>}
-              <span className="ml-auto"><Who boot={boot} email={p.added_by} size={20} withName={false} /></span>
+              <span className="ml-auto inline-flex items-center gap-1.5"><Eye boot={boot} viewed={p.viewed || []} /><Who boot={boot} email={p.added_by} size={20} withName={false} /></span>
             </div>
           </button>
         ))}
@@ -79,6 +79,8 @@ function View({ boot, p, id, reload, back }: { boot: Boot | null; p: P | null; i
   const [edit, setEdit] = useState(false); const [genie, setGenie] = useState(false);
   const tried = useRef(false);
   useEffect(() => { if (!p && !tried.current) { tried.current = true; reload(); } }, [p, reload]);
+  const seen = useRef<string | null>(null);
+  useEffect(() => { if (seen.current !== id) { seen.current = id; api("/api/lc/presentations", { action: "view", id }).then(() => reload()).catch(() => {}); } }, [id, reload]);
   if (!p) return <Empty>Opening…</Empty>;
   const may = !!boot && (boot.me.isOwner || p.added_by?.toLowerCase() === boot.me.email.toLowerCase());
   const emb = p.file_url ? embed(p.file_url) : null;
@@ -93,7 +95,7 @@ function View({ boot, p, id, reload, back }: { boot: Boot | null; p: P | null; i
           <div className="flex-1 min-w-0">
             <div className="font-bold" style={{ fontSize: 20, color: NAVY }}>{p.topic || <span style={{ color: MUTED }}>Topic to come — Genie names it on summarising</span>}</div>
             <div className="text-sm" style={{ color: "var(--dim)" }}>{p.presenter ? `Presented by ${p.presenter}` : "Presenter not named"}{p.presented_on ? ` · ${dmy(p.presented_on)}` : ""}</div>
-            <div className="text-xs mt-1 flex items-center gap-1" style={{ color: MUTED }}>Added by <Who boot={boot} email={p.added_by} size={18} /> · {dmy(p.created_at)}</div>
+            <div className="text-xs mt-1 flex items-center gap-1 flex-wrap" style={{ color: MUTED }}>Added by <Who boot={boot} email={p.added_by} size={18} /> · {dmy(p.created_at)} · <Eye boot={boot} viewed={p.viewed || []} withList /></div>
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {may && <button onClick={summarise} disabled={genie} style={btn("primary", { padding: "6px 12px", fontSize: 12 })} title="Genie reads the notes, the PDF and the link, writes the summary and names the topic">{genie ? "🧞 Reading…" : p.summary ? "🧞 Summarise again" : "🧞 Genie summarise"}</button>}
