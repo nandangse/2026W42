@@ -22,6 +22,12 @@ export const dynamic = "force-dynamic";
  * have comments and the edit by raghu or the one who wrote."
  */
 const kindOf = (v: unknown) => (v === "principles" ? "principles" : "philosophy");
+/** Text pasted from a slide or a PDF can carry U+0000, which Postgres refuses with an
+ *  error that reached the screen as "Internal error" (Dr Raghu, 10 Oct 2026, on
+ *  Philosophy). Stripped here, and the database's own words are returned when it
+ *  still says no. */
+const clean = (v: unknown) => String(v ?? "").replace(/\u0000/g, "");
+const said = (e: { message?: string } | null) => new HttpError(400, `Could not save: ${e?.message || "the database refused it"}.`);
 
 export async function GET(req: Request) {
   try {
@@ -59,19 +65,19 @@ export async function POST(req: Request) {
     if (b.action === "create") {
       const title = String(b.title || "").trim(); if (!title) throw new HttpError(400, "A title.");
       const { data: last } = await admin.from("lc_section").select("sort").eq("kind", kind).order("sort", { ascending: false }).limit(1).maybeSingle();
-      const { data, error } = await admin.from("lc_section").insert({ kind, title, body: String(b.body || "") || null, sort: Number(last?.sort || 0) + 1, created_by: u.email }).select("id").single();
-      if (error) throw error;
+      const { data, error } = await admin.from("lc_section").insert({ kind, title: clean(title), body: clean(b.body) || null, sort: Number(last?.sort || 0) + 1, created_by: u.email }).select("id").single();
+      if (error) throw said(error);
       return NextResponse.json({ ok: true, id: data.id });
     }
     if (b.action === "edit") {
       const id = String(b.id || ""); await own(id);
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      if (b.title !== undefined) { const t = String(b.title).trim(); if (!t) throw new HttpError(400, "A title."); patch.title = t; }
-      if (b.body !== undefined) patch.body = String(b.body) || null;
+      if (b.title !== undefined) { const t = clean(b.title).trim(); if (!t) throw new HttpError(400, "A title."); patch.title = t; }
+      if (b.body !== undefined) patch.body = clean(b.body) || null;
       /* an edit after approval asks for approval again — the approved text is what was read */
       patch.approved_by = null; patch.approved_at = null;
       const { error } = await admin.from("lc_section").update(patch).eq("id", id);
-      if (error) throw error;
+      if (error) throw said(error);
       return NextResponse.json({ ok: true });
     }
     if (b.action === "remove") {

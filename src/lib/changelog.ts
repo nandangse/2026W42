@@ -92,6 +92,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.7",
+    date: "2026-10-10",
+    module: "The KPI board: latest month first, two frozen columns, the menu folds",
+    items: [
+      "LATEST MONTH FIRST, ON THE LEFT, the earlier months running right (Dr Raghu, 10 Oct 2026: \u201cshow latest month on the left and the ones after on right\u201d); quarters the same way. The KPI and the Assigned-to columns both stay frozen while the months scroll, and a group\u2019s heading stays with them instead of sliding away. The board uses the whole width when the menu is folded.",
+      "MINE / ALL ON TOP (\u201con top by default should have a button - Mine - all toggle\u201d): Mine is the KPIs assigned to me, and it is the default whenever any are; All is every KPI I may see.",
+      "SAVING A PHILOSOPHY SECTION SAID \u201cInternal error\u201d (Dr Raghu, 10 Oct 2026, pasting the 2029 vision banner). Text pasted from a slide or a PDF can carry a null character that Postgres refuses; it is stripped before saving, and when the database still says no, its own words come back instead of a shrug.",
+      "THE LEFT MENU FOLDS to a rail of icons (\u201cmake the left collapsible\u201d) \u2014 \u27e8 fold at its top, remembered on the browser; hover an icon for the room\u2019s name. On a phone the menu stays the drawer it was.",
+    ],
+  },
+  {
     v: "6.4.0.6",
     date: "2026-10-10",
     module: "KPIs in Dr Raghu's five groups, the latest month at the right edge, a filter on top, a lightbox on each",

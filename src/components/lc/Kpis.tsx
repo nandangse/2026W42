@@ -12,7 +12,7 @@
  * quarter's ratio from the quarter's sums. Anyone on the council enters a
  * figure; the assigned leader is who is expected to.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, btn, Empty, Err, input, inr, label, Lightbox, MUTED, NAVY, Who, dmy, leaderOf, type Boot } from "./shared";
 
 interface K { id: string; name: string; group: string | null; code: string | null; formula: string | null; assigned_to: string | null; type: "number" | "currency"; unit: string | null; agg: "sum" | "avg" | "last"; target: number | null; sort: number; active: boolean; created_by: string | null; visibility?: string }
@@ -50,23 +50,30 @@ export default function Kpis({ boot }: { boot: Boot | null }) {
   const [span, setSpan] = useState<6 | 12>(6);
   const [to, setTo] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }).slice(0, 7));
   const [group, setGroup] = useState<string>("all");
+  /* MINE / ALL (Dr Raghu, 10 Oct 2026: "on top by default should have a
+     button - Mine - all toggle"). Mine is the KPIs assigned to me; it is the
+     default when any are, All when none is. */
+  const [mine, setMine] = useState<boolean | null>(null);
+  const me = boot?.me.email.toLowerCase() || "";
   const [who, setWho] = useState<string>("all");
   const [q, setQ] = useState("");
   const [edit, setEdit] = useState<K | "new" | null>(null);
   const [openK, setOpenK] = useState<K | null>(null);
   const [cell, setCell] = useState<{ k: K; month: string; v: V | null } | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  const scroller = useRef<HTMLDivElement>(null);
   const load = () => api<{ months: string[]; kpis: K[]; values: V[] }>(`/api/lc/kpis?months=${span}&to=${to}`).then(setD).catch(() => setD({ months: [], kpis: [], values: [] }));
   useEffect(() => { load(); }, [to, span]); // eslint-disable-line react-hooks/exhaustive-deps
-  /* THE LATEST MONTH AT THE RIGHT EDGE: the table scrolls to its end once it has loaded */
-  useEffect(() => { const el = scroller.current; if (el) el.scrollLeft = el.scrollWidth; }, [d, view]);
+  useEffect(() => { if (mine === null && d && me) setMine(d.kpis.some((k) => (k.assigned_to || "") === me)); }, [d, me, mine]);
+  /* THE LATEST MONTH FIRST, ON THE LEFT, the earlier ones running right
+     (Dr Raghu, 10 Oct 2026: "show latest month on the left and the ones
+     after on right"). */
+  const monthsDesc = useMemo(() => [...(d?.months || [])].reverse(), [d]);
 
   const byCode = useMemo(() => { const m = new Map<string, K>(); for (const k of d?.kpis || []) if (k.code) m.set(k.code, k); return m; }, [d]);
   const raw = (k: K, m: string): number | null => { const v = d?.values.find((x) => x.kpi_id === k.id && x.month === m); return v ? Number(v.value) : null; };
   const val = (k: K, m: string): number | null => k.formula ? evalFormula(k.formula, (c) => { const kk = byCode.get(c); return kk ? raw(kk, m) : null; }) : raw(k, m);
   const row = (k: K, m: string): V | null => d?.values.find((x) => x.kpi_id === k.id && x.month === m) || null;
-  const quarters = d ? [...new Set(d.months.map(qOf))] : [];
+  const quarters = d ? [...new Set(monthsDesc.map(qOf))] : [];
   const qRaw = (k: K, qr: string): number | null => {
     const vs = (d?.months || []).filter((m) => qOf(m) === qr).map((m) => raw(k, m)).filter((x): x is number => x !== null);
     if (!vs.length) return null;
@@ -78,7 +85,7 @@ export default function Kpis({ boot }: { boot: Boot | null }) {
   const tone = (v: number | null, t: number | null) => v === null || t === null ? undefined : v >= t ? "#E3F3E8" : v >= t * 0.9 ? "#FFF7E6" : "#FDECEA";
 
   const needle = q.trim().toLowerCase();
-  const kpis = (d?.kpis || []).filter((k) => (showInactive || k.active) && (group === "all" || (k.group || "Other") === group) && (who === "all" || (k.assigned_to || "") === who) && (!needle || k.name.toLowerCase().includes(needle)));
+  const kpis = (d?.kpis || []).filter((k) => (showInactive || k.active) && (!mine || (k.assigned_to || "") === me) && (group === "all" || (k.group || "Other") === group) && (who === "all" || (k.assigned_to || "") === who) && (!needle || k.name.toLowerCase().includes(needle)));
   const groups = [...GROUPS, "Other"].filter((g) => kpis.some((k) => (k.group || "Other") === g));
   const owners = [...new Set((d?.kpis || []).map((k) => k.assigned_to).filter((x): x is string => !!x))];
   const cols = view === "month" ? (d?.months.length || 0) : quarters.length;
@@ -92,28 +99,33 @@ export default function Kpis({ boot }: { boot: Boot | null }) {
         <button onClick={() => setView("month")} style={btn(view === "month" ? "primary" : "soft", { padding: "5px 10px", fontSize: 12 })}>By month</button>
         <button onClick={() => setView("quarter")} style={btn(view === "quarter" ? "primary" : "soft", { padding: "5px 10px", fontSize: 12 })}>By quarter</button>
         <button onClick={() => setSpan(span === 6 ? 12 : 6)} style={btn("soft", { padding: "5px 10px", fontSize: 12 })} title="How many months are on the board">{span} months</button>
+        <span className="text-xs" style={{ color: MUTED }}>latest first</span>
         <button onClick={() => shift(-3)} style={btn("ghost", { padding: "5px 8px", fontSize: 12 })}>‹</button>
         <span className="text-xs tnum font-bold" style={{ color: NAVY }}>to {mon(to + "-01")}</span>
         <button onClick={() => shift(3)} style={btn("ghost", { padding: "5px 8px", fontSize: 12 })}>›</button>
       </div>
       {/* THE FILTER ON TOP */}
       <div className="flex items-center gap-2 flex-wrap">
+        <span className="inline-flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--accent)" }}>
+          <button onClick={() => setMine(true)} style={{ padding: "4px 12px", fontSize: 12, fontWeight: 800, background: mine ? "var(--accent)" : "#fff", color: mine ? "#fff" : "var(--accent)" }} title="The KPIs assigned to me">Mine</button>
+          <button onClick={() => setMine(false)} style={{ padding: "4px 12px", fontSize: 12, fontWeight: 800, background: mine === false ? "var(--accent)" : "#fff", color: mine === false ? "#fff" : "var(--accent)" }} title="Every KPI I may see">All</button>
+        </span>
         {["all", ...GROUPS].map((g) => <button key={g} onClick={() => setGroup(g)} style={btn(group === g ? "primary" : "soft", { padding: "4px 10px", fontSize: 12 })}>{g === "all" ? "All groups" : g}</button>)}
         <select style={{ ...input, width: "auto", padding: "4px 8px", fontSize: 12 }} value={who} onChange={(e) => setWho(e.target.value)}><option value="all">Anyone</option>{owners.map((e) => <option key={e} value={e}>{leaderOf(boot, e).name}</option>)}</select>
         <input style={{ ...input, width: 200, padding: "4px 8px", fontSize: 12 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a KPI…" />
         <label className="text-xs flex items-center gap-1" style={{ color: MUTED }}><input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> retired too</label>
       </div>
       {d === null && <Empty>Opening…</Empty>}
-      {d && kpis.length === 0 && <Empty>Nothing to show{group !== "all" || who !== "all" || needle ? " for this filter" : " — add the first KPI"}.</Empty>}
+      {d && kpis.length === 0 && <Empty>{mine ? "No KPI is assigned to you yet — press All to see the board." : `Nothing to show${group !== "all" || who !== "all" || needle ? " for this filter" : " — add the first KPI"}.`}</Empty>}
       {d && kpis.length > 0 && (
-        <div ref={scroller} className="genie-scroll rounded-lg bg-white" style={{ border: "1px solid var(--line)", overflowX: "auto" }}>
+        <div className="genie-scroll rounded-lg bg-white" style={{ border: "1px solid var(--line)", overflowX: "auto" }}>
           <table className="genie-table lc-kpi">
             <thead>
               <tr>
-                <th style={{ position: "sticky", left: 0, background: "#fff", zIndex: 2, minWidth: 220 }}>KPI</th>
-                <th style={{ minWidth: 110 }}>Assigned to</th>
+                <th style={{ position: "sticky", left: 0, background: "var(--navy)", zIndex: 3, width: 220, minWidth: 220, maxWidth: 220 }}>KPI</th>
+                <th style={{ position: "sticky", left: 220, background: "var(--navy)", zIndex: 3, width: 120, minWidth: 120, maxWidth: 120, boxShadow: "2px 0 0 rgba(0,0,0,.15)" }}>Assigned to</th>
                 <th className="tnum" style={{ minWidth: 90, textAlign: "right" }}>Target / month</th>
-                {view === "month" ? d.months.map((m) => <th key={m} className="tnum" style={{ minWidth: 96, textAlign: "right" }}>{mon(m)}</th>) : quarters.map((qr) => <th key={qr} className="tnum" style={{ minWidth: 120, textAlign: "right" }}>{qr}</th>)}
+                {view === "month" ? monthsDesc.map((m) => <th key={m} className="tnum" style={{ minWidth: 96, textAlign: "right" }}>{mon(m)}</th>) : quarters.map((qr) => <th key={qr} className="tnum" style={{ minWidth: 120, textAlign: "right" }}>{qr}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -134,19 +146,23 @@ export default function Kpis({ boot }: { boot: Boot | null }) {
   function GroupRows({ g, rows, cols: n }: { g: string; rows: K[]; cols: number }) {
     return (
       <>
-        <tr><td colSpan={3 + n} style={{ background: "var(--paper)", color: NAVY, fontWeight: 800, fontSize: 12, letterSpacing: 0.6, padding: "6px 10px" }}>{g.toUpperCase()}</td></tr>
+        <tr style={{ background: "var(--paper)" }}>
+          <td style={{ position: "sticky", left: 0, zIndex: 2, background: "var(--paper)", color: NAVY, fontWeight: 800, fontSize: 12, letterSpacing: 0.6, padding: "6px 10px", width: 220, minWidth: 220 }}>{g.toUpperCase()}</td>
+          <td style={{ position: "sticky", left: 220, zIndex: 2, background: "var(--paper)", width: 120, minWidth: 120, boxShadow: "2px 0 0 rgba(0,0,0,.06)" }} />
+          <td colSpan={1 + n} style={{ background: "var(--paper)" }} />
+        </tr>
         {rows.map((k) => (
           <tr key={k.id} style={{ opacity: k.active ? 1 : 0.55 }}>
-            <td style={{ position: "sticky", left: 0, background: "#fff", zIndex: 1, borderLeft: `5px solid ${leaderOf(boot, k.assigned_to).colour}` }}>
+            <td style={{ position: "sticky", left: 0, background: "#fff", zIndex: 1, borderLeft: `5px solid ${leaderOf(boot, k.assigned_to).colour}`, width: 220, minWidth: 220, maxWidth: 220 }}>
               <button onClick={() => setOpenK(k)} className="text-left font-bold" style={{ color: NAVY, fontSize: 13 }} title="Open the KPI">{k.name}</button>
               <div className="text-xs flex items-center gap-1 flex-wrap" style={{ color: MUTED }}>
                 {k.formula ? <i>{k.formula.replace(/_pct/g, "").replace(/\//g, " ÷ ").replace(/\+/g, " + ")}</i> : <>{k.type === "currency" ? "₹" : k.unit || "number"} · quarter = {k.agg === "sum" ? "sum" : k.agg === "avg" ? "average" : "last month"}</>}
                 {k.visibility && k.visibility !== "all" && <span className="rounded px-1 font-bold" style={{ fontSize: 10, background: "#FFF1E8", color: "var(--accent)" }} title={VIS.find((v) => v.key === k.visibility)?.label}>👁 {VIS.find((v) => v.key === k.visibility)?.short}</span>}
               </div>
             </td>
-            <td>{k.assigned_to ? <Who boot={boot} email={k.assigned_to} size={20} /> : <span className="text-xs" style={{ color: MUTED }}>—</span>}</td>
+            <td style={{ position: "sticky", left: 220, background: "#fff", zIndex: 1, width: 120, minWidth: 120, maxWidth: 120, boxShadow: "2px 0 0 rgba(0,0,0,.06)" }}>{k.assigned_to ? <Who boot={boot} email={k.assigned_to} size={20} /> : <span className="text-xs" style={{ color: MUTED }}>—</span>}</td>
             <td className="tnum" style={{ color: MUTED, textAlign: "right" }}>{fmt(k, k.target)}</td>
-            {view === "month" ? d!.months.map((m) => { const v = val(k, m); const r = row(k, m); return (
+            {view === "month" ? monthsDesc.map((m) => { const v = val(k, m); const r = row(k, m); return (
               <td key={m} className="tnum" style={{ textAlign: "right", background: tone(v, k.target), cursor: k.formula ? "default" : "pointer", fontStyle: k.formula ? "italic" : "normal" }} onClick={() => { if (!k.formula) setCell({ k, month: m, v: r }); }} title={k.formula ? "Worked out from the others" : r ? `${r.note || ""} — ${leaderOf(boot, r.entered_by).name}` : "Click to enter"}>
                 {v === null ? <span style={{ color: "#D5D1C8" }}>·</span> : fmt(k, v)}
               </td>

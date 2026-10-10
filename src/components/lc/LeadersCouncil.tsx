@@ -39,6 +39,11 @@ export default function LeadersCouncil({ email, displayName, initials, role, isO
   const [boot] = useBoot();
   const [{ room, arg }, setAt] = useState(readHash);
   const [navOpen, setNavOpen] = useState(false);
+  /* THE LEFT COLLAPSES (Dr Raghu, 10 Oct 2026: "make the left collapsible")
+     to a rail of icons, remembered on this browser. */
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => { try { setNarrow(localStorage.getItem("lc-nav-narrow") === "1"); } catch { /* no storage */ } }, []);
+  const toggleNarrow = () => { setNarrow((n) => { try { localStorage.setItem("lc-nav-narrow", n ? "0" : "1"); } catch { /* no storage */ } return !n; }); };
   useEffect(() => { const f = () => setAt(readHash()); window.addEventListener("hashchange", f); return () => window.removeEventListener("hashchange", f); }, []);
   const go = (k: string, a?: string | null) => { window.location.hash = a ? `${k}/${a}` : k; setNavOpen(false); };
   const here = ROOMS.find((r) => r.key === room)!;
@@ -47,26 +52,31 @@ export default function LeadersCouncil({ email, displayName, initials, role, isO
     <GenieShell module="lc" title="Nandan Leaders Council" tagline="the council's own room" user={{ email, displayName, initials, role }}
       leading={<button onClick={() => setNavOpen((o) => !o)} className="lc-burger rounded px-2 font-bold" style={{ height: 32, background: "#0D161F", color: "#fff", border: "1px solid var(--ink)", fontSize: 16 }} aria-label="Rooms">☰</button>}>
       <div className="lc-wrap flex" style={{ minHeight: "calc(100vh - 50px)" }}>
-        <nav className={"lc-nav" + (navOpen ? " open" : "")} style={{ width: 232, flexShrink: 0, background: "#fff", borderRight: `1px solid ${LINE}` }}>
-          <div className="px-3 pt-3 pb-2">
-            <div className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 1 }}>THE COUNCIL</div>
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {boot?.members.map((m) => <Who key={m.email} boot={boot} email={m.email} withName={false} size={24} />)}
+        <nav className={"lc-nav" + (navOpen ? " open" : "")} style={{ width: narrow ? 56 : 232, flexShrink: 0, background: "#fff", borderRight: `1px solid ${LINE}`, transition: "width .15s" }}>
+          <button onClick={toggleNarrow} className="lc-fold w-full flex items-center justify-center py-1.5" style={{ color: MUTED, fontSize: 12, borderBottom: `1px solid ${LINE}` }} title={narrow ? "Open the menu" : "Fold the menu to icons"}>{narrow ? "⟩" : "⟨ fold"}</button>
+          {!narrow && (
+            <div className="px-3 pt-3 pb-2">
+              <div className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 1 }}>THE COUNCIL</div>
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {boot?.members.map((m) => <Who key={m.email} boot={boot} email={m.email} withName={false} size={24} />)}
+              </div>
             </div>
-          </div>
+          )}
           {ROOMS.map((r) => (
-            <button key={r.key} onClick={() => go(r.key)} className="w-full text-left px-3 py-2 flex items-center gap-2"
+            <button key={r.key} onClick={() => go(r.key)} className={"w-full text-left flex items-center gap-2 " + (narrow ? "justify-center px-0 py-2.5" : "px-3 py-2")} title={narrow ? `${r.label} — ${r.blurb}` : undefined}
               style={{ background: r.key === room ? "var(--paper)" : "transparent", borderLeft: `4px solid ${r.key === room ? "var(--accent)" : "transparent"}`, color: NAVY, fontWeight: r.key === room ? 800 : 600, fontSize: 13.5 }}>
-              <span style={{ width: 22, textAlign: "center" }}>{r.icon}</span>
-              <span className="min-w-0"><div className="truncate">{r.label}</div><div className="truncate" style={{ fontSize: 10.5, color: MUTED, fontWeight: 500 }}>{r.blurb}</div></span>
+              <span style={{ width: 22, textAlign: "center", fontSize: narrow ? 18 : undefined }}>{r.icon}</span>
+              {!narrow && <span className="min-w-0"><div className="truncate">{r.label}</div><div className="truncate" style={{ fontSize: 10.5, color: MUTED, fontWeight: 500 }}>{r.blurb}</div></span>}
             </button>
           ))}
-          <div className="px-3 py-3 text-xs" style={{ color: MUTED, borderTop: `1px solid ${LINE}`, marginTop: 8 }}>
-            Only those marked LC on Admin → Groups can open this room, on every page and every route.
-          </div>
+          {!narrow && (
+            <div className="px-3 py-3 text-xs" style={{ color: MUTED, borderTop: `1px solid ${LINE}`, marginTop: 8 }}>
+              Only those marked LC on Admin → Groups can open this room, on every page and every route.
+            </div>
+          )}
         </nav>
         {navOpen && <div className="lc-scrim fixed inset-0" style={{ zIndex: 40, background: "rgba(0,0,0,.3)" }} onClick={() => setNavOpen(false)} role="presentation" />}
-        <main className="flex-1 min-w-0 p-3 md:p-4" style={{ maxWidth: 1240 }}>
+        <main className="flex-1 min-w-0 p-3 md:p-4" style={{ maxWidth: narrow ? "none" : 1240 }}>
           <div className="flex items-center gap-2 mb-3">
             <span style={{ fontSize: 22 }}>{here.icon}</span>
             <h1 className="font-bold m-0" style={{ fontSize: 20, color: NAVY }}>{here.label}</h1>
@@ -97,6 +107,8 @@ export default function LeadersCouncil({ email, displayName, initials, role, isO
         .lc-wrap .rich-html td, .lc-wrap .rich-html th { border: 1px solid var(--line); padding: 4px 8px; }
         @media (max-width: 860px) {
           .lc-burger { display: inline-block; }
+          .lc-fold { display: none; }
+          .lc-nav { width: 232px !important; }
           .lc-nav { position: fixed; top: 50px; bottom: 0; left: -240px; z-index: 41; overflow-y: auto; transition: left .18s; box-shadow: 0 0 0 transparent; }
           .lc-nav.open { left: 0; box-shadow: 8px 0 24px rgba(0,0,0,.2); }
         }
