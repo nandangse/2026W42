@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.13",
+    date: "2026-10-10",
+    module: "IMS: Internal audit — the checklist, the audit by department, the NCs and the action plan, the audit file",
+    items: [
+      "INTERNAL AUDIT, A DOOR OF ITS OWN IN THE IMS (Dr Raghu, 10 Oct 2026: \u201ccreate Internal audit checklist \u2026 a place to add the standard, date start, target completion date, people, department, status \u2026 When you meet a certain department all the clauses of that should come up. Post that there should be an internal audit file created with the NC and also the action plan\u201d). Plan an audit: standards, dates, lead auditor, auditors, auditees, departments, status \u2014 numbered IA-2026-nn. Open it and meet a department: every checklist line of that department comes up with the objective evidence to verify, the process owner and the method; answer it on the spot \u2014 C, OFI, Minor NC, Major NC, N/A \u2014 with the finding and the evidence reference. A Minor or Major NC is numbered the moment it is saved and the finding is written on the clause in Standards as the auditor\u2019s remark.",
+      "THE AUDIT FILE: the non-conformities by severity with their status (open \u2192 root cause \u2192 action planned \u2192 verification \u2192 closed), the action plan under each \u2014 correction, corrective action, owner, support, target date, effectiveness \u2014 and the report Genie writes from every line, NC and action: details, scope, summary, findings by department, the NCs with their plan, OFIs, conclusion, sign-off. Print / PDF.",
+      "THE CHECKLIST BANK FROM THE SHEET (NGSE AS9100D Internal Audit & Recertification Checklist): 116 lines for AS 9100D including ISO 9001, each with its department, evidence and method; + Checklist line adds more, for any standard. The audit the sheet records stands as IA-2026-01 \u2014 61 conforming, 33 major, 21 minor, 1 N/A \u2014 with its 54 numbered non-conformities and the 60 action points by owner as its action plan, so nothing already found is lost. Migration 0222.",
+    ],
+  },
+  {
     v: "6.4.0.12",
     date: "2026-10-10",
     module: "IMS: the auditor's remark on every clause, per audit; ticking a standard shows its clauses at once",

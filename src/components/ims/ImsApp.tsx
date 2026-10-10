@@ -23,6 +23,7 @@ import Certificates from "./Certificates";
 import Documents from "./Documents";
 import Registers from "./Registers";
 import Standards from "./Standards";
+import InternalAudit from "./InternalAudit";
 import Tasks from "./Tasks";
 import Calendar from "./Calendar";
 import Settings from "./Settings";
@@ -34,6 +35,7 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "documents", label: "Documents", icon: "📘" },
   { key: "registers", label: "Registers", icon: "🗂" },
   { key: "standards", label: "Standards", icon: "📐" },
+  { key: "audit", label: "Internal audit", icon: "🔎" },
   { key: "tasks", label: "Tasks", icon: "✓" },
   { key: "calendar", label: "Calendar", icon: "📅" },
   { key: "settings", label: "Settings", icon: "⚙" },
@@ -91,6 +93,7 @@ export default function ImsApp({
       case "documents": return <Documents boot={boot} />;
       case "registers": return <Registers boot={boot} />;
       case "standards": return <Standards boot={boot} />;
+      case "audit": return <InternalAudit boot={boot} />;
       case "tasks": return <Tasks boot={boot} />;
       case "calendar": return <Calendar boot={boot} />;
       case "settings": return <Settings boot={boot} />;
