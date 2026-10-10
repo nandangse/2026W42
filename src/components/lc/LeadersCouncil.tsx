@@ -20,6 +20,7 @@ const Ssc = dynamic(() => import("./Ssc"));
 const Solutions = dynamic(() => import("./Solutions"));
 const Kpis = dynamic(() => import("./Kpis"));
 const Health = dynamic(() => import("./Health"));
+const Leader = dynamic(() => import("./Leader"));
 
 export const ROOMS: { key: string; label: string; icon: string; blurb: string; ownerOnly?: boolean }[] = [
   { key: "philosophy", label: "Philosophy", icon: "🪔", blurb: "values, OPSP, quarterly reports" },
@@ -33,7 +34,7 @@ export const ROOMS: { key: string; label: string; icon: string; blurb: string; o
   { key: "health", label: "Health Check", icon: "🩺", blurb: "the Rockefeller habits, anonymous" },
 ];
 
-const readHash = () => { const h = (typeof window !== "undefined" ? window.location.hash : "").replace(/^#/, ""); const [room, arg] = h.split("/"); return { room: ROOMS.some((r) => r.key === room) ? room : "philosophy", arg: arg || null }; };
+const readHash = () => { const h = (typeof window !== "undefined" ? window.location.hash : "").replace(/^#/, ""); const i = h.indexOf("/"); const room = i < 0 ? h : h.slice(0, i); const arg = i < 0 ? null : decodeURIComponent(h.slice(i + 1)) || null; return { room: room === "leader" || ROOMS.some((r) => r.key === room) ? room : "philosophy", arg }; };
 
 export default function LeadersCouncil({ email, displayName, initials, role, isOwner }: { email: string; displayName: string | null; initials: string | null; role: string; isOwner: boolean }) {
   const [boot] = useBoot();
@@ -46,7 +47,7 @@ export default function LeadersCouncil({ email, displayName, initials, role, isO
   const toggleNarrow = () => { setNarrow((n) => { try { localStorage.setItem("lc-nav-narrow", n ? "0" : "1"); } catch { /* no storage */ } return !n; }); };
   useEffect(() => { const f = () => setAt(readHash()); window.addEventListener("hashchange", f); return () => window.removeEventListener("hashchange", f); }, []);
   const go = (k: string, a?: string | null) => { window.location.hash = a ? `${k}/${a}` : k; setNavOpen(false); };
-  const here = ROOMS.find((r) => r.key === room)!;
+  const here = room === "leader" ? { key: "leader", label: "A leader", icon: "👤", blurb: "their participation across the council" } : ROOMS.find((r) => r.key === room)!;
 
   return (
     <GenieShell module="lc" title="Nandan Leaders Council" tagline="the council's own room" user={{ email, displayName, initials, role }}
@@ -58,7 +59,8 @@ export default function LeadersCouncil({ email, displayName, initials, role, isO
             <div className="px-3 pt-3 pb-2">
               <div className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 1 }}>THE COUNCIL</div>
               <div className="flex flex-wrap gap-1 mt-1.5">
-                {boot?.members.map((m) => <Who key={m.email} boot={boot} email={m.email} withName={false} size={24} />)}
+                {/* CLICKABLE (Dr Raghu, 10 Oct 2026): each opens the leader's own page */}
+                {boot?.members.map((m) => <button key={m.email} onClick={() => go("leader", m.email)} title={`${m.name} — their participation`} style={{ outline: room === "leader" && arg === m.email ? `2px solid ${NAVY}` : "none", borderRadius: 999 }}><Who boot={boot} email={m.email} withName={false} size={24} /></button>)}
               </div>
             </div>
           )}
@@ -79,7 +81,7 @@ export default function LeadersCouncil({ email, displayName, initials, role, isO
         <main className="flex-1 min-w-0 p-3 md:p-4" style={{ maxWidth: narrow ? "none" : 1240 }}>
           <div className="flex items-center gap-2 mb-3">
             <span style={{ fontSize: 22 }}>{here.icon}</span>
-            <h1 className="font-bold m-0" style={{ fontSize: 20, color: NAVY }}>{here.label}</h1>
+            <h1 className="font-bold m-0" style={{ fontSize: 20, color: NAVY }}>{room === "leader" && arg ? (boot?.members.find((m) => m.email === arg)?.name || here.label) : here.label}</h1>
             <span className="text-xs" style={{ color: MUTED }}>{here.blurb}</span>
           </div>
           {room === "philosophy" && <Pages kind="philosophy" boot={boot} isOwner={isOwner} />}
@@ -91,6 +93,7 @@ export default function LeadersCouncil({ email, displayName, initials, role, isO
           {room === "solutions" && <Solutions boot={boot} arg={arg} go={go} />}
           {room === "kpis" && <Kpis boot={boot} />}
           {room === "health" && <Health boot={boot} isOwner={isOwner} />}
+          {room === "leader" && arg && <Leader boot={boot} email={arg} go={go} />}
         </main>
       </div>
       <style>{`

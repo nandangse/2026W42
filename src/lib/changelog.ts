@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.10",
+    date: "2026-10-10",
+    module: "Every leader has a page; the council filled from its own sheets",
+    items: [
+      "A LEADER'S PAGE (Dr Raghu, 10 Oct 2026: \u201cmake these clickable and open up each leader\u2019s page showing his or her participation\u201d). Every avatar and every name in the council opens it: their Start \u00B7 Stop \u00B7 Continue cards, the problems they raised, the solutions and comments, the presentations, the minutes they attended or wrote, the principles and pages they wrote, the KPIs on their name and the figures they entered, the thumbs they gave, what they opened, and whether they answered each health-check round \u2014 never what they answered.",
+      "THE COUNCIL FILLED AS AN EA WOULD, from the Leaders Council sheet (July 2026 W28), the LC Drive folder, the Annual Planner 2026-27 and the four Breakthrough 2027 documents: the OPSP and quarterly-report format on Philosophy with Breakthrough 2027 as the plan of the year; nineteen principles awaiting approval \u2014 from the council\u2019s own MoMs, the hurdle breaker and the Breakthrough documents; twenty-one Knowledge entries, each with a debrief of what it is; seventeen problems on the Solution Board, ten carrying the sheet\u2019s own solution; four Start \u00B7 Stop \u00B7 Continue cards; two presentations; today\u2019s standing agenda; the first Health Check round opened; and 74 monthly figures on the KPI board from the Planner\u2019s Metrics sheet (April 2024 to November 2025), with On-time delivery added under Other because the sheet and the Management System both carry it.",
+      "IMS: Manish Thakare and Pankaj Sutar may edit the IMS (ims_admin) \u2014 \u201cIMS to be editable by manish and pankaj\u201d.",
+    ],
+  },
+  {
     v: "6.4.0.9",
     date: "2026-10-10",
     module: "A big pasted picture no longer ends in a bare 504",

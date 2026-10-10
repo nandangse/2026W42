@@ -44,8 +44,10 @@ export const leaderOf = (boot: Boot | null, email?: string | null): Leader => {
 
 export function Who({ boot, email, size = 26, withName = true, light }: { boot: Boot | null; email?: string | null; size?: number; withName?: boolean; light?: boolean }) {
   const l = leaderOf(boot, email);
+  /* a name or an avatar anywhere in the council opens that leader's page (10 Oct 2026) */
+  const open = (e: React.MouseEvent) => { if (!boot?.members.some((m) => m.email === l.email)) return; e.stopPropagation(); e.preventDefault(); window.location.hash = `leader/${encodeURIComponent(l.email)}`; };
   return (
-    <span className="inline-flex items-center gap-1.5" title={l.email}>
+    <span className="inline-flex items-center gap-1.5" title={`${l.name} — open their page`} onClick={open} role="link" style={{ cursor: "pointer" }}>
       <span className="rounded-full font-bold inline-flex items-center justify-center flex-shrink-0" style={{ width: size, height: size, fontSize: size * 0.4, background: l.colour, color: "#fff" }}>{l.initials}</span>
       {withName && <span className="font-semibold" style={{ fontSize: 12, color: light ? "#fff" : NAVY }}>{l.name}</span>}
     </span>
