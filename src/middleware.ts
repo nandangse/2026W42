@@ -26,6 +26,17 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  /* /LC and /Lc open the Leaders Council too (Dr Raghu, 10 Oct 2026). An
+     EXACT string test on purpose: a redirects() rule in next.config matches
+     case-insensitively, so "/LC → /lc" sent /lc to itself for ever
+     (ERR_TOO_MANY_REDIRECTS, 10 Oct 2026, reverted within minutes). */
+  {
+    const p = req.nextUrl.pathname;
+    if (p === "/LC" || p === "/Lc" || p.startsWith("/LC/") || p.startsWith("/Lc/")) {
+      const u = req.nextUrl.clone(); u.pathname = "/lc" + p.slice(3); return NextResponse.redirect(u);
+    }
+  }
+
   const res = NextResponse.next({ request: { headers: req.headers } });
   const supabase = createServerClient(
     env("NEXT_PUBLIC_SUPABASE_URL"),
