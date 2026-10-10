@@ -56,6 +56,16 @@ const nextConfig = {
       ],
     },
   },
+  async redirects() {
+    /* /LC and /Lc open the Leaders Council too (Dr Raghu, 10 Oct 2026:
+       "genie.nandan.co.in/lc or genie.nandan.co.in/LC") — routes are
+       case-sensitive, a typed address is not. */
+    return [
+      { source: "/LC", destination: "/lc", permanent: false },
+      { source: "/Lc", destination: "/lc", permanent: false },
+      { source: "/LC/:path*", destination: "/lc/:path*", permanent: false },
+    ];
+  },
   async headers() {
     return [
       {
