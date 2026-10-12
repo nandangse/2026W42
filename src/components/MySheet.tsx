@@ -13,6 +13,7 @@
  * person wants first is on top: leave left, loan left, last pay, and what is
  * still waiting on them.
  */
+import AttendanceQuick from "@/components/AttendanceQuick";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { LOGO } from "@/lib/logo";
@@ -94,7 +95,7 @@ function ComingSoon({ what, line }: { what: string; line: string }) {
   );
 }
 
-export default function MySheet({ name, children, teamBox, embedded, dashboard, idpPanel, idpStatus }: { name: string; children?: React.ReactNode; teamBox?: React.ReactNode; embedded?: boolean; dashboard?: React.ReactNode; idpPanel?: React.ReactNode; idpStatus?: "done" | "open" | "none" }) {
+export default function MySheet({ name, children, teamBox, embedded, dashboard, idpPanel, idpStatus, attendance }: { name: string; children?: React.ReactNode; teamBox?: React.ReactNode; embedded?: boolean; dashboard?: React.ReactNode; idpPanel?: React.ReactNode; idpStatus?: "done" | "open" | "none"; attendance?: boolean }) {
   const [d, setD] = useState<Sheet | null>(null);
   const [tab, setTab] = useState<Tab>("home");
   const [msg, setMsg] = useState("");
@@ -168,15 +169,14 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
         .idpm .wrap{max-width:560px;margin:0 auto;padding:16px 16px 104px}
         /* ── the hero, on his blue ground ── */
         .idpm .hero{background:linear-gradient(160deg,#1F4E9C 0%,#2E6BC4 45%,#1B4B96 100%);
-          color:#fff;border-radius:0 0 20px 20px;margin:-16px -16px 4px;padding:14px 16px 20px;text-align:center;
-          box-shadow:0 6px 20px rgba(27,34,51,.18)}
-        .idpm .hero-date{font-size:12.5px;color:rgba(255,255,255,.72);text-align:right}
-        .idpm .hero-face{width:96px;height:96px;border-radius:50%;margin:6px auto 10px;
-          background:rgba(255,255,255,.16);border:3px solid rgba(255,255,255,.85);
-          display:grid;place-items:center;font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:34px;
-          box-shadow:0 4px 16px rgba(0,0,0,.2)}
-        .idpm .hero-name{font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:23px;line-height:1.15}
-        .idpm .hero-role{font-size:15.5px;color:rgba(255,255,255,.92);margin-top:3px}
+          color:#fff;border-radius:0 0 16px 16px;margin:-16px -16px 2px;padding:10px 14px;
+          display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px rgba(27,34,51,.16)}
+        .idpm .hero-date{font-size:11.5px;color:rgba(255,255,255,.72);text-align:right;align-self:flex-start;white-space:nowrap}
+        .idpm .hero-face{width:44px;height:44px;border-radius:50%;flex:none;
+          background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.85);
+          display:grid;place-items:center;font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:16px}
+        .idpm .hero-name{font-family:Barlow,system-ui,sans-serif;font-weight:700;font-size:17px;line-height:1.15}
+        .idpm .hero-role{font-size:13px;color:rgba(255,255,255,.9);margin-top:1px}
         .idpm .hero-team{font-size:14.5px;color:rgba(255,255,255,.75)}
         .idpm .hero-meta{font-size:11.5px;color:rgba(255,255,255,.6);margin-top:6px}
         /* ── the tile grid, three across, a picture on each ── */
@@ -259,20 +259,17 @@ export default function MySheet({ name, children, teamBox, embedded, dashboard, 
             this theme!!! It looks nice"). His face, his name, his role and
             his team on a blue ground — the app knowing who you are before it
             asks you for anything. */}
+        {/* SMALLER (Dr Raghu, 12 Oct 2026: "it's too big right now … make that smaller") — one line: the face, the name, the role, the date */}
         <div className="hero">
-          <div className="hero-date">{d.today}</div>
           <div className="hero-face">{initials || "N"}</div>
-          <div className="hero-name">{d.linked ? d.me.name : name}</div>
-          {d.linked && (
-            <>
-              <div className="hero-role">{d.me.designation || d.me.type}</div>
-              <div className="hero-team">{d.me.department || ""}</div>
-              <div className="hero-meta">
-                {d.me.id}{d.me.doj ? ` · since ${when(d.me.doj)}` : ""}{d.me.manager ? ` · reports to ${d.me.manager}` : ""}
-              </div>
-            </>
-          )}
+          <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+            <div className="hero-name">{d.linked ? d.me.name : name}</div>
+            {d.linked && <div className="hero-role">{[d.me.designation || d.me.type, d.me.department].filter(Boolean).join(" · ")}</div>}
+            {d.linked && <div className="hero-meta">{d.me.id}{d.me.doj ? ` · since ${when(d.me.doj)}` : ""}{d.me.manager ? ` · reports to ${d.me.manager}` : ""}</div>}
+          </div>
+          <div className="hero-date">{d.today}</div>
         </div>
+        {attendance && <AttendanceQuick />}
 
         {!d.linked && (
           <div className="alert"><div style={{ flex: 1, fontSize: 15 }}>

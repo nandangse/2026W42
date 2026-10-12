@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.6.0.2",
+    date: "2026-10-12",
+    module: "/idp: Attendance Login, Attendance Log Off, Check My Attendance — on top; the header made small",
+    items: [
+      "THE THREE BUTTONS ON TOP (Dr Raghu, 12 Oct 2026: \u201cin the IDP currently we are not seeing in and out \u2026 that has to be seen right at the top \u2026 the YC and everything is too big right now. Make that smaller and show these buttons saying Attendance Login, Attendance Log Off, and Check My Attendance \u2026 above the orange button, which is for My IDP\u201d). Right under the header, before Your IDP: \u2705 Attendance Login, \ud83c\udfc1 Attendance Log Off, \ud83d\udccb Check My Attendance. Login and Log Off punch on the spot \u2014 the GPS position, then the camera, the time stamped on the photo, saved \u2014 with a line saying since when he is logged in; Check My Attendance opens the days and hours. The green card lower down is gone. The blue header is one line now: the initials small, the name, the role and department, the date.",
+      "WHO SEES THEM: everyone in the Service department on the HRMS roll, and Dr Raghu, so it can be tried. A punch needs migration 0225.",
+    ],
+  },
+  {
     v: "6.6.0.1",
     date: "2026-10-12",
     module: "Seva: the AMC register on the contract's own dates — 68 valid, ₹1,43,45,326, as the ERP has them",

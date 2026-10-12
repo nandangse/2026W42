@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { errJson, HttpError } from "@/lib/auth";
+import { currentUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { fieldPerson, isFieldTeam } from "@/lib/field-person";
 
@@ -36,7 +36,8 @@ export async function GET() {
       const { data: s } = p.photo_path ? await admin.storage.from(BUCKET).createSignedUrl(String(p.photo_path), 3600) : { data: null };
       return { ...p, photo_url: s?.signedUrl ?? null };
     }));
-    return NextResponse.json({ installed: true, me: { id: me.id, name: me.name, designation: me.designation }, mayPunch: isFieldTeam(me), today, todays: signed, punches: data || [] });
+    const owner = !!(await currentUser().catch(() => null))?.isOwner;
+    return NextResponse.json({ installed: true, me: { id: me.id, name: me.name, designation: me.designation }, mayPunch: isFieldTeam(me) || owner, today, todays: signed, punches: data || [] });
   } catch (e) { return errJson(e); }
 }
 
@@ -45,7 +46,8 @@ export async function POST(req: Request) {
     const admin = adminClient();
     const me = await fieldPerson(admin);
     if (!me) throw new HttpError(401, "Sign in first.");
-    if (!isFieldTeam(me)) throw new HttpError(403, "Attendance here is for the outdoor service team — HR puts you in the Service department.");
+    const owner = !!(await currentUser().catch(() => null))?.isOwner;
+    if (!isFieldTeam(me) && !owner) throw new HttpError(403, "Attendance here is for the outdoor service team — HR puts you in the Service department.");
     const fd = await req.formData();
     const kind = String(fd.get("kind") || "");
     if (kind !== "in" && kind !== "out") throw new HttpError(400, "Check in or check out?");

@@ -29,7 +29,7 @@ function worked(ps: Punch[], today: string): number {
 }
 const hours = (m: number) => `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
 
-async function shrink(file: File): Promise<Blob> {
+export async function shrink(file: File): Promise<Blob> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
@@ -45,7 +45,7 @@ async function shrink(file: File): Promise<Blob> {
   } catch { return file; } finally { URL.revokeObjectURL(url); }
 }
 
-function position(): Promise<GeolocationPosition> {
+export function position(): Promise<GeolocationPosition> {
   return new Promise((ok, no) => {
     if (!navigator.geolocation) { no(new Error("This phone gives no location to the browser.")); return; }
     navigator.geolocation.getCurrentPosition(ok, (e) => no(new Error(e.code === 1 ? "Location is blocked — allow location for genie.nandan.co.in in the browser settings, then try again." : "Could not get the GPS position — step outside or switch location on, then try again.")), { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 });

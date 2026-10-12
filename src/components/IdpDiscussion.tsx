@@ -133,10 +133,6 @@ export default function IdpDiscussion({ name, initials, field = false }: { name:
     const doneDashboard = (
       <>
         <TeamBox onOpen={setReviewRow} />
-        {field && <a href="/idp/attendance" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "#15803D", color: "#fff", textDecoration: "none" }}>
-          <div className="font-bold" style={{ fontSize: 15 }}>📍 Attendance — check in, check out</div>
-          <div className="text-xs mt-1" style={{ color: "#DCFCE7", lineHeight: 1.6 }}>For the outdoor service team: your GPS position and a photo with every punch.</div>
-        </a>}
         <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
           <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
           <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>Read it, ask HR under any section, and acknowledge the edition at the end.</div>
@@ -145,7 +141,7 @@ export default function IdpDiscussion({ name, initials, field = false }: { name:
     );
     return (
       <Shell initials={initials} name={name}>
-        <MySheet name={name} embedded dashboard={doneDashboard} idpPanel={donePanel} idpStatus="done" />
+        <MySheet name={name} embedded dashboard={doneDashboard} idpPanel={donePanel} idpStatus="done" attendance={field} />
         {reviewRow && <TeamReview row={reviewRow} onClose={() => { setReviewRow(null); }} />}
         <WhatsAppFab name={name} form="My sheet" />
       </Shell>
@@ -162,11 +158,7 @@ export default function IdpDiscussion({ name, initials, field = false }: { name:
         <div className="mx-auto px-4 py-8 md:py-10" style={{ maxWidth: 620 }}>
           <h1 className="font-bold" style={{ fontSize: 24 }}>Welcome {name}</h1>
           {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
-          {field && <a href="/idp/attendance" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "#15803D", color: "#fff", textDecoration: "none" }}>
-          <div className="font-bold" style={{ fontSize: 15 }}>📍 Attendance — check in, check out</div>
-          <div className="text-xs mt-1" style={{ color: "#DCFCE7", lineHeight: 1.6 }}>For the outdoor service team: your GPS position and a photo with every punch.</div>
-        </a>}
-        <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
+          <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
             <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
             <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>How things work at Nandan GSE: hours, leave, pay, conduct, safety, leaving. Read it, ask HR under any section, and acknowledge the edition at the end.</div>
           </a>
@@ -198,11 +190,7 @@ export default function IdpDiscussion({ name, initials, field = false }: { name:
       )}
       <TeamBox onOpen={setReviewRow} />
       {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
-      {field && <a href="/idp/attendance" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "#15803D", color: "#fff", textDecoration: "none" }}>
-          <div className="font-bold" style={{ fontSize: 15 }}>📍 Attendance — check in, check out</div>
-          <div className="text-xs mt-1" style={{ color: "#DCFCE7", lineHeight: 1.6 }}>For the outdoor service team: your GPS position and a photo with every punch.</div>
-        </a>}
-        <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
+      <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
         <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
         <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>How things work at Nandan GSE: hours, leave, pay, conduct, safety, leaving. Read it, ask HR under any section, and acknowledge the edition at the end.</div>
       </a>
@@ -364,7 +352,7 @@ export default function IdpDiscussion({ name, initials, field = false }: { name:
   // the tab strip freezes under it, Home is the dashboard, IDP is this welcome.
   return (
     <Shell initials={initials} name={name}>
-      <MySheet name={name} embedded dashboard={dashboard} idpPanel={welcomePanel} idpStatus={state.open ? "open" : "none"} />
+      <MySheet name={name} embedded dashboard={dashboard} idpPanel={welcomePanel} idpStatus={state.open ? "open" : "none"} attendance={field} />
       {reviewRow && <TeamReview row={reviewRow} onClose={() => { setReviewRow(null); }} />}
       <WhatsAppFab name={name} form="IDP" />
     </Shell>

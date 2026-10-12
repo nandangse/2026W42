@@ -23,8 +23,8 @@ export const metadata = { title: "Nandan Genie" };
 
 export default async function IdpPage() {
   /* the outdoor service team sees the Attendance card (Dr Raghu, 12 Oct 2026) */
-  const field = isFieldTeam(await fieldPerson(adminClient()).catch(() => null));
   const user = await currentUser();
+  const field = isFieldTeam(await fieldPerson(adminClient()).catch(() => null)) || !!(user && user.isOwner);
   if (user && !user.disabled)
     return <IdpDiscussion name={firstName(user.displayName) || user.email.split("@")[0]} initials={user.initials} field={field} />;
 
