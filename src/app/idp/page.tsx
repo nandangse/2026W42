@@ -4,6 +4,7 @@ import IdpDiscussion from "@/components/IdpDiscussion";
 import { idpSession } from "@/lib/idp-session";
 import { firstName } from "@/lib/person-name";
 import { adminClient } from "@/lib/supabase/admin";
+import { fieldPerson, isFieldTeam } from "@/lib/field-person";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +22,11 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Nandan Genie" };
 
 export default async function IdpPage() {
+  /* the outdoor service team sees the Attendance card (Dr Raghu, 12 Oct 2026) */
+  const field = isFieldTeam(await fieldPerson(adminClient()).catch(() => null));
   const user = await currentUser();
   if (user && !user.disabled)
-    return <IdpDiscussion name={firstName(user.displayName) || user.email.split("@")[0]} initials={user.initials} />;
+    return <IdpDiscussion name={firstName(user.displayName) || user.email.split("@")[0]} initials={user.initials} field={field} />;
 
   /**
    * NOT EVERY EMPLOYEE HAS A GENIE LOGIN (Dr Raghu, 7 Sep 2026: "whoever is
@@ -40,7 +43,7 @@ export default async function IdpPage() {
        because nobody had worked his initials out. */
     const full = String(data?.name || "").trim();
     const ini = full.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || null;
-    return <IdpDiscussion name={firstName(full || String(who))} initials={ini} />;
+    return <IdpDiscussion name={firstName(full || String(who))} initials={ini} field={field} />;
   }
   redirect("/idp/sign-in");
 }

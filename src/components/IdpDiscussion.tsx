@@ -42,7 +42,7 @@ interface Open {
 interface Done extends Open { submitted_at: string }
 type Salary = { rows: SalaryRow[]; ctcLakhs: string; exempt: boolean; info: SalaryInfo } | null;
 
-export default function IdpDiscussion({ name, initials }: { name: string; initials: string | null }) {
+export default function IdpDiscussion({ name, initials, field = false }: { name: string; initials: string | null; field?: boolean }) {
   const [state, setState] = useState<{
     open: Open | null; done: Done[];
     role: string | null; roleSummary: string | null; roleDocs: RoleDoc[]; needsMigration?: boolean;
@@ -133,6 +133,10 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
     const doneDashboard = (
       <>
         <TeamBox onOpen={setReviewRow} />
+        {field && <a href="/idp/attendance" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "#15803D", color: "#fff", textDecoration: "none" }}>
+          <div className="font-bold" style={{ fontSize: 15 }}>📍 Attendance — check in, check out</div>
+          <div className="text-xs mt-1" style={{ color: "#DCFCE7", lineHeight: 1.6 }}>For the outdoor service team: your GPS position and a photo with every punch.</div>
+        </a>}
         <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
           <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
           <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>Read it, ask HR under any section, and acknowledge the edition at the end.</div>
@@ -158,7 +162,11 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
         <div className="mx-auto px-4 py-8 md:py-10" style={{ maxWidth: 620 }}>
           <h1 className="font-bold" style={{ fontSize: 24 }}>Welcome {name}</h1>
           {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
-          <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
+          {field && <a href="/idp/attendance" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "#15803D", color: "#fff", textDecoration: "none" }}>
+          <div className="font-bold" style={{ fontSize: 15 }}>📍 Attendance — check in, check out</div>
+          <div className="text-xs mt-1" style={{ color: "#DCFCE7", lineHeight: 1.6 }}>For the outdoor service team: your GPS position and a photo with every punch.</div>
+        </a>}
+        <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
             <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
             <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>How things work at Nandan GSE: hours, leave, pay, conduct, safety, leaving. Read it, ask HR under any section, and acknowledge the edition at the end.</div>
           </a>
@@ -190,7 +198,11 @@ export default function IdpDiscussion({ name, initials }: { name: string; initia
       )}
       <TeamBox onOpen={setReviewRow} />
       {/* THE HANDBOOK, WHERE EVERY EMPLOYEE ALREADY COMES (Dr Raghu, 5 Sep 2026) */}
-      <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
+      {field && <a href="/idp/attendance" className="block rounded-lg p-3 mt-3 hover:opacity-90" style={{ background: "#15803D", color: "#fff", textDecoration: "none" }}>
+          <div className="font-bold" style={{ fontSize: 15 }}>📍 Attendance — check in, check out</div>
+          <div className="text-xs mt-1" style={{ color: "#DCFCE7", lineHeight: 1.6 }}>For the outdoor service team: your GPS position and a photo with every punch.</div>
+        </a>}
+        <a href="/idp/employee-handbook" className="block rounded-lg p-3 mt-4 hover:opacity-90" style={{ background: "var(--navy)", color: "#fff", textDecoration: "none" }}>
         <div className="font-bold" style={{ fontSize: 15 }}>📘 Employee Handbook — read and confirm</div>
         <div className="text-xs mt-1" style={{ color: "#8FA1B3", lineHeight: 1.6 }}>How things work at Nandan GSE: hours, leave, pay, conduct, safety, leaving. Read it, ask HR under any section, and acknowledge the edition at the end.</div>
       </a>

@@ -16,6 +16,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import GenieShell from "@/components/GenieShell";
 import SevaAnalytics from "@/components/SevaAnalytics";
 import SevaLocations from "@/components/SevaLocations";
+import SevaPlan from "@/components/seva/SevaPlan";
+import SevaQuotes from "@/components/seva/SevaQuotes";
+import FieldAttendanceDesk from "@/components/seva/FieldAttendanceDesk";
 import { swallow } from "@/lib/swallow";
 import { dmy as fmtD, rupee } from "@/lib/fmt";
 const money = (n: unknown) => rupee(n);
@@ -29,6 +32,9 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "locations", label: "Locations", icon: "📍" },
   { key: "discuss", label: "Discussion points", icon: "🗣" },
   { key: "amc", label: "Annual Maintenance", icon: "📅" },
+  { key: "plan", label: "Team Plan Deployment", icon: "🗓" },
+  { key: "quotes", label: "Quotation", icon: "🧾" },
+  { key: "attendance", label: "Field attendance", icon: "📍" },
   { key: "push", label: "Push — 1:1", icon: "⇢" },
   { key: "settings", label: "Settings — masters", icon: "⚙" },
 ];
@@ -1468,6 +1474,9 @@ export default function Seva({
           {openKey === "locations" && <SevaLocations />}
           {openKey === "discuss" && <DiscussScreen />}
           {openKey === "amc" && <AmcScreen />}
+          {openKey === "plan" && <SevaPlan />}
+          {openKey === "quotes" && <SevaQuotes />}
+          {openKey === "attendance" && <FieldAttendanceDesk />}
           {openKey === "push" && <PushScreen />}
           {openKey === "settings" && <SettingsScreen />}
         </main>
