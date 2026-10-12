@@ -55,7 +55,8 @@ export default function FieldAttendanceDesk() {
       </div>
       {!d && <div className="text-sm" style={{ color: "var(--muted)" }}>Reading…</div>}
       {d && !d.installed && <div className="text-sm font-bold" style={{ color: "var(--red)" }}>Run migration 0225 first — attendance has nowhere to live yet.</div>}
-      {d && d.installed && view === "calendar" && <Calendar team={d.team} punches={d.punches} days={days} onCell={(person, day) => setCell({ person, day })} />}
+      {/* LATEST DATE ON THE LEFT (Dr Raghu, 12 Oct 2026) — next to the names, the older days running right */}
+      {d && d.installed && view === "calendar" && <Calendar team={d.team} punches={d.punches} days={[...days].reverse()} onCell={(person, day) => setCell({ person, day })} />}
       {d && d.installed && view === "list" && (
         <>
           <div className="text-xs mb-2" style={{ color: "var(--muted)" }}>{d.team.length} on the service team · {from === to ? `${present.size} punched that day` : `${new Set((d.punches || []).map((p) => p.employee_id)).size} punched in these ${days.length} days`}</div>
@@ -63,7 +64,7 @@ export default function FieldAttendanceDesk() {
             <table className="genie-table" style={{ minWidth: 760, tableLayout: "fixed" }}>
               <thead><tr><th style={{ position: "sticky", left: 0, zIndex: 3, width: 220 }}>Person</th>{days.length > 1 && <th>Day</th>}<th>In</th><th>Out</th><th>Hours</th><th>Where</th><th>Photos</th></tr></thead>
               <tbody>
-                {d.team.flatMap((t) => days.map((dd) => {
+                {d.team.flatMap((t) => [...days].reverse().map((dd) => {
                   const ps = of(t.id, dd); if (days.length > 1 && !ps.length) return null;
                   const first = ps.find((p) => p.kind === "in"), last = [...ps].reverse().find((p) => p.kind === "out");
                   return (

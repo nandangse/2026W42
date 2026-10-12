@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.9.0.1",
+    date: "2026-10-12",
+    module: "Seva: Field attendance — the latest date on the left",
+    items: [
+      "LATEST DATE ON THE LEFT (Dr Raghu, 12 Oct 2026). On Field attendance\u2019s calendar the newest day now stands next to the names and the older days run to the right; the list over a range also reads newest first.",
+    ],
+  },
+  {
     v: "6.9.0.0",
     date: "2026-10-12",
     module: "Seva: Admin (paid in Kuber, read back; the ledger from 1 Nov) and the Service Repairs library",
