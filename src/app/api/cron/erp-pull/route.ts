@@ -6,6 +6,7 @@ import { beat } from "@/lib/cron-beat";
 import { adminClient } from "@/lib/supabase/admin";
 import { pullIssues, pullIssueFiles, copyFrfToDrive } from "@/lib/seva-issues";
 import { pullServiceQuotes } from "@/lib/seva-quotes";
+import { pullAmcs } from "@/lib/seva-amc";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -265,6 +266,9 @@ export async function GET(req: Request) {
       if (f.done) { fileCursor = f.maxModified || fileCursor; fileStart = 0; } else { fileStart = f.next_start; }
       const d = await copyFrfToDrive(gadmin, { limit: 25, by: "cron@genie" });
       seva.frf = { copied: d.copied, failed: d.failed, left: d.left };
+      /* the AMC register, by the contract's own dates — one list call (12 Oct 2026) */
+      try { const ap = await pullAmcs(gadmin, "cron@genie"); seva.amc = { found: ap.found, updated: ap.updated, valid: ap.valid }; }
+      catch (e) { seva.amc = { error: (e instanceof Error ? e.message : String(e)).slice(0, 120) }; }
       /* the service team's quotations, by modified, so an ERP status change arrives within the hour (12 Oct 2026) */
       try { const qp = await pullServiceQuotes(gadmin, { maxPages: 2 }); seva.quotes = { read: qp.read, written: qp.written, done: qp.done }; }
       catch (e) { seva.quotes = { error: (e instanceof Error ? e.message : String(e)).slice(0, 120) }; }

@@ -603,6 +603,8 @@ function AmcBox({ row, masters, onClose, onSaved }: { row: Row | null; masters: 
     <Modal onClose={onClose} width={720}>
       <div className="flex items-center justify-between mb-2">
         <div className="font-bold text-sm" style={{ color: INK }}>{row ? "The contract" : "Add a contract"}</div>
+        {/* OPEN IN ERP (Dr Raghu, 12 Oct 2026) — the contract's own page on the ERP, directly */}
+        {row && S(row.erp_name) && <a href={`https://nandanerp.in/app/annual-maintenance-contract/${encodeURIComponent(S(row.erp_name))}`} target="_blank" rel="noreferrer" className="ml-auto mr-3 rounded px-3 py-1 text-sm font-bold" style={{ background: "var(--blue)", color: "#fff", textDecoration: "none" }}>Open in ERP ↗ <span className="font-semibold" style={{ opacity: 0.85 }}>{S(row.erp_name)}</span></a>}
         <button onClick={onClose} style={{ color: MUTED }}>✕</button>
       </div>
       <div className="space-y-2">
@@ -645,7 +647,7 @@ function AmcBox({ row, masters, onClose, onSaved }: { row: Row | null; masters: 
         {row?.erp_name != null && S(row.erp_name) !== "" && (
           <div className="text-xs rounded p-2" style={{ background: "#F4F2EC", color: "var(--dim)", lineHeight: 1.5 }}>
             From the ERP as <b>{S(row.erp_name)}</b>{row.pulled_at ? `, last read ${stamp(row.pulled_at)}` : ""}.
-            {row.dates_derived ? " Its end date is ≈ — one year from the contract date, because the ERP holds none." : ""}
+            {row.dates_derived ? " Its end date is ≈ — one year from the contract date, because the ERP holds no valid-till date." : " From and To are the contract's own transaction date and AMC valid-till date on the ERP; the value is its value per annum."}
             {" "}A re-pull refreshes the ERP&apos;s own columns; the visits made, notes, serial and location stay yours.
           </div>
         )}
@@ -743,7 +745,7 @@ function AmcErpPull({ onClose, onDone }: { onClose: () => void; onDone: () => vo
             <b style={{ color: GREEN }}>Done.</b> {done.found} read from the ERP — <b>{done.added}</b> new, <b>{done.updated}</b> refreshed
             {done.failed ? <>, <b style={{ color: RED }}>{done.failed}</b> the ERP would not give</> : null}.
             <div className="text-xs mt-1" style={{ color: MUTED }}>
-              Dates: {done.datesFromItem} read from the ERP&apos;s own item row, {done.datesDerived} derived to a year (shown ≈)
+              Dates: read from each contract&apos;s own transaction date and valid-till date; {done.datesDerived} with no valid-till, taken as a year (shown ≈)
               {done.datesMissing ? `, ${done.datesMissing} with no date at all` : ""}.
             </div>
           </div>
@@ -1317,7 +1319,7 @@ function DiscussScreen() {
 // ============================ DASHBOARD ============================
 interface SevaStats {
   today: string; fy_start: string;
-  amc: { total: number; live: number; live_value: number };
+  amc: { total: number; live: number; live_value: number; past_till?: number };
   issues: { total: number; open: number; overdue: number; this_fy: number; by_type_open: { type: string; n: number }[]; by_type_fy: { type: string; n: number }[]; by_type_all: { type: string; n: number }[]; by_type_range?: { type: string; n: number }[] };
   warranty: { all: number; all_cost: number; fy: number; fy_cost: number; open: number; open_cost: number };
 }
@@ -1411,8 +1413,8 @@ function SevaDashboard({ go }: { go: (k: string) => void }) {
           value, issues open, the pie by type, and the cost in warranty — all
           counted on the server, over every ticket and contract. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-        <Card label="AMC VALID LIVE — NOS" value={st ? String(st.amc.live) : "…"} sub={st ? `of ${st.amc.total} contracts, today inside start and end` : "counting"} colour={GREEN} onClick={() => go("amc")} />
-        <Card label="AMC VALID LIVE — VALUE" value={st ? lakh(st.amc.live_value) : "…"} sub="the live contracts' value, as the register has it" colour={GREEN} onClick={() => go("amc")} />
+        <Card label="AMC VALID LIVE — NOS" value={st ? String(st.amc.live) : "…"} sub={st ? `marked AMC valid paid on the ERP, of ${st.amc.total}${st.amc.past_till ? ` · ${st.amc.past_till} past the valid-till date` : ""}` : "counting"} colour={GREEN} onClick={() => go("amc")} />
+        <Card label="AMC VALID LIVE — VALUE" value={st ? lakh(st.amc.live_value) : "…"} sub="the valid contracts' value per annum, as the ERP has it" colour={GREEN} onClick={() => go("amc")} />
         <Card label="ISSUES OPEN" value={st ? String(st.issues.open) : "…"} sub={st ? `${st.issues.overdue} past their due date · ${st.issues.total.toLocaleString("en-IN")} tickets in all` : "counting"} colour={st?.issues.open ? RED : GREEN} onClick={() => go("issues")} />
         <Card label="COST INCURRED IN WARRANTY" value={st ? `${st.warranty.fy} nos · ${lakh(st.warranty.fy_cost)}` : "…"} sub={st ? `this FY from ${fmtD(st.fy_start)} · all time ${st.warranty.all} nos, ${lakh(st.warranty.all_cost)} · ${st.warranty.open} still open` : "counting"} colour={st?.warranty.fy ? "var(--warn)" : GREEN} onClick={() => go("issues")} />
       </div>

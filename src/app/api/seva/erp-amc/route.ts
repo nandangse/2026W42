@@ -4,6 +4,7 @@ import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSeva } from "@/lib/seva";
 import { crmDb, crmConfigured } from "@/crm/db";
+import { pullAmcs } from "@/lib/seva-amc";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -86,101 +87,9 @@ export async function POST(req: Request) {
 
     if (action !== "pull") throw new HttpError(400, "Unknown action.");
 
-    // Which statuses to bring. Empty means all of them.
-    const wanted: string[] = Array.isArray(body.statuses) ? body.statuses.map(S).filter(Boolean) : [];
-
-    // 1 — the list of names, filtered the Frappe way where a filter is asked.
-    const names: string[] = [];
-    const filters = wanted.length ? encodeURIComponent(JSON.stringify([["amc_status", "in", wanted]])) : "";
-    for (let start = 0; ; start += 500) {
-      const u = `${base}/api/resource/${encodeURIComponent(DT)}?${filters ? `filters=${filters}&` : ""}limit_start=${start}&limit_page_length=500`;
-      const r = await fetch(u, { headers: H });
-      if (!r.ok) throw new HttpError(502, `The ERP answered ${r.status} listing contracts.`);
-      const page = ((await r.json()) as { data?: { name?: string }[] })?.data || [];
-      for (const d of page) if (d.name) names.push(String(d.name));
-      if (page.length < 500) break;
-      if (start > 20000) break;
-    }
-    if (!names.length) return NextResponse.json({ ok: true, found: 0, added: 0, updated: 0, note: "The ERP returned no contracts for that filter." });
-
-    // 2 — each document in full, because the dates hide in the child table.
-    const rows: Record<string, unknown>[] = [];
-    let failed = 0, fromItem = 0, derived = 0, noDate = 0;
-    for (const name of names) {
-      try {
-        const r = await fetch(`${base}/api/resource/${encodeURIComponent(DT)}/${encodeURIComponent(name)}`, { headers: H });
-        if (!r.ok) { failed++; continue; }
-        const d = ((await r.json()) as { data?: Doc })?.data;
-        if (!d) { failed++; continue; }
-        const item = (Array.isArray(d.items) ? (d.items as Doc[]) : [])[0] || null;
-
-        // The item is believed where it exists; otherwise the contract date
-        // starts it and the year finishes it.
-        let start_date = S(item?.start_date).slice(0, 10) || S(d.transaction_date).slice(0, 10) || "";
-        let end_date = S(item?.end_date).slice(0, 10);
-        let dates_derived = false;
-        if (!end_date) {
-          end_date = start_date ? yearLater(start_date) : "";
-          dates_derived = !!end_date;
-        }
-        if (item?.end_date) fromItem++;
-        else if (dates_derived) derived++;
-        else noDate++;
-        if (!start_date) start_date = "";
-
-        rows.push({
-          erp_name: name,
-          customer: S(d.customer) || "(unnamed on the ERP)",
-          machine: S(item?.item_code),
-          contract_no: name,
-          territory: S(d.territory),
-          start_date: start_date || null,
-          end_date: end_date || null,
-          dates_derived,
-          visits_planned: N(item?.no_of_visits) ?? N(d.visits_per_annum),
-          value: N(d.amc_contract_value) || N(d.amc_value_per_annum),
-          billed: N(d.amount_billed),
-          engineer: S(item?.sales_person),
-          status: S(d.amc_status) || "AMC valid paid",
-          pulled_at: new Date().toISOString(),
-        });
-      } catch { failed++; }
-    }
-
-    // 3 — write. The ERP owns the contract; Seva owns the service work, so a
-    // re-pull refreshes the ERP's own columns and leaves visits_done, notes,
-    // the serial and the location exactly as the team left them.
-    const admin = adminClient();
-    const { data: existing, error: readErr } = await admin
-      .from("seva_amc").select("id, erp_name").not("erp_name", "is", null).limit(5000);
-    if (readErr) {
-      if (/does not exist|schema cache/i.test(readErr.message))
-        throw new HttpError(503, "Run migration 0107 first — Seva's tables don't exist yet.");
-      throw new Error(readErr.message);
-    }
-    const known = new Map((existing || []).map((e) => [String(e.erp_name), String(e.id)]));
-
-    let added = 0, updated = 0;
-    for (let i = 0; i < rows.length; i += 200) {
-      const slice = rows.slice(i, i + 200);
-      const fresh = slice.filter((r) => !known.has(String(r.erp_name)));
-      const again = slice.filter((r) => known.has(String(r.erp_name)));
-      if (fresh.length) {
-        const { error } = await admin.from("seva_amc").insert(fresh.map((r) => ({ ...r, by: me.email })));
-        if (error) throw new Error(error.message);
-        added += fresh.length;
-      }
-      for (const r of again) {
-        const { erp_name, ...patch } = r;
-        const { error } = await admin.from("seva_amc").update(patch).eq("id", known.get(String(erp_name))!);
-        if (!error) updated++;
-      }
-    }
-
-    return NextResponse.json({
-      ok: true, found: names.length, added, updated, failed,
-      datesFromItem: fromItem, datesDerived: derived, datesMissing: noDate,
-    });
+    /* THE CONTRACT'S OWN DATES (12 Oct 2026) — see lib/seva-amc: the header, not the stale item row */
+    const out = await pullAmcs(adminClient(), me.email);
+    return NextResponse.json({ ok: true, ...out, datesFromItem: 0, datesDerived: out.derived, datesMissing: out.noDate });
   } catch (e) {
     return errJson(e);
   }

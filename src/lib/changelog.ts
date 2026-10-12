@@ -92,6 +92,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.6.0.1",
+    date: "2026-10-12",
+    module: "Seva: the AMC register on the contract's own dates — 68 valid, ₹1,43,45,326, as the ERP has them",
+    items: [
+      "THE AMC DATES ARE THE CONTRACT\u2019S OWN (Dr Raghu, 12 Oct 2026: \u201cthe one which is showing 332 in the ERP is actually valid, whereas here it is showing from 2020 to 2021 \u2026 Yashwanth says there are 68 of them, and here it is showing 66 only. That too, the dates have to match. It cannot be a theoretical date of its own\u201d). The pull read the start and end from the contract\u2019s first item row, and where there was none it made the end up as a year from the contract date. The item rows are leftovers: AMS000332 (Ajay Arora) said 01-07-2020 \u2192 31-05-2021 on its item while the contract says 01-06-2026 \u2192 31-05-2027. Now From is the contract\u2019s transaction date, To its AMC valid-till date, the value its value per annum, the visits its visits per annum, the engineer its primary handler. Re-pulled all 367: Yashavantha\u2019s 68 match date for date and rupee for rupee \u2014 \u20b91,43,45,326 a year. Four contracts with no valid-till date keep \u2248.",
+      "VALID IS THE ERP\u2019S WORD. The dashboard\u2019s AMC valid live counted contracts whose dates spanned today (66). It now counts what the ERP marks AMC valid paid \u2014 68 \u2014 with their value, and says how many are past their valid-till date (one: AMS000324, 30 Sep 2026), which the register shows in red, for the team to verify as is.",
+      "A CONTRACT DELETED ON THE ERP IS MARKED. AMS000337 (U R Rao) was deleted on the ERP and made again as AMS000348; Genie\u2019s copy kept counting as valid. A contract the ERP no longer has is now marked \u201cRemoved on the ERP\u201d. The register refreshes every hour, one list call.",
+      "OPEN IN ERP: the contract box has a link on top \u2014 Open in ERP \u2197 AMS000\u2026 \u2014 straight to that contract\u2019s page on the ERP.",
+    ],
+  },
+  {
     v: "6.6.0.0",
     date: "2026-10-12",
     module: "Seva: Installation and Jobs; the dashboard by 12M, YTD, QTD, MTD or dates",

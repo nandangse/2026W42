@@ -50,8 +50,11 @@ export async function GET(req: Request) {
       all(admin, "seva_issue", "status, type_of_support, agreement_status, cost_spent, amount_billed, issue_date, at, due, resolved_at"),
     ]);
 
-    const live = amcs.filter((r) => { const s = S(r.start_date).slice(0, 10), e = S(r.end_date).slice(0, 10); return e >= t && (!s || s <= t); });
+    /* VALID IS THE ERP'S WORD (12 Oct 2026: "Yashwanth says there are 68 of them … make sure that these 68 and the amounts tally"). The
+       count and value are the contracts the ERP marks AMC valid paid; the ones whose valid-till date has gone by are counted out loud, not dropped. */
+    const live = amcs.filter((r) => S(r.status) === "AMC valid paid");
     const liveValue = live.reduce((a, r) => a + (Number(r.value) || 0), 0);
+    const pastTill = live.filter((r) => S(r.end_date) && S(r.end_date).slice(0, 10) < t).length;
 
     const closed = (r: Doc) => /closed|resolved/i.test(S(r.status));
     const open = issues.filter((r) => !closed(r));
@@ -72,7 +75,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       ok: true, today: t, fy_start: fy,
-      amc: { total: amcs.length, live: live.length, live_value: liveValue },
+      amc: { total: amcs.length, live: live.length, live_value: liveValue, past_till: pastTill },
       issues: {
         total: issues.length, open: open.length, overdue: overdue.length, this_fy: thisFy.length,
         by_type_open: count(open), by_type_fy: count(thisFy), by_type_all: count(issues),
