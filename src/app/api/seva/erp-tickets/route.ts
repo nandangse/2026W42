@@ -4,6 +4,7 @@ import { requireSeva } from "@/lib/seva";
 import { adminClient } from "@/lib/supabase/admin";
 import { readBody } from "@/lib/validate";
 import { pullIssues, pullIssueFiles, copyFrfToDrive } from "@/lib/seva-issues";
+import { erpAuth } from "@/lib/saamaan-stock";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -26,10 +27,21 @@ const S = (v: unknown) => String(v ?? "").trim();
 export async function GET(req: Request) {
   try {
     await requireSeva();
-    const name = S(new URL(req.url).searchParams.get("name"));
+    const sp = new URL(req.url).searchParams;
+    const name = S(sp.get("name"));
     if (!name) throw new HttpError(400, "name required");
-    const { data } = await adminClient().from("seva_attachment").select("id, file_name, file_url, file_size, is_private, uploaded_at, drive_url, drive_at").eq("parent_name", name).order("uploaded_at");
-    return NextResponse.json({ ok: true, rows: data ?? [] });
+    const admin = adminClient();
+    /* OPENING A TICKET COPIES ITS FILES (Dr Raghu, 12 Oct 2026: "pull the FRF link which can open. Preferably dump in our drive and put that link") —
+       only what the hour has already indexed for this one ticket, so anyone in Seva may set it off */
+    let copy: { copied: number; failed: number; notes: string[] } | null = null;
+    if (sp.get("copy") === "1") {
+      const out = await copyFrfToDrive(admin, { parent: name, limit: 10, by: "ticket box" }).catch((e) => ({ copied: 0, failed: 1, left: null, notes: [String((e as Error).message).slice(0, 200)] }));
+      copy = { copied: out.copied, failed: out.failed, notes: out.notes };
+    }
+    const { data } = await admin.from("seva_attachment").select("id, file_name, file_url, file_size, is_private, uploaded_at, drive_url, drive_at, drive_error").eq("parent_name", name).order("uploaded_at");
+    /* the ERP's own address, so the ticket and its files open there for editing ("lets start the link on the top to open in the erp so edits can be done there") */
+    const a = await erpAuth().catch(() => null);
+    return NextResponse.json({ ok: true, rows: data ?? [], erp_base: a?.base ?? null, copy });
   } catch (e) { return errJson(e); }
 }
 

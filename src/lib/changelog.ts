@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.16",
+    date: "2026-10-12",
+    module: "Seva: the FRF opens from the ticket, newest copied first, and the ticket opens in the ERP",
+    items: [
+      "THE FRF LINK (Dr Raghu, 12 Oct 2026: \u201cpull the FRF link which can open. Preferably dump in our drive and put that link\u201d). On a ticket the FRF no and the Checklist are now links to the file itself \u2014 the Drive copy (\ud83d\udcc1) when there is one, else the ERP\u2019s copy (\u2197, opens with your ERP login). Opening a ticket copies its own files to the Drive on the spot (\u201ccopying to the Drive\u2026\u201d), so the link turns to the Drive copy within seconds. Every attachment opens the same way.",
+      "NEWEST FIRST: the hourly copy went oldest-first, 25 an hour \u2014 on 12 Oct it was still on April 2024 with 12,526 files waiting, so a ticket closed this week would have waited about 500 hours. It now takes the newest first; the old ones follow behind. Ten that failed on a timeout or the Drive\u2019s rate limit are back in the queue; the 993 the ERP refused (old files it no longer serves) stay marked.",
+      "OPEN IN THE ERP (\u201clets start the link on the top to open in the erp so edits can be done there\u201d): the ticket number on top of the box is now a link \u2014 ISS-\u2026 \u2197 open in the ERP \u2014 to the Issue\u2019s own form, where edits are made.",
+    ],
+  },
+  {
     v: "6.4.0.15",
     date: "2026-10-12",
     module: "Leaders Council: a thumbs up, a heart and comments on every check-in",

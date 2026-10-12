@@ -270,11 +270,29 @@ function TicketPullBox({ onClose }: { onClose: () => void }) {
 
 /** The ERP's side of a ticket: the tags, the money, the form, what is attached, and every field verbatim. */
 function ErpTicketPanel({ row }: { row: Row }) {
-  const [files, setFiles] = useState<{ id: string; file_name: string; file_url: string; file_size: number | null; is_private: boolean; drive_url: string | null; drive_at: string | null }[] | null>(null);
+  type F = { id: string; file_name: string; file_url: string; file_size: number | null; is_private: boolean; drive_url: string | null; drive_at: string | null; drive_error?: string | null };
+  const [files, setFiles] = useState<F[] | null>(null);
+  const [erpBase, setErpBase] = useState<string | null>(null);
+  const [copying, setCopying] = useState(false);
   const [every, setEvery] = useState(false);
   useEffect(() => {
-    fetch(`/api/seva/erp-tickets?name=${encodeURIComponent(S(row.erp_name))}`, { cache: "no-store" }).then((r) => r.json()).then((j) => setFiles(j.rows || [])).catch(() => setFiles([]));
+    const url = `/api/seva/erp-tickets?name=${encodeURIComponent(S(row.erp_name))}`;
+    fetch(url, { cache: "no-store" }).then((r) => r.json()).then((j) => {
+      const rows = (j.rows || []) as F[];
+      setFiles(rows); setErpBase(j.erp_base || null);
+      /* anything not yet in the Drive is copied now, while the box is open (12 Oct 2026) */
+      if (rows.some((f) => !f.drive_url && !f.drive_error)) {
+        setCopying(true);
+        fetch(`${url}&copy=1`, { cache: "no-store" }).then((r) => r.json()).then((k) => { if (k.rows) setFiles(k.rows); }).catch(() => undefined).finally(() => setCopying(false));
+      }
+    }).catch(() => setFiles([]));
   }, [row.erp_name]);
+  const erpFile = (f: F) => (erpBase ? `${erpBase}${f.file_url.startsWith("/") ? "" : "/"}${f.file_url}` : null);
+  const openOf = (f: F) => f.drive_url || erpFile(f);
+  /* the FRF and the checklist named in the fields, as the files they are */
+  const frfFile = (files || []).find((f) => /frf/i.test(f.file_name || "")) || null;
+  const checklistFile = (files || []).find((f) => S(row.checklist_used) && (f.file_url === S(row.checklist_used) || S(row.checklist_used).endsWith(f.file_name))) || null;
+  const issueHref = erpBase ? `${erpBase}/app/issue/${encodeURIComponent(S(row.erp_name))}` : null;
   const erp = (row.erp ?? {}) as Record<string, unknown>;
   const money = (v: unknown) => (v === null || v === undefined || v === "" || Number(v) === 0 ? "·" : rupee(v));
   const T: [string, string][] = [
@@ -285,11 +303,21 @@ function ErpTicketPanel({ row }: { row: Row }) {
     ["frf_no", "FRF no"], ["frf_date", "FRF date"], ["checklist_used", "Checklist"], ["reading", "Reading"],
     ["amount_billed", "Billed"], ["cost_spent", "Cost"], ["mandays_invested", "Man-days"], ["closure_rating", "Closure rating"], ["lead", "Lead"],
   ];
-  const show = (k: string, v: unknown) => (/amount|cost/.test(k) ? money(v) : /date|resolved_at|opening/.test(k) ? fmtD(v) : S(v) || "·");
+  const linkTo = (f: F | null, text: string) => {
+    const href = f ? openOf(f) : null;
+    return href ? <a href={href} target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "var(--blue)" }} title={f?.drive_url ? "the copy in the Drive" : "on the ERP — opens with your ERP login"}>{f?.drive_url ? "📁 " : "↗ "}{text}</a> : text;
+  };
+  const show = (k: string, v: unknown): React.ReactNode => {
+    if (k === "frf_no") return linkTo(frfFile, S(v) || "·");
+    if (k === "checklist_used") return linkTo(checklistFile, checklistFile?.file_name || S(v).split("/").pop() || "·");
+    return /amount|cost/.test(k) ? money(v) : /date|resolved_at|opening/.test(k) ? fmtD(v) : S(v) || "·";
+  };
   return (
     <div className="rounded border p-3 mb-2" style={{ borderColor: BORDER, background: "#FBFAF7" }}>
       <div className="flex items-center gap-2 mb-2 flex-wrap text-xs">
-        <b style={{ color: "var(--blue)" }}>{S(row.erp_name)}</b>
+        {issueHref
+          ? <a href={issueHref} target="_blank" rel="noreferrer" className="font-bold hover:underline" style={{ color: "var(--blue)" }} title="Open this ticket in the ERP — edits are made there">{S(row.erp_name)} ↗ <span className="font-semibold">open in the ERP</span></a>
+          : <b style={{ color: "var(--blue)" }}>{S(row.erp_name)}</b>}
         <span style={{ color: MUTED }}>off the ERP · modified {S(row.erp_modified).slice(0, 16) || "·"} · pulled {fmtD(row.pulled_at)}{row.pulled_at ? ` ${new Date(String(row.pulled_at)).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} IST` : ""}</span>
         {row.raised_as_nc ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#FBEAE8", color: "#B3392E" }}>raised as NC</span> : null}
         {row.via_portal ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: "#EEF1FA", color: "var(--blue)" }}>via customer portal</span> : null}
@@ -308,12 +336,13 @@ function ErpTicketPanel({ row }: { row: Row }) {
         <div className="mt-1 text-xs"><b style={{ color: MUTED }}>Costing · </b><span style={{ whiteSpace: "pre-wrap" }}>{S(row.costing_details)}</span></div>
       )}
       <div className="mt-2 text-xs">
-        <b style={{ color: MUTED }}>Attached on the ERP{files ? ` (${files.length})` : ""} · </b>
+        <b style={{ color: MUTED }}>Attached on the ERP{files ? ` (${files.length})` : ""}{copying ? " · copying to the Drive…" : ""} · </b>
         {!files ? <span style={{ color: MUTED }}>reading…</span> : !files.length ? <span style={{ color: MUTED }}>nothing</span> : files.map((f) => (
           <span key={f.id} className="inline-block mr-2">
             {f.drive_url ? <a href={f.drive_url} target="_blank" rel="noreferrer" className="font-semibold hover:underline" style={{ color: "var(--blue)" }} title="the copy in the Drive">📁 {f.file_name}</a>
+              : erpFile(f) ? <a href={erpFile(f)!} target="_blank" rel="noreferrer" className="font-semibold hover:underline" style={{ color: "var(--blue)" }} title="on the ERP — opens with your ERP login">↗ {f.file_name}</a>
               : <span style={{ color: INK }}>{f.file_name}</span>}
-            <span style={{ color: MUTED }}>{f.file_size ? ` ${(f.file_size / 1024).toFixed(0)} KB` : ""}{f.drive_url ? "" : " · on the ERP, not yet in the Drive"}</span>
+            <span style={{ color: MUTED }}>{f.file_size ? ` ${(f.file_size / 1024).toFixed(0)} KB` : ""}{f.drive_url ? " · in the Drive" : f.drive_error ? ` · the Drive copy failed: ${f.drive_error}` : copying ? " · copying…" : " · on the ERP"}</span>
           </span>
         ))}
       </div>

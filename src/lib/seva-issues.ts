@@ -176,13 +176,21 @@ export async function pullIssueFiles(admin: SupabaseClient, opts: { parent?: "Is
  * and the Drive link kept on the attachment row. A file the ERP will not
  * give up is marked, not retried every hour forever.
  */
-export async function copyFrfToDrive(admin: SupabaseClient, opts: { limit?: number; by?: string }): Promise<{ copied: number; failed: number; left: number | null; notes: string[] }> {
+/*
+ * NEWEST FIRST (12 Oct 2026). The walk went oldest-first, 25 an hour, so on
+ * 12 Oct it was still on April 2024 with 12,500 files waiting and a ticket
+ * closed that week would have waited about 500 hours. Now the newest go first
+ * — this week's FRF is in the Drive within the hour — and opening a ticket
+ * copies its own files on the spot (`parent`).
+ */
+export async function copyFrfToDrive(admin: SupabaseClient, opts: { limit?: number; by?: string; parent?: string }): Promise<{ copied: number; failed: number; left: number | null; notes: string[] }> {
   const a = await erpAuth();
   if (!a) throw new HttpError(503, "The ERP's URL and token are not saved — CRM → Integrations.");
   const { base, H } = a;
   const limit = opts.limit || 40;
   const pick = async (frfOnly: boolean) => {
-    let q = admin.from("seva_attachment").select("id, parent_name, file_name, file_url, file_size").eq("parent_type", "Issue").is("drive_at", null).eq("drive_error", "").not("file_url", "is", null).order("uploaded_at").limit(limit);
+    let q = admin.from("seva_attachment").select("id, parent_name, file_name, file_url, file_size").eq("parent_type", "Issue").is("drive_at", null).eq("drive_error", "").not("file_url", "is", null).order("uploaded_at", { ascending: false }).limit(limit);
+    if (opts.parent) q = q.eq("parent_name", opts.parent);
     if (frfOnly) q = q.ilike("file_name", "%frf%");
     const { data, error } = await q;
     if (error) { if (/drive_at|column|schema cache/i.test(error.message)) throw new HttpError(503, "Run migration 0195 first — the attachments cannot remember their Drive copy yet."); throw new Error(error.message); }
