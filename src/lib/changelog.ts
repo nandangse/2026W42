@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.9.0.0",
+    date: "2026-10-12",
+    module: "Seva: Admin (paid in Kuber, read back; the ledger from 1 Nov) and the Service Repairs library",
+    items: [
+      "ADMIN (Dr Raghu, 12 Oct 2026: \u201cExpense claim, OD slip, Ticket booking, Payment to team \u2026 whatever they are doing in the Google Sheet should come here \u2026 it will go directly in to Kuber to Suresh\u2019s team \u2026 once they approve it, automatically the feedback will be done out here, so by default it will only show whatever is pending to be paid out \u2026 audit whatever has been paid and when \u2026 the service team will not log on to Kuber, and the accounts team does not need to log on to Seva\u201d). Seva \u2192 Admin: four tabs, each entry numbered SAD-00001 onwards \u2014 the person, the date, the amount, what it is for, related to an AMC, a job, a customer, a ticket or a service order, from and to and the mode for OD slips and tickets, bills attached. Saved as drafts; tick and \ud83d\udce4 Send to Kuber: each becomes a request in Kuber \u2192 Payment Planning (purpose \u201cService team \u2014 \u2026\u201d, the SAD number as the reference) and accounts@ gets one line of intimation. Kuber\u2019s approval and payment come back on their own: In Kuber \u2192 Approved \u2192 Paid with the date. To be paid is the default; Paid is the audit.",
+      "THE LEDGER (\u201cup to 31st October we will make sure it all gets tallied. From 1st November there will be an opening balance, and from there the ledger \u2026 the service person can see it himself, the service manager can see it\u201d). Per person from the opening balance on 1 Nov 2026 (set in Admin \u2192 Ledger): received \u2014 what Kuber paid him, advances and claims reimbursed; spent \u2014 expense claims, OD slips and tickets sent; the balance \u2014 with him, or owed to him \u2014 line by line. The service person sees his own on /idp \u2192 \ud83d\udcbc My advances & expenses, under the attendance buttons.",
+      "SERVICE REPAIRS (\u201cin the LMS, make one more library called Service Repairs \u2026 only to the service team and also to the leaders\u2019 council \u2026 subsections about videos \u2026 seen in our Seva also \u2026 Yash can start adding small videos\u201d). A new LMS library, /lms/service-repairs, open only to two groups the LMS works out for itself \u2014 Service (on the HRMS roll in the Service department) and Leaders Council (the LC mark) \u2014 nobody ticked in by hand. The same library is Seva \u2192 Service Repairs: sections down the side, the videos as cards, played on the page; Aakash and Yash add sections and videos (a Google Drive, YouTube or .mp4 link \u2014 phone videos go to Drive, then the link). Migrations 0229 and 0230.",
+    ],
+  },
+  {
     v: "6.8.0.0",
     date: "2026-10-12",
     module: "Seva: CRM (warranty and AMC prospects), the ERP's service dashboard live, installation cost",

@@ -5,6 +5,16 @@ import { requireUser, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { teamOf } from "@/lib/team";
 import { MIN_LEARNING_WORDS, wordCount, maySeeBook, LMS_GROUPS, type LessonStatus } from "@/lib/lms";
+import { serviceTeam } from "@/lib/seva-team";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+/** SERVICE AND LEADERS COUNCIL ARE WORKED OUT, NOT TICKED (12 Oct 2026): the Service roll and profiles.lc open the Service Repairs library. */
+async function derivedGroups(admin: SupabaseClient, email: string, profileId: string): Promise<string[]> {
+  const out: string[] = [];
+  try { const { data } = await admin.from("profiles").select("lc").eq("id", profileId).maybeSingle(); if (data?.lc) out.push("Leaders Council"); } catch { /* before the lc column */ }
+  try { const team = await serviceTeam(admin); if (email && team.some((t) => t.email === email.toLowerCase())) out.push("Service"); } catch { /* the roll is optional here */ }
+  return out;
+}
 import { today } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +101,7 @@ export async function GET(req: Request) {
      * A lesson shelved only in libraries they cannot see goes with them —
      * otherwise a closed library leaks its contents through the open one.
      */
-    const myGroups: string[] = (people.find((p) => p.id === personId)?.lms_groups as string[] | null) || [];
+    const myGroups: string[] = [...((people.find((p) => p.id === personId)?.lms_groups as string[] | null) || []), ...(await derivedGroups(admin, people.find((p) => p.id === personId)?.email || "", personId))];
     const allBooks = bookRes.data || [];
     const books = allBooks.filter((b) => maySeeBook(b, myGroups, isAdmin));
     const visibleBookIds = new Set(books.map((b) => String(b.id)));

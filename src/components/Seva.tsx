@@ -19,6 +19,8 @@ import SevaLocations from "@/components/SevaLocations";
 import SevaPlan from "@/components/seva/SevaPlan";
 import SevaJobs from "@/components/seva/SevaJobs";
 import SevaCrm from "@/components/seva/SevaCrm";
+import SevaRepairs from "@/components/seva/SevaRepairs";
+import SevaAdmin from "@/components/seva/SevaAdmin";
 import SevaInstallation from "@/components/seva/SevaInstallation";
 import SevaQuotes from "@/components/seva/SevaQuotes";
 import SevaOrders from "@/components/seva/SevaOrders";
@@ -43,6 +45,8 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "quotes", label: "Quotation", icon: "🧾" },
   { key: "orders", label: "Service Order", icon: "📦" },
   { key: "attendance", label: "Field attendance", icon: "📍" },
+  { key: "repairs", label: "Service Repairs", icon: "🔧" },
+  { key: "admin", label: "Admin", icon: "🗂" },
   { key: "push", label: "Push — 1:1", icon: "⇢" },
   { key: "settings", label: "Settings — masters", icon: "⚙" },
 ];
@@ -1582,6 +1586,8 @@ export default function Seva({
           {openKey === "quotes" && <SevaQuotes onOrder={(id) => { setSoOpen(id); go("orders"); }} />}
           {openKey === "orders" && <SevaOrders openId={soOpen} onOpened={() => setSoOpen(null)} />}
           {openKey === "attendance" && <FieldAttendanceDesk />}
+          {openKey === "repairs" && <SevaRepairs />}
+          {openKey === "admin" && <SevaAdmin />}
           {openKey === "push" && <PushScreen />}
           {openKey === "settings" && <SettingsScreen />}
         </main>

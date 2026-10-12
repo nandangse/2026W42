@@ -52,6 +52,7 @@ export default function AttendanceQuick() {
         <button onClick={() => go("out")} disabled={!!busy} style={big("#E8711A", !isIn)}>🏁<br />Attendance Log Off</button>
         <a href="/idp/attendance" style={{ ...big("#1B2A41", false), textDecoration: "none", textAlign: "center" }}>📋<br />Check My Attendance</a>
       </div>
+      <a href="/idp/ledger" style={{ display: "block", textAlign: "center", marginTop: 8, fontSize: 13.5, fontWeight: 700, color: "#1B2A41" }}>💼 My advances &amp; expenses ›</a>
       <input ref={cam} type="file" accept="image/*" capture="user" style={{ display: "none" }} onChange={(e) => shot(e.target.files?.[0])} />
       <div style={{ fontSize: 13, marginTop: 6, textAlign: "center", color: msg ? (msg.ok ? "#15803D" : "#B3392E") : "var(--i-muted, #6B7280)", fontWeight: msg ? 700 : 500 }}>
         {busy || msg?.t || (last === undefined ? " " : isIn ? `Logged in since ${hm(last!.at)} — log off when you leave the site` : last ? `Logged off at ${hm(last.at)}` : "Not logged in today — GPS and a photo go with every login and log off")}

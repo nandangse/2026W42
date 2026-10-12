@@ -29,7 +29,9 @@ export const STATUS_ORDER: LessonStatus[] = ["in_progress", "planned", "complete
  * library is that somebody reads a course meant for another team; the cost of
  * a closed one is training that nobody can see and so nobody does.
  */
-export const LMS_GROUPS = ["Sales", "Operations", "Worker", "Consultant", "Lean"] as const;
+export const LMS_GROUPS = ["Sales", "Operations", "Worker", "Consultant", "Lean", "Service", "Leaders Council"] as const;
+/** Two groups the LMS works out for itself (12 Oct 2026): Service = on the HRMS roll in the Service department; Leaders Council = profiles.lc. */
+export const DERIVED_GROUPS = ["Service", "Leaders Council"] as const;
 export type LmsGroup = (typeof LMS_GROUPS)[number];
 
 export const EVERYONE = "All logged-in Genie users";
