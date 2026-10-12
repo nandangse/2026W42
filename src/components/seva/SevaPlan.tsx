@@ -11,7 +11,7 @@
  * and turn green once a plan line covers them. Contracts ending in the next
  * 30 days sit beside, for the renewal quotation.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Person = { id: string; name: string; designation: string | null; email: string | null };
 type Plan = { id: string; on_date: string; employee_id: string; person_name: string; kind: string; customer: string; site: string; amc_id: string | null; issue: string | null; backup_id: string | null; notes: string; status: string };
@@ -64,6 +64,10 @@ export default function SevaPlan() {
   const [who, setWho] = useState<string>("");
   const [showDue, setShowDue] = useState(true);
   const [form, setForm] = useState<Partial<Plan> & { employee_ids?: string[] } | null>(null);
+  /* DRAG AND DROP (Dr Raghu, 12 Oct 2026): an AMC due dropped on a person's day plans it; a plan dropped elsewhere moves it */
+  const drag = useRef<{ plan?: Plan; due?: Due } | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
   const [from, to] = range(view, anchor);
   const load = () => fetch(`/api/seva/plan?from=${from}&to=${to}`, { cache: "no-store" }).then((r) => r.json()).then(setD).catch(() => setD(null));
   useEffect(() => { setD(null); load(); }, [from, to]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -73,18 +77,43 @@ export default function SevaPlan() {
   const dues = showDue ? (d?.due || []) : [];
   const may = !!d?.mayPlan;
   const label = view === "day" ? fmt(from, { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : view === "week" ? `${fmt(from, { day: "numeric", month: "short" })} – ${fmt(to, { day: "numeric", month: "short", year: "numeric" })}` : view === "month" ? fmt(from, { month: "long", year: "numeric" }) : `Q${Math.floor(at(from).getUTCMonth() / 3) + 1} · ${fmt(from, { month: "short" })} – ${fmt(to, { month: "short", year: "numeric" })}`;
+  const dropAt = async (on_date: string, employee_id?: string) => {
+    const g = drag.current; drag.current = null; setOver(null);
+    if (!g || !may) return;
+    try {
+      if (g.plan) {
+        if (g.plan.on_date === on_date && (!employee_id || g.plan.employee_id === employee_id)) return;
+        await post({ action: "move", id: g.plan.id, on_date, employee_id: employee_id || undefined });
+        setFlash(`Moved to ${fmt(on_date, { day: "numeric", month: "short" })}${employee_id ? ` · ${d?.team.find((t) => t.id === employee_id)?.name.split(" ")[0]}` : ""}`);
+      } else if (g.due) {
+        if (!employee_id) { newPlan(on_date, undefined, g.due); return; }
+        const u = g.due;
+        await post({ action: "save", on_date, employee_ids: [employee_id], kind: "AMC visit", customer: u.customer, site: u.location, amc_id: u.amc_id, notes: `AMC visit ${u.visit_no} of ${u.visits}${u.machine ? ` — ${u.machine}` : ""}` });
+        setFlash(`${u.customer} planned for ${d?.team.find((t) => t.id === employee_id)?.name.split(" ")[0]} on ${fmt(on_date, { day: "numeric", month: "short" })}`);
+      }
+      load();
+    } catch (e) { setFlash(String((e as Error).message)); }
+    setTimeout(() => setFlash(null), 3500);
+  };
+  const dnd = (key: string, on_date: string, employee_id?: string) => may ? {
+    onDragOver: (e: React.DragEvent) => { e.preventDefault(); if (over !== key) setOver(key); },
+    onDragLeave: () => setOver((o) => (o === key ? null : o)),
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); void dropAt(on_date, employee_id); },
+  } : {};
   const newPlan = (on_date: string, employee_id?: string, due?: Due) => may && setForm({ on_date, employee_ids: employee_id ? [employee_id] : [], kind: due ? "AMC visit" : "AMC visit", customer: due?.customer || "", site: due?.location || "", amc_id: due?.amc_id || null, notes: due ? `AMC visit ${due.visit_no} of ${due.visits}${due.machine ? ` — ${due.machine}` : ""}` : "" });
 
   const Chip = ({ p, small }: { p: Plan; small?: boolean }) => (
-    <div onClick={(e) => { e.stopPropagation(); if (may) setForm({ ...p, employee_ids: [p.employee_id] }); }} title={`${p.person_name} · ${p.kind}${p.customer ? ` · ${p.customer}` : ""}${p.site ? ` · ${p.site}` : ""}${p.notes ? `\n${p.notes}` : ""}`}
-      className="rounded px-1.5 py-0.5 mb-0.5 truncate" style={{ fontSize: small ? 10.5 : 11.5, background: "#fff", borderLeft: `3px solid ${ink.get(p.employee_id) || NAVY}`, border: `1px solid ${LINE}`, cursor: may ? "pointer" : "default", textDecoration: p.status === "cancelled" ? "line-through" : undefined, opacity: p.status === "cancelled" ? 0.5 : 1 }}>
+    <div draggable={may} onDragStart={(e) => { drag.current = { plan: p }; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", p.id); }} onDragEnd={() => setOver(null)}
+      onClick={(e) => { e.stopPropagation(); if (may) setForm({ ...p, employee_ids: [p.employee_id] }); }} title={`${p.person_name} · ${p.kind}${p.customer ? ` · ${p.customer}` : ""}${p.site ? ` · ${p.site}` : ""}${p.notes ? `\n${p.notes}` : ""}`}
+      className="rounded px-1.5 py-0.5 mb-0.5 truncate" style={{ fontSize: small ? 10.5 : 11.5, background: "#fff", border: `1px solid ${LINE}`, borderLeft: `3px solid ${ink.get(p.employee_id) || NAVY}`, cursor: may ? "grab" : "default", textDecoration: p.status === "cancelled" ? "line-through" : undefined, opacity: p.status === "cancelled" ? 0.5 : 1 }}>
       {p.status === "done" ? "✓ " : p.status === "missed" ? "✗ " : ""}{KIND_ICON[p.kind] || "•"} {small ? <b style={{ color: ink.get(p.employee_id) }}>{ini(p.person_name)} </b> : null}{p.customer || p.kind}
     </div>
   );
   const DueChip = ({ x }: { x: Due }) => (
-    <div onClick={(e) => { e.stopPropagation(); if (!x.covered_by) newPlan(x.on_date, undefined, x); }} title={`${x.customer} — AMC visit ${x.visit_no} of ${x.visits}, due ${fmt(x.due_on, { day: "numeric", month: "short" })} (window to ${fmt(x.window_to, { day: "numeric", month: "short" })})${x.covered_by ? `\nPlanned: ${x.covered_by.person_name} on ${fmt(x.covered_by.on_date, { day: "numeric", month: "short" })}` : may ? "\nClick to plan it" : ""}`}
+    <div draggable={may && !x.covered_by} onDragStart={(e) => { drag.current = { due: x }; e.dataTransfer.effectAllowed = "copy"; e.dataTransfer.setData("text/plain", x.amc_id); }} onDragEnd={() => setOver(null)}
+      onClick={(e) => { e.stopPropagation(); if (!x.covered_by) newPlan(x.on_date, undefined, x); }} title={`${x.customer} — AMC visit ${x.visit_no} of ${x.visits}, due ${fmt(x.due_on, { day: "numeric", month: "short" })} (window to ${fmt(x.window_to, { day: "numeric", month: "short" })})${x.covered_by ? `\nPlanned: ${x.covered_by.person_name} on ${fmt(x.covered_by.on_date, { day: "numeric", month: "short" })}` : may ? "\nDrag it on to a person's day, or click to plan it" : ""}`}
       className="rounded px-1.5 py-0.5 mb-0.5 truncate" style={{ fontSize: 10.5, fontWeight: 700, background: x.covered_by ? "#DCFCE7" : "#FFEDD5", color: x.covered_by ? GREEN : "#9A3412", cursor: !x.covered_by && may ? "pointer" : "default" }}>
-      {x.covered_by ? "✓" : "⏰"} AMC · {x.customer}
+      {x.covered_by ? "✓" : "⏰"} AMC · {x.customer} <span style={{ fontWeight: 600, opacity: 0.75 }}>· due {fmt(x.due_on, { day: "numeric", month: "short" })}{x.covered_by ? ` · ${first(x.covered_by.person_name)} ${fmt(x.covered_by.on_date, { day: "numeric", month: "short" })}` : ""}</span>
     </div>
   );
 
@@ -103,6 +132,8 @@ export default function SevaPlan() {
         <b style={{ color: NAVY, fontSize: 15, marginLeft: 6 }}>{label}</b>
         <span className="ml-auto" />
         <label className="text-xs flex items-center gap-1" style={{ color: MUTED }}><input type="checkbox" checked={showDue} onChange={(e) => setShowDue(e.target.checked)} /> AMC due on the calendar</label>
+        {flash && <span className="text-xs font-bold" style={{ color: GREEN }}>{flash}</span>}
+        {may && <span className="text-xs" style={{ color: MUTED }}>drag an AMC due on to a person · drag a plan to move it</span>}
         {may && <button onClick={() => newPlan(view === "day" ? from : todayIst() >= from && todayIst() <= to ? todayIst() : from, who || undefined)} style={btn("primary")}>+ Plan</button>}
       </div>
 
@@ -125,8 +156,8 @@ export default function SevaPlan() {
       {d && d.installed !== false && (
         <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 280px" }}>
           <div style={{ minWidth: 0 }}>
-            {(view === "day" || view === "week") && <Roster d={d} days={daysOf(from, to)} plans={plans} dues={dues} who={who} ink={ink} may={may} onAdd={newPlan} Chip={Chip} DueChip={DueChip} />}
-            {view === "month" && <Month from={from} to={to} today={d.today} plans={plans} dues={dues} may={may} onDay={(x) => { setAnchor(x); setView("day"); }} onAdd={(x) => newPlan(x, who || undefined)} Chip={Chip} DueChip={DueChip} />}
+            {(view === "day" || view === "week") && <Roster d={d} days={daysOf(from, to)} plans={plans} dues={dues} who={who} ink={ink} may={may} onAdd={newPlan} Chip={Chip} DueChip={DueChip} dnd={dnd} over={over} />}
+            {view === "month" && <Month from={from} to={to} today={d.today} plans={plans} dues={dues} may={may} onDay={(x) => { setAnchor(x); setView("day"); }} onAdd={(x) => newPlan(x, who || undefined)} Chip={Chip} DueChip={DueChip} dnd={dnd} over={over} />}
             {view === "quarter" && <Quarter from={from} to={to} today={d.today} plans={plans} dues={dues} onDay={(x) => { setAnchor(x); setView("day"); }} />}
           </div>
           <Side d={d} dues={d.due} may={may} onPlan={(x) => newPlan(x.on_date, undefined, x)} />
@@ -142,9 +173,13 @@ type ChipT = (p: { p: Plan; small?: boolean }) => React.JSX.Element;
 type DueT = (p: { x: Due }) => React.JSX.Element;
 
 /** THE ROSTER — people down the side, days across; the AMC dues in a row of their own on top */
-function Roster({ d, days, plans, dues, who, ink, may, onAdd, Chip, DueChip }: { d: D; days: string[]; plans: Plan[]; dues: Due[]; who: string; ink: Map<string, string>; may: boolean; onAdd: (day: string, id?: string) => void; Chip: ChipT; DueChip: DueT }) {
+type DndT = (key: string, on_date: string, employee_id?: string) => Record<string, unknown>;
+function Roster({ d, days, plans, dues, who, ink, may, onAdd, Chip, DueChip, dnd, over }: { d: D; days: string[]; plans: Plan[]; dues: Due[]; who: string; ink: Map<string, string>; may: boolean; onAdd: (day: string, id?: string) => void; Chip: ChipT; DueChip: DueT; dnd: DndT; over: string | null }) {
   const people = d.team.filter((p) => !who || p.id === who);
   const wide = days.length === 1;
+  /* the AMC row folds — a busy week would push the people off the screen */
+  const [allDue, setAllDue] = useState(false);
+  const CAP = wide ? 12 : 5;
   return (
     <div className="rounded-lg bg-white" style={{ border: `1px solid ${LINE}`, overflow: "auto", maxHeight: "70vh" }}>
       <table className="genie-table" style={{ minWidth: wide ? 520 : 980, tableLayout: "fixed" }}>
@@ -156,7 +191,11 @@ function Roster({ d, days, plans, dues, who, ink, may, onAdd, Chip, DueChip }: {
           {dues.length > 0 && (
             <tr>
               <td style={{ position: "sticky", left: 0, background: "#FFFBF5", fontWeight: 800, color: "#9A3412", fontSize: 12 }}>AMC due</td>
-              {days.map((x) => <td key={x} style={{ verticalAlign: "top", background: "#FFFBF5" }}>{dues.filter((u) => u.on_date === x).map((u) => <DueChip key={u.amc_id + u.visit_no} x={u} />)}</td>)}
+              {days.map((x) => { const us = dues.filter((u) => u.on_date === x).sort((a, b) => Number(!!a.covered_by) - Number(!!b.covered_by)); return (
+                <td key={x} style={{ verticalAlign: "top", background: "#FFFBF5" }}>
+                  <div style={wide ? { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 2 } : undefined}>{(allDue ? us : us.slice(0, CAP)).map((u) => <DueChip key={u.amc_id + u.visit_no} x={u} />)}</div>
+                  {us.length > CAP && <button onClick={() => setAllDue((v) => !v)} style={{ fontSize: 10.5, fontWeight: 700, color: "#9A3412" }}>{allDue ? "fold" : `+${us.length - CAP} more`}</button>}
+                </td>); })}
             </tr>
           )}
           {people.map((p) => (
@@ -166,7 +205,7 @@ function Roster({ d, days, plans, dues, who, ink, may, onAdd, Chip, DueChip }: {
                 const ps = plans.filter((q) => q.on_date === x && q.employee_id === p.id);
                 const backs = plans.filter((q) => q.on_date === x && q.backup_id === p.id);
                 return (
-                  <td key={x} onClick={() => may && onAdd(x, p.id)} style={{ verticalAlign: "top", cursor: may ? "copy" : "default", background: x === d.today ? "#FFFBF5" : undefined, height: 44 }}>
+                  <td key={x} onClick={() => may && onAdd(x, p.id)} {...dnd(`${p.id}|${x}`, x, p.id)} style={{ verticalAlign: "top", cursor: may ? "copy" : "default", background: over === `${p.id}|${x}` ? "#DBEAFE" : x === d.today ? "#FFFBF5" : undefined, outline: over === `${p.id}|${x}` ? "2px dashed #1D4ED8" : undefined, height: 44 }}>
                     {ps.map((q) => wide ? <div key={q.id}><Chip p={q} />{(q.site || q.notes) && <div style={{ fontSize: 11, color: MUTED, margin: "0 0 4px 6px" }}>{[q.site, q.notes].filter(Boolean).join(" · ")}</div>}</div> : <Chip key={q.id} p={q} />)}
                     {backs.map((q) => <div key={q.id + "b"} className="truncate" style={{ fontSize: 10.5, color: MUTED }}>backup · {q.customer || q.kind}</div>)}
                   </td>
@@ -180,7 +219,7 @@ function Roster({ d, days, plans, dues, who, ink, may, onAdd, Chip, DueChip }: {
   );
 }
 
-function Month({ from, to, today, plans, dues, may, onDay, onAdd, Chip, DueChip }: { from: string; to: string; today: string; plans: Plan[]; dues: Due[]; may: boolean; onDay: (d: string) => void; onAdd: (d: string) => void; Chip: ChipT; DueChip: DueT }) {
+function Month({ from, to, today, plans, dues, may, onDay, onAdd, Chip, DueChip, dnd, over }: { from: string; to: string; today: string; plans: Plan[]; dues: Due[]; may: boolean; onDay: (d: string) => void; onAdd: (d: string) => void; Chip: ChipT; DueChip: DueT; dnd: DndT; over: string | null }) {
   const lead = (at(from).getUTCDay() + 6) % 7;
   const cells: (string | null)[] = [...Array(lead).fill(null), ...daysOf(from, to)];
   while (cells.length % 7) cells.push(null);
@@ -192,7 +231,7 @@ function Month({ from, to, today, plans, dues, may, onDay, onAdd, Chip, DueChip 
           if (!x) return <div key={i} style={{ minHeight: 110, borderRight: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, background: "#FAFAF8" }} />;
           const ps = plans.filter((p) => p.on_date === x); const us = dues.filter((u) => u.on_date === x);
           return (
-            <div key={x} style={{ minHeight: 110, borderRight: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, padding: 4, background: x === today ? "#FFF7ED" : undefined }}>
+            <div key={x} {...dnd(`m|${x}`, x)} style={{ minHeight: 110, borderRight: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, padding: 4, background: over === `m|${x}` ? "#DBEAFE" : x === today ? "#FFF7ED" : undefined, outline: over === `m|${x}` ? "2px dashed #1D4ED8" : undefined }}>
               <div className="flex items-center mb-0.5">
                 <button onClick={() => onDay(x)} className="font-bold text-xs hover:underline" style={{ color: x === today ? ORANGE : NAVY }}>{Number(x.slice(8))}</button>
                 {may && <button onClick={() => onAdd(x)} className="ml-auto text-xs font-bold" style={{ color: MUTED }} title="Plan on this day">+</button>}

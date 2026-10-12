@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.5.0.2",
+    date: "2026-10-12",
+    module: "Seva: Discussion points filtered, searched and sortable; the plan by drag and drop",
+    items: [
+      "DISCUSSION POINTS (Dr Raghu, 12 Oct 2026: \u201chave a filter on top and also the search, make them sortable\u201d). A line of filters on top \u2014 search across ticket, title, customer, site, machine, engineer, pending action, the point and the job; Status, Engineer, Customer, Age (over 90 days, 31\u201390, 30 or less), Point (written or not) \u2014 with \u2715 clear. Every column heading sorts; press again to turn it round. Oldest first stays the default.",
+      "THE PLAN BY DRAG AND DROP (\u201cShow date also. Make this drag and drop\u201d). Drag an AMC due on to a person\u2019s day and it is planned for them; drag a planned visit to another day or another person and it moves; on the month, drop on a day. The cell lights up where it will land, and a line says what was done. Every AMC chip now shows the date it falls due, and once covered who goes and when. The AMC row folds after five a day (twelve on the daily view) with +more, so the people stay on the screen; the column headings carry the dates in navy, today in orange.",
+    ],
+  },
+  {
     v: "6.5.0.1",
     date: "2026-10-12",
     module: "Seva: Field attendance — Today, From, To, and a calendar by name and date",

@@ -1217,9 +1217,31 @@ function DiscussScreen() {
   const [open, setOpen] = useState<Row | null>(null);
   const [onlyUndiscussed, setOnlyUndiscussed] = useState(true);
   const [busy, setBusy] = useState("");
+  /* A FILTER ON TOP, THE SEARCH, AND EVERY COLUMN SORTABLE (Dr Raghu, 12 Oct 2026) */
+  const [q, setQ] = useState(""); const [fStatus, setFStatus] = useState(""); const [fEng, setFEng] = useState(""); const [fCust, setFCust] = useState(""); const [fAge, setFAge] = useState(""); const [fNote, setFNote] = useState("");
+  const [sort, setSort] = useState<{ k: string; dir: 1 | -1 }>({ k: "age", dir: -1 });
   const today = TODAY();
   const age = (r: Row) => { const d = (S(r.issue_date) || S(r.at)).slice(0, 10); return d ? Math.round((new Date(today).getTime() - new Date(d).getTime()) / 86400000) : 0; };
-  const list = (rows || []).filter((r) => !onlyUndiscussed || !S(r.discussed_at)).sort((a, b) => age(b) - age(a));
+  const eng = (r: Row) => (S(r.attended_by) || S(r.handled_by) || S(r.owner)).split("@")[0];
+  const base = (rows || []).filter((r) => !onlyUndiscussed || !S(r.discussed_at));
+  const uniq = (f: (r: Row) => string) => [...new Set(base.map(f).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const key: Record<string, (r: Row) => string | number> = {
+    age: age, ticket: (r) => S(r.erp_name), customer: (r) => S(r.customer).toLowerCase(), site: (r) => S(r.location).toLowerCase(), machine: (r) => (S(r.equipment) || S(r.machine)).toLowerCase(),
+    status: (r) => S(r.status), engineer: eng, pending: (r) => S(r.pending_action_status), point: (r) => S(r.discuss_note).toLowerCase(), discussed: (r) => S(r.discussed_at),
+  };
+  const t = q.trim().toLowerCase();
+  const list = base.filter((r) => (!fStatus || S(r.status) === fStatus) && (!fEng || eng(r) === fEng) && (!fCust || S(r.customer) === fCust)
+      && (!fAge || (fAge === "90" ? age(r) > 90 : fAge === "30" ? age(r) > 30 && age(r) <= 90 : age(r) <= 30))
+      && (!fNote || (fNote === "with" ? !!S(r.discuss_note) : !S(r.discuss_note)))
+      && (!t || [r.erp_name, r.title, r.customer, r.location, r.equipment, r.machine, r.status, eng(r), r.pending_action_status, r.discuss_note, r.job_number].some((v) => S(v).toLowerCase().includes(t))))
+    .sort((a, b) => { const x = key[sort.k](a), y = key[sort.k](b); return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * sort.dir; });
+  const SortTh = ({ k, children }: { k: string; children: React.ReactNode }) => (
+    <th onClick={() => setSort((s) => ({ k, dir: s.k === k ? (s.dir === 1 ? -1 : 1) : k === "age" ? -1 : 1 }))} className="px-2 py-2 text-left whitespace-nowrap select-none" style={{ position: "sticky", top: 0, background: "var(--ink)", cursor: "pointer" }} title="Sort">
+      {children}<span style={{ opacity: sort.k === k ? 1 : 0.35, marginLeft: 4, fontSize: 10 }}>{sort.k === k ? (sort.dir === 1 ? "▲" : "▼") : "↕"}</span>
+    </th>
+  );
+  const sel: React.CSSProperties = { border: `1px solid ${BORDER}`, borderRadius: 6, padding: "4px 6px", fontSize: 12, background: "#fff", maxWidth: 200 };
+  const anyFilter = !!(q || fStatus || fEng || fCust || fAge || fNote);
   const save = async (r: Row, patch: Record<string, unknown>) => {
     setBusy(r.id);
     const e = await saveReg("issue", "update", r.id, patch);
@@ -1235,12 +1257,21 @@ function DiscussScreen() {
           <input type="checkbox" checked={onlyUndiscussed} onChange={(e) => setOnlyUndiscussed(e.target.checked)} /> not yet discussed only
         </label>
       }>
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search ticket, customer, site, machine, engineer, point…" style={{ ...sel, width: 300, maxWidth: 300 }} />
+        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} style={sel}><option value="">Status — all</option>{uniq((r) => S(r.status)).map((x) => <option key={x}>{x}</option>)}</select>
+        <select value={fEng} onChange={(e) => setFEng(e.target.value)} style={sel}><option value="">Engineer — all</option>{uniq(eng).map((x) => <option key={x}>{x}</option>)}</select>
+        <select value={fCust} onChange={(e) => setFCust(e.target.value)} style={sel}><option value="">Customer — all</option>{uniq((r) => S(r.customer)).map((x) => <option key={x}>{x}</option>)}</select>
+        <select value={fAge} onChange={(e) => setFAge(e.target.value)} style={sel}><option value="">Age — all</option><option value="90">Older than 90 days</option><option value="30">31 – 90 days</option><option value="0">30 days or less</option></select>
+        <select value={fNote} onChange={(e) => setFNote(e.target.value)} style={sel}><option value="">Point — all</option><option value="with">With a point written</option><option value="without">No point yet</option></select>
+        {anyFilter && <button onClick={() => { setQ(""); setFStatus(""); setFEng(""); setFCust(""); setFAge(""); setFNote(""); }} className="text-xs font-bold" style={{ color: "var(--accent)" }}>✕ clear</button>}
+      </div>
       <div className="text-sm mb-2" style={{ color: MUTED }}>
-        <b style={{ color: INK }}>{list.length}</b> open ticket{list.length === 1 ? "" : "s"}{onlyUndiscussed ? " not yet discussed" : ""} · {list.filter((r) => age(r) > 90).length} older than ninety days · cost so far {rupee(cost)}
+        <b style={{ color: INK }}>{list.length}</b> open ticket{list.length === 1 ? "" : "s"}{onlyUndiscussed ? " not yet discussed" : ""}{anyFilter ? " (filtered)" : ""} · {list.filter((r) => age(r) > 90).length} older than ninety days · cost so far {rupee(cost)}
       </div>
       <Box min={1240}>
         <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
-          <Th>Age</Th><Th>Ticket</Th><Th>Customer</Th><Th>Site</Th><Th>Machine</Th><Th>Status</Th><Th>Engineer</Th><Th>Pending action</Th><Th>Point to discuss</Th><Th>Discussed</Th>
+          <SortTh k="age">Age</SortTh><SortTh k="ticket">Ticket</SortTh><SortTh k="customer">Customer</SortTh><SortTh k="site">Site</SortTh><SortTh k="machine">Machine</SortTh><SortTh k="status">Status</SortTh><SortTh k="engineer">Engineer</SortTh><SortTh k="pending">Pending action</SortTh><SortTh k="point">Point to discuss</SortTh><SortTh k="discussed">Discussed</SortTh>
         </tr></thead>
         <tbody>
           {!rows && (<tr><td colSpan={10} className="px-3 py-5 text-center" style={{ color: MUTED }}>loading…</td></tr>)}
