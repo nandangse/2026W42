@@ -20,6 +20,7 @@ import SevaPlan from "@/components/seva/SevaPlan";
 import SevaJobs from "@/components/seva/SevaJobs";
 import SevaInstallation from "@/components/seva/SevaInstallation";
 import SevaQuotes from "@/components/seva/SevaQuotes";
+import SevaOrders from "@/components/seva/SevaOrders";
 import FieldAttendanceDesk from "@/components/seva/FieldAttendanceDesk";
 import { swallow } from "@/lib/swallow";
 import { dmy as fmtD, rupee } from "@/lib/fmt";
@@ -38,6 +39,7 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "installation", label: "Installation", icon: "🏗" },
   { key: "plan", label: "Team Plan Deployment", icon: "🗓" },
   { key: "quotes", label: "Quotation", icon: "🧾" },
+  { key: "orders", label: "Service Order", icon: "📦" },
   { key: "attendance", label: "Field attendance", icon: "📍" },
   { key: "push", label: "Push — 1:1", icon: "⇢" },
   { key: "settings", label: "Settings — masters", icon: "⚙" },
@@ -1485,6 +1487,7 @@ export default function Seva({
   email: string; displayName: string | null; initials: string | null; role: string; isOwner?: boolean;
 }) {
   const [openKey, setOpenKey] = useState("dashboard");
+  const [soOpen, setSoOpen] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(true);
   useEffect(() => {
     try { setNavOpen(localStorage.getItem("seva.nav") !== "0"); } catch (e) { swallow("Seva", e); /* fine */ }
@@ -1537,7 +1540,8 @@ export default function Seva({
           {openKey === "jobs" && <SevaJobs />}
           {openKey === "installation" && <SevaInstallation />}
           {openKey === "plan" && <SevaPlan />}
-          {openKey === "quotes" && <SevaQuotes />}
+          {openKey === "quotes" && <SevaQuotes onOrder={(id) => { setSoOpen(id); go("orders"); }} />}
+          {openKey === "orders" && <SevaOrders openId={soOpen} onOpened={() => setSoOpen(null)} />}
           {openKey === "attendance" && <FieldAttendanceDesk />}
           {openKey === "push" && <PushScreen />}
           {openKey === "settings" && <SettingsScreen />}

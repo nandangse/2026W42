@@ -92,6 +92,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.7.0.0",
+    date: "2026-10-12",
+    module: "Seva: Service Order — numbered, tagged, split spares and service, sent to accounts for billing",
+    items: [
+      "SERVICE ORDER (Dr Raghu, 12 Oct 2026: \u201cmake one more submodule called Service Order \u2026 tag it to either a quotation, an AMC, a customer, or a job \u2026 upload the PDF \u2026 split in two parts, spares and service \u2026 Send to accounts for billing \u2026 a lot of them come verbally or on WhatsApp \u2026 sometimes the PO is given after the work is done, so we don\u2019t want to hold it \u2026 in the quotation a button Create a service order \u2026 our own numbering from NGSE/PO/SER/ \u2026 tagged with the customer PO number and the quotation number \u2026 the table shows both amounts \u2026 assigned to a particular manager\u201d). Seva \u2192 Service Order: every order numbered NGSE/PO/SER/0001 onwards when it is made; how it came (Purchase order, Verbal, WhatsApp, E-mail, PO to follow) so nothing waits on paper; tagged to customer, quotation, AMC, job and ticket, each a search over what Genie holds; the customer\u2019s PO number and date when they come; the manager who executes it; New \u2192 Executing \u2192 Work done \u2192 Sent to accounts \u2192 Invoiced \u2192 Closed (or Cancelled). The table shows Spares, Service and Total for every order with the sums on top; search, status, manager and customer filters; every column sorts.",
+      "THE LINES: two tables, Spares and Service, each line item, description, qty, unit, rate, amount \u2014 add, edit, move a line across, remove. Attach the PO, the WhatsApp screenshot or the mail; \ud83e\uddde Read it in to lines and Genie proposes the lines split spares and service, with the PO number and date \u2014 use them, add them, or drop them.",
+      "FROM A QUOTATION: on every quotation in Seva \u2192 Quotation, \ud83d\udce6 Create a service order makes one with the quotation\u2019s lines in rupees, split by the ERP\u2019s item group (Services is service; the rest are spares), and opens it; a second press opens the one already made.",
+      "SEND TO ACCOUNTS FOR BILLING: one button mails accounts@nandan.co.in (changeable, with CC) the order \u2014 customer, PO, quotation, AMC, job, manager, the spares and service tables with their totals \u2014 with the PO papers and the quotation\u2019s PDF attached, from your Gmail or sales@; the order turns Sent to accounts. When the invoice comes, its number and date mark it Invoiced. Every step is logged on the order. Migration 0227.",
+    ],
+  },
+  {
     v: "6.6.0.2",
     date: "2026-10-12",
     module: "/idp: Attendance Login, Attendance Log Off, Check My Attendance — on top; the header made small",

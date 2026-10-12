@@ -34,7 +34,7 @@ async function api<T = Record<string, unknown>>(body: unknown): Promise<T> {
   return j as T;
 }
 
-export default function SevaQuotes() {
+export default function SevaQuotes({ onOrder }: { onOrder?: (id: string) => void } = {}) {
   const [d, setD] = useState<List | null>(null);
   const [owner, setOwner] = useState<string>(""); const [show, setShow] = useState<"open" | "all" | "due">("open");
   const [q, setQ] = useState(""); const [open, setOpen] = useState<string | null>(null);
@@ -119,14 +119,14 @@ export default function SevaQuotes() {
         </table>
       </div>
       {rows.length > 600 && <div className="text-xs mt-1" style={{ color: MUTED }}>Showing the newest 600 — search or pick an owner to narrow.</div>}
-      {open && <QuoteBox name={open} onClose={() => { setOpen(null); load(); }} />}
+      {open && <QuoteBox name={open} onClose={() => { setOpen(null); load(); }} onOrder={onOrder} />}
     </div>
   );
 }
 
 type One = { quote: Q; notes: { id: string; body: string; follow_status: string | null; next_on: string | null; by: string; at: string }[]; sends: Send[]; contact: { mail_to: string[]; mail_cc: string[]; mail_bcc: string[] } | null; formats: string[]; follow: string[]; erp_base: string | null; me: string; mayApprove: boolean; approvers: string[] };
 
-function QuoteBox({ name, onClose }: { name: string; onClose: () => void }) {
+function QuoteBox({ name, onClose, onOrder }: { name: string; onClose: () => void; onOrder?: (id: string) => void }) {
   const [d, setD] = useState<One | null>(null); const [err, setErr] = useState<string | null>(null);
   const [u, setU] = useState({ follow_status: "", next_action: "", next_on: "", body: "" });
   const [send, setSend] = useState<{ to: string; cc: string; bcc: string; subject: string; body_html: string; print_format: string } | null>(null);
@@ -167,6 +167,17 @@ function QuoteBox({ name, onClose }: { name: string; onClose: () => void }) {
               <select value={fmt} onChange={(e) => setFmt(e.target.value)} style={{ ...inp, width: 220 }}><option value="">Print format — the ERP&apos;s default</option>{d.formats.map((f) => <option key={f}>{f}</option>)}</select>
               <a href={`/api/seva/quotes?pdf=${encodeURIComponent(name)}${fmt ? `&format=${encodeURIComponent(fmt)}` : ""}`} target="_blank" rel="noreferrer" style={{ ...btn(), textDecoration: "none" }}>📄 The PDF</a>
               {x.docstatus === 1 && <button onClick={startSend} style={btn("primary")}>✉ Send to the customer</button>}
+              {/* "In the quotation, there has to be a button saying Create a service order" (Dr Raghu, 12 Oct 2026) — on a PO, or on the word */}
+              <button disabled={busy} onClick={async () => {
+                setErr(null); setBusy(true);
+                try {
+                  const r = await fetch("/api/seva/orders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create_from_quote", name }) });
+                  const j = await r.json(); if (!r.ok) throw new Error(j.error || "Failed");
+                  if (j.existing && !confirm(`${j.so_no} is already made from this quotation. Open it?`)) { setBusy(false); return; }
+                  if (onOrder) onOrder(j.id); else alert(`${j.so_no} made — Seva → Service Order.`);
+                } catch (e) { setErr(String((e as Error).message)); }
+                setBusy(false);
+              }} style={{ ...btn(), borderColor: "#0E7490", color: "#0E7490" }}>📦 Create a service order</button>
               {x.docstatus !== 1 && <span className="text-xs" style={{ color: MUTED }}>Submit it on the ERP before it can be sent.</span>}
             </div>
 
