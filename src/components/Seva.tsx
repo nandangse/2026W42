@@ -18,6 +18,7 @@ import SevaAnalytics from "@/components/SevaAnalytics";
 import SevaLocations from "@/components/SevaLocations";
 import SevaPlan from "@/components/seva/SevaPlan";
 import SevaJobs from "@/components/seva/SevaJobs";
+import SevaCrm from "@/components/seva/SevaCrm";
 import SevaInstallation from "@/components/seva/SevaInstallation";
 import SevaQuotes from "@/components/seva/SevaQuotes";
 import SevaOrders from "@/components/seva/SevaOrders";
@@ -35,6 +36,7 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "locations", label: "Locations", icon: "📍" },
   { key: "discuss", label: "Discussion points", icon: "🗣" },
   { key: "amc", label: "Annual Maintenance", icon: "📅" },
+  { key: "crm", label: "CRM", icon: "🤝" },
   { key: "jobs", label: "Jobs", icon: "🏷" },
   { key: "installation", label: "Installation", icon: "🏗" },
   { key: "plan", label: "Team Plan Deployment", icon: "🗓" },
@@ -1367,6 +1369,41 @@ function TypePie({ rows, title, sub }: { rows: { type: string; n: number }[]; ti
   );
 }
 
+/** THE ERP'S SERVICE DASHBOARD, LIVE — every number card on nandanerp's "Nandan Service", asked of the ERP itself (12 Oct 2026) */
+function ErpCards() {
+  type C = { name: string; label: string; value: number | null; money: boolean; pct: number | null; color: string | null; error?: string };
+  const [d, setD] = useState<{ cards: C[]; at: string; dashboard_url: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  const load = (fresh = false) => { setBusy(true); fetch(`/api/seva/erp-cards${fresh ? "?fresh=1" : ""}`, { cache: "no-store" }).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error); setD(j); setErr(null); }).catch((e) => setErr(String(e.message || e))).finally(() => setBusy(false)); };
+  useEffect(() => { load(); }, []);
+  const fmt = (c: C) => {
+    if (c.value === null) return "—";
+    if (!c.money) return Math.round(c.value).toLocaleString("en-IN");
+    const v = c.value; return v >= 1e7 ? `₹${(v / 1e7).toFixed(2)} Cr` : v >= 1e5 ? `₹${(v / 1e5).toFixed(2)} L` : v >= 1e3 ? `₹${(v / 1e3).toFixed(2)} K` : `₹${Math.round(v)}`;
+  };
+  return (
+    <div className="mb-3">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="text-xs font-bold" style={{ color: MUTED, letterSpacing: 0.8 }}>THE ERP&apos;S SERVICE DASHBOARD — LIVE</div>
+        <span className="text-xs" style={{ color: MUTED }}>{d ? `read ${new Date(d.at).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} · ${d.cards.length} cards, each computed by the ERP` : busy ? "asking the ERP…" : ""}</span>
+        <button onClick={() => load(true)} disabled={busy} className="text-xs font-bold" style={{ color: "var(--blue)" }}>⟳</button>
+        {d && <a href={d.dashboard_url} target="_blank" rel="noreferrer" className="ml-auto text-xs font-bold" style={{ color: "var(--blue)" }}>Open on the ERP ↗</a>}
+      </div>
+      {err && <div className="text-xs" style={{ color: RED }}>{err}</div>}
+      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(165px, 1fr))" }}>
+        {(d?.cards || []).map((c) => (
+          <div key={c.name} className="bg-white rounded-lg border p-2.5" style={{ borderColor: BORDER, borderTop: `3px solid ${c.color || "var(--navy)"}` }} title={c.error || c.name}>
+            <div className="text-xs" style={{ color: MUTED, lineHeight: 1.25, minHeight: 30 }}>{c.label}</div>
+            <div className="font-bold tnum" style={{ fontSize: 20, color: INK }}>{fmt(c)}</div>
+            {c.pct !== null && <div className="text-xs font-bold" style={{ color: c.pct > 0 ? GREEN : c.pct < 0 ? RED : MUTED }}>{c.pct > 0 ? "▲" : c.pct < 0 ? "▼" : "•"} {Math.abs(Math.round(c.pct))}%</div>}
+          </div>
+        ))}
+        {!d && busy && Array.from({ length: 8 }).map((_, i) => <div key={i} className="bg-white rounded-lg border p-2.5" style={{ borderColor: BORDER, height: 76, opacity: 0.5 }} />)}
+      </div>
+    </div>
+  );
+}
+
 function SevaDashboard({ go }: { go: (k: string) => void }) {
   const [amcs] = useReg("amc");
   const [pushes] = usePush();
@@ -1411,6 +1448,7 @@ function SevaDashboard({ go }: { go: (k: string) => void }) {
 
   return (
     <div style={{ maxWidth: 1100 }}>
+      <ErpCards />
       {/* THE FIVE HE ASKED FOR (3 Oct 2026): AMC valid live by number and by
           value, issues open, the pie by type, and the cost in warranty — all
           counted on the server, over every ticket and contract. */}
@@ -1537,6 +1575,7 @@ export default function Seva({
           {openKey === "locations" && <SevaLocations />}
           {openKey === "discuss" && <DiscussScreen />}
           {openKey === "amc" && <AmcScreen />}
+          {openKey === "crm" && <SevaCrm />}
           {openKey === "jobs" && <SevaJobs />}
           {openKey === "installation" && <SevaInstallation />}
           {openKey === "plan" && <SevaPlan />}

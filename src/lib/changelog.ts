@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.8.0.0",
+    date: "2026-10-12",
+    module: "Seva: CRM (warranty and AMC prospects), the ERP's service dashboard live, installation cost",
+    items: [
+      "CRM (Dr Raghu, 12 Oct 2026: \u201cjobs that did not have an AMC or are under warranty, so that they know what jobs are under warranty today \u2026 12 months by default; whichever is 24 months will get extended \u2026 contact the customer for taking AMC \u2026 all the customers and sites, and what jobs are there within that site \u2026 a call or an email \u2026 the more visibility we show, the more Sarita can work on it \u2026 an email to all of them\u201d). Every delivered machine on the ERP\u2019s Jobmaster (refreshed hourly): warranty from the installation\u2019s completion, else the delivery, for 12 months unless set on the job (0 to 60 months, one click); covered when a valid AMC names the job. Four counts on top \u2014 AMC prospects, under warranty today, covered by an AMC, all delivered \u2014 each opening its list; search, site and family filters; every column sorts. AMC prospects by customer: the sites, how many machines are out of warranty with no AMC, how many end within two months, the contact, the last touch and the next date. Open a customer for its machines site by site, log a call, mail, visit, quotation or WhatsApp with an outcome and a next date, save the contact, or make the quotation on the ERP. Tick customers and \u2709 Mail the ticked customers: one letter each, their own machines listed, from your Gmail or sales@, logged against each.",
+      "THE ERP\u2019S SERVICE DASHBOARD, LIVE (\u201cthese minimum things need to come from live data on the main dashboard in Genie also\u201d). The top of Seva\u2019s dashboard is every number card on nandanerp\u2019s Nandan Service dashboard \u2014 29 of them, from Open Service Issues and Service Cost in Year to AMC pending this month and the month\u2019s spares & service orders \u2014 each computed by the ERP itself with its own filters, with its change since last period, so Seva shows exactly what the ERP shows; read in under a second, kept five minutes, \u27f3 to read again, and a link to the ERP\u2019s dashboard.",
+      "INSTALLATION COST (\u201cin the installation, I want to check out the cost incurred in installation \u2026 that also should come on the dashboard\u201d). Each job on Seva \u2192 Installation shows its cost as the ERP\u2019s Jobmaster has it \u2014 the total site expense, transport, site expenses, man-days at site, the start date and the installation engineer \u2014 and the total across the jobs at installation on top. The dashboard carries the ERP\u2019s Installation Cost in Year card (\u20b926.34 L on 12 Oct). Migration 0228.",
+    ],
+  },
+  {
     v: "6.7.0.0",
     date: "2026-10-12",
     module: "Seva: Service Order — numbered, tagged, split spares and service, sent to accounts for billing",

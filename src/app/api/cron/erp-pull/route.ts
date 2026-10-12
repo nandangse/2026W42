@@ -7,6 +7,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { pullIssues, pullIssueFiles, copyFrfToDrive } from "@/lib/seva-issues";
 import { pullServiceQuotes } from "@/lib/seva-quotes";
 import { pullAmcs } from "@/lib/seva-amc";
+import { pullJobInfo } from "@/lib/seva-job-info";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -266,6 +267,9 @@ export async function GET(req: Request) {
       if (f.done) { fileCursor = f.maxModified || fileCursor; fileStart = 0; } else { fileStart = f.next_start; }
       const d = await copyFrfToDrive(gadmin, { limit: 25, by: "cron@genie" });
       seva.frf = { copied: d.copied, failed: d.failed, left: d.left };
+      /* every job's site, dates and installation cost (12 Oct 2026) */
+      try { const jp = await pullJobInfo(gadmin); seva.jobs = { found: jp.found }; }
+      catch (e) { seva.jobs = { error: (e instanceof Error ? e.message : String(e)).slice(0, 120) }; }
       /* the AMC register, by the contract's own dates — one list call (12 Oct 2026) */
       try { const ap = await pullAmcs(gadmin, "cron@genie"); seva.amc = { found: ap.found, updated: ap.updated, valid: ap.valid }; }
       catch (e) { seva.amc = { error: (e instanceof Error ? e.message : String(e)).slice(0, 120) }; }

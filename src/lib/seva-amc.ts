@@ -51,7 +51,7 @@ export async function pullAmcs(admin: SupabaseClient, by: string): Promise<AmcPu
       territory: S(d.territory), start_date, end_date, dates_derived,
       visits_planned: N(d.visits_per_annum), value: N(d.amc_value_per_annum) ?? N(d.amc_contract_value),
       billed: N(d.amount_billed), engineer: S(d.primary_handler), status: S(d.amc_status) || "AMC valid paid",
-      machine: S(d.type_of_product), pulled_at: now,
+      machine: S(d.type_of_product), job_details: S(d.job_1) || null, pulled_at: now,
     };
   });
   const { data: existing, error } = await admin.from("seva_amc").select("id, erp_name, machine").not("erp_name", "is", null).limit(10000);

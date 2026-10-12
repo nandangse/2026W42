@@ -9,7 +9,10 @@
  */
 import { useEffect, useState } from "react";
 
-type Job = { id: string; tag: string; fam: string; cust: string; own: string; stat: string; status: string; delivered_on: string | null; tickets: number; open: number };
+type Cost = { mandays_at_site: number | null; transport_cost: number | null; site_expense: number | null; total_site_expense: number | null; install_started_on: string | null; installed_on: string | null; delivery_location: string | null; installation_engineer: string | null };
+type Job = { id: string; tag: string; fam: string; cust: string; own: string; stat: string; status: string; delivered_on: string | null; tickets: number; open: number; cost: Cost | null };
+const rs = (n?: number | null) => (n ? "₹" + Math.round(n).toLocaleString("en-IN") : "—");
+const costOf = (c: Cost | null) => (c ? Number(c.total_site_expense) || (Number(c.transport_cost) || 0) + (Number(c.site_expense) || 0) : 0);
 type Plan = { id: string; on_date: string; employee_id: string; person_name: string; status: string; site: string; notes: string; job_id: string };
 type Person = { id: string; name: string; designation: string | null };
 type D = { installed: boolean; today: string; jobs: Job[]; plans: Plan[]; team: Person[]; mayPlan: boolean };
@@ -44,7 +47,7 @@ export default function SevaInstallation() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search job / customer…" style={{ ...inp, width: 240 }} />
       </div>
       {!d.installed && <div className="text-sm font-bold mb-2" style={{ color: RED }}>Run migration 0226 first — deploying needs it. The jobs show below meanwhile.</div>}
-      <div className="text-xs mb-2" style={{ color: MUTED }}>{jobs.length} job{jobs.length === 1 ? "" : "s"} at installation · {jobs.filter((j) => of(j.id).some((p) => p.on_date >= d.today && p.status === "planned")).length} with people deployed now or coming</div>
+      <div className="text-xs mb-2" style={{ color: MUTED }}>{jobs.length} job{jobs.length === 1 ? "" : "s"} at installation · <b style={{ color: NAVY }}>cost so far {rs(jobs.reduce((s, j) => s + costOf(j.cost), 0))}</b> on the ERP · {jobs.filter((j) => of(j.id).some((p) => p.on_date >= d.today && p.status === "planned")).length} with people deployed now or coming</div>
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))" }}>
         {jobs.map((j) => {
           const ps = of(j.id); const now = ps.filter((p) => p.on_date === d.today); const coming = ps.filter((p) => p.on_date > d.today && p.status !== "cancelled"); const past = ps.filter((p) => p.on_date < d.today);
@@ -63,7 +66,13 @@ export default function SevaInstallation() {
                 <div><b style={{ color: GREEN }}>Today:</b> {now.length ? people(now).join(", ") : <span style={{ color: MUTED }}>nobody</span>}</div>
                 {coming.length > 0 && <div><b style={{ color: ORANGE }}>Coming:</b> {people(coming).join(", ")} <span style={{ color: MUTED }}>· {dmy(coming[0].on_date)} – {dmy(coming[coming.length - 1].on_date)}</span></div>}
                 {past.length > 0 && <div style={{ color: MUTED }}>Done so far: {past.length} man-day{past.length === 1 ? "" : "s"} by {people(past).join(", ")}</div>}
-                {(now[0]?.site || coming[0]?.site) && <div style={{ color: MUTED }}>📍 {now[0]?.site || coming[0]?.site}</div>}
+                {(now[0]?.site || coming[0]?.site || j.cost?.delivery_location) && <div style={{ color: MUTED }}>📍 {now[0]?.site || coming[0]?.site || j.cost?.delivery_location}</div>}
+                {/* the cost incurred, as the ERP's Jobmaster has it */}
+                <div className="mt-1 rounded px-2 py-1" style={{ background: "#F8FAFC", border: `1px solid ${LINE}` }}>
+                  <b style={{ color: NAVY }}>Cost {rs(costOf(j.cost))}</b>
+                  <span style={{ color: MUTED }}> · transport {rs(j.cost?.transport_cost)} · site {rs(j.cost?.site_expense)} · {j.cost?.mandays_at_site ? `${j.cost.mandays_at_site} man-days at site (ERP)` : "man-days not on the ERP"}{past.length ? ` · ${past.length} planned here` : ""}</span>
+                  {(j.cost?.install_started_on || j.cost?.installation_engineer) && <div style={{ color: MUTED }}>{j.cost?.install_started_on ? `started ${dmy(j.cost.install_started_on)}` : ""}{j.cost?.installation_engineer ? ` · ${j.cost.installation_engineer}` : ""}</div>}
+                </div>
               </div>
             </div>
           );

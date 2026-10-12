@@ -32,9 +32,11 @@ export async function GET() {
     const ids = list.map((j) => j.id);
     const { data: plans, error } = ids.length ? await admin.from("seva_plan").select("id, on_date, employee_id, person_name, status, site, notes, job_id").in("job_id", ids).order("on_date") : { data: [], error: null };
     if (error) { if (/job_id|does not exist|schema cache/i.test(error.message)) return NextResponse.json({ installed: false, jobs: list, plans: [], team, mayPlan: mayPlan(me.email, me.isOwner), today: istDay() }); throw error; }
+    /* WHAT THE INSTALLATION COST (Dr Raghu, 12 Oct 2026: "I want to check out the cost incurred in installation") — the ERP's Jobmaster figures */
+    const { data: info } = ids.length ? await admin.from("seva_job_info").select("job_id, mandays_at_site, transport_cost, site_expense, total_site_expense, install_started_on, installed_on, delivery_location, installation_engineer").in("job_id", ids) : { data: [] };
     /* tickets on these jobs, for the column */
     const { data: tix } = ids.length ? await admin.from("seva_issue").select("erp_name, status, job_number").in("job_number", ids) : { data: [] };
-    return NextResponse.json({ installed: true, today: istDay(), jobs: list.map((j) => ({ ...j, tickets: (tix || []).filter((t) => t.job_number === j.id).length, open: (tix || []).filter((t) => t.job_number === j.id && !/closed|resolved/i.test(String(t.status))).length })), plans: plans || [], team, mayPlan: mayPlan(me.email, me.isOwner) });
+    return NextResponse.json({ installed: true, today: istDay(), jobs: list.map((j) => ({ ...j, cost: (info || []).find((x) => x.job_id === j.id) || null, tickets: (tix || []).filter((t) => t.job_number === j.id).length, open: (tix || []).filter((t) => t.job_number === j.id && !/closed|resolved/i.test(String(t.status))).length })), plans: plans || [], team, mayPlan: mayPlan(me.email, me.isOwner) });
   } catch (e) { return errJson(e); }
 }
 
