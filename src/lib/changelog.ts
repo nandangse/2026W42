@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.5.0.1",
+    date: "2026-10-12",
+    module: "Seva: Field attendance — Today, From, To, and a calendar by name and date",
+    items: [
+      "TODAY, FROM, TO (Dr Raghu, 12 Oct 2026: \u201cin this do today, then from and to \u2026 if from and to is same date then its only for one day\u201d). The dates sit on a line of their own under the title: Today, From, To. The same date in both is that one day, said in words beside them; a range says how many days. From cannot pass To, and neither can be after today. A CALENDAR VIEW (\u201cmake a view by calendar. name on left and dates on the column headings\u201d): \u25a6 Calendar beside \u2610 List \u2014 the names down the left, frozen, with days present and hours for the range; one column per date, today in orange, Sundays shaded; each cell the first in, the last out and the hours (green when closed, amber when there is no out). Click a cell for that day\u2019s photos and map. It opens on this month so far; This week and This month are one click. The first column\u2019s heading on Field attendance, Quotation and the plan roster is navy like the rest of the header again, not white.",
+    ],
+  },
+  {
     v: "6.5.0.0",
     date: "2026-10-12",
     module: "Seva: field attendance on /idp, Service Team Plan Deployment, Quotation",

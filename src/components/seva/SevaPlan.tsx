@@ -149,8 +149,8 @@ function Roster({ d, days, plans, dues, who, ink, may, onAdd, Chip, DueChip }: {
     <div className="rounded-lg bg-white" style={{ border: `1px solid ${LINE}`, overflow: "auto", maxHeight: "70vh" }}>
       <table className="genie-table" style={{ minWidth: wide ? 520 : 980, tableLayout: "fixed" }}>
         <thead><tr>
-          <th style={{ width: 170, position: "sticky", left: 0, top: 0, background: "#fff", zIndex: 3 }}>Person</th>
-          {days.map((x) => <th key={x} style={{ position: "sticky", top: 0, background: x === d.today ? "#FFF7ED" : "#fff", zIndex: 2, color: x === d.today ? ORANGE : undefined }}>{fmt(x, { weekday: "short", day: "numeric", month: "short" })}</th>)}
+          <th style={{ width: 170, position: "sticky", left: 0, top: 0, zIndex: 3 }}>Person</th>
+          {days.map((x) => <th key={x} style={{ position: "sticky", top: 0, zIndex: 2, background: x === d.today ? "var(--accent)" : undefined }}>{fmt(x, { weekday: "short", day: "numeric", month: "short" })}</th>)}
         </tr></thead>
         <tbody>
           {dues.length > 0 && (

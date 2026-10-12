@@ -97,7 +97,7 @@ export default function SevaQuotes() {
       </div>
       <div className="rounded-lg bg-white" style={{ border: `1px solid ${LINE}`, overflow: "auto", maxHeight: "68vh" }}>
         <table className="genie-table" style={{ minWidth: 1180 }}>
-          <thead><tr><th style={{ position: "sticky", left: 0, background: "#fff", zIndex: 2 }}>Quotation</th><th>Date</th><th>Customer</th><th>Subject</th><th className="tnum">Value</th><th>Owner</th><th>Sent to</th><th>ERP status</th><th>Last status (ERP)</th><th>Follow-up</th><th>Target order</th></tr></thead>
+          <thead><tr><th style={{ position: "sticky", left: 0, zIndex: 3 }}>Quotation</th><th>Date</th><th>Customer</th><th>Subject</th><th className="tnum">Value</th><th>Owner</th><th>Sent to</th><th>ERP status</th><th>Last status (ERP)</th><th>Follow-up</th><th>Target order</th></tr></thead>
           <tbody>
             {rows.slice(0, 600).map((r) => (
               <tr key={r.erp_name} onClick={() => setOpen(r.erp_name)} style={{ cursor: "pointer" }}>
