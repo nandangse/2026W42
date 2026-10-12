@@ -14,9 +14,9 @@
  */
 import { useEffect, useState } from "react";
 import { RELATED_TO } from "@/lib/lc/related";
-import { api, btn, Card, Err, input, label, Lightbox, MUTED, NAVY, ORANGE, Who, dmy, istToday, leaderOf, type Boot } from "./shared";
+import { api, btn, Card, Err, input, label, Lightbox, MUTED, NAVY, ORANGE, Who, dmy, dmyt, istToday, leaderOf, type Boot } from "./shared";
 
-export interface Checkin { id: string; meeting_id: string; email: string; on_date: string; t1: string | null; t2: string | null; b1: string | null; burning: string | null; burning_related_to: string | null; burning_problem_id: string | null; goals: Goal[]; plan_99: string | null; learning: string | null; updated_at: string }
+export interface Checkin { id: string; meeting_id: string; email: string; on_date: string; t1: string | null; t2: string | null; b1: string | null; burning: string | null; burning_related_to: string | null; burning_problem_id: string | null; goals: Goal[]; plan_99: string | null; learning: string | null; updated_at: string; up?: string[]; heart?: string[]; mine?: string | null; comments?: { id: string; body: string; added_by: string; created_at: string }[] }
 interface Goal { goal: string; result: string }
 interface MeetingLite { id: string; held_on: string }
 
@@ -130,7 +130,7 @@ export function CheckinForm({ boot, meetings, meetingId, onDone }: { boot: Boot 
 }
 
 /** THE ROUND, ON THE MEETING: every leader's check-in as a card; Genie folds them in to the minutes as the T2B1 table. */
-export function CheckinRound({ boot, checkins, go, onCheckin }: { boot: Boot | null; checkins: Checkin[]; go: (k: string, a?: string | null) => void; onCheckin: () => void }) {
+export function CheckinRound({ boot, checkins, go, onCheckin, onChange }: { boot: Boot | null; checkins: Checkin[]; go: (k: string, a?: string | null) => void; onCheckin: () => void; onChange: () => void }) {
   const mine = checkins.find((c) => c.email === boot?.me.email);
   const notYet = (boot?.members || []).filter((l) => !checkins.some((c) => c.email === l.email));
   return (
@@ -149,10 +149,51 @@ export function CheckinRound({ boot, checkins, go, onCheckin }: { boot: Boot | n
               {c.plan_99 && <div className="mt-1"><div className="text-xs font-bold" style={{ color: MUTED }}>NEXT 99 DAYS</div><div className="text-xs" style={{ whiteSpace: "pre-wrap" }}>{c.plan_99}</div></div>}
               {c.learning && <div className="mt-1"><div className="text-xs font-bold" style={{ color: MUTED }}>LEARNING</div><div className="text-xs" style={{ whiteSpace: "pre-wrap" }}>{c.learning}</div></div>}
             </div>
+            <CheckinTalk boot={boot} c={c} onChange={onChange} />
           </div>
         ))}
       </div>
       {notYet.length > 0 && checkins.length > 0 && <div className="text-xs mt-2" style={{ color: MUTED }}>Not yet: {notYet.map((l) => l.name.split(" ")[0]).join(", ")}</div>}
     </Card>
+  );
+}
+
+/**
+ * A THUMBS UP, A HEART, AND THE TALK (Dr Raghu, 12 Oct 2026: "in the checkins
+ * also give a place to react to it with a thumbs up or heart. also comment").
+ * One reaction per leader — the same again takes it back; hover shows who.
+ */
+function CheckinTalk({ boot, c, onChange }: { boot: Boot | null; c: Checkin; onChange: () => void }) {
+  const [open, setOpen] = useState(false); const [text, setText] = useState(""); const [busy, setBusy] = useState(false);
+  const up = c.up || [], heart = c.heart || [], talk = c.comments || [];
+  const names = (es: string[]) => es.map((e) => leaderOf(boot, e).name).join(", ") || "No one yet";
+  const react = async (value: "up" | "heart") => { try { await api("/api/lc/meetings", { action: "checkin_react", id: c.id, value }); onChange(); } catch (e) { alert(String((e as Error).message)); } };
+  const say = async () => { if (!text.trim()) return; setBusy(true); try { await api("/api/lc/meetings", { action: "checkin_comment", id: c.id, body: text }); setText(""); onChange(); } catch (e) { alert(String((e as Error).message)); } setBusy(false); };
+  const unsay = async (id: string) => { if (!confirm("Remove this comment?")) return; await api("/api/lc/meetings", { action: "uncomment", comment_id: id }); onChange(); };
+  const pill = (on: boolean): React.CSSProperties => ({ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 9px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, border: `1px solid ${on ? "var(--accent)" : "var(--line)"}`, background: on ? "#fff7ed" : "#fff", color: NAVY });
+  return (
+    <div className="mt-2 pt-2" style={{ borderTop: "1px dashed var(--line)" }}>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <button onClick={() => react("up")} style={pill(c.mine === "up")} title={names(up)}>👍 {up.length}</button>
+        <button onClick={() => react("heart")} style={pill(c.mine === "heart")} title={names(heart)}>❤️ {heart.length}</button>
+        <button onClick={() => setOpen((o) => !o)} style={pill(open)} title="Comments">💬 {talk.length}</button>
+        {!open && talk.length > 0 && <span className="text-xs truncate" style={{ color: MUTED, maxWidth: 200 }}>{leaderOf(boot, talk[talk.length - 1].added_by).name.split(" ")[0]}: {talk[talk.length - 1].body}</span>}
+      </div>
+      {open && (
+        <div className="mt-2 grid gap-1.5">
+          {talk.map((x) => (
+            <div key={x.id} className="flex gap-2 items-start text-xs">
+              <Who boot={boot} email={x.added_by} size={18} withName={false} />
+              <div className="flex-1 min-w-0"><b style={{ color: NAVY }}>{leaderOf(boot, x.added_by).name}</b> <span style={{ color: MUTED }}>· {dmyt(x.created_at)}</span><div style={{ whiteSpace: "pre-wrap" }}>{x.body}</div></div>
+              {(boot?.me.isOwner || x.added_by === boot?.me.email) && <button onClick={() => unsay(x.id)} style={{ color: MUTED, fontSize: 11 }} title="Remove">✕</button>}
+            </div>
+          ))}
+          <div className="flex gap-1.5">
+            <input style={{ ...input, padding: "5px 8px", fontSize: 13 }} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); say(); } }} placeholder={`Say something to ${leaderOf(boot, c.email).name.split(" ")[0]}…`} />
+            <button onClick={say} disabled={busy || !text.trim()} style={btn("primary", { padding: "5px 10px", fontSize: 12 })}>Say</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

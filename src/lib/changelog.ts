@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.4.0.15",
+    date: "2026-10-12",
+    module: "Leaders Council: a thumbs up, a heart and comments on every check-in",
+    items: [
+      "REACT AND TALK ON A CHECK-IN (Dr Raghu, 12 Oct 2026: \u201cin the checkins also give a place to react to it with a thumbs up or heart. also comment\u201d). Under every leader\u2019s check-in card: \ud83d\udc4d and \u2764\ufe0f with their counts \u2014 one per leader, press the same again to take it back, hover to see who \u2014 and \ud83d\udcac opens the comments: who said it, when, and a line to say something (Enter sends). Your own comment, or Dr Raghu, can remove one. Closed, the card shows the latest comment in one line. Migration 0224.",
+    ],
+  },
+  {
     v: "6.4.0.14",
     date: "2026-10-10",
     module: "Leaders Council: the Leaders Check-in on every meeting; Related to on the Solution Board",

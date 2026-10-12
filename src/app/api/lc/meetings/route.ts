@@ -53,7 +53,17 @@ export async function GET(req: Request) {
         admin.from("lc_comment").select("id,body,added_by,created_at").eq("ref_kind", "meeting").eq("ref_id", id).order("created_at"),
         admin.from("lc_checkin").select("*").eq("meeting_id", id).order("created_at"),
       ]);
-      return NextResponse.json({ meeting: { ...m, hours: hours(m.from_time, m.to_time), viewed }, files: files || [], comments: comments || [], checkins: checkins || [] });
+      /* the thumbs up, the heart and the talk on each check-in (Dr Raghu, 12 Oct 2026) */
+      const ckIds = (checkins || []).map((c) => String(c.id));
+      const [{ data: ckReacts }, { data: ckTalk }] = ckIds.length ? await Promise.all([
+        admin.from("lc_reaction").select("ref_id,email,value").eq("ref_kind", "checkin").in("ref_id", ckIds),
+        admin.from("lc_comment").select("id,ref_id,body,added_by,created_at").eq("ref_kind", "checkin").in("ref_id", ckIds).order("created_at"),
+      ]) : [{ data: [] }, { data: [] }];
+      const withTalk = (checkins || []).map((c) => {
+        const rs = (ckReacts || []).filter((r) => r.ref_id === c.id);
+        return { ...c, up: rs.filter((r) => r.value === "up").map((r) => r.email), heart: rs.filter((r) => r.value === "heart").map((r) => r.email), mine: rs.find((r) => r.email === u.email)?.value || null, comments: (ckTalk || []).filter((x) => x.ref_id === c.id).map(({ ref_id: _r, ...x }) => x) };
+      });
+      return NextResponse.json({ meeting: { ...m, hours: hours(m.from_time, m.to_time), viewed }, files: files || [], comments: comments || [], checkins: withTalk });
     }
     const [{ data: ms, error }, { data: files }] = await Promise.all([
       admin.from("lc_meeting").select("id,held_on,from_time,to_time,location,attendees,guests,created_by,created_at,updated_at").order("held_on", { ascending: false }).order("created_at", { ascending: false }),
@@ -134,6 +144,27 @@ export async function POST(req: Request) {
       const { error } = await admin.from("lc_checkin").upsert(row, { onConflict: "meeting_id,email" });
       if (error) throw error;
       return NextResponse.json({ ok: true, burning_problem_id });
+    }
+    /* A THUMBS UP OR A HEART ON A CHECK-IN — one per leader; the same again takes it back */
+    if (b.action === "checkin_react") {
+      const id = String(b.id || ""); const value = String(b.value || "");
+      if (!["up", "heart"].includes(value)) throw new HttpError(400, "A thumbs up or a heart.");
+      const { data: had } = await admin.from("lc_reaction").select("value").eq("ref_kind", "checkin").eq("ref_id", id).eq("email", u.email).maybeSingle();
+      if (had?.value === value) await admin.from("lc_reaction").delete().eq("ref_kind", "checkin").eq("ref_id", id).eq("email", u.email);
+      else {
+        const { error } = await admin.from("lc_reaction").upsert({ ref_kind: "checkin", ref_id: id, email: u.email, value }, { onConflict: "ref_kind,ref_id,email" });
+        if (error) throw error;
+      }
+      return NextResponse.json({ ok: true });
+    }
+    if (b.action === "checkin_comment") {
+      const id = String(b.id || ""); const body = String(b.body || "").replace(/\u0000/g, "").trim();
+      if (!body) throw new HttpError(400, "Say something.");
+      const { data: ck } = await admin.from("lc_checkin").select("id").eq("id", id).maybeSingle();
+      if (!ck) throw new HttpError(404, "No such check-in.");
+      const { data, error } = await admin.from("lc_comment").insert({ ref_kind: "checkin", ref_id: id, body, added_by: u.email }).select("id").single();
+      if (error) throw error;
+      return NextResponse.json({ ok: true, id: data.id });
     }
     if (b.action === "comment") {
       const id = String(b.id || ""); const body = String(b.body || "").trim();

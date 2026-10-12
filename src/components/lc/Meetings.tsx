@@ -234,7 +234,7 @@ function View({ boot, id, back, go }: { boot: Boot | null; id: string; back: () 
           </Card>
         </div>
       )}
-      <CheckinRound boot={boot} checkins={d.checkins || []} go={go} onCheckin={() => setCk(true)} />
+      <CheckinRound boot={boot} checkins={d.checkins || []} go={go} onCheckin={() => setCk(true)} onChange={load} />
       <Card title="Minutes">
         {m.minutes ? <Rich html={m.minutes} /> : <span className="text-sm" style={{ color: MUTED }}>Nothing written yet{may ? " — Edit to write them" : ""}.</span>}
       </Card>
