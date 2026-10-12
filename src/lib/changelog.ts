@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.6.0.0",
+    date: "2026-10-12",
+    module: "Seva: Installation and Jobs; the dashboard by 12M, YTD, QTD, MTD or dates",
+    items: [
+      "INSTALLATION (Dr Raghu, 12 Oct 2026: \u201cmake a sub module called Installation. Show jobs in installation. Deploy people there\u201d). Every job the ERP has at installation \u2014 its classifier says Installation Stage, or its stage reads installation in progress or not started \u2014 as a card: the job (opens on the ERP), customer, tag, family, stage, delivered on, its tickets. Who is there today, who is coming and when, the man-days done so far, the site. + Deploy: pick the people, From and To, the site and notes; each person\u2019s each day goes on the Team Plan Deployment roster as an Installation line with the job number, so the roster and the installation screen are one record. Aakash, Yash and Dr Raghu deploy. Migration 0226.",
+      "JOBS (\u201cshow jobs also on the side so that all the jobs which are there can be seen, with the same filters as normal. Only show the jobs with an issue ticket\u201d). Every job \u2014 live, and delivered back to 2013 \u2014 that at least one ticket names: 1,261 jobs from about 10,000 tickets. The filters of the planning boards (Planning owner, the search) and Customer, Family, Stage (live, delivered, or any stage), Tickets (with an open one, all closed); every column sorts. Each row: tickets, open, the last ticket\u2019s date, the cost so far. Click a job for its tickets, each opening on the ERP. A job a ticket names that Genie\u2019s job lists do not carry still shows, marked so.",
+      "THE DASHBOARD\u2019S PIE BY ANY WINDOW (\u201cput from and to also \u2014 12 m, YTD, QTD, MTD or date\u201d). Issues by type: 12 M, YTD (the financial year from 1 April), QTD, MTD, open now, all time, or any From and To \u2014 counted on the server over every ticket.",
+    ],
+  },
+  {
     v: "6.5.0.2",
     date: "2026-10-12",
     module: "Seva: Discussion points filtered, searched and sortable; the plan by drag and drop",

@@ -17,6 +17,8 @@ import GenieShell from "@/components/GenieShell";
 import SevaAnalytics from "@/components/SevaAnalytics";
 import SevaLocations from "@/components/SevaLocations";
 import SevaPlan from "@/components/seva/SevaPlan";
+import SevaJobs from "@/components/seva/SevaJobs";
+import SevaInstallation from "@/components/seva/SevaInstallation";
 import SevaQuotes from "@/components/seva/SevaQuotes";
 import FieldAttendanceDesk from "@/components/seva/FieldAttendanceDesk";
 import { swallow } from "@/lib/swallow";
@@ -32,6 +34,8 @@ const SECTIONS: { key: string; label: string; icon: string }[] = [
   { key: "locations", label: "Locations", icon: "📍" },
   { key: "discuss", label: "Discussion points", icon: "🗣" },
   { key: "amc", label: "Annual Maintenance", icon: "📅" },
+  { key: "jobs", label: "Jobs", icon: "🏷" },
+  { key: "installation", label: "Installation", icon: "🏗" },
   { key: "plan", label: "Team Plan Deployment", icon: "🗓" },
   { key: "quotes", label: "Quotation", icon: "🧾" },
   { key: "attendance", label: "Field attendance", icon: "📍" },
@@ -1314,7 +1318,7 @@ function DiscussScreen() {
 interface SevaStats {
   today: string; fy_start: string;
   amc: { total: number; live: number; live_value: number };
-  issues: { total: number; open: number; overdue: number; this_fy: number; by_type_open: { type: string; n: number }[]; by_type_fy: { type: string; n: number }[]; by_type_all: { type: string; n: number }[] };
+  issues: { total: number; open: number; overdue: number; this_fy: number; by_type_open: { type: string; n: number }[]; by_type_fy: { type: string; n: number }[]; by_type_all: { type: string; n: number }[]; by_type_range?: { type: string; n: number }[] };
   warranty: { all: number; all_cost: number; fy: number; fy_cost: number; open: number; open_cost: number };
 }
 /** The five hues, in fixed order, validated for colour-blind separation; the sixth slice is always "Other", in gray. */
@@ -1363,8 +1367,27 @@ function SevaDashboard({ go }: { go: (k: string) => void }) {
   const [amcs] = useReg("amc");
   const [pushes] = usePush();
   const [st, setSt] = useState<SevaStats | null>(null);
-  const [pieOf, setPieOf] = useState<"open" | "fy" | "all">("fy");
+  /* THE PIE'S WINDOW (Dr Raghu, 12 Oct 2026: "put from and to also — 12 m, YTD, QTD, MTD or date"). YTD is the financial year to date. */
+  type Win = "12m" | "ytd" | "qtd" | "mtd" | "dates" | "open" | "all";
+  const [pieOf, setPieOf] = useState<Win>("ytd");
+  const t0 = TODAY();
+  const winOf = (w: Win): [string, string] | null => {
+    const y = Number(t0.slice(0, 4)), m = Number(t0.slice(5, 7));
+    if (w === "12m") { const d = new Date(t0 + "T00:00:00Z"); d.setUTCFullYear(d.getUTCFullYear() - 1); d.setUTCDate(d.getUTCDate() + 1); return [d.toISOString().slice(0, 10), t0]; }
+    if (w === "ytd") return [m >= 4 ? `${y}-04-01` : `${y - 1}-04-01`, t0];
+    if (w === "qtd") { const q = Math.floor((m - 1) / 3) * 3 + 1; return [`${y}-${String(q).padStart(2, "0")}-01`, t0]; }
+    if (w === "mtd") return [t0.slice(0, 8) + "01", t0];
+    return null;
+  };
+  const [pFrom, setPFrom] = useState(() => winOf("ytd")![0]); const [pTo, setPTo] = useState(t0);
+  const [pie, setPie] = useState<{ type: string; n: number }[] | null>(null);
   useEffect(() => { fetch("/api/seva/stats", { cache: "no-store" }).then((r) => r.json()).then((j) => setSt(j.ok ? j : null)).catch(() => setSt(null)); }, []);
+  useEffect(() => {
+    if (pieOf === "open" || pieOf === "all") { setPie(null); return; }
+    setPie(null);
+    fetch(`/api/seva/stats?from=${pFrom}&to=${pTo}`, { cache: "no-store" }).then((r) => r.json()).then((j) => setPie(j.ok ? j.issues.by_type_range || [] : [])).catch(() => setPie([]));
+  }, [pieOf, pFrom, pTo]);
+  const pickWin = (w: Win) => { setPieOf(w); const r = winOf(w); if (r) { setPFrom(r[0]); setPTo(r[1]); } };
   const owed = (pushes?.inbox || []).filter((p) => p.status === "sent" || p.status === "seen");
   const lakh = (n: number) => (n >= 1e7 ? `₹${(n / 1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n / 1e5).toFixed(2)} L` : rupee(n));
   const expiring = (amcs || []).filter((r) => { const d = daysTo(r.end_date); return d != null && d >= 0 && d <= 60; });
@@ -1402,13 +1425,17 @@ function SevaDashboard({ go }: { go: (k: string) => void }) {
       </div>
       <div className="grid md:grid-cols-2 gap-2 mb-3">
         <div>
-          <div className="flex gap-1 mb-1 text-xs">
-            {([["fy", "this FY"], ["open", "open now"], ["all", "all time"]] as const).map(([k, l]) => (
-              <button key={k} onClick={() => setPieOf(k)} className="rounded px-2 py-0.5 font-bold" style={{ background: pieOf === k ? "var(--ink)" : "#F3F1EB", color: pieOf === k ? "#fff" : MUTED }}>{l}</button>
+          <div className="flex gap-1 mb-1 text-xs items-center flex-wrap">
+            {([["12m", "12 M"], ["ytd", "YTD"], ["qtd", "QTD"], ["mtd", "MTD"], ["open", "open now"], ["all", "all time"]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => pickWin(k)} className="rounded px-2 py-0.5 font-bold" style={{ background: pieOf === k ? "var(--ink)" : "#F3F1EB", color: pieOf === k ? "#fff" : MUTED }}>{l}</button>
             ))}
+            <span className="ml-1 font-bold" style={{ color: pieOf === "dates" ? INK : MUTED }}>From</span>
+            <input type="date" value={pFrom} max={pTo} onChange={(e) => { setPieOf("dates"); setPFrom(e.target.value); }} className="rounded border px-1 py-0.5" style={{ borderColor: BORDER, fontSize: 11 }} />
+            <span className="font-bold" style={{ color: pieOf === "dates" ? INK : MUTED }}>To</span>
+            <input type="date" value={pTo} min={pFrom} max={t0} onChange={(e) => { setPieOf("dates"); setPTo(e.target.value); }} className="rounded border px-1 py-0.5" style={{ borderColor: BORDER, fontSize: 11 }} />
           </div>
-          <TypePie rows={st ? (pieOf === "open" ? st.issues.by_type_open : pieOf === "fy" ? st.issues.by_type_fy : st.issues.by_type_all) : []}
-            title="ISSUES BY TYPE" sub={pieOf === "open" ? "every ticket still open, by its type of support" : pieOf === "fy" ? "tickets opened this financial year, by type of support" : "every ticket on record, by type of support"} />
+          <TypePie rows={st ? (pieOf === "open" ? st.issues.by_type_open : pieOf === "all" ? st.issues.by_type_all : pie || []) : []}
+            title="ISSUES BY TYPE" sub={pieOf === "open" ? "every ticket still open, by its type of support" : pieOf === "all" ? "every ticket on record, by type of support" : `tickets opened ${fmtD(pFrom)} to ${fmtD(pTo)}${pieOf === "ytd" ? " — the financial year to date" : pieOf === "12m" ? " — the last twelve months" : pieOf === "qtd" ? " — the quarter to date" : pieOf === "mtd" ? " — the month to date" : ""}${pie === null ? " · counting…" : ""}, by type of support`} />
         </div>
       </div>
 
@@ -1505,6 +1532,8 @@ export default function Seva({
           {openKey === "locations" && <SevaLocations />}
           {openKey === "discuss" && <DiscussScreen />}
           {openKey === "amc" && <AmcScreen />}
+          {openKey === "jobs" && <SevaJobs />}
+          {openKey === "installation" && <SevaInstallation />}
           {openKey === "plan" && <SevaPlan />}
           {openKey === "quotes" && <SevaQuotes />}
           {openKey === "attendance" && <FieldAttendanceDesk />}

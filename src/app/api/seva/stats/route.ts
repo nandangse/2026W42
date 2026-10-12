@@ -36,9 +36,13 @@ async function all(admin: ReturnType<typeof adminClient>, table: string, cols: s
   return out;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireSeva();
+    /* ANY WINDOW FOR THE PIE (Dr Raghu, 12 Oct 2026: "put from and to also — 12 m, YTD, QTD, MTD or date") */
+    const sp = new URL(req.url).searchParams;
+    const isD = (v: string | null) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    const rFrom = isD(sp.get("from")) ? String(sp.get("from")) : null, rTo = isD(sp.get("to")) ? String(sp.get("to")) : null;
     const admin = adminClient();
     const t = today(), fy = fyStart(t);
     const [amcs, issues] = await Promise.all([
@@ -72,6 +76,7 @@ export async function GET() {
       issues: {
         total: issues.length, open: open.length, overdue: overdue.length, this_fy: thisFy.length,
         by_type_open: count(open), by_type_fy: count(thisFy), by_type_all: count(issues),
+        ...(rFrom && rTo ? { range: { from: rFrom, to: rTo }, by_type_range: count(issues.filter((r) => { const d = dateOf(r); return d >= rFrom && d <= rTo; })) } : {}),
       },
       warranty: { all: wAll.length, all_cost: cost(wAll), fy: wFy.length, fy_cost: cost(wFy), open: wOpen.length, open_cost: cost(wOpen) },
     });
