@@ -18,6 +18,7 @@ import UploadFiles from "@/components/kuber/UploadFiles";
 import RegisterScreen from "@/components/kuber/Registers";
 import KuberTasking from "@/components/kuber/Tasking";
 import StockRegister from "@/components/kuber/StockRegister";
+import OeRegister from "@/components/kuber/OeRegister";
 import { KuberDashboard, AgeingScreen, ReportCardScreen, CashFlowScreen, LedgerBrowser, VoucherBrowser, PnLScreen, BalanceSheetScreen, ExpensesScreen, ActualCashFlowScreen, FundFlowScreen, RatioScreen, CfoNoteScreen, VoucherRegister, RulesScreen, BillsReceivable, CashPlanScreen, PaymentHub } from "@/components/kuber/Books";
 import { MoneyProvider, UnitPicker } from "@/components/kuber/money";
 import PlaybookScreen from "@/components/Playbook";
@@ -52,6 +53,7 @@ const NAV: { header?: string; items: { key: string; label: string; icon: string 
     items: [
       { key: "salesreg", label: "Sales Register", icon: "▤" },
       { key: "purchreg", label: "Purchase Register", icon: "▥" },
+      { key: "oereg", label: "OE Register", icon: "▦" },
       { key: "loan", label: "Bank Loan Register", icon: "◨" },
       { key: "bg", label: "Bank Guarantees", icon: "🏦" },
       { key: "fd", label: "Fixed Deposits", icon: "▤" },
@@ -238,6 +240,7 @@ export default function Accounts({
           {openKey === "cfonote" && <CfoNoteScreen go={go} />}
           {openKey === "salesreg" && <VoucherRegister kind="sales" key="s" />}
           {openKey === "purchreg" && <VoucherRegister kind="purchase" key="p" />}
+          {openKey === "oereg" && <OeRegister />}
           {openKey === "payplan" && <PaymentHub />}
           {["bg", "fd", "insurance", "cashitem", "loan", "bounce", "release"].includes(openKey) && <RegisterScreen kind={openKey} key={openKey} />}
           {openKey in STUBS && (

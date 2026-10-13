@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.9.1.0",
+    date: "2026-10-13",
+    module: "Kuber: the OE Register",
+    items: [
+      "OE REGISTER (Dr Raghu, 13 Oct 2026: \u201cmake an OE Register. This will help to know the OE\u201d). Kuber \u2192 Registers \u2192 OE Register. Every voucher line the P&L counts as operating expense \u2014 a ledger the one ladder of rules puts under Indirect or Finance \u2014 with its date, voucher, party, narration, ledger, group and the OE head it lands in (Labour, Staff and Consultant Salaries, Directors\u2019 Remuneration, Consultancies, Finance Costs, Bank Charges, Utilities, Rent & Others, Marketing, Sales Promotion, Other OE). On top: OE, sales and OE as a share of sales for the dates, and the heads by month with the latest month on the left, each head\u2019s total and share of sales, and the month\u2019s OE % of sales. Click a head or a month and the lines narrow to it; search, filters, every column sorts; 12 M, YTD, QTD, MTD or From and To. Struck by the same rules and the same signs as the P&L, so it adds back to the P&L\u2019s OE to the rupee \u2014 \u20b97,25,97,430 for 1 Apr to 10 Oct 2026, 6,245 lines.",
+    ],
+  },
+  {
     v: "6.9.0.1",
     date: "2026-10-12",
     module: "Seva: Field attendance — the latest date on the left",
