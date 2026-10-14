@@ -97,7 +97,7 @@ function sheet(j: SheetJob, on: string): string {
     </tr>`;
   }).join("");
 
-  return `<section class="pg">
+  return `<article class="job">
   <header class="hd">
     <div class="jno">${esc(jobNo(j.id))}</div>
     <div class="who1">
@@ -128,8 +128,30 @@ function sheet(j: SheetJob, on: string): string {
     <span>Nandan GSE &middot; pending tasks as at ${fmtFull(on)}</span>
     <span>JOB ${esc(jobNo(j.id))}</span>
   </footer>
-</section>`;
+</article>`;
 }
+
+/**
+ * TWO TO A PAGE WHEN THEY FIT (Dr Raghu, 14 Oct 2026: "check if two pages
+ * back to back can fit on half the page, then make it that way; if not it
+ * will have a page break"). Every job is laid out on its own page first; then,
+ * in the browser that prints it, each job is measured at the printed width
+ * (186 mm, the A4 page less its margins) and a job joins the one before it
+ * when both together fit the 276 mm the page can hold. Never more than two to
+ * a sheet, never a job split to make room — a job that does not fit starts a
+ * fresh page as before. If the script cannot run, the pack is one job a page.
+ */
+const PAIR_SCRIPT = `(function(){try{
+  var MM = 96 / 25.4, ROOM = 276 - 11 - 3;   /* the page, less the dashed gap, less a margin of safety */
+  var pages = Array.prototype.slice.call(document.querySelectorAll("section.pg"));
+  var open = null;
+  pages.forEach(function (pg) {
+    var job = pg.querySelector("article.job"); if (!job) return;
+    var h = job.getBoundingClientRect().height / MM;
+    if (open && open.n === 1 && open.h + h <= ROOM) { open.pg.appendChild(job); pg.parentNode.removeChild(pg); open.n = 2; open = null; return; }
+    open = { pg: pg, h: h, n: 1 };
+  });
+}catch(e){}})();`;
 
 export function taskSheetHtml(jobs: SheetJob[], on: string, title: string): string {
   /* SORTED BY THE JOB'S TARGET DELIVERY (his instruction) — the pack comes out
@@ -147,6 +169,8 @@ body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI
 @media print { body { background:#fff; } }
 @media screen { .pg { width:210mm; min-height:297mm; margin:6mm auto; padding:11mm 12mm 10mm; box-shadow:0 1px 6px rgba(0,0,0,.15); } }
 .hd, .strip { break-inside: avoid; break-after: avoid; }
+/* two short jobs share a sheet, the second below a dashed line */
+.job + .job { margin-top:6mm; padding-top:5mm; border-top:.4mm dashed #C9C5BA; }
 table.t thead { display: table-header-group; }
 table.t tr { break-inside: avoid; page-break-inside: avoid; }
 
@@ -191,6 +215,7 @@ i.moved { font-style:normal; font-size:6.8pt; color:#B45309; margin-left:1.5mm; 
 .ft { margin-top:4mm; border-top:.2mm solid #D8D5CC; padding-top:2mm; display:flex; justify-content:space-between;
       font-size:7pt; color:#8B8F87; break-inside: avoid; }
 </style></head><body>
-${ordered.map((j) => sheet(j, on)).join("\n")}
+${ordered.map((j) => `<section class="pg">${sheet(j, on)}</section>`).join("\n")}
+<script>${PAIR_SCRIPT}</script>
 </body></html>`;
 }

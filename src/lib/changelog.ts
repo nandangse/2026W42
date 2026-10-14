@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.10",
+    date: "2026-10-14",
+    module: "Planning: the pending-tasks pack \u2014 two short jobs to a sheet",
+    items: [
+      "TWO TO A PAGE WHEN THEY FIT (Dr Raghu, 14 Oct 2026: \u201ccheck if two pages back to back can fit on half the page, then make it that way; if not it will have a page break\u201d). Each job is measured at the printed width; a job joins the one before it, below a dashed line, when both fit one A4 sheet. Never more than two to a sheet and never a job split to make room \u2014 one that does not fit starts a fresh page as before.",
+    ],
+  },
+  {
     v: "6.10.0.9",
     date: "2026-10-14",
     module: "CEO: Internal Kuber \u2014 the title frozen",
