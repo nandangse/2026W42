@@ -131,9 +131,28 @@ function Dashboard({ top }: { top: number }) {
           {isErr(d.trend) ? <div className="text-xs mb-3" style={{ color: C.red }}>The rolling year could not be read: {d.trend.error}</div> : !d.trend.empty && <RollingYear t={d.trend as Trend} />}
 
           {b && (
-            <Section title="OE by head" hint={`the twelve heads of operating expense, to ${dmy(b.pnl_to)}`}>
-              {Object.entries(b.byHead as Record<string, number>).filter(([, v]) => v).sort((x, y) => y[1] - x[1]).map(([h, v]) => <Card key={h} label={h} value={cr(v)} sub={`${pct(v, b.sales)} of sales · ${pct(v, b.oe)} of OE`} ask={{ what: `head:${h}`, from, to: b.pnl_to, label: h }} tone={C.amber} />)}
-            </Section>
+            (() => {
+              /* OE BY HEAD, PER MONTH (Dr Raghu, 14 Oct 2026: "show total OE on top and per month, mention up to 30th September (last date of previous month);
+                 in each box also show total and per month; show % of OE also"). Months = the whole months from the first day to the month-end. */
+              const months = Math.max(1, (Number(b.pnl_to.slice(0, 4)) - Number(from.slice(0, 4))) * 12 + Number(b.pnl_to.slice(5, 7)) - Number(from.slice(5, 7)) + 1);
+              const pm = (v: number) => cr(v / months);
+              return (
+                <>
+                  <div className="rounded-2xl p-4 mb-3 flex items-center gap-6 flex-wrap" style={{ background: "#FFFAEB", border: "1px solid #FEDF89" }}>
+                    <div><div className="text-xs font-medium" style={{ color: C.muted }}>Total OE</div><button onClick={() => undefined} className="font-bold tnum" style={{ fontSize: 24, color: C.ink, cursor: "default" }}>{cr(b.oe)}</button></div>
+                    <div><div className="text-xs font-medium" style={{ color: C.muted }}>Per month</div><div className="font-bold tnum" style={{ fontSize: 24, color: C.ink }}>{pm(b.oe)}</div></div>
+                    <div><div className="text-xs font-medium" style={{ color: C.muted }}>% of sales</div><div className="font-bold tnum" style={{ fontSize: 24, color: C.ink }}>{pct(b.oe, b.sales)}</div></div>
+                    <div className="text-sm" style={{ color: "#93370D" }}>{dmy(from)} to <b>{dmy(b.pnl_to)}</b> — the last day of the previous month · {months} month{months === 1 ? "" : "s"}</div>
+                  </div>
+                  <Section title="OE by head" hint={`the twelve heads — total, per month, share of OE and of sales, to ${dmy(b.pnl_to)}`}>
+                    {Object.entries(b.byHead as Record<string, number>).filter(([, v]) => v).sort((x, y) => y[1] - x[1]).map(([h, v]) => (
+                      <Card key={h} label={h} value={cr(v)} ask={{ what: `head:${h}`, from, to: b.pnl_to, label: h }} tone={C.amber}
+                        rows={[{ label: "Per month", value: pm(v) }, { label: "% of OE", value: pct(v, b.oe) }, { label: "% of sales", value: pct(v, b.sales) }]} />
+                    ))}
+                  </Section>
+                </>
+              );
+            })()
           )}
 
           <Section title="The order book" hint="CRM" err={isErr(d.orders) ? d.orders.error : undefined}>

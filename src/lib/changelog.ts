@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.7",
+    date: "2026-10-14",
+    module: "CEO: OE by head — the total and per month on top; total, per month, % of OE and % of sales in each box",
+    items: [
+      "OE BY HEAD, PER MONTH (Dr Raghu, 14 Oct 2026: \u201cshow total OE on top and per month, mention up to 30th September (last date of previous month); below that in each box also show total and per month; show % of OE also\u201d). A band above the twelve heads: total OE, OE per month and OE as a share of sales, with the dates \u2014 1 Apr to 30 Sep 2026, the last day of the previous month, six months (\u20b97.05 Cr, \u20b91.18 Cr a month, 22.1%). Each head\u2019s box: its total, then per month, % of OE and % of sales.",
+    ],
+  },
+  {
     v: "6.10.0.6",
     date: "2026-10-14",
     module: "CEO: Sales up to now; the rest to the month-end",
