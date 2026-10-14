@@ -1,36 +1,30 @@
 "use client";
 /**
  * THE CEO MODULE (Dr Raghu, 14 Oct 2026). A menu on the left — Dashboard,
- * People, Strategy, Execution, Cash, Reviews, Exceptions — and every number
- * on it opens a lightbox of what makes it, each line opening in a new tab.
- * Every figure is read live from the module that owns it; nothing is typed.
+ * People, Strategy, Execution, Cash, Reviews, Exceptions — the header, the
+ * title and the period frozen at the top, and on the dashboard: Sales, TVC,
+ * Throughput, OE, PBT with their share of sales; the rolling year; the money
+ * owed and owing; the order book; the floor; service; people. Every number
+ * opens a lightbox; every box carries its change on a week ago.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import GenieShell from "@/components/GenieShell";
 import RollingYear, { type Trend } from "@/components/ceo/RollingYear";
-import { DrillProvider, useDrill, cr } from "@/components/ceo/Drill";
-import { Card, Section } from "@/components/ceo/ui";
+import { DrillProvider, cr } from "@/components/ceo/Drill";
+import { Card, Section, C, type Delta } from "@/components/ceo/ui";
 import { PeopleRoom, StrategyRoom, ExecutionRoom, CashRoom, ReviewsRoom, ExceptionsRoom } from "@/components/ceo/CeoRooms";
 import { swallow } from "@/lib/swallow";
 
 type Err = { error: string };
-type D = {
-  from: string; to: string; today: string;
-  books: { empty?: boolean; sales: number; oe: number; byHead: Record<string, number>; books_to: string | null } | Err;
-  owed: { receivable: number; receivable_overdue: number; receivable_180: number; advances: number; payable: number; payable_180: number } | Err;
-  orders: { orders: number; order_value: number; quotes_live: number; quote_value: number } | Err;
-  floor: { live: number; live_value: number; late: number; delivered: number; delivered_value: number } | Err;
-  service: { open_tickets: number; amc_valid: number; amc_value: number } | Err;
-  people: { headcount: number; by_department: Record<string, number> } | Err;
-  trend: (Trend & { empty?: boolean }) | { empty: true } | Err;
-};
-const NAVY = "var(--navy)", MUTED = "var(--muted)", LINE = "var(--line)", RED = "var(--red)", GREEN = "var(--green)";
-const pct = (a: number, b: number) => (b ? `${((a / b) * 100).toFixed((a / b) * 100 < 10 ? 1 : 0)}%` : "—");
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type D = { from: string; to: string; today: string; books: any; owed: any; erp: any; orders: any; floor: any; service: any; people: any; trend: any; snap: Record<string, number>; prev: { day: string | null; values: Record<string, number> }; direction: Record<string, { good: 1 | -1 | 0; pct?: boolean }>; isYtd: boolean };
 const isErr = (x: unknown): x is Err => !!x && typeof x === "object" && "error" in (x as object);
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 const fyStart = (t: string) => (t.slice(5, 7) >= "04" ? `${t.slice(0, 4)}-04-01` : `${Number(t.slice(0, 4)) - 1}-04-01`);
 const dmy = (d?: string | null) => (d ? new Date(d.slice(0, 10) + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—");
-const ctl: React.CSSProperties = { border: `1px solid ${LINE}`, borderRadius: 6, padding: "4px 8px", fontSize: 12, background: "#fff" };
+const pct = (a: number, b: number) => (b ? `${((a / b) * 100).toFixed(Math.abs((a / b) * 100) < 10 ? 1 : 0)}%` : "—");
+const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.brand : C.line}`, borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, background: on ? C.brand : "#fff", color: on ? "#fff" : C.ink });
+const ctl: React.CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 8, padding: "4px 8px", fontSize: 12, background: "#fff" };
 
 const ROOMS = [
   { key: "dashboard", label: "Dashboard", icon: "◧" },
@@ -42,12 +36,12 @@ const ROOMS = [
   { key: "exceptions", label: "Exceptions", icon: "⚠" },
 ] as const;
 
-function Dashboard() {
+function Dashboard({ top }: { top: number }) {
   const t0 = today();
   const [from, setFrom] = useState(fyStart(t0)); const [to, setTo] = useState(t0);
   const [d, setD] = useState<D | null>(null); const [err, setErr] = useState<string | null>(null);
-  const open = useDrill();
-  useEffect(() => { setD(null); fetch(`/api/ceo?from=${from}&to=${to}`, { cache: "no-store" }).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error); setD(j); }).catch((e) => setErr(String(e.message || e))); }, [from, to]);
+  useEffect(() => { setD(null); setErr(null); fetch(`/api/ceo?from=${from}&to=${to}`, { cache: "no-store" }).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error); setD(j); }).catch((e) => setErr(String(e.message || e))); }, [from, to]);
+  const which = from === fyStart(t0) && to === t0 ? "ytd" : "";
   const win = (k: "12m" | "ytd" | "qtd" | "mtd") => {
     const y = Number(t0.slice(0, 4)), m = Number(t0.slice(5, 7));
     if (k === "ytd") setFrom(fyStart(t0));
@@ -56,61 +50,118 @@ function Dashboard() {
     if (k === "12m") { const x = new Date(t0 + "T00:00:00Z"); x.setUTCFullYear(x.getUTCFullYear() - 1); x.setUTCDate(x.getUTCDate() + 1); setFrom(x.toISOString().slice(0, 10)); }
     setTo(t0);
   };
-  const b = d && !isErr(d.books) && !d.books.empty ? d.books : null;
+  /** the week's change for a snapshot key */
+  const dl = (k: string, cur?: number): Delta | undefined => {
+    if (!d || !d.isYtd) return undefined;
+    const dir = d.direction[k]; const prev = d.prev.values[k]; const now = cur ?? d.snap[k];
+    if (!dir || prev === undefined || now === undefined) return undefined;
+    return { cur: now, prev, good: dir.good, pct: dir.pct };
+  };
   const R = { from, to };
+  const b = d && !isErr(d.books) && !d.books.empty ? d.books : null;
+  const o = d && !isErr(d.owed) ? d.owed : null;
+  const e = d && !isErr(d.erp) ? d.erp : null;
+  const f = d && !isErr(d.floor) ? d.floor : null;
+  const p = d && !isErr(d.people) ? d.people : null;
   return (
     <>
-      <div className="flex items-center gap-2 flex-wrap mb-4">
-        <h1 className="font-bold" style={{ fontSize: 22, color: NAVY }}>The company, {dmy(from)} – {dmy(to)}</h1>
+      {/* THE TITLE AND THE PERIOD, FROZEN UNDER THE HEADER */}
+      <div className="flex items-center gap-2 flex-wrap py-3 mb-3" style={{ position: "sticky", top, zIndex: 30, background: C.bg, borderBottom: `1px solid ${C.line}`, margin: "0 -20px", padding: "12px 20px" }}>
+        <div>
+          <h1 className="font-bold" style={{ fontSize: 20, color: C.ink, lineHeight: 1.2 }}>The company, {dmy(from)} – {dmy(to)}</h1>
+          <div className="text-xs" style={{ color: C.muted }}>{d?.isYtd ? (d.prev.day ? `▲▼ against ${dmy(d.prev.day)}` : "the week-on-week triangles begin once a week of figures is kept") : "the triangles show on the financial year to date (YTD)"}{b ? ` · books to ${dmy(b.books_to)}` : ""}</div>
+        </div>
         <span className="ml-auto" />
-        {(["12m", "ytd", "qtd", "mtd"] as const).map((k) => <button key={k} onClick={() => win(k)} style={{ ...ctl, fontWeight: 700 }}>{k === "12m" ? "12 M" : k.toUpperCase()}</button>)}
-        <span className="text-xs font-bold" style={{ color: MUTED }}>From</span><input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} style={ctl} />
-        <span className="text-xs font-bold" style={{ color: MUTED }}>To</span><input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} style={ctl} />
+        {(["12m", "ytd", "qtd", "mtd"] as const).map((k) => <button key={k} onClick={() => win(k)} style={chip(k === which)}>{k === "12m" ? "12 M" : k.toUpperCase()}</button>)}
+        <span className="text-xs font-semibold" style={{ color: C.muted }}>From</span><input type="date" value={from} max={to} onChange={(ev) => setFrom(ev.target.value)} style={ctl} />
+        <span className="text-xs font-semibold" style={{ color: C.muted }}>To</span><input type="date" value={to} min={from} onChange={(ev) => setTo(ev.target.value)} style={ctl} />
       </div>
-      {err && <div className="text-sm font-bold" style={{ color: RED }}>{err}</div>}
-      {!d && !err && <div className="text-sm" style={{ color: MUTED }}>Reading the books, the order book, the floor…</div>}
+      {err && <div className="text-sm font-bold" style={{ color: C.red }}>{err}</div>}
+      {!d && !err && <div className="text-sm" style={{ color: C.muted }}>Reading the books, the ERP, the order book, the floor…</div>}
       {d && (
         <>
-          <Section title="THE BOOKS — KUBER" err={isErr(d.books) ? d.books.error : undefined}>
+          {/* SALES · TVC · THROUGHPUT · OE · PBT — the total and the share of sales */}
+          <Section title="The P&L" hint="Kuber's own arithmetic — total and % of sales" err={isErr(d.books) ? d.books.error : undefined} min={190}>
             {b && <>
-              <Card label="SALES" value={cr(b.sales)} sub={`books to ${dmy(b.books_to)}`} ask={{ what: "sales", ...R }} tone={GREEN} />
-              <Card label="OE" value={cr(b.oe)} sub={`${pct(b.oe, b.sales)} of sales`} ask={{ what: "oe", ...R }} tone="#B45309" />
-              <Card label="SALES LESS OE" value={cr(b.sales - b.oe)} sub="before materials and the floor's own cost — opens the OE" ask={{ what: "oe", ...R, label: "OE — what is taken from sales" }} />
+              <Card icon="₹" tone={C.green} label="Sales" value={cr(b.sales)} sub="100% · booked sales" ask={{ what: "sales", ...R }} delta={dl("sales")} />
+              <Card icon="📦" tone={C.amber} label="TVC" value={cr(b.tvc)} sub={`${pct(b.tvc, b.sales)} of sales · purchases ± stock`} ask={{ what: "tvc", ...R }} delta={dl("tvc_pct")} />
+              <Card icon="⚡" tone={C.brand} label="Throughput" value={cr(b.throughput)} sub={`${pct(b.throughput, b.sales)} of sales`} ask={{ what: "throughput", ...R }} delta={dl("throughput_pct")} />
+              <Card icon="⚙" tone={C.amber} label="OE" value={cr(b.oe)} sub={`${pct(b.oe, b.sales)} of sales · indirect + finance`} ask={{ what: "oe", ...R }} delta={dl("oe_pct")} />
+              <Card icon="🏁" tone={b.pbt >= 0 ? C.green : C.red} label="PBT" value={cr(b.pbt)} sub={`${pct(b.pbt, b.sales)} of sales`} ask={{ what: "pbt", ...R }} delta={dl("pbt_pct")} />
             </>}
           </Section>
-          {isErr(d.trend) ? <div className="text-xs mb-3" style={{ color: RED }}>The rolling year could not be read: {d.trend.error}</div> : !d.trend.empty && <RollingYear t={d.trend as Trend} />}
+          {b && <div className="text-xs -mt-3 mb-5" style={{ color: C.muted }}>TVC uses the stock register: opening {cr(b.openingStock)}{b.openingAt ? ` (${dmy(b.openingAt)})` : ""}, closing {cr(b.closingStock)}{b.closingAt ? ` (${dmy(b.closingAt)})` : ""}. PBT also takes off manufacturing {cr(b.manuf)}{b.depreciation ? ` and depreciation ${cr(b.depreciation)}` : ""} and adds other income {cr(b.otherIncome)}. The % triangles compare the share of sales with a week ago.</div>}
+
+          {/* MONEY OWED AND OWING */}
+          <Section title="Money" hint="today — Tally's open bills, and the ERP" min={250}>
+            {o && <>
+              <Card icon="↘" tone={C.red} label="Receivables" value={cr(o.receivable)} ask={{ what: "receivable" }} delta={dl("receivable")}
+                rows={[{ label: "0–90 days", value: cr(o.rec_0_90), ask: { what: "receivable_0_90" }, delta: dl("rec_0_90") }, { label: "90+ days", value: cr(o.rec_90), ask: { what: "receivable_90" }, delta: dl("rec_90"), tone: C.red }]} />
+              <Card icon="↗" tone={C.amber} label="Payables" value={cr(o.payable)} ask={{ what: "payable" }} delta={dl("payable")}
+                rows={[{ label: "0–180 days", value: cr(o.pay_0_180), ask: { what: "payable_0_180" }, delta: dl("pay_0_180") }, { label: "180+ days", value: cr(o.pay_180), ask: { what: "payable_180" }, delta: dl("pay_180"), tone: C.red }]} />
+            </>}
+            {e && <Card icon="🧾" tone={C.violet} label="Supplier bills not received" value={cr(e.grn_unbilled)} sub={`${e.grn_count} goods receipts on the ERP not fully billed`} ask={{ what: "grn" }} delta={dl("grn_unbilled")} />}
+            {o && <Card icon="⇄" tone={C.sky} label="Advances" value={`${cr(o.adv_received)} | ${cr(o.adv_paid)}`} sub="received from customers | paid to suppliers"
+              rows={[{ label: "Advance received", value: cr(o.adv_received), ask: { what: "advances" }, delta: dl("adv_received") }, { label: "Advance paid", value: cr(o.adv_paid), ask: { what: "advances_paid" }, delta: dl("adv_paid") }]} />}
+            {e && <Card icon="🚚" tone={C.red} label="Payment on order execution" value={cr(e.poe_0_30 + e.poe_31_60 + e.poe_61_90 + e.poe_90)} sub="due on delivery, still pending — days since delivery" ask={{ what: "poe:0_30", label: "Payment on order execution" }}
+              rows={[
+                { label: "0–30 days", value: cr(e.poe_0_30), ask: { what: "poe:0_30" }, delta: dl("poe_0_30") },
+                { label: "31–60 days", value: cr(e.poe_31_60), ask: { what: "poe:31_60" }, delta: dl("poe_31_60") },
+                { label: "61–90 days", value: cr(e.poe_61_90), ask: { what: "poe:61_90" }, delta: dl("poe_61_90") },
+                { label: "90+ days", value: cr(e.poe_90), ask: { what: "poe:90" }, delta: dl("poe_90"), tone: C.red },
+                { label: "not yet delivered", value: cr(e.poe_undelivered), ask: { what: "poe:undelivered" }, delta: dl("poe_undelivered"), tone: C.muted },
+              ]} />}
+            {isErr(d.erp) && <div className="text-xs" style={{ color: C.red }}>The ERP could not be read: {d.erp.error}</div>}
+          </Section>
+
+          {isErr(d.trend) ? <div className="text-xs mb-3" style={{ color: C.red }}>The rolling year could not be read: {d.trend.error}</div> : !d.trend.empty && <RollingYear t={d.trend as Trend} />}
+
           {b && (
-            <Section title="OE BY HEAD">
-              {Object.entries(b.byHead).filter(([, v]) => v).sort((x, y) => y[1] - x[1]).map(([h, v]) => <Card key={h} label={h.toUpperCase()} value={cr(v)} sub={`${pct(v, b.sales)} of sales · ${pct(v, b.oe)} of OE`} ask={{ what: `head:${h}`, ...R, label: h }} tone="#B45309" />)}
+            <Section title="OE by head" hint="the twelve heads of operating expense">
+              {Object.entries(b.byHead as Record<string, number>).filter(([, v]) => v).sort((x, y) => y[1] - x[1]).map(([h, v]) => <Card key={h} label={h} value={cr(v)} sub={`${pct(v, b.sales)} of sales · ${pct(v, b.oe)} of OE`} ask={{ what: `head:${h}`, ...R, label: h }} tone={C.amber} />)}
             </Section>
           )}
-          <Section title="WHAT IS OWED — TODAY" err={isErr(d.owed) ? d.owed.error : undefined}>
-            {!isErr(d.owed) && <>
-              <Card label="RECEIVABLES" value={cr(d.owed.receivable)} ask={{ what: "receivable" }} tone={RED} sub={<><span onClick={(e) => { e.stopPropagation(); open({ what: "receivable_overdue", label: "Receivables past due" }); }} className="hover:underline" style={{ cursor: "pointer" }}>{cr(d.owed.receivable_overdue)} past due</span> · <span onClick={(e) => { e.stopPropagation(); open({ what: "receivable_180", label: "Receivables over 180 days" }); }} className="hover:underline" style={{ color: RED, cursor: "pointer" }}>{cr(d.owed.receivable_180)} over 180 days</span></>} />
-              <Card label="ADVANCES HELD" value={cr(d.owed.advances)} sub="received before the bill" ask={{ what: "advances" }} />
-              <Card label="PAYABLES" value={cr(d.owed.payable)} ask={{ what: "payable" }} sub={<span onClick={(e) => { e.stopPropagation(); open({ what: "payable_180", label: "Payables over 180 days" }); }} className="hover:underline" style={{ cursor: "pointer" }}>{cr(d.owed.payable_180)} over 180 days</span>} />
-            </>}
-          </Section>
-          <Section title="THE ORDER BOOK — CRM" err={isErr(d.orders) ? d.orders.error : undefined}>
+
+          <Section title="The order book" hint="CRM" err={isErr(d.orders) ? d.orders.error : undefined}>
             {!isErr(d.orders) && <>
-              <Card label="ORDERS BOOKED" value={cr(d.orders.order_value)} sub={`${d.orders.orders} sales orders in the dates`} ask={{ what: "orders", ...R }} tone={GREEN} />
-              <Card label="LIVE QUOTATIONS" value={cr(d.orders.quote_value)} sub={`${d.orders.quotes_live.toLocaleString("en-IN")} live, hot-listed or submitted`} ask={{ what: "quotes" }} />
+              <Card icon="✍" tone={C.green} label="Orders booked" value={cr(d.orders.order_value)} sub={`${d.orders.orders} sales orders in the dates`} ask={{ what: "orders", ...R }} delta={dl("order_value")} />
+              <Card icon="📄" tone={C.brand} label="Live quotations" value={cr(d.orders.quote_value)} sub={`${d.orders.quotes_live.toLocaleString("en-IN")} live, hot-listed or submitted, quoted in the last 12 months`} ask={{ what: "quotes" }} delta={dl("quote_value")} />
             </>}
           </Section>
-          <Section title="THE FLOOR — PLANNING" err={isErr(d.floor) ? d.floor.error : undefined}>
-            {!isErr(d.floor) && <>
-              <Card label="LIVE JOBS" value={String(d.floor.live)} ask={{ what: "live_jobs" }} tone={d.floor.late ? RED : NAVY} sub={<>{cr(d.floor.live_value)} · <span onClick={(e) => { e.stopPropagation(); open({ what: "late_jobs", label: "Jobs past their delivery date" }); }} className="hover:underline" style={{ color: d.floor.late ? RED : undefined, cursor: "pointer" }}>{d.floor.late} past their delivery date</span></>} />
-              <Card label="DELIVERED" value={cr(d.floor.delivered_value)} sub={`${d.floor.delivered} jobs in the dates`} ask={{ what: "delivered", ...R }} tone={GREEN} />
+
+          {/* THE FLOOR — "show more data here, use your senses" */}
+          <Section title="The floor" hint="Planning — the jobs not yet delivered, and what went out" err={isErr(d.floor) ? d.floor.error : undefined}>
+            {f && <>
+              <Card icon="🏭" tone={C.brand} label="Live jobs" value={String(f.live)} sub={`${cr(f.live_value)} · ${f.avg_pct}% complete on average`} ask={{ what: "live_jobs" }} delta={dl("live")} />
+              <Card icon="📅" tone={C.sky} label="Due in 30 days" value={String(f.due30)} sub={cr(f.due30_value)} ask={{ what: "due_30" }} delta={dl("due30")} />
+              <Card icon="⏰" tone={f.late ? C.red : C.green} label="Past delivery date" value={String(f.late)} sub={f.late ? `${cr(f.late_value)} · ${f.late_avg_days} days late on average` : "none late"} ask={{ what: "late_jobs" }} delta={dl("late")} />
+              <Card icon="🔧" tone={C.violet} label="On the floor now" value={String(f.on_floor)} sub="jobs being built today" ask={{ what: "on_floor" }} delta={dl("on_floor")} />
+              <Card icon="🚩" tone={f.escalated ? C.red : C.green} label="Escalated" value={String(f.escalated)} sub="jobs carrying an escalation note" ask={{ what: "escalated" }} delta={dl("escalated")} />
+              <Card icon="✅" tone={C.green} label="Delivered" value={cr(f.delivered_value)} sub={`${f.delivered} jobs in the dates · ${f.delivered_month} this month, ${cr(f.delivered_month_value)}`} ask={{ what: "delivered", ...R }} delta={dl("delivered_value")} />
+              <div className="rounded-2xl bg-white p-4" style={{ border: `1px solid ${C.line}`, boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+                <div className="text-xs font-medium mb-2" style={{ color: C.muted }}>Where the live jobs stand</div>
+                {Object.entries(f.stages as Record<string, number>).sort((x, y) => y[1] - x[1]).map(([k, v]) => (
+                  <div key={k} className="flex items-center gap-2 text-xs mb-1"><span style={{ width: 120, color: C.ink }}>{k}</span><div style={{ flex: 1, height: 8, background: C.bg, borderRadius: 4 }}><div style={{ width: `${(v / Math.max(1, f.live)) * 100}%`, height: 8, background: C.brand, borderRadius: 4 }} /></div><b className="tnum" style={{ width: 24, textAlign: "right" }}>{v}</b></div>
+                ))}
+              </div>
             </>}
           </Section>
-          <Section title="SERVICE — SEVA" err={isErr(d.service) ? d.service.error : undefined}>
+
+          <Section title="Service" hint="Seva" err={isErr(d.service) ? d.service.error : undefined}>
             {!isErr(d.service) && <>
-              <Card label="OPEN TICKETS" value={String(d.service.open_tickets)} ask={{ what: "tickets" }} tone={d.service.open_tickets ? RED : GREEN} />
-              <Card label="AMC VALID" value={cr(d.service.amc_value)} sub={`${d.service.amc_valid} contracts, per annum`} ask={{ what: "amc" }} />
+              <Card icon="🛎" tone={d.service.open_tickets ? C.red : C.green} label="Open tickets" value={String(d.service.open_tickets)} ask={{ what: "tickets" }} delta={dl("open_tickets")} />
+              <Card icon="🛡" tone={C.brand} label="AMC valid" value={cr(d.service.amc_value)} sub={`${d.service.amc_valid} contracts, per annum`} ask={{ what: "amc" }} delta={dl("amc_value")} />
             </>}
           </Section>
-          <Section title="PEOPLE — HRMS" err={isErr(d.people) ? d.people.error : undefined}>
-            {!isErr(d.people) && <Card label="ON THE ROLL" value={String(d.people.headcount)} ask={{ what: "people" }} sub={Object.entries(d.people.by_department).sort((x, y) => y[1] - x[1]).slice(0, 4).map(([k, v]) => `${k} ${v}`).join(" · ")} />}
+
+          <Section title="People" hint="HRMS" err={isErr(d.people) ? d.people.error : undefined}>
+            {p && <>
+              <Card icon="👥" tone={C.brand} label="On the roll" value={String(p.headcount)} ask={{ what: "people" }} delta={dl("headcount")} sub={Object.entries(p.by_department as Record<string, number>).sort((x, y) => y[1] - x[1]).slice(0, 4).map(([k, v]) => `${k} ${v}`).join(" · ")} />
+              <Card icon="➕" tone={C.green} label="Added in 90 days" value={String(p.added90)} ask={{ what: "added90" }} delta={dl("added90")} />
+              <Card icon="➖" tone={C.red} label="Left in 90 days" value={String(p.left90)} ask={{ what: "left90" }} delta={dl("left90")} />
+              <Card icon="⌛" tone={C.amber} label="In notice period" value={String(p.notice)} ask={{ what: "notice" }} delta={dl("notice")} />
+              <Card icon="📑" tone={p.fnf_pending ? C.red : C.green} label="F&F pending" value={String(p.fnf_pending)} sub="exited, settlement not closed" ask={{ what: "fnf_pending" }} delta={dl("fnf_pending")} />
+            </>}
           </Section>
         </>
       )}
@@ -121,35 +172,44 @@ function Dashboard() {
 export default function CeoCockpit({ email, displayName, initials, role }: { email: string; displayName: string | null; initials: string | null; role: string }) {
   const [room, setRoom] = useState<string>("dashboard");
   const [narrow, setNarrow] = useState(false);
+  const hdr = useRef<HTMLDivElement>(null); const [top, setTop] = useState(56);
   useEffect(() => {
     try { setNarrow(localStorage.getItem("ceo.nav") === "0"); } catch (e) { swallow("ceo", e); }
     const apply = () => { const h = window.location.hash.replace(/^#/, ""); if (ROOMS.some((r) => r.key === h)) setRoom(h); };
-    apply(); window.addEventListener("hashchange", apply); return () => window.removeEventListener("hashchange", apply);
+    apply(); window.addEventListener("hashchange", apply);
+    /* the header's own height, so the title bar freezes just under it */
+    const ro = new ResizeObserver(() => { if (hdr.current) setTop(hdr.current.getBoundingClientRect().height); });
+    if (hdr.current) ro.observe(hdr.current);
+    return () => { window.removeEventListener("hashchange", apply); ro.disconnect(); };
   }, []);
   const go = (k: string) => { setRoom(k); try { window.history.replaceState(null, "", `#${k}`); } catch { /* fine */ } };
   const fold = () => setNarrow((v) => { try { localStorage.setItem("ceo.nav", v ? "1" : "0"); } catch { /* fine */ } return !v; });
   return (
-    <div className="min-h-screen" style={{ background: "var(--paper)", color: "var(--ink)" }}>
-      <GenieShell module="ceo" title="Nandan CEO" tagline="The company on one page" user={{ email, displayName, initials, role }} />
+    <div className="min-h-screen" style={{ background: C.bg, color: C.ink }}>
+      {/* THE HEADER, FROZEN (Dr Raghu, 14 Oct 2026) */}
+      <div ref={hdr} style={{ position: "sticky", top: 0, zIndex: 50 }}>
+        <GenieShell module="ceo" title="Nandan CEO" tagline="The company on one page" user={{ email, displayName, initials, role }} />
+      </div>
       <DrillProvider>
-        <div style={{ display: "flex", alignItems: "stretch", minHeight: "calc(100vh - 46px)" }}>
-          <nav style={{ width: narrow ? 54 : 210, flexShrink: 0, background: "#fff", borderRight: `1px solid ${LINE}`, padding: "10px 6px", transition: "width .15s ease" }}>
-            <button onClick={fold} className="w-full rounded px-2 py-1.5 text-xs font-bold mb-1 text-left" style={{ color: MUTED }}>{narrow ? "»" : "« fold"}</button>
+        <div style={{ display: "flex", alignItems: "flex-start" }}>
+          <nav style={{ width: narrow ? 58 : 220, flexShrink: 0, background: "#fff", borderRight: `1px solid ${C.line}`, padding: "14px 10px", transition: "width .15s ease", position: "sticky", top, height: `calc(100vh - ${top}px)`, overflowY: "auto" }}>
+            <button onClick={fold} className="w-full rounded-lg px-2 py-1.5 text-xs font-bold mb-2 text-left" style={{ color: C.muted }}>{narrow ? "»" : "« fold"}</button>
+            {!narrow && <div className="text-xs font-semibold px-2 mb-1" style={{ color: C.muted, letterSpacing: 0.6 }}>MENU</div>}
             {ROOMS.map((r) => (
-              <button key={r.key} onClick={() => go(r.key)} title={narrow ? r.label : undefined} className="w-full text-left rounded px-2 py-2 text-sm font-semibold flex items-center gap-2 mb-0.5" style={room === r.key ? { background: "var(--navy)", color: "#fff" } : { color: "var(--dim)" }}>
+              <button key={r.key} onClick={() => go(r.key)} title={narrow ? r.label : undefined} className="w-full text-left rounded-lg px-3 py-2.5 text-sm font-medium flex items-center gap-3 mb-1" style={room === r.key ? { background: "#ECF3FF", color: C.brand } : { color: "#344054" }}>
                 <span style={{ width: 18, textAlign: "center", flexShrink: 0 }}>{r.icon}</span>{!narrow && r.label}
               </button>
             ))}
           </nav>
-          <main className="flex-1 p-5" style={{ minWidth: 0, maxWidth: 1400 }}>
-            {room === "dashboard" && <Dashboard />}
+          <main className="flex-1" style={{ minWidth: 0, maxWidth: 1480, padding: "0 20px 20px" }}>
+            {room === "dashboard" ? <Dashboard top={top} /> : <div className="pt-5" />}
             {room === "people" && <PeopleRoom />}
             {room === "strategy" && <StrategyRoom />}
             {room === "execution" && <ExecutionRoom />}
             {room === "cash" && <CashRoom />}
             {room === "reviews" && <ReviewsRoom />}
             {room === "exceptions" && <ExceptionsRoom />}
-            <div className="text-xs mt-6" style={{ color: MUTED }}>Open to three: Dr Raghu, J C Kumar and Tushar Giri. Every figure is read from the module that owns it; click any number for what makes it.</div>
+            <div className="text-xs mt-6" style={{ color: C.muted }}>Open to three: Dr Raghu, J C Kumar and Tushar Giri. Every figure is read from the module that owns it; click any number for what makes it.</div>
           </main>
         </div>
       </DrillProvider>

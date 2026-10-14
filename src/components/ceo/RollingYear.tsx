@@ -58,7 +58,7 @@ export default function RollingYear({ t }: { t: Trend }) {
         <div className="text-xs font-bold" style={{ color: NAVY, letterSpacing: 1 }}>THE LAST 12 MONTHS — ROLLING</div>
         <span className="text-xs" style={{ color: MUTED }}>* {mon(t.current)} is incomplete — books to {dmy(t.books_to)}</span>
       </div>
-      <div className="rounded-lg bg-white p-3 mb-3" style={{ border: `1px solid ${LINE}`, height: 340 }}>
+      <div className="rounded-2xl bg-white p-3 mb-3" style={{ border: `1px solid ${LINE}`, height: 340 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -71,7 +71,7 @@ export default function RollingYear({ t }: { t: Trend }) {
         </ResponsiveContainer>
       </div>
       {/* BY MONTH — only these four, the latest on the left */}
-      <div className="rounded-lg bg-white mb-3" style={{ border: `1px solid ${LINE}`, overflow: "auto" }}>
+      <div className="rounded-2xl bg-white mb-3" style={{ border: `1px solid ${LINE}`, overflow: "auto" }}>
         <table className="genie-table" style={{ minWidth: 900 }}>
           <thead><tr><th style={{ position: "sticky", left: 0, zIndex: 3 }}>By month</th>{latestFirst.map((m) => <th key={m} style={{ textAlign: "right" }}>{label(m)}</th>)}</tr></thead>
           <tbody>{SERIES.map((s) => (
@@ -82,7 +82,7 @@ export default function RollingYear({ t }: { t: Trend }) {
       {/* THE FIGURES — each line, four windows */}
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(420px, 1fr))" }}>
         {SERIES.map((s) => (
-          <div key={s.key} className="rounded-lg bg-white" style={{ border: `1px solid ${LINE}`, borderTop: `3px solid ${s.color}`, overflow: "auto" }}>
+          <div key={s.key} className="rounded-2xl bg-white" style={{ border: `1px solid ${LINE}`, borderTop: `3px solid ${s.color}`, overflow: "auto" }}>
             <table className="genie-table" style={{ width: "100%" }}>
               <thead><tr><th>{s.label}</th>{WIN.map((w) => <th key={w.key} style={{ textAlign: "right" }} title={`${mon(w.months[0])} – ${mon(w.months[w.months.length - 1])}`}>{w.label}</th>)}</tr></thead>
               <tbody>{ROWS.map((r) => (

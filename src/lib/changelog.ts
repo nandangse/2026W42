@@ -92,6 +92,20 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.2",
+    date: "2026-10-14",
+    module: "CEO: the P&L on top, money in depth, the floor and people in depth, triangles week on week, frozen header, a TailAdmin look",
+    items: [
+      "THE P&L ON TOP (Dr Raghu, 14 Oct 2026: \u201cthe top box to be Sales, TVC, Throughput, OE, PBT as total and %\u201d). Five boxes, each the total and its share of sales, struck exactly as Kuber\u2019s P&L strikes them: TVC = purchases + opening stock \u2212 closing stock (the stock register), Throughput = sales \u2212 TVC, OE = indirect + finance, PBT = throughput \u2212 manufacturing \u2212 OE \u2212 depreciation + other income. FY to 10 Oct: sales \u20b935.29 Cr, TVC \u20b919.13 Cr (54%), throughput \u20b916.16 Cr (46%), OE \u20b97.26 Cr (21%), PBT \u20b94.06 Cr (11%). Click Throughput, TVC or PBT for the lines they are struck from.",
+      "MONEY (\u201cReceivables total then 0\u201390 and 90+; Payables total then 0\u2013180 and 180+; Supplier bills not received; Advance received | Advance paid; Payment on Order Execution 0\u201330, 31\u201360, 61\u201390, 90+ days\u201d). Receivables and payables with their age bands from Tally\u2019s open bills (by bill date); supplier bills not received \u2014 goods receipts on the ERP not fully billed, the unbilled part (\u20b94.32 Cr, 1,371 receipts); advances received from customers and paid to suppliers; payment on order execution \u2014 the ERP\u2019s Pending Payment on Delivery on each job, aged from its delivery date, and apart from them what is due on jobs not yet delivered. Every band opens its own list.",
+      "THE FLOOR, IN DEPTH (\u201cshow more data here, use your senses\u201d): live jobs with their value and average completion, due in the next 30 days, past their delivery date with the average days late, on the floor now, escalated, delivered in the dates and this month, and a bar of where the live jobs stand \u2014 order & design, material, production, quality, installation.",
+      "PEOPLE (\u201cAdded in 90 days, left in 90 days, in notice period, FnF pending\u201d): beside the roll \u2014 joined in 90 days, left in 90 days and full & final settlements pending (the F&F register), in notice period (HRMS status).",
+      "TRIANGLES (\u201cshow triangles in each box with respect to last week \u2014 is there improvement or has it got worse\u201d). Every box on the financial year to date carries a pill: \u25b2 or \u25bc with the change on a week ago, green when better, red when worse, grey when it only moved. Better is decided per figure \u2014 receivables down is better, PBT up is better; the P&L lines compare their share of sales. The figures are kept once a day (the hourly ERP pull, and whenever the page opens) because what is owed cannot be worked out backwards; the books are struck for a week back so their triangles show today, the rest from a week on. Migration 0231.",
+      "FROZEN (\u201cthe header also keep it frozen, as well as the title and periods\u201d): the header, the title with its dates and the period buttons stay at the top while the page scrolls; the menu stays beside it.",
+      "THE LOOK (\u201cimprove the look and feel\u201d, after TailAdmin): soft white cards with rounded corners, an icon in a tinted square, the figure large, the week\u2019s pill, rows beneath for the bands; a lighter menu with the room in blue. Live quotations now count the last 12 months only \u2014 the CRM still calls 2,771 quotations live (\u20b91,692 Cr), most of them years old.",
+    ],
+  },
+  {
     v: "6.10.0.1",
     date: "2026-10-14",
     module: "CEO: the rolling year, a chart library, the menu and its rooms, every number opens",

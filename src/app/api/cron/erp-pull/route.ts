@@ -8,6 +8,7 @@ import { pullIssues, pullIssueFiles, copyFrfToDrive } from "@/lib/seva-issues";
 import { pullServiceQuotes } from "@/lib/seva-quotes";
 import { pullAmcs } from "@/lib/seva-amc";
 import { pullJobInfo } from "@/lib/seva-job-info";
+import { ceoFigures, keepSnapshot, istDay, fyStartOf } from "@/lib/ceo/figures";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -277,6 +278,12 @@ export async function GET(req: Request) {
       try { const qp = await pullServiceQuotes(gadmin, { maxPages: 2 }); seva.quotes = { read: qp.read, written: qp.written, done: qp.done }; }
       catch (e) { seva.quotes = { error: (e instanceof Error ? e.message : String(e)).slice(0, 120) }; }
     } catch (e) { seva.error = (e instanceof Error ? e.message : String(e)).slice(0, 200); swallow("cron/erp-pull/seva", e); }
+
+    /* THE CEO'S DAILY SNAPSHOT (14 Oct 2026) — once a day, the financial year to date, so the week-on-week triangles have a week back even on a day nobody opened the page */
+    try {
+      const sadmin = adminClient(); const { count } = await sadmin.from("ceo_snapshot").select("*", { count: "exact", head: true }).eq("day", istDay());
+      if (!count) { const t = istDay(); const f = await ceoFigures(sadmin, fyStartOf(t), t); await keepSnapshot(sadmin, f.snap); }
+    } catch (e) { swallow("cron/erp-pull/ceo-snapshot", e); }
 
     // move the cursors only past what we actually walked
     await db.from("integration_setting").update({ config: { ...cfg, last_pull: maxCreation, jm_cursor: jmCursorNew, issue_cursor: issueCursor, issue_start: issueStart, issue_file_cursor: fileCursor, issue_file_start: fileStart } }).eq("key", "erpnext");

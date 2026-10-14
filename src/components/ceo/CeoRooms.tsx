@@ -21,7 +21,7 @@ function useRoom(name: string): [any, string | null] {
 }
 const Title = ({ t, s }: { t: string; s: string }) => <div className="mb-3"><h1 className="font-bold" style={{ fontSize: 22, color: NAVY }}>{t}</h1><div className="text-xs" style={{ color: MUTED }}>{s}</div></div>;
 const Wait = ({ err }: { err: string | null }) => (err ? <div className="text-sm font-bold" style={{ color: RED }}>{err}</div> : <div className="text-sm" style={{ color: MUTED }}>Reading…</div>);
-const Box = ({ children, min = 640 }: { children: React.ReactNode; min?: number }) => <div className="rounded-lg bg-white mb-4" style={{ border: `1px solid ${LINE}`, overflow: "auto", maxHeight: "60vh" }}><table className="genie-table" style={{ minWidth: min, width: "100%" }}>{children}</table></div>;
+const Box = ({ children, min = 640 }: { children: React.ReactNode; min?: number }) => <div className="rounded-2xl bg-white mb-4" style={{ border: `1px solid ${LINE}`, overflow: "auto", maxHeight: "60vh" }}><table className="genie-table" style={{ minWidth: min, width: "100%" }}>{children}</table></div>;
 const Out = ({ href, children }: { href: string | null; children: React.ReactNode }) => (href ? <a href={href} target="_blank" rel="noreferrer" className="font-semibold hover:underline" style={{ color: "var(--blue)" }}>{children} ↗</a> : <b>{children}</b>);
 
 export function PeopleRoom() {

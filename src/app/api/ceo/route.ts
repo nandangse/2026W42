@@ -3,7 +3,8 @@ import { errJson } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { requireCeo } from "@/lib/ceo/auth";
-import { oeAndSales } from "@/lib/kuber-oe";
+import { oeAndSales, pnlOf } from "@/lib/kuber-oe";
+import { ceoFigures, keepSnapshot, weekAgo, DIRECTION } from "@/lib/ceo/figures";
 import { OE_HEADS } from "@/lib/kuber-rules";
 import { swallow } from "@/lib/swallow";
 
@@ -49,66 +50,9 @@ export async function GET(req: Request) {
        this month to date, whatever dates are picked above; the windows are struck on complete months, YTD runs to date. */
     const thisMonth = today.slice(0, 7);
     const back12 = (() => { const x = new Date(thisMonth + "-01T00:00:00Z"); x.setUTCMonth(x.getUTCMonth() - 12); return x.toISOString().slice(0, 10); })();
-    const [books, owed, orders, floor, service, people, trend] = await Promise.all([
-      /* THE BOOKS — sales and OE by the P&L's own rules */
-      part("books", async () => {
-        const g = await oeAndSales(admin, from, to);
-        if (g.empty) return { empty: true };
-        const byHead: Record<string, number> = {}; for (const h of OE_HEADS) byHead[h] = 0;
-        for (const r of g.rows) byHead[r.head] = (byHead[r.head] || 0) + r.amount;
-        const oe = g.rows.reduce((s, r) => s + r.amount, 0);
-        const months = [...new Set([...Object.keys(g.salesByMonth), ...g.rows.map((r) => r.date.slice(0, 7))])].sort().reverse();
-        const oeByMonth: Record<string, number> = {}; for (const r of g.rows) { const m = r.date.slice(0, 7); oeByMonth[m] = (oeByMonth[m] || 0) + r.amount; }
-        return { sales: Math.round(g.sales), oe: Math.round(oe), byHead, months, salesByMonth: g.salesByMonth, oeByMonth, books_to: g.latest };
-      }),
-      /* WHAT IS OWED — Tally's open bills: receivables positive, payables negative */
-      part("owed", async () => {
-        const bills = await all((a, b) => admin.from("kuber_bill").select("kind, amount, bill_date, due_date").order("id").range(a, b));
-        const rec = bills.filter((b) => b.kind === "receivable" && N(b.amount) > 0);
-        const pay = bills.filter((b) => b.kind === "payable" && N(b.amount) < 0);
-        const old = addDays(today, -180);
-        return {
-          receivable: Math.round(rec.reduce((s, b) => s + N(b.amount), 0)),
-          receivable_overdue: Math.round(rec.filter((b) => S(b.due_date) && S(b.due_date) < today).reduce((s, b) => s + N(b.amount), 0)),
-          receivable_180: Math.round(rec.filter((b) => S(b.bill_date) && S(b.bill_date) < old).reduce((s, b) => s + N(b.amount), 0)),
-          advances: Math.round(-bills.filter((b) => b.kind === "receivable" && N(b.amount) < 0).reduce((s, b) => s + N(b.amount), 0)),
-          payable: Math.round(-pay.reduce((s, b) => s + N(b.amount), 0)),
-          payable_180: Math.round(-pay.filter((b) => S(b.bill_date) && S(b.bill_date) < old).reduce((s, b) => s + N(b.amount), 0)),
-        };
-      }),
-      /* THE ORDER BOOK — the CRM's sales orders and live quotations */
-      part("orders", async () => {
-        if (!crmConfigured()) return { error: "The CRM database is not connected." };
-        const crm = crmDb();
-        const so = await all((a, b) => crm.from("sales_order").select("amount, ordered_on, erp_status").gte("ordered_on", from).lte("ordered_on", to).order("id").range(a, b));
-        const live = so.filter((s) => !/cancel/i.test(S(s.erp_status)));
-        const q = await all((a, b) => crm.from("quotation").select("grand_total, status").in("status", ["live", "hotlist", "submitted"]).order("id").range(a, b));
-        return { orders: live.length, order_value: Math.round(live.reduce((s, x) => s + N(x.amount), 0)), quotes_live: q.length, quote_value: Math.round(q.reduce((s, x) => s + N(x.grand_total), 0)) };
-      }),
-      /* THE FLOOR — live jobs and what was delivered in the window */
-      part("floor", async () => {
-        const [{ data: jobs }, dj] = await Promise.all([
-          admin.from("jobs").select("id, val, tdd").eq("delivered", false).eq("active", true),
-          all((a, b) => admin.from("delivered_jobs").select("val, delivered_on").gte("delivered_on", from).lte("delivered_on", to).order("id").range(a, b)),
-        ]);
-        const j = jobs || [];
-        return { live: j.length, live_value: Math.round(j.reduce((s, x) => s + N(x.val), 0)), late: j.filter((x) => S(x.tdd) && S(x.tdd) < today).length, delivered: dj.length, delivered_value: Math.round(dj.reduce((s, x) => s + N(x.val), 0)) };
-      }),
-      /* SERVICE — open tickets and the AMC book */
-      part("service", async () => {
-        const [{ count: open }, { data: amc }] = await Promise.all([
-          admin.from("seva_issue").select("*", { count: "exact", head: true }).not("status", "ilike", "%closed%").not("status", "ilike", "%resolved%"),
-          admin.from("seva_amc").select("value").eq("status", "AMC valid paid"),
-        ]);
-        return { open_tickets: open || 0, amc_valid: (amc || []).length, amc_value: Math.round((amc || []).reduce((s, x) => s + N(x.value), 0)) };
-      }),
-      /* PEOPLE — the active roll */
-      /* (the rolling year is the last entry of this list) */
-      part("people", async () => {
-        const { data } = await admin.from("hrms_employees").select("department, active").eq("active", true);
-        const by: Record<string, number> = {}; for (const e of data || []) by[S(e.department) || "—"] = (by[S(e.department) || "—"] || 0) + 1;
-        return { headcount: (data || []).length, by_department: by };
-      }),
+    const isYtd = from === fy && to === today;
+    const [figs, trend] = await Promise.all([
+      ceoFigures(admin, from, to),
       part("trend", async () => {
         const g = await oeAndSales(admin, back12, today);
         if (g.empty) return { empty: true };
@@ -119,6 +63,26 @@ export async function GET(req: Request) {
         return { months, current: thisMonth, books_to: g.latest, fy_start: fy.slice(0, 7), series: { sales: round(series.sales), purchase: round(series.purchase), oe: round(series.oe), salaries: round(series.salaries) } };
       }),
     ]);
-    return NextResponse.json({ from, to, today, me: me.email, books, owed, orders, floor, service, people, trend });
+    /* THE WEEK BEFORE (Dr Raghu, 14 Oct 2026: "show triangles in each box with respect to last week"). Only on the financial year to date — the
+       window the snapshots are kept for. Today's figures are kept; a week back is read; if none is there yet, the books are struck for that day so
+       their triangles show from the first day, and the rest begin a week later. */
+    let prev: { day: string | null; values: Record<string, number> } = { day: null, values: {} };
+    if (isYtd) {
+      try {
+        await keepSnapshot(admin, figs.snap);
+        prev = await weekAgo(admin);
+        if (!prev.day) {
+          const back = (() => { const x = new Date(today + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() - 7); return x.toISOString().slice(0, 10); })();
+          const p = await pnlOf(admin, fy, back);
+          if (p && p.sales) {
+            const pc = (v: number) => Math.round((v / p.sales) * 10000) / 100;
+            const vals: Record<string, number> = { sales: Math.round(p.sales), tvc: Math.round(p.tvc), throughput: Math.round(p.throughput), oe: Math.round(p.oe), pbt: Math.round(p.pbt), tvc_pct: pc(p.tvc), throughput_pct: pc(p.throughput), oe_pct: pc(p.oe), pbt_pct: pc(p.pbt) };
+            await admin.from("ceo_snapshot").upsert(Object.entries(vals).map(([key, value]) => ({ day: back, key, value })), { onConflict: "day,key" });
+            prev = { day: back, values: vals };
+          }
+        }
+      } catch (e) { swallow("ceo/snapshot", e); /* before 0231 — no triangles yet */ }
+    }
+    return NextResponse.json({ from, to, today, me: me.email, ...figs, trend, prev, direction: DIRECTION, isYtd });
   } catch (e) { return errJson(e); }
 }

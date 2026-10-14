@@ -3,7 +3,8 @@ import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { requireCeo } from "@/lib/ceo/auth";
-import { oeAndSales } from "@/lib/kuber-oe";
+import { oeAndSales, pnlOf } from "@/lib/kuber-oe";
+import { erpAuth } from "@/lib/saamaan-stock";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -47,6 +48,74 @@ export async function GET(req: Request) {
     const from = isD(sp.get("from")) ? String(sp.get("from")) : addDays(today, -365);
     const to = isD(sp.get("to")) ? String(sp.get("to")) : today;
 
+    /* THE BRIDGE — Throughput and PBT are struck, not booked: the lines they are struck from */
+    if (what === "throughput" || what === "pbt" || what === "tvc") {
+      const p = await pnlOf(admin, from, to);
+      if (!p) throw new HttpError(404, "No books yet.");
+      const L = (title: string, amount: number, sub = "", href: string | null = null) => ({ title, amount: Math.round(amount), sub, date: null, href });
+      const rows = [
+        L("Sales", p.sales, "booked sales", "/kuber#salesreg"),
+        L("Purchases", -p.purchases, "materials bought", "/kuber#purchreg"),
+        L("Opening stock", -p.openingStock, p.openingAt ? `stock register, ${p.openingAt}` : "no stock entry before the first day", "/kuber#stock"),
+        L("Closing stock", p.closingStock, p.closingAt ? `stock register, ${p.closingAt}` : "no stock entry yet", "/kuber#stock"),
+        L("= Throughput", p.throughput, `sales − TVC (${Math.round(p.tvc).toLocaleString("en-IN")})`, "/kuber#pnl"),
+        ...(what === "pbt" ? [
+          L("Manufacturing expenses", -p.manuf, "wages on the floor, factory power, consumables", "/kuber#pnl"),
+          L("OE", -p.oe, "indirect expenses and finance costs", "/kuber#oereg"),
+          L("Depreciation", -p.depreciation, "", "/kuber#pnl"),
+          L("Other income", p.otherIncome, "", "/kuber#pnl"),
+          L("= PBT", p.pbt, "profit before tax", "/kuber#pnl"),
+        ] : []),
+      ];
+      return NextResponse.json({ title: what === "pbt" ? "PBT — how it is struck" : what === "tvc" ? "TVC — how it is struck" : "Throughput — how it is struck", total: what === "pbt" ? p.pbt : what === "tvc" ? p.tvc : p.throughput, count: rows.length, rows: what === "tvc" ? rows.slice(1, 4).map((r) => ({ ...r, amount: -N(r.amount) })) : rows, screen: "/kuber#pnl", note: "The P&L's own arithmetic: TVC = purchases + opening stock − closing stock; Throughput = sales − TVC; PBT = throughput − manufacturing − OE − depreciation + other income." });
+    }
+
+    /* SUPPLIER BILLS NOT RECEIVED — goods received on the ERP, not yet billed */
+    if (what === "grn") {
+      const a = await erpAuth(); if (!a) throw new HttpError(503, "The ERP is not connected.");
+      const r = await fetch(`${a.base}/api/resource/${encodeURIComponent("Purchase Receipt")}?fields=${encodeURIComponent(JSON.stringify(["name", "supplier", "posting_date", "base_grand_total", "per_billed", "status"]))}&filters=${encodeURIComponent(JSON.stringify([["docstatus", "=", 1], ["per_billed", "<", 100], ["status", "not in", ["Closed", "Return Issued", "Return"]]]))}&limit_page_length=0`, { headers: a.H });
+      const rows = (((await r.json()) as { data?: R[] }).data || []).map((x) => ({ date: S(x.posting_date), title: S(x.supplier), sub: `${S(x.name)} · ${Math.round(N(x.per_billed))}% billed · ${S(x.status)}`, amount: Math.round(N(x.base_grand_total) * (1 - N(x.per_billed) / 100)), href: `${ERP}/purchase-receipt/${encodeURIComponent(S(x.name))}` }));
+      return done("Supplier bills not received", rows, `${ERP}/query-report/Received Items To Be Billed`, "Goods received on the ERP whose bill has not been booked — the part not yet billed.");
+    }
+    /* PAYMENT ON ORDER EXECUTION — the ERP's Pending Payment on Delivery, by days since delivery */
+    if (what.startsWith("poe:")) {
+      const a = await erpAuth(); if (!a) throw new HttpError(503, "The ERP is not connected.");
+      const r = await fetch(`${a.base}/api/resource/Jobmaster?fields=${encodeURIComponent(JSON.stringify(["name", "customer", "customer_tag", "status", "actual_delivery_date", "custom_pending_payment_on_delivery"]))}&filters=${encodeURIComponent(JSON.stringify([["custom_pending_payment_on_delivery", ">", 0], ["status", "!=", "Cancelled"]]))}&limit_page_length=0`, { headers: a.H });
+      const b = what.slice(4); const dd = (d: string) => Math.round((Date.parse(today) - Date.parse(d)) / 864e5);
+      const rows = (((await r.json()) as { data?: R[] }).data || []).filter((j) => {
+        const d = S(j.actual_delivery_date); if (b === "undelivered") return !d || d > today; if (!d || d > today) return false;
+        const n = dd(d); return b === "0_30" ? n <= 30 : b === "31_60" ? n > 30 && n <= 60 : b === "61_90" ? n > 60 && n <= 90 : n > 90;
+      }).map((j) => ({ date: S(j.actual_delivery_date) || null, title: `${S(j.name)} · ${S(j.customer)}`, sub: `${S(j.customer_tag)} · ${S(j.status)}${S(j.actual_delivery_date) ? ` · ${dd(S(j.actual_delivery_date))} days since delivery` : ""}`, amount: Math.round(N(j.custom_pending_payment_on_delivery)), href: `${ERP}/jobmaster/${S(j.name)}` }));
+      const label = ({ "0_30": "0–30 days", "31_60": "31–60 days", "61_90": "61–90 days", "90": "over 90 days", undelivered: "not yet delivered" } as Record<string, string>)[b] || b;
+      return done(`Payment on order execution — ${label}`, rows, `${ERP}/jobmaster`, "The ERP's Pending Payment on Delivery on each job; date is the delivery date.");
+    }
+    if (what === "due_30" || what === "on_floor" || what === "escalated") {
+      let q = admin.from("jobs").select("id, cust, tag, tdd, own, stat, val, escalation, on_floor").eq("delivered", false).eq("active", true);
+      if (what === "due_30") q = q.gte("tdd", today).lte("tdd", addDays(today, 30));
+      if (what === "on_floor") q = q.eq("on_floor", true);
+      const { data } = await q;
+      const rows = (data || []).filter((j) => what !== "escalated" || S(j.escalation)).map((j) => ({ date: S(j.tdd) || null, title: `${S(j.id)} · ${S(j.cust)}`, sub: what === "escalated" ? S(j.escalation).replace(/\*\*/g, "").slice(0, 220) : `${S(j.tag)} · ${S(j.stat)} · ${S(j.own).split("@")[0]}`, amount: Math.round(N(j.val)), href: `${ERP}/jobmaster/${S(j.id)}` }));
+      return done(what === "due_30" ? "Due in the next 30 days" : what === "on_floor" ? "On the floor now" : "Escalated", rows, "/", "Date is the target delivery date.");
+    }
+    if (what === "added90" || what === "left90" || what === "notice" || what === "fnf_pending") {
+      const d90 = addDays(today, -90);
+      if (what === "added90") {
+        const { data } = await admin.from("hrms_employees").select("id, name, department, designation, doj").eq("active", true).gte("doj", d90);
+        return done("Joined in the last 90 days", (data || []).map((e) => ({ date: S(e.doj), title: S(e.name), sub: `${S(e.designation)} · ${S(e.department)}`, amount: null, href: null })), "/hrms");
+      }
+      if (what === "notice") {
+        const { data: n } = await admin.from("hrms_employee_edits").select("employee_id").eq("field", "status").ilike("value", "notice%");
+        const ids = (n || []).map((x) => S(x.employee_id));
+        const { data } = ids.length ? await admin.from("hrms_employees").select("id, name, department, designation").in("id", ids).eq("active", true) : { data: [] };
+        const { data: f } = ids.length ? await admin.from("hrms_fnf").select("employee_id, exit_date").in("employee_id", ids) : { data: [] };
+        return done("In notice period", (data || []).map((e) => ({ date: S((f || []).find((x) => S(x.employee_id) === S(e.id))?.exit_date) || null, title: S(e.name), sub: `${S(e.designation)} · ${S(e.department)}`, amount: null, href: null })), "/hrms", "Date is the exit date, where HR has set it.");
+      }
+      const { data } = await admin.from("hrms_fnf").select("fnf_no, name, department, exit_date, status, paid_amount");
+      const rows = (data || []).filter((f) => what === "left90" ? S(f.exit_date) >= d90 && S(f.exit_date) <= today : S(f.status) !== "Closed" && S(f.exit_date) && S(f.exit_date) <= today)
+        .map((f) => ({ date: S(f.exit_date) || null, title: S(f.name), sub: `${S(f.fnf_no)} · ${S(f.department)} · ${S(f.status)}`, amount: N(f.paid_amount) || null, href: null }));
+      return done(what === "left90" ? "Left in the last 90 days" : "Full & final settlements pending", rows, "/hrms", "From the F&F register; date is the exit date.");
+    }
+
     /* THE BOOKS — the voucher lines, a voucher at a time */
     if (["sales", "purchase", "oe", "salaries"].includes(what) || what.startsWith("head:")) {
       const g = await oeAndSales(admin, from, to);
@@ -65,25 +134,29 @@ export async function GET(req: Request) {
     }
 
     /* WHAT IS OWED — by party */
-    if (/^(receivable|receivable_overdue|receivable_180|advances|payable|payable_180)$/.test(what)) {
+    if (/^(receivable|receivable_overdue|receivable_180|receivable_0_90|receivable_90|advances|advances_paid|payable|payable_180|payable_0_180)$/.test(what)) {
       const kind = what.startsWith("pay") ? "payable" : "receivable";
       const bills = await all((a, b) => admin.from("kuber_bill").select("party, bill, amount, bill_date, due_date").eq("kind", kind).order("id").range(a, b));
-      const old = addDays(today, -180);
+      const old = addDays(today, -180), d90 = addDays(today, -90);
       const keep = bills.filter((b) => {
         const a = kind === "receivable" ? N(b.amount) : -N(b.amount);
         if (what === "advances") return N(b.amount) < 0;
+        if (what === "advances_paid") return N(b.amount) > 0;
         if (a <= 0) return false;
+        if (what === "receivable_0_90") return !S(b.bill_date) || S(b.bill_date) >= d90;
+        if (what === "receivable_90") return !!S(b.bill_date) && S(b.bill_date) < d90;
+        if (what === "payable_0_180") return !S(b.bill_date) || S(b.bill_date) >= old;
         if (what === "receivable_overdue") return !!S(b.due_date) && S(b.due_date) < today;
         if (what.endsWith("_180")) return !!S(b.bill_date) && S(b.bill_date) < old;
         return true;
       });
       const m = new Map<string, { title: string; amount: number; n: number; oldest: string }>();
       for (const b of keep) {
-        const amt = what === "advances" ? -N(b.amount) : kind === "receivable" ? N(b.amount) : -N(b.amount);
+        const amt = what === "advances" ? -N(b.amount) : what === "advances_paid" ? N(b.amount) : kind === "receivable" ? N(b.amount) : -N(b.amount);
         const x = m.get(S(b.party)) || { title: S(b.party), amount: 0, n: 0, oldest: "9999" };
         x.amount += amt; x.n++; if (S(b.bill_date) && S(b.bill_date) < x.oldest) x.oldest = S(b.bill_date); m.set(S(b.party), x);
       }
-      const label = ({ receivable: "Receivables", receivable_overdue: "Receivables past due", receivable_180: "Receivables over 180 days", advances: "Advances held", payable: "Payables", payable_180: "Payables over 180 days" } as Record<string, string>)[what] || what;
+      const label = ({ receivable: "Receivables", receivable_overdue: "Receivables past due", receivable_180: "Receivables over 180 days", receivable_0_90: "Receivables 0–90 days", receivable_90: "Receivables over 90 days", advances: "Advances received", advances_paid: "Advances paid", payable: "Payables", payable_180: "Payables over 180 days", payable_0_180: "Payables 0–180 days" } as Record<string, string>)[what] || what;
       return done(label, [...m.values()].map((x) => ({ title: x.title, amount: Math.round(x.amount), sub: `${x.n} bill${x.n === 1 ? "" : "s"}${x.oldest !== "9999" ? ` · oldest ${x.oldest}` : ""}`, date: null, href: null })), kind === "receivable" ? "/kuber#receivables" : "/kuber#payables", "By party, from Tally's open bills.");
     }
 
@@ -97,9 +170,9 @@ export async function GET(req: Request) {
         await names([...new Set(so.map((s) => S(s.company_id)).filter(Boolean))]);
         return done("Orders booked", so.map((s) => ({ date: S(s.ordered_on), title: cos.get(S(s.company_id)) || S(s.so_no), sub: `${S(s.so_no)} · ${S(s.erp_status)}`, amount: Math.round(N(s.amount)), href: `${ERP}/sales-order/${encodeURIComponent(S(s.erpnext_so_no) || S(s.so_no))}` })), "/crm/salesorders");
       }
-      const q = await all((a, b) => crm.from("quotation").select("quote_no, company_id, grand_total, quoted_on, status, subject").in("status", ["live", "hotlist", "submitted"]).order("id").range(a, b));
+      const q = await all((a, b) => crm.from("quotation").select("quote_no, company_id, grand_total, quoted_on, status, subject").in("status", ["live", "hotlist", "submitted"]).gte("quoted_on", addDays(today, -365)).order("id").range(a, b));
       await names([...new Set(q.map((s) => S(s.company_id)).filter(Boolean))]);
-      return done("Live quotations", q.map((s) => ({ date: S(s.quoted_on) || null, title: cos.get(S(s.company_id)) || S(s.quote_no), sub: `${S(s.quote_no)} · ${S(s.status)}${s.subject ? ` · ${S(s.subject)}` : ""}`, amount: Math.round(N(s.grand_total)), href: `${ERP}/quotation/${encodeURIComponent(S(s.quote_no))}` })), "/crm/quotations");
+      return done("Live quotations — the last 12 months", q.map((s) => ({ date: S(s.quoted_on) || null, title: cos.get(S(s.company_id)) || S(s.quote_no), sub: `${S(s.quote_no)} · ${S(s.status)}${s.subject ? ` · ${S(s.subject)}` : ""}`, amount: Math.round(N(s.grand_total)), href: `${ERP}/quotation/${encodeURIComponent(S(s.quote_no))}` })), "/crm/quotations");
     }
 
     if (what === "live_jobs" || what === "late_jobs") {
