@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.0",
+    date: "2026-10-14",
+    module: "CEO — genie.nandan.co.in/ceo, for three",
+    items: [
+      "THE CEO MODULE (Dr Raghu, 14 Oct 2026: \u201cmake a module genie.nandan.co.in/ceo. This is only for me and no one else now. It will also need JCK and Tushar\u201d). A door of its own, open to three names written in the code \u2014 Dr Raghu, J C Kumar (jckumar@) and Tushar Giri (tushar@) \u2014 so no tick on Admin, no group and no role can open it to a fourth. The page and its data both check; anyone else is sent home. It shows in the module menu and on the home tiles only for those three.",
+      "THE FIRST PAGE IS THE COMPANY ON ONE PAGE, every figure read live from the module that owns it, nothing typed: the books (Kuber \u2014 sales, OE and its share of sales, sales less OE, the months side by side with the latest on the left, OE by each of its twelve heads), what is owed today (receivables, past due, over 180 days, advances held, payables), the order book (CRM sales orders booked in the dates, live quotations), the floor (live jobs, their value, how many are past delivery date, delivered in the dates), service (open tickets, the AMC book) and the people on the roll. Financial year to date by default; 12 M, YTD, QTD, MTD or any From and To. Each card opens the screen behind it. The OE and sales come from the same computation as Kuber\u2019s OE Register, now shared, so the two can never disagree \u2014 FY 2026-27 to 10 Oct: sales \u20b935.29 Cr, OE \u20b97.26 Cr, 20.6%.",
+    ],
+  },
+  {
     v: "6.9.1.0",
     date: "2026-10-13",
     module: "Kuber: the OE Register",

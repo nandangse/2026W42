@@ -8,6 +8,7 @@ import { resolveGoalAccess } from "@/lib/goal-access";
 import { mayUseMarketing } from "@/lib/marketing";
 import { mayUsePlanning } from "@/lib/planning-door";
 import { mayUseLeadersCouncil } from "@/lib/lc/auth";
+import { mayUseCeo } from "@/lib/ceo/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export async function GET() {
     if (u.lmsOnly) {
       return NextResponse.json({
         kind: "staff" as const, employee,
-        doors: { main: false, crm: false, marketing: false, hrms: false, ims: false, lms: true, accounts: false, vishwakarma: false, saamaan: false, lc: false },
+        doors: { main: false, crm: false, marketing: false, hrms: false, ims: false, lms: true, accounts: false, vishwakarma: false, saamaan: false, lc: false, ceo: false },
         goals: false,
         me: { email: u.email, displayName: u.displayName, initials: u.initials, role: u.role, isOwner: u.isOwner, lmsOnly: true },
       });
@@ -72,7 +73,7 @@ export async function GET() {
     ]);
     return NextResponse.json({
       kind, employee,
-      doors: { main: kind === "staff" && planning, crm, marketing, hrms, ims, lms: true, accounts, vishwakarma, saamaan, seva, lc: mayUseLeadersCouncil(u) },
+      doors: { main: kind === "staff" && planning, crm, marketing, hrms, ims, lms: true, accounts, vishwakarma, saamaan, seva, lc: mayUseLeadersCouncil(u), ceo: mayUseCeo(u) },
       goals: goals.see,
       me: { email: u.email, displayName: u.displayName, initials: u.initials, role: u.role, isOwner: u.isOwner },
     });

@@ -12,6 +12,7 @@ import { mayUseMarketing } from "@/lib/marketing";
 import { currentPortalUser, isStaff } from "@/lib/portal/auth";
 import { mayUsePlanning } from "@/lib/planning-door";
 import { mayUseLeadersCouncil } from "@/lib/lc/auth";
+import { mayUseCeo } from "@/lib/ceo/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const u = await currentUser();
   if (!u || u.disabled)
-    return NextResponse.json({ main: false, crm: false, marketing: false, hrms: false, accounts: false, vishwakarma: false, seva: false, ims: false, saamaan: false, portal: false, lc: false });
+    return NextResponse.json({ main: false, crm: false, marketing: false, hrms: false, accounts: false, vishwakarma: false, seva: false, ims: false, saamaan: false, portal: false, lc: false, ceo: false });
 
   const admin = adminClient();
   const [main, crm, hrms, accounts, vishwakarma, seva, ims, saamaan, marketing, portalUser] = await Promise.all([
@@ -47,5 +48,5 @@ export async function GET() {
     currentPortalUser(),
   ]);
   const portal = !!portalUser && isStaff(portalUser);
-  return NextResponse.json({ main, crm, marketing, hrms, accounts, vishwakarma, seva, ims, saamaan, portal, lc: mayUseLeadersCouncil(u) });
+  return NextResponse.json({ main, crm, marketing, hrms, accounts, vishwakarma, seva, ims, saamaan, portal, lc: mayUseLeadersCouncil(u), ceo: mayUseCeo(u) });
 }

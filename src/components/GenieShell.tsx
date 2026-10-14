@@ -19,7 +19,7 @@ import { LOGO } from "@/lib/logo";
 import { APP_VERSION } from "@/lib/version";
 import { swallow } from "@/lib/swallow";
 
-export type ShellModule = "main" | "crm" | "marketing" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan" | "lms" | "idp" | "portal" | "lc";
+export type ShellModule = "main" | "crm" | "marketing" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan" | "lms" | "idp" | "portal" | "lc" | "ceo";
 
 export const MODULES: { key: ShellModule; label: string; icon: string; href: string; blurb: string }[] = [
   { key: "main", label: "Planning", icon: "🧞", href: "/", blurb: "jobs, milestones, the floor" },
@@ -40,6 +40,8 @@ export const MODULES: { key: ShellModule; label: string; icon: string; href: str
   /* GENIE 6.0 (Dr Raghu, 3 Oct 2026): the customers' and suppliers' own door. */
   { key: "portal", label: "Portal", icon: "🚪", href: "/portal", blurb: "customers and suppliers" },
   { key: "lc", label: "Leaders Council", icon: "🏛", href: "/lc", blurb: "the council's own room" },
+  /* 14 Oct 2026 — three names in code: Dr Raghu, J C Kumar, Tushar Giri */
+  { key: "ceo", label: "CEO", icon: "🧭", href: "/ceo", blurb: "the company on one page" },
 ];
 
 export interface ShellUser {
