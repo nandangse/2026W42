@@ -5,6 +5,8 @@ import { crmDb, crmConfigured } from "@/crm/db";
 import { requireCeo } from "@/lib/ceo/auth";
 import { oeAndSales, pnlOf } from "@/lib/kuber-oe";
 import { erpAuth } from "@/lib/saamaan-stock";
+import { WASTE, wasteOf } from "@/lib/ceo/internal";
+import { lastMonthEnd } from "@/lib/ceo/figures";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -116,6 +118,15 @@ export async function GET(req: Request) {
       return done(what === "left90" ? "Left in the last 90 days" : "Full & final settlements pending", rows, "/hrms", "From the F&F register; date is the exit date.");
     }
 
+    /* WASTAGE — the lines of one bucket of Internal Kuber, to the month-end */
+    if (what.startsWith("waste:")) {
+      const key = what.slice(6); const rule = WASTE.find((w) => w.key === key); if (!rule) throw new HttpError(400, "Not a wastage bucket.");
+      const cut = lastMonthEnd(to);
+      const g = await oeAndSales(admin, from, to);
+      const keep = g.lines.filter((l) => l.kind !== "sales" && l.date <= cut && wasteOf(l.ledger, l.group)?.key === key);
+      return done(rule.label, keep.map((l) => ({ date: l.date, title: l.ledger, sub: [l.vtype + " " + l.vno, l.party, l.narration].filter(Boolean).join(" · ").slice(0, 200), amount: Math.round(l.amount), href: null })), "/kuber#oereg", `${rule.lever}. To ${cut}, the last month-end.`);
+    }
+
     /* THE BOOKS — the voucher lines, a voucher at a time */
     if (["sales", "purchase", "oe", "salaries"].includes(what) || what.startsWith("head:")) {
       const g = await oeAndSales(admin, from, to);
@@ -192,6 +203,18 @@ export async function GET(req: Request) {
     if (what === "amc") {
       const { data } = await admin.from("seva_amc").select("erp_name, customer, start_date, end_date, value, visits_planned").eq("status", "AMC valid paid");
       return done("AMC valid", (data || []).map((a) => ({ date: S(a.end_date) || null, title: S(a.customer), sub: `${S(a.erp_name)} · ${S(a.start_date)} → ${S(a.end_date)} · ${S(a.visits_planned)} visits`, amount: Math.round(N(a.value)), href: S(a.erp_name) ? `${ERP}/annual-maintenance-contract/${encodeURIComponent(S(a.erp_name))}` : null })), "/seva#amc", "Date is the valid-till date.");
+    }
+    /* INTERNAL KUBER — service given away, and the AMCs coming due */
+    if (what === "service:warranty" || what === "service:complimentary") {
+      const rx = what.endsWith("warranty") ? /warrant/i : /complimentar/i; const cut = lastMonthEnd(to);
+      const t = await all((a, b) => admin.from("seva_issue").select("erp_name, title, customer, status, issue_date, at, cost_spent, type_of_support").gte("issue_date", from).lte("issue_date", cut).order("id").range(a, b));
+      const keep = t.filter((i) => rx.test(S(i.type_of_support)) && N(i.cost_spent) > 0).sort((x, y) => N(y.cost_spent) - N(x.cost_spent));
+      return done(what.endsWith("warranty") ? "Warranty service cost" : "Free service cost", keep.map((i) => ({ date: S(i.issue_date).slice(0, 10) || null, title: `${S(i.erp_name)} · ${S(i.customer)}`, sub: `${S(i.title)} · ${S(i.type_of_support)} · ${S(i.status)}`, amount: Math.round(N(i.cost_spent)), href: S(i.erp_name) ? `${ERP}/issue/${encodeURIComponent(S(i.erp_name))}` : null })), "/seva#issues", `Cost spent on each ticket, as the ERP has it — to ${cut}.`);
+    }
+    if (what === "amc_due") {
+      const t0 = istDay(); const t60 = new Date(Date.parse(t0) + 60 * 864e5).toISOString().slice(0, 10);
+      const { data } = await admin.from("seva_amc").select("erp_name, customer, start_date, end_date, value").eq("status", "AMC valid paid").gte("end_date", t0).lte("end_date", t60).order("end_date");
+      return done("AMC renewals due in 60 days", (data || []).map((a) => ({ date: S(a.end_date) || null, title: S(a.customer), sub: `${S(a.erp_name)} · ${S(a.start_date)} → ${S(a.end_date)}`, amount: Math.round(N(a.value)), href: S(a.erp_name) ? `${ERP}/annual-maintenance-contract/${encodeURIComponent(S(a.erp_name))}` : null })), "/seva#amc", "Date is the valid-till date; amount is the value per year.");
     }
     if (what === "people") {
       const { data } = await admin.from("hrms_employees").select("id, name, department, designation, doj").eq("active", true);

@@ -14,6 +14,7 @@ import { DrillProvider, cr } from "@/components/ceo/Drill";
 import { Card, Section, C, type Delta } from "@/components/ceo/ui";
 import { PeopleRoom, ExecutionRoom, CashRoom, ReviewsRoom, ExceptionsRoom } from "@/components/ceo/CeoRooms";
 import { StrategyRoom } from "@/components/ceo/CeoStrategy";
+import { InternalKuberRoom } from "@/components/ceo/InternalKuber";
 import { swallow } from "@/lib/swallow";
 
 type Err = { error: string };
@@ -35,6 +36,7 @@ const ROOMS = [
   { key: "cash", label: "Cash", icon: "₹" },
   { key: "reviews", label: "Reviews", icon: "📋" },
   { key: "exceptions", label: "Exceptions", icon: "⚠" },
+  { key: "internal", label: "Internal Kuber", icon: "🪙" },
 ] as const;
 
 function Dashboard({ top }: { top: number }) {
@@ -242,6 +244,7 @@ export default function CeoCockpit({ email, displayName, initials, role }: { ema
             {room === "cash" && <CashRoom />}
             {room === "reviews" && <ReviewsRoom />}
             {room === "exceptions" && <ExceptionsRoom />}
+            {room === "internal" && <InternalKuberRoom />}
             <div className="text-xs mt-6" style={{ color: C.muted }}>Open to three: Dr Raghu, J C Kumar and Tushar Giri. Every figure is read from the module that owns it; click any number for what makes it.</div>
           </main>
         </div>

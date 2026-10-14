@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.8",
+    date: "2026-10-14",
+    module: "CEO: Internal Kuber — the money to bring home, and where it leaks",
+    items: [
+      "INTERNAL KUBER (Dr Raghu, 14 Oct 2026: \u201cmake another module, Internal Kuber \u2014 all the places where we are going to generate from accruals as well as from saving wastage; we will show places where it is getting wasted\u201d). A new room on the CEO menu. Three headlines: cash to bring home, what leaks from the books (per month, % of sales, times the PBT), and what the waiting money costs a month at 12% a year.",
+      "GENERATE \u2014 from what we already have: receivables over 90 days; payment due on delivery, not collected; supplier advances not adjusted; stock above 60 days of TVC (\u20b916.60 Cr on 30 Sep is 159 days); AMC renewals due in 60 days. Each with its lever.",
+      "WASTAGE \u2014 from the books ledger by ledger, to the last month-end: interest on borrowing, bank and loan charges, freight and handling, exchange loss, penalties and late fees, write-offs, rework; and from Seva the cost of warranty and free service calls. The rules are one list in src/lib/ceo/internal.ts; every figure opens its voucher lines or tickets.",
+    ],
+  },
+  {
     v: "6.10.0.7",
     date: "2026-10-14",
     module: "CEO: OE by head — the total and per month on top; total, per month, % of OE and % of sales in each box",
