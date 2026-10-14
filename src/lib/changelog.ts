@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.5",
+    date: "2026-10-14",
+    module: "CEO: the P&L always to the last month-end",
+    items: [
+      "TO THE LAST MONTH-END (Dr Raghu, 14 Oct 2026, on the PBT box: \u201cthis always make it up to the last month end, else will show wrong number, and mention it\u201d). Sales, TVC, Throughput, OE, PBT and OE by head are now struck to the last month-end on or before the To date \u2014 30 Sep 2026 today \u2014 because the closing stock is counted only at month-ends; struck mid-month, a month\u2019s sales and purchases sat against last month\u2019s stock. The heading says the date and why. It moved PBT from \u20b94.06 Cr (11%) to \u20b90.86 Cr (2.7%) for 1 Apr \u2013 30 Sep; throughput from 46% to 39.9%. The lightboxes, the triangles (their snapshots were struck again) and the Strategy room\u2019s pace use the same month-end. A window with no closed month says so.",
+    ],
+  },
+  {
     v: "6.10.0.4",
     date: "2026-10-14",
     module: "CEO: Strategy as strategic action; figures on one line",

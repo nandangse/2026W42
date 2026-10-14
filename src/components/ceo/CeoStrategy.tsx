@@ -114,7 +114,7 @@ export function StrategyRoom() {
       </div>
 
       {/* ARE WE ON PACE? */}
-      <div className="flex items-baseline gap-2 mb-2"><div className="text-sm font-semibold" style={{ color: C.ink }}>Are we on pace for the year?</div><div className="text-xs" style={{ color: C.muted }}>{p ? `the books to ${dmy(p.books_to)} — ${Math.round(p.year_fraction * 100)}% of the year gone; the black tick is where we should be today` : ""}</div></div>
+      <div className="flex items-baseline gap-2 mb-2"><div className="text-sm font-semibold" style={{ color: C.ink }}>Are we on pace for the year?</div><div className="text-xs" style={{ color: C.muted }}>{p ? `to ${dmy(p.books_to)}, the last month-end — ${Math.round(p.year_fraction * 100)}% of the year; the black tick is where we should be by then` : ""}</div></div>
       {p && (
         <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
           <Bar label="Sales" actual={p.sales} target={p.sales_target} expected={p.sales_expected} fmt={cr} sub={`at this pace the year ends at ${cr(p.sales_projected)}`} />

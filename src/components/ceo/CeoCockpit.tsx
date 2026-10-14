@@ -94,13 +94,14 @@ function Dashboard({ top }: { top: number }) {
       {d && (
         <>
           {/* SALES · TVC · THROUGHPUT · OE · PBT — the total and the share of sales */}
-          <Section title="The P&L" hint="Kuber's own arithmetic — total and % of sales" err={isErr(d.books) ? d.books.error : undefined} min={190}>
+          <Section title="The P&L" hint={b ? `to ${dmy(b.pnl_to)} — the last month-end, where the stock is counted; a P&L struck mid-month would set this month's sales and purchases against last month's stock` : "Kuber's own arithmetic — total and % of sales"} err={isErr(d.books) ? d.books.error : undefined} min={190}>
+            {d.books && !isErr(d.books) && d.books.no_month && <div className="text-sm" style={{ color: C.muted }}>No month has closed between {dmy(from)} and {dmy(to)} — the P&amp;L is struck to a month-end ({dmy(d.books.pnl_to)}). Pick a wider window.</div>}
             {b && <>
-              <Card icon="₹" tone={C.green} label="Sales" value={cr(b.sales)} sub="100% · booked sales" ask={{ what: "sales", ...R }} delta={dl("sales")} />
-              <Card icon="📦" tone={C.amber} label="TVC" value={cr(b.tvc)} sub={`${pct(b.tvc, b.sales)} of sales · purchases ± stock`} ask={{ what: "tvc", ...R }} delta={dl("tvc_pct")} />
-              <Card icon="⚡" tone={C.brand} label="Throughput" value={cr(b.throughput)} sub={`${pct(b.throughput, b.sales)} of sales`} ask={{ what: "throughput", ...R }} delta={dl("throughput_pct")} />
-              <Card icon="⚙" tone={C.amber} label="OE" value={cr(b.oe)} sub={`${pct(b.oe, b.sales)} of sales · indirect + finance`} ask={{ what: "oe", ...R }} delta={dl("oe_pct")} />
-              <Card icon="🏁" tone={b.pbt >= 0 ? C.green : C.red} label="PBT" value={cr(b.pbt)} sub={`${pct(b.pbt, b.sales)} of sales`} ask={{ what: "pbt", ...R }} delta={dl("pbt_pct")} />
+              <Card icon="₹" tone={C.green} label="Sales" value={cr(b.sales)} sub={`100% · to ${dmy(b.pnl_to)}`} ask={{ what: "sales", from, to: b.pnl_to }} delta={dl("sales")} />
+              <Card icon="📦" tone={C.amber} label="TVC" value={cr(b.tvc)} sub={`${pct(b.tvc, b.sales)} of sales · purchases ± stock`} ask={{ what: "tvc", from, to: b.pnl_to }} delta={dl("tvc_pct")} />
+              <Card icon="⚡" tone={C.brand} label="Throughput" value={cr(b.throughput)} sub={`${pct(b.throughput, b.sales)} of sales`} ask={{ what: "throughput", from, to: b.pnl_to }} delta={dl("throughput_pct")} />
+              <Card icon="⚙" tone={C.amber} label="OE" value={cr(b.oe)} sub={`${pct(b.oe, b.sales)} of sales · indirect + finance`} ask={{ what: "oe", from, to: b.pnl_to }} delta={dl("oe_pct")} />
+              <Card icon="🏁" tone={b.pbt >= 0 ? C.green : C.red} label="PBT" value={cr(b.pbt)} sub={`${pct(b.pbt, b.sales)} of sales`} ask={{ what: "pbt", from, to: b.pnl_to }} delta={dl("pbt_pct")} />
             </>}
           </Section>
           {b && <div className="text-xs -mt-3 mb-5" style={{ color: C.muted }}>TVC uses the stock register: opening {cr(b.openingStock)}{b.openingAt ? ` (${dmy(b.openingAt)})` : ""}, closing {cr(b.closingStock)}{b.closingAt ? ` (${dmy(b.closingAt)})` : ""}. PBT also takes off manufacturing {cr(b.manuf)}{b.depreciation ? ` and depreciation ${cr(b.depreciation)}` : ""} and adds other income {cr(b.otherIncome)}. The % triangles compare the share of sales with a week ago.</div>}
@@ -130,8 +131,8 @@ function Dashboard({ top }: { top: number }) {
           {isErr(d.trend) ? <div className="text-xs mb-3" style={{ color: C.red }}>The rolling year could not be read: {d.trend.error}</div> : !d.trend.empty && <RollingYear t={d.trend as Trend} />}
 
           {b && (
-            <Section title="OE by head" hint="the twelve heads of operating expense">
-              {Object.entries(b.byHead as Record<string, number>).filter(([, v]) => v).sort((x, y) => y[1] - x[1]).map(([h, v]) => <Card key={h} label={h} value={cr(v)} sub={`${pct(v, b.sales)} of sales · ${pct(v, b.oe)} of OE`} ask={{ what: `head:${h}`, ...R, label: h }} tone={C.amber} />)}
+            <Section title="OE by head" hint={`the twelve heads of operating expense, to ${dmy(b.pnl_to)}`}>
+              {Object.entries(b.byHead as Record<string, number>).filter(([, v]) => v).sort((x, y) => y[1] - x[1]).map(([h, v]) => <Card key={h} label={h} value={cr(v)} sub={`${pct(v, b.sales)} of sales · ${pct(v, b.oe)} of OE`} ask={{ what: `head:${h}`, from, to: b.pnl_to, label: h }} tone={C.amber} />)}
             </Section>
           )}
 

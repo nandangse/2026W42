@@ -4,7 +4,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { requireCeo } from "@/lib/ceo/auth";
 import { oeAndSales, pnlOf } from "@/lib/kuber-oe";
-import { ceoFigures, keepSnapshot, weekAgo, DIRECTION } from "@/lib/ceo/figures";
+import { ceoFigures, keepSnapshot, weekAgo, DIRECTION, lastMonthEnd } from "@/lib/ceo/figures";
 import { OE_HEADS } from "@/lib/kuber-rules";
 import { swallow } from "@/lib/swallow";
 
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
         prev = await weekAgo(admin);
         if (!prev.day) {
           const back = (() => { const x = new Date(today + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() - 7); return x.toISOString().slice(0, 10); })();
-          const p = await pnlOf(admin, fy, back);
+          const p = await pnlOf(admin, fy, lastMonthEnd(back));
           if (p && p.sales) {
             const pc = (v: number) => Math.round((v / p.sales) * 10000) / 100;
             const vals: Record<string, number> = { sales: Math.round(p.sales), tvc: Math.round(p.tvc), throughput: Math.round(p.throughput), oe: Math.round(p.oe), pbt: Math.round(p.pbt), tvc_pct: pc(p.tvc), throughput_pct: pc(p.throughput), oe_pct: pc(p.oe), pbt_pct: pc(p.pbt) };

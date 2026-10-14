@@ -4,7 +4,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { requireCeo } from "@/lib/ceo/auth";
 import { pnlOf } from "@/lib/kuber-oe";
 import { lcMembers } from "@/lib/lc/auth";
-import { istDay, fyStartOf } from "@/lib/ceo/figures";
+import { istDay, fyStartOf, lastMonthEnd } from "@/lib/ceo/figures";
 import { swallow } from "@/lib/swallow";
 
 export const dynamic = "force-dynamic";
@@ -41,8 +41,10 @@ export async function GET() {
     /* ON PACE? — the year's targets against the books (as fresh as Tally) and the floor */
     let pace: R | null = null;
     try {
-      const p = await pnlOf(admin, fy, today);
-      const booksTo = p?.g.latest || today;
+      /* to the last month-end — the closing stock is counted only there, so PBT % struck mid-month would be wrong */
+      const pnlTo = lastMonthEnd(today);
+      const p = pnlTo >= fy ? await pnlOf(admin, fy, pnlTo) : null;
+      const booksTo = pnlTo;
       const frac = Math.max(0.01, (Date.parse(booksTo) - Date.parse(fy) + 864e5) / (365 * 864e5));
       const sales = p?.sales || 0;
       const exports = (p?.g.lines || []).filter((l) => l.kind === "sales" && /export/i.test(`${l.ledger} ${l.group}`)).reduce((s, l) => s + l.amount, 0);

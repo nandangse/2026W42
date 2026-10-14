@@ -26,6 +26,16 @@ const N = (v: unknown) => Number(v) || 0;
 const addDays = (d: string, n: number) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
 export const istDay = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+/**
+ * THE P&L STOPS AT A MONTH-END (Dr Raghu, 14 Oct 2026: "this always make it up to the last month end, else will show wrong number, and mention it").
+ * The closing stock is counted at month-ends only, so a P&L struck mid-month sets a month's sales and purchases against last month's stock and
+ * TVC, throughput and PBT come out wrong. The day itself if it is a month-end, else the last day of the month before.
+ */
+export const lastMonthEnd = (d: string) => {
+  const x = new Date(d + "T00:00:00Z"); const next = new Date(x); next.setUTCDate(x.getUTCDate() + 1);
+  if (next.getUTCMonth() !== x.getUTCMonth()) return d;
+  return new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), 0)).toISOString().slice(0, 10);
+};
 export const fyStartOf = (t: string) => (t.slice(5, 7) >= "04" ? `${t.slice(0, 4)}-04-01` : `${Number(t.slice(0, 4)) - 1}-04-01`);
 
 async function all(q: (a: number, b: number) => PromiseLike<{ data: R[] | null; error: { message: string } | null }>): Promise<R[]> {
@@ -54,11 +64,13 @@ export async function ceoFigures(admin: SupabaseClient, from: string, to: string
   const today = istDay();
   const [books, owed, erp, orders, floor, service, people] = await Promise.all([
     part("books", async () => {
-      const p = await pnlOf(admin, from, to);
+      const pnlTo = lastMonthEnd(to);
+      if (pnlTo < from) return { empty: true as const, pnl_to: pnlTo, no_month: true };
+      const p = await pnlOf(admin, from, pnlTo);
       if (!p) return { empty: true as const };
       const byHead: Record<string, number> = {}; for (const h of OE_HEADS) byHead[h] = 0;
       for (const r of p.g.rows) byHead[r.head] = (byHead[r.head] || 0) + r.amount;
-      return { sales: Math.round(p.sales), purchases: Math.round(p.purchases), openingStock: Math.round(p.openingStock), closingStock: Math.round(p.closingStock), openingAt: p.openingAt, closingAt: p.closingAt, tvc: Math.round(p.tvc), throughput: Math.round(p.throughput), manuf: Math.round(p.manuf), oe: Math.round(p.oe), depreciation: Math.round(p.depreciation), otherIncome: Math.round(p.otherIncome), pbt: Math.round(p.pbt), byHead, books_to: p.g.latest };
+      return { pnl_to: pnlTo, sales: Math.round(p.sales), purchases: Math.round(p.purchases), openingStock: Math.round(p.openingStock), closingStock: Math.round(p.closingStock), openingAt: p.openingAt, closingAt: p.closingAt, tvc: Math.round(p.tvc), throughput: Math.round(p.throughput), manuf: Math.round(p.manuf), oe: Math.round(p.oe), depreciation: Math.round(p.depreciation), otherIncome: Math.round(p.otherIncome), pbt: Math.round(p.pbt), byHead, books_to: p.g.latest };
     }),
     part("owed", async () => {
       const bills = await all((a, b) => admin.from("kuber_bill").select("kind, amount, bill_date, due_date").order("id").range(a, b));
