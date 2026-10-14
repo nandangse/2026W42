@@ -44,7 +44,12 @@ export async function GET(req: Request) {
     const from = isD(sp.get("from")) ? String(sp.get("from")) : fy;
     const to = isD(sp.get("to")) ? String(sp.get("to")) : today;
 
-    const [books, owed, orders, floor, service, people] = await Promise.all([
+    /* THE ROLLING YEAR (Dr Raghu, 14 Oct 2026: "show a graph of the last 12 months rolling always — Sales, Purchase, OE, Salaries … Total, Average/month,
+       Mean, Median, Min, Max — 12 months, 6 months, 3 months, YTD … October number show * incomplete"). Always the last twelve COMPLETE months and
+       this month to date, whatever dates are picked above; the windows are struck on complete months, YTD runs to date. */
+    const thisMonth = today.slice(0, 7);
+    const back12 = (() => { const x = new Date(thisMonth + "-01T00:00:00Z"); x.setUTCMonth(x.getUTCMonth() - 12); return x.toISOString().slice(0, 10); })();
+    const [books, owed, orders, floor, service, people, trend] = await Promise.all([
       /* THE BOOKS — sales and OE by the P&L's own rules */
       part("books", async () => {
         const g = await oeAndSales(admin, from, to);
@@ -98,12 +103,22 @@ export async function GET(req: Request) {
         return { open_tickets: open || 0, amc_valid: (amc || []).length, amc_value: Math.round((amc || []).reduce((s, x) => s + N(x.value), 0)) };
       }),
       /* PEOPLE — the active roll */
+      /* (the rolling year is the last entry of this list) */
       part("people", async () => {
         const { data } = await admin.from("hrms_employees").select("department, active").eq("active", true);
         const by: Record<string, number> = {}; for (const e of data || []) by[S(e.department) || "—"] = (by[S(e.department) || "—"] || 0) + 1;
         return { headcount: (data || []).length, by_department: by };
       }),
+      part("trend", async () => {
+        const g = await oeAndSales(admin, back12, today);
+        if (g.empty) return { empty: true };
+        const months: string[] = []; for (let x = new Date(back12 + "T00:00:00Z"); x.toISOString().slice(0, 7) <= thisMonth; x.setUTCMonth(x.getUTCMonth() + 1)) months.push(x.toISOString().slice(0, 7));
+        const oeBy: Record<string, number> = {}; for (const r of g.rows) { const m = r.date.slice(0, 7); oeBy[m] = (oeBy[m] || 0) + r.amount; }
+        const series = { sales: g.salesByMonth, purchase: g.purchasesByMonth, oe: oeBy, salaries: g.salariesByMonth };
+        const round = (o: Record<string, number>) => Object.fromEntries(months.map((m) => [m, Math.round(o[m] || 0)]));
+        return { months, current: thisMonth, books_to: g.latest, fy_start: fy.slice(0, 7), series: { sales: round(series.sales), purchase: round(series.purchase), oe: round(series.oe), salaries: round(series.salaries) } };
+      }),
     ]);
-    return NextResponse.json({ from, to, today, me: me.email, books, owed, orders, floor, service, people });
+    return NextResponse.json({ from, to, today, me: me.email, books, owed, orders, floor, service, people, trend });
   } catch (e) { return errJson(e); }
 }

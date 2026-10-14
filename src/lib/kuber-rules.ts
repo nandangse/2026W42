@@ -196,7 +196,8 @@ export type OeHead = typeof OE_HEADS[number];
 
 export interface OeRule { id: string; head: OeHead; says: string; why?: string; test: (g: string, l: string) => boolean }
 
-const isPay = (g: string) => /salar|allowance|bonus|exgratia|gratuity|contribution to funds|welfare|site allowance|payment & provision to employee|wages/.test(g);
+/** Is this group a pay group? Exported (14 Oct 2026) so the CEO's Salaries line reads pay by the same test the OE heads use. */
+export const isPay = (g: string) => /salar|allowance|bonus|exgratia|gratuity|contribution to funds|welfare|site allowance|payment & provision to employee|wages/.test(g);
 
 export const OE_RULES: OeRule[] = [
   {

@@ -92,6 +92,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.1",
+    date: "2026-10-14",
+    module: "CEO: the rolling year, a chart library, the menu and its rooms, every number opens",
+    items: [
+      "THE ROLLING YEAR (Dr Raghu, 14 Oct 2026: \u201cshow a graph of the last 12 months rolling always \u2014 Sales, Purchase, OE, Salaries \u2014 a line graph with legend \u2026 Total, Average/month, Mean, Median, Min, Max \u2026 12 months, 6 months, 3 months, YTD \u2026 by month table only show this \u2026 October number show * incomplete\u201d). On the dashboard, whatever dates are picked: a line chart of the four, with a legend and the figure on hover; the By month table now only these four, the latest month on the left; and for each line a table of Total, Average / month, Mean, Median, Min and Max for 12, 6 and 3 months and YTD. The month in progress carries a * and is set apart; 12, 6 and 3 months are complete months, YTD runs to date. Purchase is the P&L\u2019s purchases; Salaries are wages on the floor and the staff, labour and consultant salaries in OE (FY to 10 Oct: \u20b95.73 Cr), directors\u2019 remuneration staying in OE.",
+      "A CHART LIBRARY FOR GENIE (\u201cadd a chart library to genie. it is needed\u201d): Recharts \u2014 line, bar, area, pie and more \u2014 now part of Genie for any module; the rolling year is its first use.",
+      "THE MENU (\u201cshow on the left side Menu \u2014 Dashboard, People, Strategy, Execution, Cash, Reviews, Exceptions\u201d), foldable, each room at its own address (/ceo#cash). People: the roll by department and by tenure, the last 90 days\u2019 joiners. Strategy: the Leaders Council\u2019s philosophy pages with their approval, the principles, and the company KPIs by month. Execution: every live job by delivery date with how late, deliveries by month, open service orders, the service team\u2019s next seven days. Cash: owed both ways, the largest fifteen each way with what is over 180 days, Kuber\u2019s payment plan. Reviews: the council\u2019s meetings (attended, checked in, minutes written) and the internal audits with their open non-conformities. Exceptions: only what is off track \u2014 jobs past their date, money over 180 days, tickets older than 90 days, AMCs past valid-till, problems blocked or overdue, quotations waiting for approval.",
+      "EVERY NUMBER OPENS (\u201call the numbers should be clickable in to a lightbox \u2026 show details which will open in new tab\u201d). Click any figure \u2014 a card, a month in the table, a total or a median in the figures \u2014 and a lightbox lists what makes it, largest first, with a search: Tally vouchers for the books, parties for what is owed, sales orders, quotations, jobs, tickets, contracts and people for the rest. Each line opens its own record on the ERP in a new tab; Open the full screen opens the Genie screen behind it, also in a new tab.",
+    ],
+  },
+  {
     v: "6.10.0.0",
     date: "2026-10-14",
     module: "CEO — genie.nandan.co.in/ceo, for three",
