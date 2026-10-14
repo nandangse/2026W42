@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.6",
+    date: "2026-10-14",
+    module: "CEO: Sales up to now; the rest to the month-end",
+    items: [
+      "SALES UP TO NOW (Dr Raghu, 14 Oct 2026: \u201cSales still show up to now, the rest up to Sept end\u201d). The Sales box shows sales to the books\u2019 latest date (\u20b935.29 Cr to 10 Oct), with the month-end figure beneath (\u20b931.84 Cr to 30 Sep) \u2014 the base the other four boxes\u2019 percentages are struck on, so TVC, Throughput, OE and PBT stay like for like at the month-end. One read of the books gives both: the shared computation now keeps every P&L bucket month by month.",
+    ],
+  },
+  {
     v: "6.10.0.5",
     date: "2026-10-14",
     module: "CEO: the P&L always to the last month-end",

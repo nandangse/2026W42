@@ -94,10 +94,10 @@ function Dashboard({ top }: { top: number }) {
       {d && (
         <>
           {/* SALES · TVC · THROUGHPUT · OE · PBT — the total and the share of sales */}
-          <Section title="The P&L" hint={b ? `to ${dmy(b.pnl_to)} — the last month-end, where the stock is counted; a P&L struck mid-month would set this month's sales and purchases against last month's stock` : "Kuber's own arithmetic — total and % of sales"} err={isErr(d.books) ? d.books.error : undefined} min={190}>
+          <Section title="The P&L" hint={b ? `Sales up to now; TVC, Throughput, OE and PBT to ${dmy(b.pnl_to)} — the last month-end, where the stock is counted, their % of sales to that date` : "Kuber's own arithmetic — total and % of sales"} err={isErr(d.books) ? d.books.error : undefined} min={190}>
             {d.books && !isErr(d.books) && d.books.no_month && <div className="text-sm" style={{ color: C.muted }}>No month has closed between {dmy(from)} and {dmy(to)} — the P&amp;L is struck to a month-end ({dmy(d.books.pnl_to)}). Pick a wider window.</div>}
             {b && <>
-              <Card icon="₹" tone={C.green} label="Sales" value={cr(b.sales)} sub={`100% · to ${dmy(b.pnl_to)}`} ask={{ what: "sales", from, to: b.pnl_to }} delta={dl("sales")} />
+              <Card icon="₹" tone={C.green} label="Sales" value={cr(b.sales_to_date)} sub={<>up to now — books to {dmy(b.books_to)}<br />{cr(b.sales)} to {dmy(b.pnl_to)}, the base for the % beside</>} ask={{ what: "sales", from, to }} delta={dl("sales")} />
               <Card icon="📦" tone={C.amber} label="TVC" value={cr(b.tvc)} sub={`${pct(b.tvc, b.sales)} of sales · purchases ± stock`} ask={{ what: "tvc", from, to: b.pnl_to }} delta={dl("tvc_pct")} />
               <Card icon="⚡" tone={C.brand} label="Throughput" value={cr(b.throughput)} sub={`${pct(b.throughput, b.sales)} of sales`} ask={{ what: "throughput", from, to: b.pnl_to }} delta={dl("throughput_pct")} />
               <Card icon="⚙" tone={C.amber} label="OE" value={cr(b.oe)} sub={`${pct(b.oe, b.sales)} of sales · indirect + finance`} ask={{ what: "oe", from, to: b.pnl_to }} delta={dl("oe_pct")} />

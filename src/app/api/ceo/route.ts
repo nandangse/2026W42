@@ -73,10 +73,10 @@ export async function GET(req: Request) {
         prev = await weekAgo(admin);
         if (!prev.day) {
           const back = (() => { const x = new Date(today + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() - 7); return x.toISOString().slice(0, 10); })();
-          const p = await pnlOf(admin, fy, lastMonthEnd(back));
+          const p = await pnlOf(admin, fy, back, lastMonthEnd(back));
           if (p && p.sales) {
             const pc = (v: number) => Math.round((v / p.sales) * 10000) / 100;
-            const vals: Record<string, number> = { sales: Math.round(p.sales), tvc: Math.round(p.tvc), throughput: Math.round(p.throughput), oe: Math.round(p.oe), pbt: Math.round(p.pbt), tvc_pct: pc(p.tvc), throughput_pct: pc(p.throughput), oe_pct: pc(p.oe), pbt_pct: pc(p.pbt) };
+            const vals: Record<string, number> = { sales: Math.round(p.salesToDate), tvc: Math.round(p.tvc), throughput: Math.round(p.throughput), oe: Math.round(p.oe), pbt: Math.round(p.pbt), tvc_pct: pc(p.tvc), throughput_pct: pc(p.throughput), oe_pct: pc(p.oe), pbt_pct: pc(p.pbt) };
             await admin.from("ceo_snapshot").upsert(Object.entries(vals).map(([key, value]) => ({ day: back, key, value })), { onConflict: "day,key" });
             prev = { day: back, values: vals };
           }

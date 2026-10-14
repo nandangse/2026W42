@@ -35,14 +35,14 @@ export type OeLine = { date: string; vtype: string; vno: string; party: string; 
 /** every line the CEO can click in to (14 Oct 2026): sales, purchases, OE, and floor wages — with whether it is pay */
 export type BookLine = OeLine & { kind: "sales" | "purchase" | "oe" | "wages"; pay: boolean };
 
-export async function oeAndSales(admin: SupabaseClient, from: string, to: string): Promise<{ empty: boolean; rows: OeLine[]; lines: BookLine[]; totals: Record<string, number>; sales: number; salesByMonth: Record<string, number>; purchasesByMonth: Record<string, number>; salariesByMonth: Record<string, number>; latest: string | null }> {
+export async function oeAndSales(admin: SupabaseClient, from: string, to: string): Promise<{ empty: boolean; rows: OeLine[]; lines: BookLine[]; totals: Record<string, number>; totalsByMonth: Record<string, Record<string, number>>; sales: number; salesByMonth: Record<string, number>; purchasesByMonth: Record<string, number>; salariesByMonth: Record<string, number>; latest: string | null }> {
   const [groups, ledgersRaw, vouchers] = await Promise.all([
     all((a, b) => admin.from("kuber_group").select("name, parent").order("name").range(a, b)),
     all((a, b) => admin.from("kuber_ledger").select("name, parent, fy").order("name").range(a, b)),
     all((a, b) => admin.from("kuber_voucher").select("id, date, vtype, vno, party, narration").gte("date", from).lte("date", to).order("id").range(a, b)),
   ]);
   const ledgers = newestByName(ledgersRaw as { name?: unknown; fy?: unknown }[]) as R[];
-  if (!ledgers.length) return { empty: true, rows: [], lines: [], totals: {}, sales: 0, salesByMonth: {}, purchasesByMonth: {}, salariesByMonth: {}, latest: null };
+  if (!ledgers.length) return { empty: true, rows: [], lines: [], totals: {}, totalsByMonth: {}, sales: 0, salesByMonth: {}, purchasesByMonth: {}, salariesByMonth: {}, latest: null };
   const parentOf = new Map(groups.map((g) => [S(g.name).toLowerCase(), S(g.parent)]));
   const properOf = new Map(groups.map((g) => [S(g.name).toLowerCase(), S(g.name)]));
   const rootOf = (g: string) => { let cur = g.toLowerCase(); for (let i = 0; i < 25; i++) { const p = (parentOf.get(cur) || "").toLowerCase(); if (!p || p === cur) break; cur = p; } return properOf.get(cur) || g; };
@@ -61,11 +61,14 @@ export async function oeAndSales(admin: SupabaseClient, from: string, to: string
   for (let i = 0; i < ids.length; i += 300) lines.push(...(await all((a, b) => admin.from("kuber_voucher_line").select("id, voucher_id, ledger, amount").in("voucher_id", ids.slice(i, i + 300)).order("id").range(a, b))));
   const rows: OeLine[] = []; const all_: BookLine[] = []; let sales = 0;
   /* every P&L bucket's total for the dates — the P&L's own arithmetic follows in pnlOf() */
-  const totals: Record<string, number> = {}; const salesByMonth: Record<string, number> = {}, purchasesByMonth: Record<string, number> = {}, salariesByMonth: Record<string, number> = {};
+  const totals: Record<string, number> = {};
+  /* the same, month by month — so one read gives a P&L to any month-end inside the dates */
+  const totalsByMonth: Record<string, Record<string, number>> = {}; const salesByMonth: Record<string, number> = {}, purchasesByMonth: Record<string, number> = {}, salariesByMonth: Record<string, number> = {};
   for (const l of lines) {
     const c = cls.get(S(l.ledger)); if (!c) continue;
     const amt = (Number(l.amount) || 0) * c.sign; if (!amt) continue;
     totals[c.bucket] = (totals[c.bucket] || 0) + amt;
+    { const mm = S(vById.get(S(l.voucher_id))?.date).slice(0, 7); const tb = (totalsByMonth[c.bucket] ||= {}); tb[mm] = (tb[mm] || 0) + amt; }
     if (!["sales", "purchases", "manuf", "indirect", "finance"].includes(c.bucket)) continue;
     const v = vById.get(S(l.voucher_id))!;
     const m = S(v.date).slice(0, 7);
@@ -78,7 +81,7 @@ export async function oeAndSales(admin: SupabaseClient, from: string, to: string
     rows.push({ date: S(v.date), vtype: S(v.vtype), vno: S(v.vno), party: S(v.party), narration: S(v.narration), ledger: S(l.ledger), group: c.group, head: c.head, amount: Math.round(amt * 100) / 100 });
   }
   const latest = [...vById.values()].map((v) => S(v.date)).sort().pop() || null;
-  return { empty: false, rows, lines: all_.filter((x) => x.kind !== "wages" || x.pay), totals, sales, salesByMonth, purchasesByMonth, salariesByMonth, latest };
+  return { empty: false, rows, lines: all_.filter((x) => x.kind !== "wages" || x.pay), totals, totalsByMonth, sales, salesByMonth, purchasesByMonth, salariesByMonth, latest };
 }
 
 /**
@@ -89,15 +92,17 @@ export async function oeAndSales(admin: SupabaseClient, from: string, to: string
  * = sales − TVC, OE = indirect + finance, PBT = throughput − manufacturing −
  * OE − depreciation + other income.
  */
-export async function pnlOf(admin: SupabaseClient, from: string, to: string) {
+export async function pnlOf(admin: SupabaseClient, from: string, to: string, cut: string = to) {
+  /* read to `to`; strike the P&L to `cut` (a month-end) — sales to date ride along as salesToDate (14 Oct 2026: "Sales still show up to now, the rest up to Sept end") */
   const g = await oeAndSales(admin, from, to);
   if (g.empty) return null;
-  const t = (k: string) => g.totals[k] || 0;
+  const cm = cut.slice(0, 7);
+  const t = (k: string) => (cut >= to ? g.totals[k] || 0 : Object.entries(g.totalsByMonth[k] || {}).filter(([m]) => m <= cm).reduce((s, [, v]) => s + v, 0));
   let openingStock = 0, closingStock = 0, openingAt: string | null = null, closingAt: string | null = null;
   try {
     const { data } = await admin.from("kuber_stock").select("as_on, amount").order("as_on");
     const rows = (data || []) as { as_on: string; amount: number }[];
-    const o = rows.filter((r) => String(r.as_on) < from).pop(); const c = rows.filter((r) => String(r.as_on) <= to).pop();
+    const o = rows.filter((r) => String(r.as_on) < from).pop(); const c = rows.filter((r) => String(r.as_on) <= cut).pop();
     if (o) { openingStock = Number(o.amount) || 0; openingAt = String(o.as_on); }
     if (c) { closingStock = Number(c.amount) || 0; closingAt = String(c.as_on); }
   } catch { /* no stock register yet */ }
@@ -106,5 +111,5 @@ export async function pnlOf(admin: SupabaseClient, from: string, to: string) {
   const throughput = sales - tvc;
   const oe = indirect + finance;
   const pbt = throughput - manuf - oe - depreciation + otherIncome;
-  return { g, sales, purchases, openingStock, closingStock, openingAt, closingAt, tvc, throughput, manuf, oe, depreciation, otherIncome, pbt };
+  return { g, cut, salesToDate: g.sales, sales, purchases, openingStock, closingStock, openingAt, closingAt, tvc, throughput, manuf, oe, depreciation, otherIncome, pbt };
 }

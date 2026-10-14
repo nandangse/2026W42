@@ -66,11 +66,11 @@ export async function ceoFigures(admin: SupabaseClient, from: string, to: string
     part("books", async () => {
       const pnlTo = lastMonthEnd(to);
       if (pnlTo < from) return { empty: true as const, pnl_to: pnlTo, no_month: true };
-      const p = await pnlOf(admin, from, pnlTo);
+      const p = await pnlOf(admin, from, to, pnlTo);
       if (!p) return { empty: true as const };
       const byHead: Record<string, number> = {}; for (const h of OE_HEADS) byHead[h] = 0;
-      for (const r of p.g.rows) byHead[r.head] = (byHead[r.head] || 0) + r.amount;
-      return { pnl_to: pnlTo, sales: Math.round(p.sales), purchases: Math.round(p.purchases), openingStock: Math.round(p.openingStock), closingStock: Math.round(p.closingStock), openingAt: p.openingAt, closingAt: p.closingAt, tvc: Math.round(p.tvc), throughput: Math.round(p.throughput), manuf: Math.round(p.manuf), oe: Math.round(p.oe), depreciation: Math.round(p.depreciation), otherIncome: Math.round(p.otherIncome), pbt: Math.round(p.pbt), byHead, books_to: p.g.latest };
+      for (const r of p.g.rows) if (r.date <= pnlTo) byHead[r.head] = (byHead[r.head] || 0) + r.amount;
+      return { pnl_to: pnlTo, sales_to_date: Math.round(p.salesToDate), sales: Math.round(p.sales), purchases: Math.round(p.purchases), openingStock: Math.round(p.openingStock), closingStock: Math.round(p.closingStock), openingAt: p.openingAt, closingAt: p.closingAt, tvc: Math.round(p.tvc), throughput: Math.round(p.throughput), manuf: Math.round(p.manuf), oe: Math.round(p.oe), depreciation: Math.round(p.depreciation), otherIncome: Math.round(p.otherIncome), pbt: Math.round(p.pbt), byHead, books_to: p.g.latest };
     }),
     part("owed", async () => {
       const bills = await all((a, b) => admin.from("kuber_bill").select("kind, amount, bill_date, due_date").order("id").range(a, b));
@@ -161,7 +161,7 @@ export async function ceoFigures(admin: SupabaseClient, from: string, to: string
   const ok = <T,>(x: T | { error: string }): x is T => !!x && !(typeof x === "object" && "error" in (x as object));
   if (ok(books) && !("empty" in books)) {
     const pc = (v: number) => (books.sales ? Math.round((v / books.sales) * 10000) / 100 : 0);
-    Object.assign(snap, { sales: books.sales, tvc: books.tvc, throughput: books.throughput, oe: books.oe, pbt: books.pbt, tvc_pct: pc(books.tvc), throughput_pct: pc(books.throughput), oe_pct: pc(books.oe), pbt_pct: pc(books.pbt) });
+    Object.assign(snap, { sales: books.sales_to_date, tvc: books.tvc, throughput: books.throughput, oe: books.oe, pbt: books.pbt, tvc_pct: pc(books.tvc), throughput_pct: pc(books.throughput), oe_pct: pc(books.oe), pbt_pct: pc(books.pbt) });
   }
   if (ok(owed)) for (const k of ["receivable", "rec_0_90", "rec_90", "payable", "pay_0_180", "pay_180", "adv_received", "adv_paid"]) snap[k] = (owed as Record<string, number>)[k];
   if (ok(erp)) for (const k of ["grn_unbilled", "poe_0_30", "poe_31_60", "poe_61_90", "poe_90", "poe_undelivered"]) snap[k] = (erp as unknown as Record<string, number>)[k];
