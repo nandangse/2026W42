@@ -12,7 +12,8 @@ import GenieShell from "@/components/GenieShell";
 import RollingYear, { type Trend } from "@/components/ceo/RollingYear";
 import { DrillProvider, cr } from "@/components/ceo/Drill";
 import { Card, Section, C, type Delta } from "@/components/ceo/ui";
-import { PeopleRoom, StrategyRoom, ExecutionRoom, CashRoom, ReviewsRoom, ExceptionsRoom } from "@/components/ceo/CeoRooms";
+import { PeopleRoom, ExecutionRoom, CashRoom, ReviewsRoom, ExceptionsRoom } from "@/components/ceo/CeoRooms";
+import { StrategyRoom } from "@/components/ceo/CeoStrategy";
 import { swallow } from "@/lib/swallow";
 
 type Err = { error: string };

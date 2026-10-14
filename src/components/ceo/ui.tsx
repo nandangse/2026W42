@@ -38,7 +38,7 @@ export function Card({ label, value, sub, ask, tone, icon, delta, rows }: { labe
         {icon && <div className="rounded-xl flex items-center justify-center flex-shrink-0" style={{ width: 40, height: 40, background: `${t}14`, color: t, fontSize: 18 }}>{icon}</div>}
         <div className="flex-1 min-w-0">
           <div className="text-xs font-medium" style={{ color: C.muted }}>{label}</div>
-          <button onClick={() => ask && open({ ...ask, label: ask.label || label })} disabled={!ask} className="text-left font-bold tnum" style={{ fontSize: 24, color: C.ink, lineHeight: 1.2, cursor: ask ? "pointer" : "default" }} title={ask ? "Open what makes this number" : undefined}>{value}</button>
+          <button onClick={() => ask && open({ ...ask, label: ask.label || label })} disabled={!ask} className="text-left font-bold tnum" style={{ fontSize: "clamp(16px, 1.45vw, 21px)", whiteSpace: "nowrap", color: C.ink, lineHeight: 1.25, cursor: ask ? "pointer" : "default" }} title={ask ? "Open what makes this number" : undefined}>{value}</button>
         </div>
         <DeltaPill d={delta} />
       </div>

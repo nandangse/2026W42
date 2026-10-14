@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.4",
+    date: "2026-10-14",
+    module: "CEO: Strategy as strategic action; figures on one line",
+    items: [
+      "STRATEGY AS STRATEGIC ACTION (Dr Raghu, 14 Oct 2026: \u201cthis strategy doesn\u2019t need this kind of numbers, it needs the strategic action. As a world class coach what would you put on this page?\u201d). The KPI table is gone; the room is the one-page strategy. Where we are going, word for word from Breakthrough 2027 \u2014 the north star (by 2029, \u20b9350 Cr at 15% PBT), this year (\u20b9100 Cr at 10% PBT, exports \u20b950 Cr, on-time delivery 90%+, founder time under four hours a day), the themes (Safety \u00b7 On-Time Delivery), what we stand for, the three pillars every decision is filtered by, the one line of the culture \u2014 each a click to change. Are we on pace: sales against \u20b9100 Cr with a tick where we should be today and where the year ends at this pace, PBT %, exports, on-time delivery (by Genie\u2019s own job dates: 7 of 106 this year), founder hours as written each week.",
+      "THE TWENTY CONDITIONS, AS THE WEEKLY REVIEW: the ten of the Management System and the ten Critical Success Factors, each with one owner from the council, green / amber / red, this week\u2019s note and the date it was last reviewed \u2014 a date older than a week turns red. Then this quarter\u2019s rocks (each leader\u2019s 99-day plan from the check-in), the decisions the council owes (the Solution Board, blocked first, then the oldest), what the council backs to start, stop and continue, and the rhythm \u2014 the last and next council meeting. Migration 0232.",
+      "FIGURES ON ONE LINE (\u201creduce the font size to show the amounts and Cr on one line\u201d): the figure in every box now sizes to the box and never wraps.",
+    ],
+  },
+  {
     v: "6.10.0.3",
     date: "2026-10-14",
     module: "CEO: how fresh — Tally's last upload, and Genie live",
