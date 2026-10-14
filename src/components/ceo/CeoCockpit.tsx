@@ -17,7 +17,7 @@ import { swallow } from "@/lib/swallow";
 
 type Err = { error: string };
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type D = { from: string; to: string; today: string; books: any; owed: any; erp: any; orders: any; floor: any; service: any; people: any; trend: any; snap: Record<string, number>; prev: { day: string | null; values: Record<string, number> }; direction: Record<string, { good: 1 | -1 | 0; pct?: boolean }>; isYtd: boolean };
+type D = { fresh?: { tally: { at: string; by: string; name: string; kind: string } | null; erp: string | null }; from: string; to: string; today: string; books: any; owed: any; erp: any; orders: any; floor: any; service: any; people: any; trend: any; snap: Record<string, number>; prev: { day: string | null; values: Record<string, number> }; direction: Record<string, { good: 1 | -1 | 0; pct?: boolean }>; isYtd: boolean };
 const isErr = (x: unknown): x is Err => !!x && typeof x === "object" && "error" in (x as object);
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 const fyStart = (t: string) => (t.slice(5, 7) >= "04" ? `${t.slice(0, 4)}-04-01` : `${Number(t.slice(0, 4)) - 1}-04-01`);
@@ -72,9 +72,21 @@ function Dashboard({ top }: { top: number }) {
           <div className="text-xs" style={{ color: C.muted }}>{d?.isYtd ? (d.prev.day ? `▲▼ against ${dmy(d.prev.day)}` : "the week-on-week triangles begin once a week of figures is kept") : "the triangles show on the financial year to date (YTD)"}{b ? ` · books to ${dmy(b.books_to)}` : ""}</div>
         </div>
         <span className="ml-auto" />
-        {(["12m", "ytd", "qtd", "mtd"] as const).map((k) => <button key={k} onClick={() => win(k)} style={chip(k === which)}>{k === "12m" ? "12 M" : k.toUpperCase()}</button>)}
-        <span className="text-xs font-semibold" style={{ color: C.muted }}>From</span><input type="date" value={from} max={to} onChange={(ev) => setFrom(ev.target.value)} style={ctl} />
-        <span className="text-xs font-semibold" style={{ color: C.muted }}>To</span><input type="date" value={to} min={from} onChange={(ev) => setTo(ev.target.value)} style={ctl} />
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {(["12m", "ytd", "qtd", "mtd"] as const).map((k) => <button key={k} onClick={() => win(k)} style={chip(k === which)}>{k === "12m" ? "12 M" : k.toUpperCase()}</button>)}
+            <span className="text-xs font-semibold" style={{ color: C.muted }}>From</span><input type="date" value={from} max={to} onChange={(ev) => setFrom(ev.target.value)} style={ctl} />
+            <span className="text-xs font-semibold" style={{ color: C.muted }}>To</span><input type="date" value={to} min={from} onChange={(ev) => setTo(ev.target.value)} style={ctl} />
+          </div>
+          {/* HOW FRESH — Tally's last upload, and Genie live */}
+          {d?.fresh && (
+            <div className="text-xs text-right" style={{ color: C.muted, lineHeight: 1.45 }}>
+              {d.fresh.tally ? <>Tally last updated on <b style={{ color: C.ink }}>{new Date(d.fresh.tally.at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" })}</b> at <b style={{ color: C.ink }}>{new Date(d.fresh.tally.at).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" })}</b> by <b style={{ color: C.ink }}>{d.fresh.tally.by}</b></> : "Tally not uploaded yet"}
+              <span style={{ margin: "0 6px" }}>·</span>
+              <span style={{ color: C.green, fontWeight: 600 }}>● Genie live</span>{d.fresh.erp ? ` — ERP pulled ${new Date(d.fresh.erp).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" })}${new Date(d.fresh.erp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) === t0 ? " today" : ` on ${new Date(d.fresh.erp).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })}`}` : ""}
+            </div>
+          )}
+        </div>
       </div>
       {err && <div className="text-sm font-bold" style={{ color: C.red }}>{err}</div>}
       {!d && !err && <div className="text-sm" style={{ color: C.muted }}>Reading the books, the ERP, the order book, the floor…</div>}

@@ -83,6 +83,20 @@ export async function GET(req: Request) {
         }
       } catch (e) { swallow("ceo/snapshot", e); /* before 0231 — no triangles yet */ }
     }
-    return NextResponse.json({ from, to, today, me: me.email, ...figs, trend, prev, direction: DIRECTION, isYtd });
+    /* HOW FRESH (Dr Raghu, 14 Oct 2026: "in the corner mention last updated Tally on <> at <> by <>, and of course now Genie is updated fully").
+       Tally: the last upload Kuber took in, when and by whom. Genie: live, and the ERP's last hourly pull. */
+    const fresh: { tally: { at: string; by: string; name: string; kind: string } | null; erp: string | null } = { tally: null, erp: null };
+    try {
+      const { data: up } = await admin.from("kuber_upload").select("at, by, kind, name").order("at", { ascending: false }).limit(1);
+      if (up?.[0]) {
+        const { data: who } = await admin.from("profiles").select("display_name").ilike("email", String(up[0].by)).maybeSingle();
+        fresh.tally = { at: String(up[0].at), by: (who?.display_name as string) || String(up[0].by).split("@")[0], name: String(up[0].name || ""), kind: String(up[0].kind || "") };
+      }
+      if (crmConfigured()) {
+        const { data: beat } = await crmDb().from("crm_audit").select("at").eq("entity", "cron").eq("entity_id", "erp-pull").eq("action", "done").order("at", { ascending: false }).limit(1);
+        fresh.erp = beat?.[0]?.at ? String(beat[0].at) : null;
+      }
+    } catch (e) { swallow("ceo/fresh", e); }
+    return NextResponse.json({ from, to, today, me: me.email, ...figs, trend, prev, direction: DIRECTION, isYtd, fresh });
   } catch (e) { return errJson(e); }
 }

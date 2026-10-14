@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.3",
+    date: "2026-10-14",
+    module: "CEO: how fresh — Tally's last upload, and Genie live",
+    items: [
+      "HOW FRESH (Dr Raghu, 14 Oct 2026: \u201chere in the corner mention last updated Tally on <> at <> by <>, and of course now Genie is updated fully\u201d). Under the period buttons, frozen with them: Tally last updated on <date> at <time> by <who> \u2014 the last upload Kuber took in (10 Oct 2026, 4:18 PM, Sandesh Sawant) \u2014 and \u25cf Genie live, with the time of the ERP\u2019s last hourly pull. The books figures are as fresh as the Tally upload; everything else on the page is read live.",
+    ],
+  },
+  {
     v: "6.10.0.2",
     date: "2026-10-14",
     module: "CEO: the P&L on top, money in depth, the floor and people in depth, triangles week on week, frozen header, a TailAdmin look",
