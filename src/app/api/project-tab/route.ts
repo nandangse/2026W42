@@ -40,14 +40,17 @@ export async function GET(req: Request) {
     const id = projectId(new URL(req.url).searchParams.get("id") || "");
     if (!id) throw new HttpError(400, "Which project?");
     const admin = adminClient();
-    const [{ data: docs, error: de }, { data: rows, error: re }] = await Promise.all([
+    const [{ data: docs, error: de }, { data: rows, error: re }, { data: vp }, { data: vplan }] = await Promise.all([
       admin.from("project_doc").select("section, body, updated_by, updated_at").eq("project_id", id),
       admin.from("project_row").select("*").eq("project_id", id).order("section").order("seq"),
+      /* THE DESIGN SECTION IS VISHWAKARMA'S (Dr Raghu, 14 Oct 2026): read here, written there */
+      admin.from("vishwa_project").select("design_stage, design_owner, support_needed, bom_pct, manuf_pct, by, at").eq("project_id", id).maybeSingle(),
+      admin.from("vishwa_design_plan").select("idx, title, on_date, done, by, at").eq("project_id", id).order("idx"),
     ]);
     const err = de?.message || re?.message;
     if (err && missing(err)) return NextResponse.json({ installed: false, docs: [], rows: [] });
     if (err) throw new Error(err);
-    return NextResponse.json({ installed: true, docs: docs ?? [], rows: rows ?? [] });
+    return NextResponse.json({ installed: true, docs: docs ?? [], rows: rows ?? [], design: { project: vp ?? null, plan: vplan ?? [] } });
   } catch (e) {
     return errJson(e);
   }

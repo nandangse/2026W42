@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.11",
+    date: "2026-10-14",
+    module: "Project book: PCD first \u2014 typed documents filed in the Drive; the Design Section read from Vishwakarma",
+    items: [
+      "PCD FIRST (Dr Raghu, 14 Oct 2026: \u201cmove the PCD to the front before the TDS\u201d). The tab now sits after Product details.",
+      "THE PROJECT\u2019S DOCUMENTS (\u201ca Type drop down \u2026 in alphabetical order, a button to add type, a place to upload, show what was uploaded by who and when, save all this in the drive, keep this in project memory\u201d). Thirty-five types to start (Unpriced PO, Client TDS, GA Drawing Approved, QAP Approved, FAT Report \u2026), alphabetical, and + Add type for the rest. Each file goes browser \u2192 a private bucket by a signed upload (no size wall at Vercel) \u2192 the shared Drive under Projects / <project> / PCD / <type>, named with the date and type; the bucket copy is dropped once the Drive copy is made. The list shows type, document, who filed it and when (IST), whether the Drive copy is made (with Retry), and filters by type. Taking a document off the project book leaves the Drive copy. Migration 0233.",
+      "THE DESIGN SECTION IS VISHWAKARMA\u2019S (\u201cshould be linked to the Vishwakarma. Show all that here in view mode. Designer can see it in edit\u201d). The tab is view-only now: design stage, owner, BOM and manufacturing-drawing progress, support needed and the design plan, read from Vishwakarma, with Open in Vishwakarma. The detailed section waits for Dr Raghu\u2019s explanation.",
+    ],
+  },
+  {
     v: "6.10.0.10",
     date: "2026-10-14",
     module: "Planning: the pending-tasks pack \u2014 two short jobs to a sheet",

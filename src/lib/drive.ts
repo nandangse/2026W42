@@ -235,6 +235,39 @@ export async function uploadToFolder(
   return { id: j.id, link: j.webViewLink ?? null };
 }
 
+/**
+ * Make (or find) a chain of folders under a root and return the last one's id
+ * — Projects / <project> / PCD / <type> (Dr Raghu, 14 Oct 2026).
+ */
+export async function folderPath(cfg: DriveConfig, rootFolderId: string, steps: string[]): Promise<string> {
+  const token = await accessToken(cfg);
+  let parent = rootFolderId;
+  for (const step of steps) parent = await folder(token, parent, step);
+  return parent;
+}
+
+/** Upload one file straight to a folder already made (see folderPath). */
+export async function uploadToFolderId(
+  cfg: DriveConfig, folderId: string, bytes: ArrayBuffer, filename: string, mime = "application/octet-stream",
+): Promise<{ id: string; link: string | null }> {
+  const token = await accessToken(cfg);
+  const boundary = "genie" + Math.random().toString(36).slice(2);
+  const meta = JSON.stringify({ name: filename, parents: [folderId] });
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`),
+    Buffer.from(bytes),
+    Buffer.from(`\r\n--${boundary}--`),
+  ]);
+  const res = await fetch(`${UPLOAD}?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": `multipart/related; boundary=${boundary}` },
+    body,
+  });
+  const j = await res.json();
+  if (!res.ok || !j.id) throw new Error(j.error?.message || `Drive refused the file (${res.status})`);
+  return { id: j.id, link: j.webViewLink ?? null };
+}
+
 /* ------------------------------------------------------------------ reads */
 /**
  * READING FROM DRIVE (Dr Raghu, 4 Sep 2026: the InstaFinancials reports
