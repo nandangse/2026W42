@@ -53,13 +53,16 @@ function List({ title, hint, rows, total, tone, from, to }: { title: string; hin
   );
 }
 
-export function InternalKuberRoom() {
+export function InternalKuberRoom({ top }: { top: number }) {
   const [d, setD] = useState<D | null>(null); const [err, setErr] = useState<string | null>(null);
   useEffect(() => { fetch("/api/ceo/internal", { cache: "no-store" }).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error); setD(j); }).catch((e) => setErr(String(e.message || e))); }, []);
   return (
-    <div className="pt-5">
-      <div className="text-xl font-bold" style={{ color: C.ink }}>Internal Kuber</div>
-      <div className="text-sm mb-4" style={{ color: C.muted }}>the money already inside the company — what can be brought home without a new order, and where it leaks{d ? ` · books to ${dmy(d.pnl_to)}, the last month-end; cash today` : ""}</div>
+    <div>
+      {/* FROZEN (Dr Raghu, 14 Oct 2026: "this is to be frozen") — the title stays under the header, like the Dashboard's bar */}
+      <div className="mb-4" style={{ position: "sticky", top, zIndex: 30, background: C.bg, borderBottom: `1px solid ${C.line}`, margin: "0 -20px", padding: "16px 20px 10px" }}>
+        <div className="text-xl font-bold" style={{ color: C.ink }}>Internal Kuber</div>
+        <div className="text-sm" style={{ color: C.muted }}>the money already inside the company — what can be brought home without a new order, and where it leaks{d ? ` · books to ${dmy(d.pnl_to)}, the last month-end; cash today` : ""}</div>
+      </div>
       {err && <div className="text-sm" style={{ color: C.red }}>{err}</div>}
       {!d && !err && <div className="text-sm" style={{ color: C.muted }}>Reading the books, the ERP and Seva…</div>}
       {d && (

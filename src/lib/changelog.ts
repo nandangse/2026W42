@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.0.9",
+    date: "2026-10-14",
+    module: "CEO: Internal Kuber \u2014 the title frozen",
+    items: [
+      "FROZEN (Dr Raghu, 14 Oct 2026: \u201cthis is to be frozen\u201d). Internal Kuber\u2019s title bar \u2014 the name, what the room shows and the dates the books are struck to \u2014 now stays under the header while the lists scroll, as the Dashboard\u2019s bar does.",
+    ],
+  },
+  {
     v: "6.10.0.8",
     date: "2026-10-14",
     module: "CEO: Internal Kuber — the money to bring home, and where it leaks",

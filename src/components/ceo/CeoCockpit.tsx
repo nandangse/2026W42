@@ -237,14 +237,15 @@ export default function CeoCockpit({ email, displayName, initials, role }: { ema
             ))}
           </nav>
           <main className="flex-1" style={{ minWidth: 0, maxWidth: 1480, padding: "0 20px 20px" }}>
-            {room === "dashboard" ? <Dashboard top={top} /> : <div className="pt-5" />}
+            {room === "dashboard" || room === "internal" ? null : <div className="pt-5" />}
+            {room === "dashboard" && <Dashboard top={top} />}
             {room === "people" && <PeopleRoom />}
             {room === "strategy" && <StrategyRoom />}
             {room === "execution" && <ExecutionRoom />}
             {room === "cash" && <CashRoom />}
             {room === "reviews" && <ReviewsRoom />}
             {room === "exceptions" && <ExceptionsRoom />}
-            {room === "internal" && <InternalKuberRoom />}
+            {room === "internal" && <InternalKuberRoom top={top} />}
             <div className="text-xs mt-6" style={{ color: C.muted }}>Open to three: Dr Raghu, J C Kumar and Tushar Giri. Every figure is read from the module that owns it; click any number for what makes it.</div>
           </main>
         </div>
