@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.1.1",
+    date: "2026-10-15",
+    module: "LMS: the five Nandan TOC modules, a lesson each, planned for all staff",
+    items: [
+      "NANDAN TOC (Dr Raghu, 15 Oct 2026: \u201cmake new lesson, put all as separate lessons, embed the public view in that, give summary of that also in the description, make this assigned to all the staff\u201d). Five lessons in a Nandan TOC section of ToC Trainings: 1 Breaking Patterns, Building Flow (/lms/1672) \u00b7 2 From Pilot to Practice (/lms/5804) \u00b7 3 Find It. Feed It. Trust It. (/lms/5714) \u00b7 4 Decisions That Compound (/lms/4476) \u00b7 5 Plan It. Build It Right. Own It. (/lms/7964). Each carries its deck in the lesson and a summary of it in the description, and sits on all 186 staff members\u2019 plans as planned (by RJ).",
+      "A Google Slides, Docs or Sheets link on a lesson now opens in its viewer inside the lesson rather than the editor.",
+    ],
+  },
+  {
     v: "6.10.1.0",
     date: "2026-10-15",
     module: "LMS: an Admin page; My Team as one table of everybody",

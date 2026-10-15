@@ -287,6 +287,9 @@ export function pdfEmbed(url: string | null | undefined): string | null {
   if (!u) return null;
   const gd = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:.*&)?id=)([\w-]{10,})/i);
   if (gd) return `https://drive.google.com/file/d/${gd[1]}/preview`;
+  /* a Google Slides / Docs / Sheets link (…/edit) shows its viewer, not the editor (15 Oct 2026, the Nandan TOC decks) */
+  const gdoc = u.match(/docs\.google\.com\/(presentation|document|spreadsheets)\/d\/([\w-]{20,})/i);
+  if (gdoc) return `https://docs.google.com/${gdoc[1]}/d/${gdoc[2]}/preview`;
   return /^https?:\/\//i.test(u) ? u : null;
 }
 
