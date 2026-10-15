@@ -45,14 +45,21 @@ export default function Settings({ boot, reload }: { boot: Boot; reload: () => v
 /* ----------------------------------------------------------- organisations */
 function Orgs({ d, refresh, setMsg }: { d: Admin; refresh: () => void; setMsg: (s: string) => void }) {
   const [edit, setEdit] = useState<Partial<Org> | null>(null);
+  /* LIVE CLIENTS ONLY, OR ALL (Dr Raghu, 15 Oct 2026: "a button on top showing Live client only or all") — live = active, with at least one person who can sign in */
+  const [live, setLive] = useState(true);
+  const isLive = (o: Org) => o.active && d.users.some((u) => u.org_slug === o.slug && u.active);
+  const shown = d.orgs.filter((o) => !live || isLive(o));
   return (
-    <Card title="Organisations — the doors" right={<button onClick={() => setEdit({ slug: "", name: "", kind: "customer", match_names: [], intro: "", active: true })} style={btn("primary", { padding: "4px 10px", fontSize: 12 })}>+ Add</button>}>
+    <Card title="Organisations — the doors" right={<span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      {([[true, `Live clients · ${d.orgs.filter(isLive).length}`], [false, `All · ${d.orgs.length}`]] as const).map(([v, l]) => <button key={String(v)} onClick={() => setLive(v)} style={btn("ghost", { padding: "3px 9px", fontSize: 12, background: live === v ? P.navy : "#fff", color: live === v ? "#fff" : P.ink })}>{l}</button>)}
+      <button onClick={() => setEdit({ slug: "", name: "", kind: "customer", match_names: [], intro: "", active: true })} style={btn("primary", { padding: "4px 10px", fontSize: 12 })}>+ Add a client</button></span>}>
       <p style={{ fontSize: 12, color: P.dim, margin: "0 0 10px" }}>Each organisation has a slug — the word after /portal/ — and the names it goes by on Nandan's jobmaster or purchase orders. The portal matches on those names; nothing else decides what a customer sees.</p>
       {edit && <OrgForm d={d} o={edit} onDone={() => { setEdit(null); refresh(); setMsg("Organisation saved."); }} onCancel={() => setEdit(null)} setMsg={setMsg} />}
       <div style={{ display: "grid", gap: 6 }}>
-        {d.orgs.map((o) => (
+        {shown.map((o) => (
           <div key={o.slug} style={{ display: "flex", gap: 10, alignItems: "center", border: `1px solid ${P.line}`, borderRadius: 10, padding: "8px 12px", flexWrap: "wrap" }}>
             <b style={{ fontSize: 14 }}>{o.name}</b>
+            {isLive(o) && <span style={pill("#0D7A3F")}>live</span>}
             <a href={`/portal/${o.slug}`} style={{ fontSize: 12, color: P.blue }}>/portal/{o.slug}</a>
             <span style={pill(o.kind === "supplier" ? P.blue : P.accent)}>{o.kind}</span>
             {!o.active && <span style={pill(P.red)}>inactive</span>}
@@ -61,7 +68,7 @@ function Orgs({ d, refresh, setMsg }: { d: Admin; refresh: () => void; setMsg: (
             <button onClick={() => setEdit(o)} style={btn("ghost", { padding: "3px 9px", fontSize: 12 })}>Edit</button>
           </div>
         ))}
-        {d.orgs.length === 0 && <div style={{ color: P.muted, fontSize: 13 }}>No organisations yet. Add Veda, Taj… and give each the names it goes by.</div>}
+        {shown.length === 0 && <div style={{ color: P.muted, fontSize: 13 }}>{d.orgs.length ? "No live client yet — a client is live once it is active and has a person who can sign in." : "No organisations yet. Add Veda Aeronautics, Taj SATS, Vama, Safran… the slug is made from the name; give each the names it goes by on the jobmaster."}</div>}
       </div>
     </Card>
   );

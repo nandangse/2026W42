@@ -11,6 +11,7 @@ import { fmt, fmtFull, jobNo, initials, whoTag, computeSchedule, manDays, isoWee
 import { Board, GROUP_ORDER, Job, Person, TODAY, Task, assignees, myHandles, personLabel, taskJobRef, taskLate } from "./shared";
 import { TodayItem } from "./MyWeek";
 import { MyTasks } from "./MyTasks";
+import { QuerySolverView, LiveClientsView } from "./QuerySolver";
 
 // task card used in the Job Plan kanban + Tasking board
 export function TaskCard({ t, onOpen, onDelete }: { t: Task; onOpen: (t: Task) => void; onDelete?: (t: Task) => void }) {
@@ -48,7 +49,11 @@ export const TASKING_VIEWS = [
   ["goals", "By Goals"],
   ["esc", "By Escalations"],
   ["dump", "🧠 Brain Dump"],
+  /* THE QUERY SOLVER and LIVE CLIENTS (Dr Raghu, 15 Oct 2026) — Dr Raghu, Tushar and Pankaj */
+  ["queries", "💬 Query Solver"],
+  ["clients", "🏢 Live Clients"],
 ] as const;
+export const QUERY_SOLVER_VIEWERS = ["raghu@nandan.co.in", "tushar@nandan.co.in", "pankajs@nandan.co.in"];
 
 export type TaskingView = (typeof TASKING_VIEWS)[number][0];
 
@@ -263,7 +268,7 @@ export function Tasking({
     <div className="p-4">
       {/* ---- the six ways of reading the same list ---- */}
       <div className="flex gap-1 rounded p-1 bg-white border mb-2" style={{ borderColor: "#D9D6CD", width: "fit-content", overflowX: "auto" }}>
-        {TASKING_VIEWS.map(([k, l]) => (
+        {TASKING_VIEWS.filter(([k]) => (k !== "queries" && k !== "clients") || QUERY_SOLVER_VIEWERS.includes(me.email.toLowerCase())).map(([k, l]) => (
           <button
             key={k}
             onClick={() => setView(k)}
@@ -329,6 +334,10 @@ export function Tasking({
         <MyTasks board={board} me={me} reload={reload} onOpen={onOpen} onOpenTask={setLightbox} onDelete={isAdminHere ? deleteTask : undefined} />
       ) : view === "dump" ? (
         <BrainDump board={board} reload={reload} />
+      ) : view === "queries" ? (
+        <QuerySolverView onOpenTask={(id) => { const t = board.tasks.find((x) => x.id === id); if (t) setLightbox(t); }} />
+      ) : view === "clients" ? (
+        <LiveClientsView />
       ) : (
       <>
       <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -1443,7 +1452,9 @@ export function TaskModal({ task, owners = [], onClose, onToggle, reload, canDel
   const [closing, setClosing] = useState(false);
   const [prevent, setPrevent] = useState("");
   const [closeErr, setCloseErr] = useState("");
-  const [ef, setEf] = useState({ t: task.t || "", d: task.d || "", who: task.who || "", due: task.due || "", cat: task.cat || "Production", esc: task.esc || "None" });
+  const [ef, setEf] = useState({ t: task.t || "", d: task.d || "", who: task.who || "", due: task.due || "", cat: task.cat || "Production", esc: task.esc || "None",
+    /* THE QUERY SOLVER'S TICKS (Dr Raghu, 15 Oct 2026): Query Solver yes/no, client / ours, Client shared yes/no */
+    query_solver: !!task.query_solver, query_kind: (task.query_kind || "ours") as "client" | "ours", client_shared: !!task.client_shared });
   /** Photos and files on the task (0074) — stored in Genie, mirrored to Drive. */
   const [files, setFiles] = useState<{ id: string; name: string; url: string | null; is_photo: boolean; by: string | null; at: string }[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -1488,7 +1499,8 @@ export function TaskModal({ task, owners = [], onClose, onToggle, reload, canDel
   };
   const saveEdit = async () => {
     if (!ef.t.trim()) return;
-    await api.post("/api/tasks", { action: "update", id: task.id, kind: task.kind, title: ef.t.trim(), detail: ef.d, who: ef.who, due: ef.due || null, cat: ef.cat, esc: ef.esc });
+    await api.post("/api/tasks", { action: "update", id: task.id, kind: task.kind, title: ef.t.trim(), detail: ef.d, who: ef.who, due: ef.due || null, cat: ef.cat, esc: ef.esc,
+      query_solver: ef.query_solver, query_kind: ef.query_solver ? ef.query_kind : null, client_shared: ef.query_solver && ef.client_shared });
     await reload();
     onClose();
   };
@@ -1565,6 +1577,7 @@ export function TaskModal({ task, owners = [], onClose, onToggle, reload, canDel
 
         {isMs ? (
           <>
+            {task.query_solver && <div className="text-xs mt-2 font-bold rounded px-2 py-1 inline-block" style={{ background: "#DCE8F5", color: "var(--blue)" }}>💬 Query Solver · Q-{String(task.query_no || 0).padStart(4, "0")} · {task.query_kind === "client" ? "client's query" : "our query"}{task.client_shared ? " · shared with the client" : ""}</div>}
             {task.d && <div className="text-xs mt-2" style={{ color: "var(--dim)" }}>{task.d}</div>}
             <div className="text-xs mt-3 rounded p-2" style={{ background: "#DDE6EE", color: "var(--blue)" }}>⚑ This is a plan milestone — edit its name, dates, crew or tick it done in the Milestone table above.</div>
           </>
@@ -1586,6 +1599,19 @@ export function TaskModal({ task, owners = [], onClose, onToggle, reload, canDel
               <select value={ef.esc} onChange={(e) => setEf({ ...ef, esc: e.target.value })} className="w-1/2 text-xs border rounded px-1 py-1 bg-white" style={{ borderColor: "var(--line)" }} title="Escalation Log">
                 {ESC_LEVELS.map((c) => (<option key={c}>{c}</option>))}
               </select>
+            </div>
+            {/* THE QUERY SOLVER (Dr Raghu, 15 Oct 2026): "Query Solver — yes or no; Client shared — yes or no; the department, assigned etc as per normal" */}
+            <div className="flex gap-3 items-center flex-wrap text-xs rounded px-2 py-1.5" style={{ background: "#F4F2EC" }}>
+              <label className="flex items-center gap-1 font-bold" style={{ color: "var(--ink)" }}><input type="checkbox" checked={ef.query_solver} onChange={(e) => setEf({ ...ef, query_solver: e.target.checked })} /> Query Solver</label>
+              {ef.query_solver && (
+                <>
+                  <select value={ef.query_kind} onChange={(e) => setEf({ ...ef, query_kind: e.target.value as "client" | "ours" })} className="text-xs border rounded px-1 py-0.5 bg-white" style={{ borderColor: "var(--line)" }}>
+                    <option value="client">Client's query</option><option value="ours">Our query</option>
+                  </select>
+                  <label className="flex items-center gap-1" style={{ color: "var(--ink)" }} title="Shown to the customer on their portal, under Query solver"><input type="checkbox" checked={ef.client_shared} onChange={(e) => setEf({ ...ef, client_shared: e.target.checked })} /> Client shared</label>
+                  {task.query_no ? <span style={{ color: "var(--muted)" }}>Q-{String(task.query_no).padStart(4, "0")}</span> : <span style={{ color: "var(--muted)" }}>gets its number on save</span>}
+                </>
+              )}
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={saveEdit} className="flex-1 text-xs font-bold rounded py-1.5" style={{ background: "var(--accent)", color: "#fff" }}>💾 Save changes</button>

@@ -1,4 +1,5 @@
 import { fmtFull, jobNo } from "@/lib/schedule";
+import { PAGINATE } from "@/lib/print-pages";
 
 /**
  * THE FOR-UPDATING TABLE AS A PRINTED SHEET (Dr Raghu, 15 Oct 2026: "help me
@@ -52,12 +53,12 @@ tr:nth-child(even) td { background: #FAF9F5; }
 th.c, th.r { text-align: center; }
 .ft { margin-top: 3mm; font-size: 6.5pt; color: #8B8F87; display: flex; justify-content: space-between; }
 </style></head><body>
-<h1>Job Delivery Board — for updating</h1>
-<div class="meta">${rows.length} jobs in the Priority List's order · as at ${esc(fmtFull(today))} · Nandan GSE</div>
-<table>
+<header id="top"><h1>Job Delivery Board — for updating</h1>
+<div class="meta">${rows.length} jobs in the Priority List's order · as at ${esc(fmtFull(today))} · Nandan GSE</div></header>
+<table id="sheet">
 <thead><tr><th>#</th><th>Job</th><th>Customer tag</th><th class="c">Target delivery</th><th class="c">Owner</th><th class="c">Prod %</th><th class="c">Kit %</th><th class="r">Throughput</th><th class="c">T%</th><th>Current update</th><th>Status</th><th class="c">Tasks pending</th><th>Escalations</th></tr></thead>
 <tbody>${tr}</tbody>
 </table>
-<div class="ft"><span>Nandan GSE · Genie · job delivery board, for updating</span><span>${esc(fmtFull(today))}</span></div>
+<script>${PAGINATE(210 - 19, `Nandan GSE · Genie · job delivery board, for updating · ${esc(fmtFull(today))}`)}</script>
 </body></html>`;
 }

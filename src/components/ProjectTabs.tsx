@@ -30,7 +30,7 @@ export type TabKey =
 /* PCD FIRST (Dr Raghu, 14 Oct 2026: "move the PCD to the front before the
    TDS") — the project's documents, typed and filed in the Drive. The Design
    Section is Vishwakarma's: read here, written there. */
-export const TABS: { k: TabKey; label: string; kind: "doc" | "list" | "built-in" | "files" | "design"; note?: string }[] = [
+export const TABS: { k: TabKey; label: string; kind: "doc" | "list" | "built-in" | "files" | "design" | "queries"; note?: string }[] = [
   { k: "product",     label: "Product details",  kind: "doc" },
   { k: "pcd",         label: "PCD",              kind: "files", note: "Project documents — filed in the Drive" },
   { k: "tds",         label: "TDS",              kind: "doc",  note: "Technical data sheet" },
@@ -38,7 +38,8 @@ export const TABS: { k: TabKey; label: string; kind: "doc" | "list" | "built-in"
   { k: "commercials", label: "Commercials",      kind: "built-in", note: "Project managers only" },
   { k: "charter",     label: "Project Charter",  kind: "doc" },
   { k: "rbom",        label: "RBOM",             kind: "list", note: "Real Bill of Materials" },
-  { k: "issue",       label: "Real Issues Solving", kind: "list" },
+  /* THE QUERY SOLVER (Dr Raghu, 15 Oct 2026: "this Real Issues is Query Solver") — the project's queries are tasks with the tick */
+  { k: "issue",       label: "Query Solver",      kind: "queries", note: "Queries — the client's and ours — raised as tasks on this project" },
   { k: "risk",        label: "Risk Statement",   kind: "doc" },
   { k: "milestone",   label: "Milestones",       kind: "list" },
   { k: "checklist",   label: "Checklist",        kind: "list" },
@@ -61,6 +62,7 @@ const STATES: { k: string; label: string; bg: string; fg: string }[] = [
   { k: "dropped", label: "Dropped", bg: "#F7F5EF", fg: "#B8B5AC" },
 ];
 
+type QueryRow = { id: string; kind: "erp" | "manual"; query_no: number | null; query_kind: "client" | "ours" | null; client_shared: boolean; project_id: string | null; client: string | null; job_id: string | null; job_tag: string | null; raised_on: string | null; title: string; detail: string; who: string; cat: string; esc: string; due: string | null; done: boolean };
 type Design = { project: { design_stage: string | null; design_owner: string | null; support_needed: string | null; bom_pct: number | null; manuf_pct: number | null; by: string | null; at: string } | null; plan: { idx: number; title: string; on_date: string | null; done: boolean; by: string | null; at: string }[] };
 type Doc = { section: string; body: string; updated_by: string | null; updated_at: string };
 type Row = {
@@ -70,12 +72,14 @@ type Row = {
 };
 
 export default function ProjectTabs({
-  projectId, canEdit, mayMoney, erp, jobsPane, commercialsPane,
+  projectId, canEdit, mayMoney, erp, jobsOfProject = [], jobsPane, commercialsPane,
 }: {
   projectId: string;
   canEdit: boolean;
   mayMoney: boolean;
   erp: Record<string, unknown>;
+  /** the project's jobs, for a query to hang on (15 Oct 2026) */
+  jobsOfProject?: { id: string; tag: string }[];
   jobsPane: React.ReactNode;
   commercialsPane: React.ReactNode;
 }) {
@@ -83,17 +87,19 @@ export default function ProjectTabs({
   const [docs, setDocs] = useState<Doc[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [design, setDesign] = useState<Design>({ project: null, plan: [] });
+  const [queries, setQueries] = useState<QueryRow[]>([]);
   const [nFiles, setNFiles] = useState(0);
   const [installed, setInstalled] = useState(true);
   const [busy, setBusy] = useState("");
 
   const load = useCallback(async () => {
     const r = await api.get(`/api/project-tab?id=${encodeURIComponent(projectId)}`) as
-      { installed: boolean; docs: Doc[]; rows: Row[]; design?: Design };
+      { installed: boolean; docs: Doc[]; rows: Row[]; design?: Design; queries?: QueryRow[] };
     setInstalled(r.installed !== false);
     setDocs(r.docs || []);
     setRows(r.rows || []);
     setDesign(r.design || { project: null, plan: [] });
+    setQueries(r.queries || []);
   }, [projectId]);
 
   useEffect(() => { void load().catch(() => null); }, [load]);
@@ -107,7 +113,7 @@ export default function ProjectTabs({
       <div className="flex flex-wrap gap-1.5">
         {shown.map((t) => {
           const on = t.k === tab;
-          const n = t.kind === "list" ? rows.filter((r) => r.section === t.k).length : t.kind === "files" ? nFiles : 0;
+          const n = t.kind === "list" ? rows.filter((r) => r.section === t.k).length : t.kind === "files" ? nFiles : t.kind === "queries" ? queries.filter((q) => !q.done).length : 0;
           const has = (t.kind === "doc" || t.kind === "design") && !!docs.find((d) => d.section === t.k)?.body.trim();
           return (
             <button key={t.k} onClick={() => setTab(t.k)}
@@ -145,6 +151,9 @@ export default function ProjectTabs({
         )}
         {meta.kind === "files" && (
           <FilesPane projectId={projectId} title={String(erp.project_name ?? erp.name ?? "")} onCount={setNFiles} />
+        )}
+        {meta.kind === "queries" && (
+          <QueriesPane projectId={projectId} title={String(erp.project_name ?? erp.name ?? "")} client={String(erp.customer ?? erp.customer_name ?? "")} rows={queries} jobs={jobsOfProject} canEdit={canEdit && installed} reload={load} />
         )}
         {meta.kind === "design" && (
           <DesignPane design={design} doc={docs.find((d) => d.section === "design") || null} />
@@ -568,6 +577,82 @@ function DesignPane({ design, doc }: { design: Design; doc: Doc | null }) {
         </>
       )}
       {!p && !design.plan.length && <div className="text-xs mt-3" style={{ color: C.sub }}>Nothing is kept for this project in Vishwakarma yet — the designer starts it there.</div>}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------- the Query Solver */
+
+/**
+ * THE QUERY SOLVER ON THE PROJECT BOOK (Dr Raghu, 15 Oct 2026: "Project :
+ * project name - Client - QueryNo - Raised date - Query"; "two types — client
+ * and ours"; "Client shared — yes or no"). Every line is a task on the task
+ * list with the Query Solver tick; it is assigned, dated and closed there like
+ * any task, and the client-shared ones show on the customer's portal.
+ */
+const QTYPE: Record<string, { label: string; bg: string; fg: string }> = { client: { label: "Client", bg: "#FFF3E8", fg: "#B26A00" }, ours: { label: "Ours", bg: "#E8F0F8", fg: "var(--blue)" } };
+function QueriesPane({ projectId, title, client, rows, jobs, canEdit, reload }: { projectId: string; title: string; client: string; rows: QueryRow[]; jobs: { id: string; tag: string }[]; canEdit: boolean; reload: () => Promise<void> }) {
+  const [f, setF] = useState({ t: "", d: "", kind: "client" as "client" | "ours", shared: true, who: "", due: "", cat: "Production", job_id: jobs[0]?.id || "" });
+  const [busy, setBusy] = useState(false); const [msg, setMsg] = useState(""); const [showDone, setShowDone] = useState(false);
+  useEffect(() => { if (!f.job_id && jobs[0]) setF((x) => ({ ...x, job_id: jobs[0].id })); }, [jobs, f.job_id]);
+  const add = async () => {
+    if (!f.t.trim()) return; setBusy(true); setMsg("");
+    const r = await api.post("/api/tasks", { action: "create", title: f.t.trim(), detail: f.d, who: f.who || "unassigned", due: f.due || null, cat: f.cat, esc: "None", job_id: f.job_id || null, project: projectId, query_solver: true, query_kind: f.kind, client_shared: f.shared }).catch((e) => ({ ok: false, error: String(e.message || e) }));
+    setBusy(false);
+    if (!r.ok) { setMsg(r.error || "Could not raise the query."); return; }
+    setF({ ...f, t: "", d: "" }); await reload();
+  };
+  const toggle = async (q: QueryRow) => { await api.post("/api/tasks", { action: "toggle", id: q.id, kind: q.kind, done: !q.done }).catch(() => null); await reload(); };
+  const shown = rows.filter((q) => showDone || !q.done);
+  const qn = (n: number | null) => (n ? `Q-${String(n).padStart(4, "0")}` : "—");
+  return (
+    <div className="rounded-lg border bg-white" style={{ borderColor: C.line }}>
+      <div className="px-3 pt-2 flex items-baseline justify-between gap-2 flex-wrap">
+        <div><span className="font-bold" style={{ color: C.ink }}>Query Solver</span><span className="text-xs ml-2" style={{ color: C.sub }}>{title}{client ? ` · ${client}` : ""} — each query is a task on the list; the client-shared ones show on their portal</span></div>
+        <div className="text-xs flex gap-2 items-center" style={{ color: C.sub }}>{rows.filter((q) => !q.done).length} open · {rows.filter((q) => q.done).length} closed<label className="flex items-center gap-1"><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> show closed</label></div>
+      </div>
+      <div className="overflow-x-auto mt-1">
+        <table className="w-full text-xs genie-table" style={{ minWidth: 980 }}>
+          <thead>
+            <tr style={{ background: "var(--ink)", color: "#fff" }}>
+              <th className="px-2 py-2 text-left" style={{ width: 70 }}>Query no</th><th className="px-2 py-2 text-left" style={{ width: 95 }}>Raised</th><th className="px-2 py-2 text-left">Query</th>
+              <th className="px-2 py-2 text-left" style={{ width: 70 }}>Type</th><th className="px-2 py-2 text-left" style={{ width: 90 }}>Client shared</th><th className="px-2 py-2 text-left" style={{ width: 110 }}>Assigned</th>
+              <th className="px-2 py-2 text-left" style={{ width: 100 }}>Department</th><th className="px-2 py-2 text-left" style={{ width: 95 }}>Due</th><th className="px-2 py-2 text-left" style={{ width: 80 }}>State</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((q, i) => (
+              <tr key={q.id} style={{ borderTop: "1px solid #EFEDE7", background: i % 2 ? "#FAF9F5" : "#fff", opacity: q.done ? .55 : 1 }}>
+                <td className="px-2 py-1.5 font-bold tnum" style={{ color: C.navy }}>{qn(q.query_no)}</td>
+                <td className="px-2 py-1.5 tnum">{q.raised_on ? fmtFull(q.raised_on) : "—"}</td>
+                <td className="px-2 py-1.5"><b style={{ color: C.ink }}>{q.title}</b>{q.detail && <div style={{ color: C.sub }}>{q.detail}</div>}{q.job_tag && <div style={{ color: "#B8B5AC" }}>{q.job_id?.slice(-4)} · {q.job_tag}</div>}</td>
+                <td className="px-2 py-1.5">{q.query_kind ? <span className="rounded px-1.5 py-0.5 font-bold" style={{ background: QTYPE[q.query_kind].bg, color: QTYPE[q.query_kind].fg }}>{QTYPE[q.query_kind].label}</span> : "—"}</td>
+                <td className="px-2 py-1.5">{q.client_shared ? <span style={{ color: C.green, fontWeight: 700 }}>✓ Yes</span> : <span style={{ color: C.sub }}>No</span>}</td>
+                <td className="px-2 py-1.5">{q.who}</td><td className="px-2 py-1.5" style={{ color: C.sub }}>{q.cat}</td>
+                <td className="px-2 py-1.5 tnum" style={{ color: q.due && !q.done && q.due < new Date().toISOString().slice(0, 10) ? "var(--red)" : C.ink }}>{q.due ? fmtFull(q.due) : "—"}</td>
+                <td className="px-2 py-1.5">{canEdit ? <button onClick={() => void toggle(q)} className="rounded px-1.5 py-0.5 text-xs font-bold" style={q.done ? { background: "#E8F3E9", color: C.green } : { background: "#F4F2EC", color: "var(--dim)" }}>{q.done ? "Closed" : "Open"}</button> : <Chip state={q.done ? "done" : "open"} />}</td>
+              </tr>
+            ))}
+            {shown.length === 0 && <tr><td colSpan={9} className="px-3 py-4 text-center" style={{ color: C.sub }}>No query on this project yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {canEdit && (
+        <div className="p-2 border-t grid gap-1.5" style={{ borderColor: C.line, background: "#FAF9F5" }}>
+          <div className="flex flex-wrap gap-1.5 items-center">
+            <input value={f.t} onChange={(e) => setF({ ...f, t: e.target.value })} placeholder="The query" className="rounded border px-2 py-1 text-xs" style={{ borderColor: C.line, minWidth: 280, flex: 1 }} />
+            <select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as "client" | "ours" })} className="rounded border px-1 py-1 text-xs bg-white" style={{ borderColor: C.line }}><option value="client">Client&apos;s query</option><option value="ours">Our query</option></select>
+            <label className="text-xs flex items-center gap-1"><input type="checkbox" checked={f.shared} onChange={(e) => setF({ ...f, shared: e.target.checked })} /> Client shared</label>
+            <input value={f.who} onChange={(e) => setF({ ...f, who: e.target.value })} placeholder="Assigned to" className="rounded border px-2 py-1 text-xs" style={{ borderColor: C.line, width: 120 }} />
+            <input type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} className="rounded border px-2 py-1 text-xs" style={{ borderColor: C.line }} />
+            <input value={f.cat} onChange={(e) => setF({ ...f, cat: e.target.value })} placeholder="Department" className="rounded border px-2 py-1 text-xs" style={{ borderColor: C.line, width: 110 }} />
+            {jobs.length > 0 && <select value={f.job_id} onChange={(e) => setF({ ...f, job_id: e.target.value })} className="rounded border px-1 py-1 text-xs bg-white" style={{ borderColor: C.line, maxWidth: 220 }}>{jobs.map((j) => <option key={j.id} value={j.id}>{j.id.slice(-4)} · {j.tag}</option>)}</select>}
+            <button onClick={add} disabled={busy || !f.t.trim()} className="px-3 py-1 rounded text-xs font-bold" style={{ background: f.t.trim() ? "var(--green)" : "var(--line)", color: f.t.trim() ? "#fff" : "var(--muted)" }}>{busy ? "…" : "+ Raise"}</button>
+          </div>
+          <input value={f.d} onChange={(e) => setF({ ...f, d: e.target.value })} placeholder="Detail (optional)" className="rounded border px-2 py-1 text-xs" style={{ borderColor: C.line }} />
+          {msg && <div className="text-xs" style={{ color: "var(--red)" }}>{msg}</div>}
+        </div>
+      )}
     </div>
   );
 }

@@ -14,6 +14,15 @@ export const dynamic = "force-dynamic";
 //   { action: "toggle", id, kind: "erp"|"manual", done }
 //   { action: "update", id, kind, title?, detail?, who?, due?, cat?, esc? }
 //   { action: "delete", id, kind }  — removes the task and its comments
+/** The next query number — one sequence across both task tables (0235). */
+async function nextQueryNo(): Promise<number | null> {
+  try { const { data, error } = await adminClient().rpc("nextval_query_solver"); if (!error && data != null) return Number(data); } catch { /* fall through */ }
+  const a = adminClient();
+  const [m, e] = await Promise.all([a.from("manual_tasks").select("query_no").not("query_no", "is", null).order("query_no", { ascending: false }).limit(1), a.from("erp_tasks").select("query_no").not("query_no", "is", null).order("query_no", { ascending: false }).limit(1)]);
+  if (m.error || e.error) return null;
+  return Math.max(Number(m.data?.[0]?.query_no) || 0, Number(e.data?.[0]?.query_no) || 0) + 1;
+}
+
 export async function POST(req: Request) {
   try {
     const user = await requireTasker();
@@ -39,11 +48,13 @@ export async function POST(req: Request) {
           // the swimlane it belongs to — Kuber's Tasking and the main one
           // share it (0082); an unknown value is dropped, never guessed
           ...(["job", "goal", "rock", "audit", "strategic"].includes(String(body.related_to)) ? { related_to: String(body.related_to) } : {}),
+          /* THE QUERY SOLVER'S TICKS (0235) */
+          ...(body.query_solver ? { query_solver: true, query_kind: body.query_kind === "client" ? "client" : "ours", client_shared: !!body.client_shared, raised_on: String(body.raised_on || "").slice(0, 10) || new Date().toISOString().slice(0, 10), query_no: await nextQueryNo() } : {}),
       };
       let ins = await supabase.from("manual_tasks").insert(row).select("id").single();
-      /* 0199 not run yet: the task is still raised, without the goal and project */
-      if (ins.error && /goal_id|project|schema cache/i.test(ins.error.message)) {
-        delete row.goal_id; delete row.project;
+      /* 0199 / 0235 not run yet: the task is still raised, without the goal, the project or the query ticks */
+      if (ins.error && /goal_id|project|query_|client_shared|raised_on|schema cache/i.test(ins.error.message)) {
+        delete row.goal_id; delete row.project; delete row.query_solver; delete row.query_kind; delete row.client_shared; delete row.query_no; delete row.raised_on;
         ins = await supabase.from("manual_tasks").insert(row).select("id").single();
       }
       const { data, error } = ins;
@@ -171,6 +182,17 @@ export async function POST(req: Request) {
       if ("esc_why" in body) patch.esc_why = String(body.esc_why || "").trim() || null;
       if (body.kind === "manual" && "goal_id" in body) patch.goal_id = /^[0-9a-f-]{36}$/i.test(String(body.goal_id || "")) ? String(body.goal_id) : null;
       if (body.kind === "manual" && "project" in body) patch.project = String(body.project || "").trim() || null;
+      /* THE QUERY SOLVER'S TICKS (0235) — either kind of task; the number is given once and kept */
+      if ("query_solver" in body) {
+        patch.query_solver = !!body.query_solver;
+        if (body.query_solver) {
+          const { data: cur } = await adminClient().from(table).select("query_no, raised_on").eq("id", body.id).maybeSingle();
+          if (!cur?.query_no) patch.query_no = await nextQueryNo();
+          if (!cur?.raised_on) patch.raised_on = new Date().toISOString().slice(0, 10);
+        }
+      }
+      if ("query_kind" in body) patch.query_kind = body.query_kind === "client" ? "client" : body.query_kind === "ours" ? "ours" : null;
+      if ("client_shared" in body) patch.client_shared = !!body.client_shared;
       if (!Object.keys(patch).length)
         return NextResponse.json({ error: "nothing to update" }, { status: 400 });
 
@@ -213,7 +235,13 @@ export async function POST(req: Request) {
           ? (await supabase.from(table).select("who, title").eq("id", body.id).maybeSingle()).data
           : null;
 
-      const { error } = await supabase.from(table).update(patch).eq("id", body.id);
+      let { error } = await supabase.from(table).update(patch).eq("id", body.id);
+      /* before 0235 the query columns are not there — the rest of the change still lands */
+      if (error && /query_|client_shared|raised_on|schema cache/i.test(error.message)) {
+        for (const k of ["query_solver", "query_kind", "client_shared", "query_no", "raised_on"]) delete patch[k];
+        if (Object.keys(patch).length) ({ error } = await supabase.from(table).update(patch).eq("id", body.id));
+        else error = null;
+      }
       if (error) throw new Error(error.message);
 
       if (

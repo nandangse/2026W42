@@ -3,6 +3,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { errJson, HttpError } from "@/lib/auth";
 import { isStaff, portalAudit, requirePortalUser } from "@/lib/portal/auth";
 import { resolveScope } from "@/lib/portal/data";
+import { queryRows } from "@/lib/query-solver";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,22 @@ export async function GET(req: Request) {
       const { data } = await r;
       replies = (data || []) as Record<string, unknown>[];
     }
-    return NextResponse.json({ queries: qs || [], replies });
+    /* GENIE'S OWN QUERIES, SHARED WITH THE CLIENT (Dr Raghu, 15 Oct 2026: "this will also be
+       visible to clients — in this portal also it will come up"). A task ticked Query Solver and
+       Client shared shows here as a thread of Nandan's, read-only: it is answered in Genie. */
+    let shared: Record<string, unknown>[] = [];
+    try {
+      const names = scope.org ? scope.org.match_names : undefined;
+      if (!scope.org || scope.org.kind === "customer") {
+        const rows = await queryRows(admin, { sharedOnly: true, ...(names ? { clientNames: names } : {}) });
+        shared = rows.map((r) => ({
+          id: `task:${r.id}`, org_slug: scope.org?.slug || "", job_id: r.job_id ? r.job_id.slice(-4) : null,
+          subject: `${r.query_no ? `Q-${String(r.query_no).padStart(4, "0")} · ` : ""}${r.title}`, body: r.detail || "",
+          status: r.done ? "closed" : "open", by_name: `Nandan · ${r.who}`, by_side: "us", at: r.created_at || r.raised_on, updated_at: r.created_at || r.raised_on, genie: true,
+        }));
+      }
+    } catch { /* before 0235 — nothing shared */ }
+    return NextResponse.json({ queries: [...(qs || []), ...shared].sort((a, b) => String((b as Record<string, unknown>).updated_at).localeCompare(String((a as Record<string, unknown>).updated_at))), replies });
   } catch (e) { return errJson(e); }
 }
 
@@ -63,6 +79,7 @@ export async function POST(req: Request) {
 
     const id = String(b.id || "");
     if (!id) throw new HttpError(400, "Which query?");
+    if (id.startsWith("task:")) throw new HttpError(400, "This one is Nandan's own query, tracked in Genie — it is answered there.");
     const { data: q, error: qe } = await admin.from("portal_query").select("id,org_slug,status").eq("id", id).maybeSingle();
     if (qe) throw qe;
     if (!q) throw new HttpError(404, "No such query.");

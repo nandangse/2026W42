@@ -178,6 +178,7 @@ export default function ProjectPage({
           canEdit={d.mayMoney !== false}
           mayMoney={d.mayMoney !== false}
           erp={e}
+          jobsOfProject={d.jobs.map((j) => ({ id: String(j.id), tag: String(j.tag || "") }))}
           jobsPane={jobsPane}
           commercialsPane={commercialsPane}
         />

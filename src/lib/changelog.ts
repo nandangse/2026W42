@@ -92,6 +92,18 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.2.0",
+    date: "2026-10-15",
+    module: "The Query Solver \u2014 on the task list, the project book, Nandan Tasking and the customer\u2019s portal; Live Clients; page numbers on printed sheets",
+    items: [
+      "THE QUERY SOLVER (Dr Raghu, 15 Oct 2026: \u201cthis Real Issues is Query Solver. In that also keep two types \u2014 client and ours. Keep the task list item as Query Solver \u2014 yes or no; Client shared \u2014 yes or no. The department, assigned, etc are as per normal\u201d). A query is a task that says so: two ticks on any task \u2014 Query Solver, and Client shared \u2014 and a type, the client\u2019s or ours. A query earns a number (Q-0001) that stays with it. Migration 0235.",
+      "ON THE PROJECT BOOK, Real Issues Solving is now Query Solver: project, client, query no, raised date, the query, type, client shared, assigned, department, due and state \u2014 and a line to raise one straight onto the project\u2019s job.",
+      "IN NANDAN TASKING, two views for Dr Raghu, Tushar and Pankaj (\u201clet Tushar and Pankaj and me see it\u201d): Query Solver, every query by project, and Live Clients \u2014 the customers with a portal door, their people, last sign-in and the queries shared with them.",
+      "ON THE CUSTOMER\u2019S PORTAL, a query ticked Client shared appears under Query solver as Nandan\u2019s own thread, read-only there and closed there when it closes in Genie. Portal Settings gained a Live clients / All switch (\u201ca button on top showing live clients only or all\u201d) and + Add a client; a client\u2019s slug is made from its name.",
+      "PAGE NUMBERS (\u201cin this put page numbers also\u201d). Materials still short and the For Updating sheet now paginate themselves before printing: the head on every page, no row split, and Page n of N at the foot of each.",
+    ],
+  },
+  {
     v: "6.10.1.4",
     date: "2026-10-15",
     module: "CEO: an Approvals room, and the CEO page as Dr Raghu\u2019s front door",

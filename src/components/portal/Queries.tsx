@@ -116,7 +116,8 @@ function Thread({ boot, q, replies, reload, close }: { boot: Boot; q: Query; rep
         {bubble(q.by_side, q.by_name, q.at, q.body || "(no details)")}
         {replies.map((r) => bubble(r.by_side, r.by_name, r.at, r.body, r.internal, r.id))}
       </div>
-      {q.status !== "closed" && (
+      {q.id.startsWith("task:") && <div style={{ fontSize: 12, color: P.muted, marginTop: 8 }}>Raised by Nandan and tracked in Genie&apos;s Query Solver — it is answered there, and closes here when it closes there.</div>}
+      {q.status !== "closed" && !q.id.startsWith("task:") && (
         <div className="no-print" style={{ marginTop: 14, display: "grid", gap: 8 }}>
           <textarea style={{ ...input, minHeight: 70 }} value={text} onChange={(e) => setText(e.target.value)} placeholder={boot.me.staff ? "Answer, or an internal note…" : "Write back…"} />
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>

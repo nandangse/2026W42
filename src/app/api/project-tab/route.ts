@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readBody, type AnyBody } from "@/lib/validate";
 import { requireUser, errJson, HttpError, type AuthedUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
+import { queryRows } from "@/lib/query-solver";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,9 @@ export async function GET(req: Request) {
     const err = de?.message || re?.message;
     if (err && missing(err)) return NextResponse.json({ installed: false, docs: [], rows: [] });
     if (err) throw new Error(err);
-    return NextResponse.json({ installed: true, docs: docs ?? [], rows: rows ?? [], design: { project: vp ?? null, plan: vplan ?? [] } });
+    /* THE QUERY SOLVER TAB (15 Oct 2026): the project's queries are tasks with the tick, read here */
+    const queries = await queryRows(admin, { projectId: id }).catch(() => []);
+    return NextResponse.json({ installed: true, docs: docs ?? [], rows: rows ?? [], design: { project: vp ?? null, plan: vplan ?? [] }, queries });
   } catch (e) {
     return errJson(e);
   }

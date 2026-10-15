@@ -420,6 +420,7 @@ export async function buildBoard(supabase: SupabaseClient) {
       // ERP ToDos have no author inside Genie — they arrive from the export
       by: null as string | null,
       comments: commentCounts["erp:" + t.id] || 0,
+      ...queryBits(t),
     })),
     ...(manualRes.data || []).map((t) => ({
       id: t.id,
@@ -443,6 +444,7 @@ export async function buildBoard(supabase: SupabaseClient) {
       goal_id: (t.goal_id ?? null) as string | null,
       project: (t.project ?? null) as string | null,
       comments: commentCounts["manual:" + t.id] || 0,
+      ...queryBits(t),
     })),
   ];
 
@@ -469,6 +471,15 @@ export async function buildBoard(supabase: SupabaseClient) {
   for (const t of templatesRes.data || []) templates[t.family] = t.milestones;
 
   // latest import batch per kind
+
+/** THE QUERY SOLVER'S TWO TICKS (0235) — read tolerantly, so a board before the migration still draws. */
+const queryBits = (t: Record<string, unknown>) => ({
+  query_solver: !!t.query_solver,
+  query_kind: (t.query_kind === "client" || t.query_kind === "ours" ? t.query_kind : null) as "client" | "ours" | null,
+  client_shared: !!t.client_shared,
+  query_no: (t.query_no == null ? null : Number(t.query_no)) as number | null,
+  raised_on: (t.raised_on ?? null) as string | null,
+});
   const batches: Record<string, any> = {};
   for (const b of batchesRes.data || []) {
     if (!batches[b.kind]) batches[b.kind] = b;

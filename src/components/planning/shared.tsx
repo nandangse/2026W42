@@ -248,6 +248,12 @@ export interface Task {
   /** The goal and the project it serves, when it names them (0199). */
   goal_id?: string | null;
   project?: string | null;
+  /** THE QUERY SOLVER (0235): a task that is a query, of the client's or ours; shared to the client's portal or not; its number once it is one. */
+  query_solver?: boolean;
+  query_kind?: "client" | "ours" | null;
+  client_shared?: boolean;
+  query_no?: number | null;
+  raised_on?: string | null;
 }
 
 /**

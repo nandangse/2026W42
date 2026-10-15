@@ -12,6 +12,7 @@ import { MatBox, type Mat } from "../MaterialKitting";
 import { JobLightbox } from "../JobsInProgress";
 import { toWip } from "./OnFloor";
 import { Board, Job, TODAY, Task, assignees, taskJobRef, taskLate } from "./shared";
+import { PAGINATE } from "@/lib/print-pages";
 import { TaskModal } from "./Tasking";
 
 /**
@@ -284,12 +285,12 @@ tr.late td.c { font-weight: bold; color: #B3261E; }
 .foot { margin-top: 8px; font-size: 10px; color: #5A6B7B; }
 thead { display: table-header-group; }
 </style></head><body>
-<h1>Materials still short</h1>
+<header id="top"><h1>Materials still short</h1>
 <div class="sub">Nandan GSE &middot; ${rows.length} line${rows.length === 1 ? "" : "s"} across ${jobsAffected} job${jobsAffected === 1 ? "" : "s"} &middot; printed ${new Date().toLocaleString("en-IN")}<br>
-Showing: ${esc(bits.join(" &middot; "))}</div>
-<table><thead><tr><th>Job</th><th>Tag</th><th>TDD</th><th>Material / kit item</th><th>Qty</th><th>Receivable</th><th>Update</th><th>Status</th><th>With</th></tr></thead>
+Showing: ${esc(bits.join(" &middot; "))}</div></header>
+<table id="sheet"><thead><tr><th>Job</th><th>Tag</th><th>TDD</th><th>Material / kit item</th><th>Qty</th><th>Receivable</th><th>Update</th><th>Status</th><th>With</th></tr></thead>
 <tbody>${body}</tbody></table>
-<div class="foot"><b>${late}</b> past their receivable date (shaded) &middot; <b>${defective}</b> QC defective. This is the screen as it was filtered and sorted, nothing more and nothing less.</div>
+<script>${PAGINATE(210 - 20, `${late} past their receivable date (shaded) · ${defective} QC defective · the screen as filtered and sorted`)}</script>
 </body></html>`;
     const w = window.open("", "_blank");
     if (!w) { window.alert("Your browser blocked the print window. Allow pop-ups for this site and press PDF again."); return; }
