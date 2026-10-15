@@ -42,6 +42,7 @@ export interface Content { id: string; kind: string; title: string; body: string
 
 export const TABS: { key: string; label: string; icon: string; blurb: string }[] = [
   { key: "home", label: "Orders & jobs", icon: "🚚", blurb: "what is open, what is under delivery" },
+  { key: "customers", label: "Customer portal", icon: "🏢", blurb: "the customers, and each one's Jobmaster" },
   { key: "rfqs", label: "RFQs", icon: "📝", blurb: "what Nandan wants quoted" },
   { key: "queries", label: "Query solver", icon: "💬", blurb: "ask, and read the answers" },
   { key: "commercials", label: "Commercials", icon: "₹", blurb: "values and payment terms" },

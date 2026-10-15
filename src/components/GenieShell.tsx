@@ -22,7 +22,7 @@ import { swallow } from "@/lib/swallow";
 export type ShellModule = "main" | "crm" | "marketing" | "hrms" | "accounts" | "vishwakarma" | "seva" | "ims" | "saamaan" | "lms" | "idp" | "portal" | "lc" | "ceo";
 
 export const MODULES: { key: ShellModule; label: string; icon: string; href: string; blurb: string }[] = [
-  { key: "main", label: "Planning", icon: "🧞", href: "/?home=1", blurb: "jobs, milestones, the floor" },
+  { key: "main", label: "Planning", icon: "🧞", href: "/", blurb: "jobs, milestones, the floor" },
   { key: "crm", label: "CRM", icon: "🤝", href: "/crm", blurb: "enquiries to orders" },
   { key: "marketing", label: "Marketing", icon: "📣", href: "/marketing", blurb: "leads, lists, campaigns" },
   /* SEVA WAS MISSING FROM THIS LIST (Dr Raghu, 8 Sep 2026: "we had seva

@@ -3,6 +3,15 @@
 // offset_days→offset, milestones grouped into plans, etc.).
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** THE QUERY SOLVER'S TWO TICKS (0235) — read tolerantly, so a board before the migration still draws. */
+const queryBits = (t: Record<string, unknown>) => ({
+  query_solver: !!t.query_solver,
+  query_kind: (t.query_kind === "client" || t.query_kind === "ours" ? t.query_kind : null) as "client" | "ours" | null,
+  client_shared: !!t.client_shared,
+  query_no: (t.query_no == null ? null : Number(t.query_no)) as number | null,
+  raised_on: (t.raised_on ?? null) as string | null,
+});
+
 export interface BoardJob {
   id: string;
   tag: string;
@@ -471,15 +480,6 @@ export async function buildBoard(supabase: SupabaseClient) {
   for (const t of templatesRes.data || []) templates[t.family] = t.milestones;
 
   // latest import batch per kind
-
-/** THE QUERY SOLVER'S TWO TICKS (0235) — read tolerantly, so a board before the migration still draws. */
-const queryBits = (t: Record<string, unknown>) => ({
-  query_solver: !!t.query_solver,
-  query_kind: (t.query_kind === "client" || t.query_kind === "ours" ? t.query_kind : null) as "client" | "ours" | null,
-  client_shared: !!t.client_shared,
-  query_no: (t.query_no == null ? null : Number(t.query_no)) as number | null,
-  raised_on: (t.raised_on ?? null) as string | null,
-});
   const batches: Record<string, any> = {};
   for (const b of batchesRes.data || []) {
     if (!batches[b.kind]) batches[b.kind] = b;

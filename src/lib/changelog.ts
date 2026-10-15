@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.2.2",
+    date: "2026-10-15",
+    module: "Portal: a Customer portal tab for Nandan\u2019s own people \u2014 the customers, and each one\u2019s Jobmaster",
+    items: [
+      "FIXED: Planning would not open on 6.10.2.0\u20132.1 (\u201cCannot access L before initialization\u201d) \u2014 the Query Solver\u2019s helper in the board reader sat below its first use. Moved. The CEO page is no longer the owner\u2019s default (\u201cdon\u2019t make CEO my default, keep as before\u201d): genie.nandan.co.in opens the suite as it did.",
+      "CUSTOMER PORTAL (Dr Raghu, 15 Oct 2026: \u201ckeep Customer portal \u2014 that\u2019s where the customers are seen. In that we should have the Jobmaster\u201d). On the all-organisations page, a tab for Nandan\u2019s people: every customer on the jobmaster \u2014 open and delivered counts, whether it has a portal door (live, nobody invited, inactive, none), who signed in last \u2014 and, for the one picked, its Jobmaster: the open jobs in the portal\u2019s columns and the delivered ones below, each opening in Orders & jobs. A customer without a door gets a + Create their portal button into Settings.",
+    ],
+  },
+  {
     v: "6.10.2.1",
     date: "2026-10-15",
     module: "On Floor: the manpower assignment on the job card",

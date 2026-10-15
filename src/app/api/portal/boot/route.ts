@@ -38,6 +38,8 @@ export async function GET(req: Request) {
       ? ["home", "rfqs", "queries", "issues", "faq", "newsletter", "advisory"]
       : ["home", "queries", "previous", "issues", "faq", "newsletter", "advisory"];
     if (scope.commercials && kind !== "supplier") tabs.splice(2, 0, "commercials");
+    /* THE CUSTOMER PORTAL TAB — Nandan's own people, on the all-organisations page (15 Oct 2026) */
+    if (isStaff(u) && !scope.org) tabs.splice(1, 0, "customers");
     if (isPortalAdmin(u)) tabs.push("settings");
 
     return NextResponse.json({
