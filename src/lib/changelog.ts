@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.2.3",
+    date: "2026-10-15",
+    module: "Saamaan: the issue slip moves the stock in the ERP; disabled items out of every stock figure",
+    items: [
+      "THE RELEASE MOVES THE STOCK (Dr Raghu, 15 Oct 2026: \u201cwhen the release is done \u2026 the stock should be physically moved by reducing it from stock \u2026 to the WIP warehouse for that particular job. That is not happening. Please check why\u201d). It was not happening because nothing was written anywhere \u2014 Release only marked Genie\u2019s line, and stock lives in the ERP. Now every Release makes an ERP Stock Entry: a Material Transfer carrying the job number, out of the Stock warehouse holding the most of the item, into the WIP warehouse (the setting wip_warehouse, Khopoli Work In Progress to start) \u2014 the same document the store makes by hand. The line keeps the entry\u2019s number; if the ERP will not move it (not enough in stock, or the ERP down), the line is NOT released and says why in red. Mark done moves whatever is still unmoved first, and stops on the first line that cannot. WIP real on the WIP screen rises with it. Migration 0236.",
+      "DISABLED IN THE ERP, SEEN NOWHERE (\u201cwhatever is put as disabled in the ERP should not be used in the total or even seen anywhere\u201d). The item mirror\u2019s own flag carried 1 of the ERP\u2019s 14,656 disabled items, so Inventory now reads the disabled list live from the ERP and leaves those items out of the RM stock, the warehouse lists, the item-group view and the unique-items count. On the day, no disabled item held RM stock, so the figures do not move \u2014 but they cannot drift in.",
+    ],
+  },
+  {
     v: "6.10.2.2",
     date: "2026-10-15",
     module: "Portal: a Customer portal tab for Nandan\u2019s own people \u2014 the customers, and each one\u2019s Jobmaster",

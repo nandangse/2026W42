@@ -3,6 +3,7 @@ import { readBody, type AnyBody } from "@/lib/validate";
 import { errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { requireSaamaan } from "@/lib/saamaan";
+import { transferToWip } from "@/lib/erp-stock-entry";
 
 export const dynamic = "force-dynamic";
 
@@ -163,17 +164,46 @@ export async function POST(req: Request) {
         const asked = N(body.qty);
         const qty = asked === null ? owed : Math.min(owed, asked);
         if (qty <= 0) throw new HttpError(400, "The quantity has to be more than nothing.");
+        /* THE PHYSICAL MOVE (Dr Raghu, 15 Oct 2026): the release IS a stock transfer in the ERP —
+           Stock warehouse → WIP, with the job number. If the ERP will not move it, the line is
+           NOT released, and the reason is shown on it. */
+        let moved: { name: string; from: string; to: string } | null = null;
+        try {
+          moved = await transferToWip(admin, { item_code: S(line.item_code), item_name: S(line.item_name), qty, uom: S(line.uom), job_no: S(line.job_no), slip_no: S(slip.slip_no) }, me.email);
+        } catch (e) {
+          const why = e instanceof Error ? e.message : String(e);
+          await admin.from("material_slip_line").update({ erp_error: why.slice(0, 500), erp_at: new Date().toISOString() }).eq("id", lineId).then(() => null, () => null);
+          throw new HttpError(409, `Not released — the stock did not move: ${why}`);
+        }
         const { error } = await admin.from("material_slip_line").update({
           released_qty: (Number(line.released_qty) || 0) + qty, released_at: new Date().toISOString(), released_by: me.email,
+          erp_ste: moved.name, erp_from: moved.from, erp_to: moved.to, erp_error: null, erp_at: new Date().toISOString(),
         }).eq("id", lineId);
-        if (error) throw error;
+        if (error) {
+          /* before 0236 the columns are not there — the release still lands, the entry's number does not */
+          if (/erp_|schema cache/i.test(error.message)) { const r2 = await admin.from("material_slip_line").update({ released_qty: (Number(line.released_qty) || 0) + qty, released_at: new Date().toISOString(), released_by: me.email }).eq("id", lineId); if (r2.error) throw r2.error; }
+          else throw error;
+        }
         // Every line released → the slip is done, and the ladder stops.
         const { data: rest } = await admin.from("material_slip_line").select("qty, released_qty").eq("slip_id", id);
         const allDone = (rest ?? []).every((l) => (Number(l.released_qty) || 0) >= (Number(l.qty) || 0));
         if (allDone && S(slip.status) === "open") {
           await admin.from("material_slip").update({ status: "done", done_at: new Date().toISOString() }).eq("id", id);
         }
-        return NextResponse.json({ ok: true, released: qty, done: allDone });
+        return NextResponse.json({ ok: true, released: qty, done: allDone, erp_ste: moved.name, from: moved.from, to: moved.to });
+      }
+      if (action === "done") {
+        /* MARK DONE MOVES WHAT IS STILL UNMOVED (15 Oct 2026): every line not yet released goes to WIP now; one that cannot stops the slip, and says why */
+        const { data: open } = await admin.from("material_slip_line").select("*").eq("slip_id", id);
+        for (const l of open ?? []) {
+          const owed = (Number(l.qty) || 0) - (Number(l.released_qty) || 0);
+          if (owed <= 0) continue;
+          let moved: { name: string; from: string; to: string };
+          try { moved = await transferToWip(admin, { item_code: S(l.item_code), item_name: S(l.item_name), qty: owed, uom: S(l.uom), job_no: S(l.job_no), slip_no: S(slip.slip_no) }, me.email); }
+          catch (e) { const why = e instanceof Error ? e.message : String(e); await admin.from("material_slip_line").update({ erp_error: why.slice(0, 500), erp_at: new Date().toISOString() }).eq("id", l.id).then(() => null, () => null); throw new HttpError(409, `Not done — ${S(l.job_no)} · ${S(l.item_code)} did not move: ${why}`); }
+          const up = await admin.from("material_slip_line").update({ released_qty: Number(l.qty) || 0, released_at: new Date().toISOString(), released_by: me.email, erp_ste: moved.name, erp_from: moved.from, erp_to: moved.to, erp_error: null, erp_at: new Date().toISOString() }).eq("id", l.id);
+          if (up.error && /erp_|schema cache/i.test(up.error.message)) await admin.from("material_slip_line").update({ released_qty: Number(l.qty) || 0, released_at: new Date().toISOString(), released_by: me.email }).eq("id", l.id);
+        }
       }
       if (action === "done" || action === "cancel") {
         const { error } = await admin.from("material_slip").update({ status: action === "done" ? "done" : "cancelled", done_at: new Date().toISOString(), note: S(body.note) || S(slip.note) }).eq("id", id);

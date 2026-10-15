@@ -91,13 +91,29 @@ async function mirrorClasses(admin: SupabaseClient): Promise<Map<string, { cls: 
  */
 export const RM_KINDS = new Set(["Stock", "Vendor", "Stores"]);
 
+/**
+ * DISABLED IN THE ERP, SEEN NOWHERE (Dr Raghu, 15 Oct 2026: "whatever is put
+ * as disabled in the ERP should not be used in the total or even seen
+ * anywhere"). Read live from the ERP's Item list — the mirror's own flag was
+ * found carrying 1 of the ERP's 14,656 — so a bin on a disabled item adds to
+ * nothing and is listed nowhere.
+ */
+export async function disabledItems(base: string, H: Record<string, string>): Promise<Set<string>> {
+  try {
+    const rows = await getAll(base, H, "Item", ["name"], [["disabled", "=", 1]], 50000);
+    return new Set(rows.map((r) => S(r.name)));
+  } catch { return new Set(); }
+}
+
 export async function inventoryDashboard(admin: SupabaseClient) {
   const { base, H } = await erpOrThrow();
-  const [bins, kinds, mirror] = await Promise.all([
+  const [binsAll, kinds, mirror, disabled] = await Promise.all([
     getAll(base, H, "Bin", ["item_code", "warehouse", "actual_qty", "stock_value"], [["actual_qty", "!=", 0]]),
     warehouseKinds(admin),
     mirrorClasses(admin),
+    disabledItems(base, H),
   ]);
+  const bins = binsAll.filter((b) => !disabled.has(S(b.item_code)));
   type Acc = { value: number; qty: number; items: Set<string> };
   const acc = (): Acc => ({ value: 0, qty: 0, items: new Set<string>() });
   const add = (a: Acc, code: string, v: number, q: number) => { a.value += v; a.qty += q; a.items.add(code); };
@@ -147,8 +163,11 @@ export async function inventoryDashboard(admin: SupabaseClient) {
 /** One warehouse's bins, live, joined to the mirror's names and classes. */
 export async function warehouseBins(admin: SupabaseClient, warehouse: string, limit = 2000) {
   const { base, H } = await erpOrThrow();
-  const bins = await getAll(base, H, "Bin", ["item_code", "actual_qty", "valuation_rate", "stock_value", "stock_uom", "reserved_qty", "ordered_qty"],
-    [["warehouse", "=", warehouse], ["actual_qty", "!=", 0]], 20000);
+  const [binsAll, disabled] = await Promise.all([
+    getAll(base, H, "Bin", ["item_code", "actual_qty", "valuation_rate", "stock_value", "stock_uom", "reserved_qty", "ordered_qty"], [["warehouse", "=", warehouse], ["actual_qty", "!=", 0]], 20000),
+    disabledItems(base, H),
+  ]);
+  const bins = binsAll.filter((b) => !disabled.has(S(b.item_code)));
   const codes = bins.map((b) => S(b.item_code));
   const meta = new Map<string, Doc>();
   for (let i = 0; i < codes.length; i += 500) {
@@ -312,10 +331,11 @@ export async function erpQtyAtMany(warehouse: string, asks: { code: string; at: 
  */
 export async function itemGroupStock(admin: SupabaseClient) {
   const { base, H } = await erpOrThrow();
-  const [bins, kinds, mirror] = await Promise.all([
+  const [binsAll, kinds, mirror, disabled] = await Promise.all([
     getAll(base, H, "Bin", ["item_code", "warehouse", "actual_qty", "stock_value"], [["actual_qty", "!=", 0]]),
-    warehouseKinds(admin), mirrorClasses(admin),
+    warehouseKinds(admin), mirrorClasses(admin), disabledItems(base, H),
   ]);
+  const bins = binsAll.filter((b) => !disabled.has(S(b.item_code)));
   const g = new Map<string, { group: string; items: number; holding: Set<string>; qty: number; value: number }>();
   const row = (k: string) => g.get(k) ?? g.set(k, { group: k, items: 0, holding: new Set(), qty: 0, value: 0 }).get(k)!;
   for (const m of mirror.values()) row(m.group || "(no group)").items++;

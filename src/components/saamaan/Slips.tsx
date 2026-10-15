@@ -30,6 +30,8 @@ export interface Slip {
 interface Line {
   id: string; project_id: string; project_name: string; job_no: string; item_group: string; item_code: string; item_name: string;
   qty: number; uom: string; rate: number | null; amount: number | null; released_qty: number; released_at: string | null; released_by: string | null;
+  /* the ERP stock entry the release made (0236), or why the stock did not move */
+  erp_ste?: string | null; erp_from?: string | null; erp_to?: string | null; erp_error?: string | null;
 }
 const who = (s: string | null) => (S(s).includes("@") ? S(s).split("@")[0] : S(s)) || "·";
 
@@ -212,7 +214,7 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
                         <td className="px-2 py-1 text-right tnum" style={{ color: MUTED, whiteSpace: "nowrap" }}>{money(l.amount)}</td>
                         <td className="px-2 py-1 text-right" style={{ whiteSpace: "nowrap", width: 220 }}>
                           {full ? (
-                            <span className="text-xs" style={{ color: GREEN }} title={`released by ${who(l.released_by)}`}>✓ released {l.released_at ? fmtD(l.released_at) : ""}</span>
+                            <span className="text-xs" style={{ color: GREEN }} title={`released by ${who(l.released_by)}${l.erp_from ? `\n${l.erp_from} → ${l.erp_to}` : ""}`}>✓ released {l.released_at ? fmtD(l.released_at) : ""}{l.erp_ste ? <span style={{ color: NAVY }}> · {l.erp_ste}</span> : <span style={{ color: AMBER }} title="Released before 15 Oct 2026 — no stock entry was made by Genie; the store moved it by hand, or not at all"> · no ERP entry</span>}</span>
                           ) : s.status === "open" ? (
                             <span className="inline-flex items-center gap-1">
                               {l.released_qty > 0 && <span className="text-xs tnum" style={{ color: "#92400E" }}>{qtyFmt(l.released_qty)} gone</span>}
@@ -221,6 +223,7 @@ export function SlipView({ slip, onClose }: { slip: Slip; onClose: () => void })
                               <button onClick={() => release(l)} disabled={saving === l.id} className="rounded px-1.5 py-0.5 text-xs font-bold" style={{ background: GREEN, color: "#fff" }}>Release</button>
                             </span>
                           ) : <span style={{ color: MUTED }}>{qtyFmt(l.released_qty)} of {qtyFmt(l.qty)}</span>}
+                          {!full && l.erp_error && <div className="text-xs" style={{ color: RED, whiteSpace: "normal", maxWidth: 260, textAlign: "right" }}>✗ {l.erp_error}</div>}
                         </td>
                       </tr>
                     );
