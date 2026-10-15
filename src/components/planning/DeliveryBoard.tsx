@@ -20,7 +20,7 @@ import YearPanel from "./YearPanel";
 
 import { JobLightbox } from "../JobsInProgress";
 
-import { Board, Job, TODAY, groupAnchor, investedIn, ownerInk, ownerTint, personLabel, stamp } from "./shared";
+import { STATUSES, Board, Job, TODAY, groupAnchor, investedIn, ownerInk, ownerTint, personLabel, stamp } from "./shared";
 import { toWip } from "./OnFloor";
 
 /** The commonest non-empty value — used to name a project's customer from its jobs. */
@@ -178,6 +178,8 @@ export function DeliveryBoard({
     return () => { live = false; };
   }, []);
   const [subTab, setSubTab] = useState<"priority" | "okan" | "cal" | "fam" | "cust">("priority");
+  /* FOR UPDATING (Dr Raghu, 15 Oct 2026: "below the next 30 days table make a tabbed view again — For Updating") */
+  const [prioView, setPrioView] = useState<"priority" | "update">("priority");
   /**
    * The figures above the tabs: open on the Priority List, folded away on the
    * rest.
@@ -839,11 +841,21 @@ export function DeliveryBoard({
           he said so. */}
       {subTab === "priority" && <NextThirtyDays jobs={byTDD} />}
 
+      {subTab === "priority" && (
+        <div className="flex gap-1 rounded p-1 mb-2 bg-white border" style={{ borderColor: "var(--line)", width: "fit-content" }}>
+          {([["priority", "Priority List"], ["update", "✎ For Updating"]] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setPrioView(k)} className="px-3 py-1.5 rounded text-xs font-bold"
+              style={prioView === k ? { background: "var(--ink)", color: "#fff" } : { color: "var(--dim)" }}>{label}</button>
+          ))}
+        </div>
+      )}
+
       {subTab === "priority" && (() => {
         const base = prio
           ? prio.map((id) => byTDD.find((j) => j.id === id)).filter(Boolean).concat(byTDD.filter((j) => !prio.includes(j.id))) as Job[]
           : byTDD;
         const plist = sortJobs(base); // owner/search filtered upstream, then sorted
+        if (prioView === "update") return <UpdatingTable jobs={plist} tasks={board.tasks} V={V} link={(j) => <JobLink j={j} />} onStat={editStat} reload={reload} />;
         // reordering writes the full priority list, so only allow it unfiltered
         const canDrag = delOwn === "all" && !q && !sortKey;
         const onDrop = (ti: number) => {
@@ -1152,6 +1164,135 @@ export function DeliveryBoard({
         />
       )}
 
+    </div>
+  );
+}
+
+/**
+ * FOR UPDATING (Dr Raghu, 15 Oct 2026: "below the next 30 days table make a
+ * tabbed view again — For Updating: Job, Customer tag, Target Delivery Date,
+ * Planning owner initials, Prod %, Kitting %, Throughput, T%, CURRENT UPDATE ✎,
+ * STATUS, Tasks pending, Escalations — with frozen columns and frozen rows").
+ *
+ * The same jobs in the same order as the Priority List, cut to what is read
+ * and written in the weekly update. The current update and the status are
+ * written here; each goes through /api/job-field like everywhere else, so the
+ * old update is kept in the job's history and the change queues for the ERP.
+ * The head and the first two columns stay put while the rest scrolls.
+ */
+function UpdatingTable({ jobs, tasks, V, link, onStat, reload }: {
+  jobs: Job[]; tasks: Board["tasks"]; V: (v: number) => string; link: (j: Job) => React.ReactNode;
+  onStat: (j: Job, value: string) => Promise<void>; reload: () => Promise<Board | null>;
+}) {
+  const [edit, setEdit] = useState<string | null>(null);
+  const [txt, setTxt] = useState("");
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+  const open = useMemo(() => {
+    const m = new Map<string, { n: number; late: number; esc: { t: string; esc: string; why: string | null }[] }>();
+    for (const t of tasks) {
+      if (t.done) continue;
+      const x = m.get(t.j) || { n: 0, late: 0, esc: [] };
+      x.n++;
+      if (t.due && t.due < TODAY) x.late++;
+      if (t.esc && t.esc !== "None") x.esc.push({ t: t.t, esc: t.esc, why: t.esc_why ?? null });
+      m.set(t.j, x);
+    }
+    return m;
+  }, [tasks]);
+  const saveNote = async (j: Job) => {
+    setBusy(j.id); setMsg("");
+    try { await api.post("/api/job-field", { job_id: j.id, field: "note", value: txt }); setEdit(null); await reload(); }
+    catch (e) { setMsg(`${jobNo(j.id)}: ${e instanceof Error ? e.message : String(e)}`); }
+    finally { setBusy(""); }
+  };
+  const W = { job: 64, tag: 230 };
+  const head: React.CSSProperties = { position: "sticky", top: 0, zIndex: 3, background: "var(--ink)", color: "#fff" };
+  const left0: React.CSSProperties = { position: "sticky", left: 0, zIndex: 2, minWidth: W.job, width: W.job };
+  const left1: React.CSSProperties = { position: "sticky", left: W.job, zIndex: 2, minWidth: W.tag, width: W.tag, boxShadow: "2px 0 0 var(--line)" };
+  return (
+    <div className="bg-white rounded-lg border" style={{ borderColor: "var(--line)" }}>
+      <div className="px-3 pt-2 pb-1 text-xs flex gap-3 flex-wrap" style={{ color: "var(--muted)" }}>
+        <span>{jobs.length} jobs, in the Priority List&apos;s order · click a Current Update to write it · the Status saves when chosen</span>
+        {msg && <b style={{ color: "var(--red)" }}>{msg}</b>}
+      </div>
+      <div className="overflow-auto" style={{ maxHeight: "72vh" }}>
+        <table className="text-xs genie-table" style={{ minWidth: 1500, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead>
+            <tr>
+              <th className="px-2 py-2 text-left" style={{ ...head, ...left0, zIndex: 4 }}>Job</th>
+              <th className="px-2 py-2 text-left" style={{ ...head, ...left1, zIndex: 4 }}>Customer Tag</th>
+              <th className="px-2 py-2 text-center" style={head}>Target Delivery</th>
+              <th className="px-2 py-2 text-center" style={head}>Owner</th>
+              <th className="px-2 py-2 text-center" style={head}>Prod %</th>
+              <th className="px-2 py-2 text-center" style={head}>Kit %</th>
+              <th className="px-2 py-2 text-right" style={head}>Throughput</th>
+              <th className="px-2 py-2 text-center" style={head}>T%</th>
+              <th className="px-2 py-2 text-left" style={{ ...head, minWidth: 340 }}>Current Update ✎</th>
+              <th className="px-2 py-2 text-left" style={{ ...head, minWidth: 210 }}>Status</th>
+              <th className="px-2 py-2 text-center" style={head}>Tasks pending</th>
+              <th className="px-2 py-2 text-left" style={{ ...head, minWidth: 240 }}>Escalations</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.map((j, i) => {
+              const bg = i % 2 ? "#FAF9F5" : "#fff";
+              const t = open.get(j.id);
+              return (
+                <tr key={j.id} style={{ background: bg }}>
+                  <td className="px-2 py-1.5 align-top border-t" style={{ ...left0, background: bg, borderColor: "var(--line-soft)" }}>{link(j)}</td>
+                  <td className="px-2 py-1.5 align-top border-t font-medium" style={{ ...left1, background: bg, borderColor: "var(--line-soft)" }}>{j.tag}<div style={{ color: "var(--muted)", fontWeight: 400 }}>{j.cust}</div></td>
+                  <td className="px-2 py-1.5 align-top border-t text-center font-bold whitespace-nowrap tnum" style={{ borderColor: "var(--line-soft)", color: j.tdd && j.tdd < TODAY ? "var(--red)" : "var(--ink)" }}>{fmtFull(j.tdd)}</td>
+                  <td className="px-2 py-1.5 align-top border-t text-center" style={{ borderColor: "var(--line-soft)" }} title={j.ownerName || j.own || ""}>
+                    {j.ownerInitials ? <span className="font-bold rounded px-1" style={{ background: "#DCE8F5", color: "var(--blue)" }}>{j.ownerInitials}</span> : <span style={{ color: "#B8B5AC" }}>—</span>}
+                  </td>
+                  <td className="px-2 py-1.5 align-top border-t text-center tnum" style={{ borderColor: "var(--line-soft)" }}>{j.pct}%</td>
+                  <td className="px-2 py-1.5 align-top border-t text-center tnum" style={{ borderColor: "var(--line-soft)", color: (j.kit || 0) >= 80 ? "var(--green)" : (j.kit || 0) >= 40 ? "var(--warn)" : "var(--red)" }}>{j.kit || 0}%</td>
+                  <td className="px-2 py-1.5 align-top border-t text-right whitespace-nowrap tnum" style={{ borderColor: "var(--line-soft)", color: "var(--accent)" }}>{V(j.tpv || 0)}</td>
+                  <td className="px-2 py-1.5 align-top border-t text-center tnum" style={{ borderColor: "var(--line-soft)" }}>{j.tpp || 0}%</td>
+                  <td className="px-2 py-1.5 align-top border-t" style={{ borderColor: "var(--line-soft)", minWidth: 340 }}>
+                    {edit === j.id ? (
+                      <div>
+                        <textarea autoFocus value={txt} onChange={(e) => setTxt(e.target.value)} rows={3}
+                          onKeyDown={(e) => { if (e.key === "Escape") setEdit(null); if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void saveNote(j); }}
+                          className="w-full rounded border p-1.5 text-xs" style={{ borderColor: "var(--line)", lineHeight: 1.4, fontFamily: "inherit" }} />
+                        <div className="flex gap-2 mt-1">
+                          <button onClick={() => void saveNote(j)} disabled={busy === j.id} className="rounded px-2 py-0.5 font-bold" style={{ background: "var(--accent)", color: "#fff" }}>{busy === j.id ? "saving…" : "Save"}</button>
+                          <button onClick={() => setEdit(null)} style={{ color: "var(--muted)" }}>cancel</button>
+                          <span style={{ color: "#B8B5AC" }}>⌘↵ saves · the old update is kept</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div onClick={() => { setEdit(j.id); setTxt(j.note || ""); }} className="cursor-text" title="Click to write the current update" style={{ lineHeight: 1.4, whiteSpace: "pre-wrap" }}>
+                        {j.note || <span style={{ color: "#B8B5AC" }}>✎ write the update</span>}
+                        {j.updated_at && <div style={{ color: "#B8B5AC", fontSize: 10 }}>{stamp(j.updated_at)}</div>}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5 align-top border-t" style={{ borderColor: "var(--line-soft)" }}>
+                    <select value={j.stat || ""} onChange={(e) => void onStat(j, e.target.value)} className="rounded border px-1 py-0.5 text-xs w-full" style={{ borderColor: "var(--line)", maxWidth: 220 }}>
+                      {!STATUSES.includes(j.stat) && <option value={j.stat || ""}>{j.stat || "—"}</option>}
+                      {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1.5 align-top border-t text-center tnum" style={{ borderColor: "var(--line-soft)" }}>
+                    {t?.n ? <><b>{t.n}</b>{t.late ? <div style={{ color: "var(--red)", fontSize: 10 }}>{t.late} late</div> : null}</> : <span style={{ color: "#B8B5AC" }}>—</span>}
+                  </td>
+                  <td className="px-2 py-1.5 align-top border-t" style={{ borderColor: "var(--line-soft)", minWidth: 240 }}>
+                    {j.escalation ? <div style={{ color: "var(--red)", fontWeight: 600 }}>{j.escalation}</div> : null}
+                    {(t?.esc || []).slice(0, 3).map((e, k) => (
+                      <div key={k} style={{ lineHeight: 1.35 }} title={e.why || ""}><b style={{ color: e.esc.startsWith("L3") ? "var(--red)" : "var(--warn)" }}>{e.esc.split(" ")[0]}</b> {e.t}</div>
+                    ))}
+                    {(t?.esc.length || 0) > 3 && <div style={{ color: "var(--muted)" }}>+{(t?.esc.length || 0) - 3} more</div>}
+                    {!j.escalation && !t?.esc.length && <span style={{ color: "#B8B5AC" }}>—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+            {jobs.length === 0 && <tr><td colSpan={12} className="py-6 text-center" style={{ color: "var(--muted)" }}>No jobs match this filter.</td></tr>}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

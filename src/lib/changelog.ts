@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.1.2",
+    date: "2026-10-15",
+    module: "Delivery board: a For Updating tab below the next 30 days",
+    items: [
+      "FOR UPDATING (Dr Raghu, 15 Oct 2026: \u201cbelow the next 30 days table make a tabbed view again \u2014 For Updating \u2026 with frozen columns and also frozen rows\u201d). Two tabs under the thirty-day strip: Priority List (as it was) and \u270e For Updating \u2014 Job, Customer Tag, Target Delivery, Planning owner initials, Prod %, Kit %, Throughput, T%, Current Update (click to write; the old one is kept in the job\u2019s history), Status (saves when chosen), Tasks pending (and how many late) and Escalations (the job\u2019s own, then escalated tasks). Same jobs, same order and filters as the Priority List. The head row and the Job and Customer Tag columns stay put while the rest scrolls.",
+    ],
+  },
+  {
     v: "6.10.1.1",
     date: "2026-10-15",
     module: "LMS: the five Nandan TOC modules, a lesson each, planned for all staff",
