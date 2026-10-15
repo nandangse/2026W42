@@ -239,6 +239,8 @@ export function OnFloor({
    * whole reason it is a ledger and not a scribble.
    */
   const [manpower, setManpower] = useState<Record<string, Crew>>({});
+  /* the names assigned for the day, as counts — the assignment row on the card (15 Oct 2026) */
+  const [assigned, setAssigned] = useState<Record<string, { crew: Record<string, number>; names: string[] }>>({});
   const [mpOpen, setMpOpen] = useState<string | null>(null);
   /**
    * THE SECOND VIEW (Dr Raghu, 1 Sep 2026: "In On floor make another view -
@@ -253,8 +255,9 @@ export function OnFloor({
   const [mpDay, setMpDay] = useState<string>(() => TODAY);
   const loadManpower = useCallback(() => {
     api.get(`/api/on-floor/manpower?day=${encodeURIComponent(mpDay)}`)
-      .then((r: { rows?: { job_id: string; crew: Crew }[] }) => {
+      .then((r: { rows?: { job_id: string; crew: Crew }[]; assigned?: Record<string, { crew: Record<string, number>; names: string[] }> }) => {
         setManpower(Object.fromEntries((r.rows || []).map((x) => [x.job_id, x.crew])));
+        setAssigned(r.assigned || {});
       })
       .catch(() => {});
   }, [mpDay]);
@@ -438,6 +441,7 @@ export function OnFloor({
                         return (stage as { crew?: Partial<Crew> } | undefined)?.crew ?? null;
                       })()}
                       today={manpower[j.id] ?? null}
+                      assigned={assigned[j.id] ?? null}
                     />
                     <div className="mt-1">
                       {!(manpower[j.id] && Object.values(manpower[j.id]).some((n) => n)) && (

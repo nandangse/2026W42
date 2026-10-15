@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.2.1",
+    date: "2026-10-15",
+    module: "On Floor: the manpower assignment on the job card",
+    items: [
+      "THE ASSIGNMENT ON THE CARD (Dr Raghu, 15 Oct 2026: \u201cin this manpower now start merging the numbers from the manpower assignment\u201d). The crew table under each job on On Floor now reads plan (the stage\u2019s crew from the milestone plan), then assigned \u2014 the names on the Manpower Plan for the day as trade counts, the names on hover, \u21bb where carried from yesterday \u2014 then today (what the floor recorded, which for a named job is those same names).",
+    ],
+  },
+  {
     v: "6.10.2.0",
     date: "2026-10-15",
     module: "The Query Solver \u2014 on the task list, the project book, Nandan Tasking and the customer\u2019s portal; Live Clients; page numbers on printed sheets",

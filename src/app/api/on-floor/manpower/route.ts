@@ -6,7 +6,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { today } from "@/lib/schedule";
 import { TRADES } from "@/lib/templates";
 import { ensureManpowerRollover, istToday } from "@/lib/manpower-rollover";
-import { ensureCrewRollover } from "@/lib/crew-roll";
+import { ensureCrewRollover, crewFromNames } from "@/lib/crew-roll";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +86,16 @@ export async function GET(req: Request) {
         return NextResponse.json({ rows: [], needsMigration: true });
       throw new Error(error.message);
     }
-    return NextResponse.json({ rows: data || [] });
+    /* THE ASSIGNMENT, BY JOB (Dr Raghu, 15 Oct 2026: "in this manpower now start merging the
+       numbers from the manpower assignment") — the names on the Manpower Plan for the day, as
+       trade counts, with the names, so the card can show the assignment beside the stage plan */
+    const assigned: Record<string, { crew: Record<string, number>; names: string[] }> = {};
+    try {
+      const { data: names } = await admin.from("job_crew_person").select("job_id, emp_id, emp_name, trade, noted_by").eq("day", day);
+      const crew = crewFromNames(names || []);
+      for (const [job, c] of crew.entries()) assigned[job] = { crew: c, names: (names || []).filter((n) => String(n.job_id) === job).map((n) => `${String(n.emp_name || n.emp_id)} · ${String(n.trade)}${String(n.noted_by) === "rollover@genie" ? " ↻" : ""}`) };
+    } catch { /* before 0171 — no names */ }
+    return NextResponse.json({ rows: data || [], assigned });
   } catch (e) {
     return errJson(e);
   }

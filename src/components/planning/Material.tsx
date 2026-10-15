@@ -20,17 +20,17 @@ import { TaskModal } from "./Tasking";
  * from the milestone plan — over TODAY, what the floor recorded, in bold.
  * Below the job number on On Floor, exactly where the print puts it.
  */
-export function FloorCrewTable({ plan, today: rec }: { plan: Partial<Crew> | null; today: Crew | null }) {
-  return (
-    <CrewRowsTable rows={[
-      { label: "plan", crew: plan },
-      { label: "today", crew: rec && Object.values(rec).some((n) => Number(n) > 0) ? rec : null, bold: true },
-    ]} />
-  );
+export function FloorCrewTable({ plan, today: rec, assigned }: { plan: Partial<Crew> | null; today: Crew | null; assigned?: { crew: Record<string, number>; names: string[] } | null }) {
+  /* THE ASSIGNMENT MERGED IN (Dr Raghu, 15 Oct 2026): the stage's plan, then the names assigned
+     on the Manpower Plan as counts (hover for the names), then what the floor recorded */
+  const rows: { label: string; crew: Partial<Crew> | null; bold?: boolean; title?: string }[] = [{ label: "plan", crew: plan }];
+  if (assigned && assigned.names.length) rows.push({ label: `assigned · ${assigned.names.length}`, crew: assigned.crew as Partial<Crew>, title: assigned.names.join("\n") });
+  rows.push({ label: "today", crew: rec && Object.values(rec).some((n) => Number(n) > 0) ? rec : null, bold: true });
+  return <CrewRowsTable rows={rows} />;
 }
 
 /** The crew table itself — any rows, walk-sheet styling. */
-export function CrewRowsTable({ rows }: { rows: { label: string; crew: Partial<Crew> | null; bold?: boolean }[] }) {
+export function CrewRowsTable({ rows }: { rows: { label: string; crew: Partial<Crew> | null; bold?: boolean; title?: string }[] }) {
   const cell: React.CSSProperties = {
     border: "1px solid #E2E0DA", padding: "1px 6px", textAlign: "right", fontVariantNumeric: "tabular-nums",
   };
@@ -49,7 +49,7 @@ export function CrewRowsTable({ rows }: { rows: { label: string; crew: Partial<C
         {rows.map((r) => {
           const tot = r.crew ? TRADES.reduce((n, t) => n + (Number(r.crew?.[t.key]) || 0), 0) : 0;
           return (
-            <tr key={r.label} style={r.bold ? { fontWeight: 700 } : undefined}>
+            <tr key={r.label} style={r.bold ? { fontWeight: 700 } : undefined} title={r.title}>
               <td style={{ ...cell, textAlign: "left", color: "var(--muted)", fontSize: 9 }}>{r.label}</td>
               {TRADES.map((t) => (
                 <td key={t.key} style={{ ...cell, color: r.crew && Number(r.crew[t.key]) ? "var(--ink)" : "#C9C6BD" }}>
