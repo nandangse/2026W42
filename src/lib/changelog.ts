@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.2.4",
+    date: "2026-10-15",
+    module: "LMS: a Google Slides / Doc link on every lesson, shown as the slides themselves",
+    items: [
+      "THE SLIDES THEMSELVES (Dr Raghu, 15 Oct 2026: \u201cput in one more field \u2014 the Google Slides link or the doc link that will show that item in view mode \u2026 so that in the display it can be seen as Google Slides itself\u201d). A lesson now carries a Google Slides / Doc link beside the document: a Slides link plays in the lesson as the deck \u2014 the player\u2019s own arrows and full screen, no autoplay; a Doc or Sheet opens its viewer; a deck uploaded to Drive opens as Drive shows it. The five Nandan TOC lessons carry theirs. Migration 0237.",
+    ],
+  },
+  {
     v: "6.10.2.3",
     date: "2026-10-15",
     module: "Saamaan: the issue slip moves the stock in the ERP; disabled items out of every stock figure",

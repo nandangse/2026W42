@@ -89,6 +89,8 @@ export interface Lesson {
   content: string;
   description: string;
   pdf_url: string | null;
+  /** A Google Slides / Docs / Sheets link, or a Drive file, shown in the lesson as the thing itself (0237). */
+  slides_url?: string | null;
   video_url: string | null;
   minutes: number;
   /** The lesson's URL — genie.nandan.co.in/lms/<4-digit code>. Random,
@@ -291,6 +293,22 @@ export function pdfEmbed(url: string | null | undefined): string | null {
   const gdoc = u.match(/docs\.google\.com\/(presentation|document|spreadsheets)\/d\/([\w-]{20,})/i);
   if (gdoc) return `https://docs.google.com/${gdoc[1]}/d/${gdoc[2]}/preview`;
   return /^https?:\/\//i.test(u) ? u : null;
+}
+
+/**
+ * THE SLIDES THEMSELVES (Dr Raghu, 15 Oct 2026): a Google Slides link plays
+ * as a deck (the embed player, no autoplay); a Doc or Sheet opens its viewer;
+ * a Drive file (a .pptx uploaded to Drive) opens Drive's preview, which is
+ * the Slides viewer for a deck. Anything else is left to the PDF frame.
+ */
+export function slidesEmbed(url: string | null | undefined): { src: string; kind: "slides" | "doc" | "sheet" | "drive" } | null {
+  const u = String(url || "").trim();
+  if (!u) return null;
+  const g = u.match(/docs\.google\.com\/(presentation|document|spreadsheets)\/d\/([\w-]{20,})/i);
+  if (g) return g[1] === "presentation" ? { src: `https://docs.google.com/presentation/d/${g[2]}/embed?start=false&loop=false&delayms=60000`, kind: "slides" } : { src: `https://docs.google.com/${g[1]}/d/${g[2]}/preview`, kind: g[1] === "document" ? "doc" : "sheet" };
+  const d = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:.*&)?id=)([\w-]{10,})/i);
+  if (d) return { src: `https://drive.google.com/file/d/${d[1]}/preview`, kind: "drive" };
+  return null;
 }
 
 /** mm:ss, for the player's clock. */

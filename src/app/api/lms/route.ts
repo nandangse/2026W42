@@ -264,6 +264,7 @@ export async function POST(req: Request) {
         content: str(body.content),
         description: str(body.description),
         pdf_url: str(body.pdf_url, 2000) || null,
+        slides_url: str(body.slides_url, 2000) || null,
         video_url: str(body.video_url, 2000) || null,
         minutes: int(body.minutes),
         updated_at: new Date().toISOString(),
@@ -286,7 +287,8 @@ export async function POST(req: Request) {
 
       let lessonId = id;
       if (id) {
-        const { error } = await admin.from("lms_lesson").update(patch).eq("id", id);
+        let { error } = await admin.from("lms_lesson").update(patch).eq("id", id);
+        if (error && /slides_url|schema cache/i.test(error.message)) { delete (patch as Record<string, unknown>).slides_url; ({ error } = await admin.from("lms_lesson").update(patch).eq("id", id)); }
         if (error) throw new Error(error.message);
         // an old lesson without a code earns one on its next save
         const { data: cur } = await admin.from("lms_lesson").select("code").eq("id", id).maybeSingle();
@@ -302,7 +304,8 @@ export async function POST(req: Request) {
           .select("id")
           .single();
         if (error) {
-          if (/code/.test(error.message)) {
+          if (/slides_url|schema cache/.test(error.message)) delete (patch as Record<string, unknown>).slides_url;
+          if (/code|slides_url|schema cache/.test(error.message)) {
             const { data: d2, error: e2 } = await admin.from("lms_lesson")
               .insert({ ...patch, created_by: user.id }).select("id").single();
             if (e2) throw new Error(e2.message);

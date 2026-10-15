@@ -24,7 +24,7 @@ import LmsText from "./LmsText";
 import LmsVideo from "./LmsVideo";
 import {
   MIN_LEARNING_WORDS, STATUS_META, STATUS_ORDER, wordCount, learningShortfall,
-  meetsLearningFloor, totalsOf, hhmm, parseVideo, pdfEmbed, LMS_GROUPS, audienceLabel, EVERYONE,
+  meetsLearningFloor, totalsOf, hhmm, parseVideo, pdfEmbed, slidesEmbed, LMS_GROUPS, audienceLabel, EVERYONE,
   type Book, type Section, type Lesson, type Progress, type Extra, type Plan, type LessonStatus,
 } from "@/lib/lms";
 import { today, fmtFull } from "@/lib/schedule";
@@ -417,7 +417,7 @@ function LessonRows({ ctx, rows, book }: { ctx: Ctx; rows: { l: Lesson; shelf?: 
             </button>
             <span className="text-xs" style={{ color: C.faint, width: 54, textAlign: "right" }}>{l.minutes ? `${l.minutes} m` : "—"}</span>
             {video.kind === "youtube" || video.kind === "drive" ? <span title="Has a video">🎬</span> : <span style={{ width: 16 }} />}
-            {l.pdf_url ? <span title="Has a PDF">📄</span> : <span style={{ width: 16 }} />}
+            {l.slides_url ? <span title="Has slides">🎞</span> : l.pdf_url ? <span title="Has a PDF">📄</span> : <span style={{ width: 16 }} />}
             {p ? <StatusChip status={p.status} /> : (
               <button onClick={() => ctx.post({ action: "progress.plan", lesson_ids: [l.id], planned_by: "self" })}
                 className="text-xs font-bold rounded px-2 py-0.5"
@@ -497,7 +497,9 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
   const short = learningShortfall(learning);
   const canComplete = meetsLearningFloor(learning);
   const video = parseVideo(lesson.video_url);
-  const pdf = pdfEmbed(lesson.pdf_url);
+  /* THE SLIDES THEMSELVES (15 Oct 2026): the slides link, else a Slides/Drive deck put in the document field before the link existed */
+  const slides = slidesEmbed(lesson.slides_url) || (/docs\.google\.com\/presentation|drive\.google\.com/i.test(String(lesson.pdf_url || "")) ? slidesEmbed(lesson.pdf_url) : null);
+  const pdf = slides && slides.src === (pdfEmbed(lesson.pdf_url) || "") ? null : pdfEmbed(lesson.pdf_url);
   const books = lesson.shelves
     .map((s) => ctx.d.books.find((b) => b.id === s.book_id))
     .filter(Boolean) as Book[];
@@ -608,6 +610,18 @@ function LessonDrawer({ ctx, lesson, onClose }: { ctx: Ctx; lesson: Lesson; onCl
             </div>
           )}
 
+          {slides && (
+            <div className="rounded-lg bg-white border mb-3" style={{ borderColor: C.line, overflow: "hidden" }}>
+              <div className="px-3 py-1.5 text-xs font-bold flex items-center gap-2" style={{ background: C.panel, color: C.sub }}>
+                {slides.kind === "slides" ? "🎞 SLIDES" : slides.kind === "doc" ? "📝 DOCUMENT" : slides.kind === "sheet" ? "📊 SHEET" : "🎞 DECK"}
+                <a href={lesson.slides_url || lesson.pdf_url || "#"} target="_blank" rel="noreferrer" className="ml-auto font-bold underline" style={{ color: C.navy }}>open in Google</a>
+              </div>
+              {/* 16:9, as a deck is — the player's own arrows and full-screen stay */}
+              <div style={{ position: "relative", width: "100%", paddingTop: slides.kind === "slides" || slides.kind === "drive" ? "60%" : "70%" }}>
+                <iframe src={slides.src} allowFullScreen style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }} />
+              </div>
+            </div>
+          )}
           {pdf && (
             <div className="rounded-lg bg-white border mb-3" style={{ borderColor: C.line, overflow: "hidden" }}>
               <div className="px-3 py-1.5 text-xs font-bold flex items-center gap-2" style={{ background: C.panel, color: C.sub }}>
@@ -1259,6 +1273,7 @@ function LessonEditor({ ctx, id, onClose }: { ctx: Ctx; id?: string; onClose: ()
     content: existing?.content || "",
     video_url: existing?.video_url || "",
     pdf_url: existing?.pdf_url || "",
+    slides_url: existing?.slides_url || "",
     minutes: String(existing?.minutes || ""),
   });
   const [shelves, setShelves] = useState<{ book_id: string; section_id: string | null }[]>(
@@ -1319,6 +1334,10 @@ function LessonEditor({ ctx, id, onClose }: { ctx: Ctx; id?: string; onClose: ()
 
           <Field label="PDF link" hint="A Drive share link or any direct PDF URL. It is embedded in the lesson.">
             <input value={f.pdf_url} onChange={(e) => setF({ ...f, pdf_url: e.target.value })}
+              className="w-full text-sm border rounded px-2 py-1.5" style={{ borderColor: C.line }} />
+          </Field>
+          <Field label="Google Slides / Doc link" hint="Shown in the lesson as the slides themselves — a Slides, Docs or Sheets link, or a deck uploaded to Drive. Share it with the company first.">
+            <input value={f.slides_url} onChange={(e) => setF({ ...f, slides_url: e.target.value })} placeholder="https://docs.google.com/presentation/d/…"
               className="w-full text-sm border rounded px-2 py-1.5" style={{ borderColor: C.line }} />
           </Field>
 
