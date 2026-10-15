@@ -40,6 +40,7 @@ const TABS = [
   { key: "mine", label: "My Learning", icon: "🧾" },
   { key: "team", label: "My Team", icon: "👥" },
   { key: "library", label: "Library", icon: "✍️" },
+  { key: "admin", label: "Admin", icon: "🛠" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -140,7 +141,7 @@ export default function LMS({ initialKey = null }: { initialKey?: string | null 
       </div>
 
       <div className="flex gap-1 rounded p-1 mb-1 overflow-x-auto" style={{ background: "#fff", border: `1px solid ${C.line}` }}>
-        {TABS.filter((t) => t.key !== "library" || d.canAuthor).filter((t) => t.key !== "team" || d.team.length > 0).map((t) => (
+        {TABS.filter((t) => (t.key !== "library" && t.key !== "admin") || d.canAuthor).filter((t) => t.key !== "team" || d.team.length > 0).map((t) => (
           <button key={t.key} onClick={() => { setTab(t.key); setOpenBook(null); }}
             className="px-3 py-1.5 rounded text-xs font-bold whitespace-nowrap flex-shrink-0"
             style={tab === t.key ? { background: C.body, color: "#fff" } : { color: C.sub }}>
@@ -151,7 +152,8 @@ export default function LMS({ initialKey = null }: { initialKey?: string | null 
       <div className="text-xs mb-3" style={{ color: C.mute }}>
         {tab === "goals" && "Your learning plan, and the fifteen books it is drawn from."}
         {tab === "mine" && "Everything on your name — planned, under way, finished — plus training you took elsewhere."}
-        {tab === "team" && "What the people below you have been learning."}
+        {tab === "team" && (d.me.isAdmin ? "Everybody's learning, one line each — click a name for their record." : "What the people below you have been learning — click a name for their record.")}
+        {tab === "admin" && "The LMS admins, who sees which library, and how each library is being used."}
         {tab === "library" && "Write the lessons. A lesson is authored once and can sit in as many books as it belongs in."}
       </div>
 
@@ -161,6 +163,7 @@ export default function LMS({ initialKey = null }: { initialKey?: string | null 
       {tab === "mine" && <MineTab ctx={ctx} />}
       {tab === "team" && <TeamTab ctx={ctx} />}
       {tab === "library" && d.canAuthor && <LibraryTab ctx={ctx} onEdit={setEditing} />}
+      {tab === "admin" && d.canAuthor && <AdminTab ctx={ctx} />}
 
       {lesson && <LessonDrawer ctx={ctx} lesson={lesson} onClose={() => setOpenLesson(null)} />}
       {editing && d.canAuthor && <LessonEditor ctx={ctx} id={editing.id} onClose={() => setEditing(null)} />}
@@ -856,17 +859,19 @@ function TeamTab({ ctx }: { ctx: Ctx }) {
     try { setRec(await api.get(`/api/lms?person=${encodeURIComponent(id)}`)); }
     catch (e) { swallow("LMS", e); /* the manager view is a read; a failure says nothing rather than shouting */ }
     finally { setBusy(false); }
+    setTimeout(() => document.getElementById("lms-record")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const t = rec ? totalsOf(rec.progress, new Map(rec.lessons.map((l) => [l.id, l])), rec.extras) : null;
 
   return (
     <>
-      <div className="flex items-center gap-2 flex-wrap mb-3">
+      <PeopleTable onPick={(id) => void pick(id)} picked={who} />
+      <div id="lms-record" className="flex items-center gap-2 flex-wrap mb-3 mt-4" style={{ scrollMarginTop: 80 }}>
         <span className="text-xs font-bold" style={{ color: C.mute }}>WHOSE RECORD</span>
         <select value={who} onChange={(e) => pick(e.target.value)}
           className="text-xs border rounded px-2 py-1 bg-white font-bold" style={{ borderColor: C.line, color: C.body }}>
-          <option value="">Pick someone below you…</option>
+          <option value="">{ctx.d.me.isAdmin ? "Pick anyone…" : "Pick someone below you…"}</option>
           {ctx.d.team.map((m) => (
             <option key={m.id} value={m.id}>{"— ".repeat(m.depth - 1)}{m.name}{m.designation ? ` · ${m.designation}` : ""}</option>
           ))}
@@ -876,7 +881,7 @@ function TeamTab({ ctx }: { ctx: Ctx }) {
 
       {!who && (
         <div className="rounded-lg border bg-white p-8 text-center text-sm" style={{ borderColor: C.line, color: C.mute }}>
-          Pick anyone below you to see what they have been learning — everyone in your line, not just your direct reports.
+          Click a name in the table, or pick one here, to read what they have been learning and what they wrote.
         </div>
       )}
 
@@ -941,8 +946,8 @@ function TeamTab({ ctx }: { ctx: Ctx }) {
  * that is once, on the person, rather than eight times as a permission
  * somebody must remember to withhold.
  */
-function PeoplePanel({ ctx }: { ctx: Ctx }) {
-  const [open, setOpen] = useState(false);
+function PeoplePanel({ ctx, startOpen = false }: { ctx: Ctx; startOpen?: boolean }) {
+  const [open, setOpen] = useState(startOpen);
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState("");
   const roster = ctx.d.roster || [];
@@ -1033,7 +1038,6 @@ function LibraryTab({ ctx, onEdit }: { ctx: Ctx; onEdit: (t: { id?: string }) =>
   return (
     <>
       <BooksPanel ctx={ctx} />
-      <PeoplePanel ctx={ctx} />
 
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 Search lessons"
@@ -1384,6 +1388,184 @@ function NotInstalled() {
         It creates the books, lessons, sections and everybody&apos;s learning record, and seeds the fifteen books. Purely
         additive — nothing already running depends on it.
       </p>
+    </div>
+  );
+}
+
+// ===========================================================================
+// EVERYBODY, AS A TABLE (Dr Raghu, 15 Oct 2026: "show all in this also to me
+// … as a table"). An LMS admin sees every active person; a manager, their
+// line. Counted as the person's own page counts them.
+// ===========================================================================
+type PRow = { id: string; depth: number; name: string; email: string; designation: string | null; department: string | null; groups: string[]; completed: number; in_progress: number; planned: number; extra: number; minutes: number; words: number; last_completed: string | null; plan_at: string | null };
+const PCOLS: { k: keyof PRow | "status"; label: string; num?: boolean }[] = [
+  { k: "name", label: "Name" }, { k: "department", label: "Department" }, { k: "completed", label: "Completed", num: true },
+  { k: "in_progress", label: "In progress", num: true }, { k: "planned", label: "Planned", num: true }, { k: "minutes", label: "Time", num: true },
+  { k: "words", label: "Words written", num: true }, { k: "last_completed", label: "Last finished" }, { k: "plan_at", label: "Plan" },
+];
+
+function PeopleTable({ onPick, picked }: { onPick: (id: string) => void; picked: string }) {
+  const [rows, setRows] = useState<PRow[] | null>(null);
+  const [err, setErr] = useState("");
+  const [q, setQ] = useState("");
+  const [only, setOnly] = useState<"all" | "started" | "none">("all");
+  const [sort, setSort] = useState<{ k: string; dir: 1 | -1 }>({ k: "completed", dir: -1 });
+  useEffect(() => { api.get("/api/lms/people").then((r: { rows: PRow[] }) => setRows(r.rows || [])).catch((e) => setErr(e instanceof Error ? e.message : String(e))); }, []);
+  if (err) return <div className="text-xs" style={{ color: C.red }}>{err}</div>;
+  if (!rows) return <div className="text-xs p-3" style={{ color: C.mute }}>Reading everybody&apos;s record…</div>;
+  const needle = q.trim().toLowerCase();
+  const started = (r: PRow) => r.completed + r.in_progress + r.extra > 0;
+  const shown = rows
+    .filter((r) => !needle || `${r.name} ${r.email} ${r.department || ""} ${r.designation || ""}`.toLowerCase().includes(needle))
+    .filter((r) => only === "all" || (only === "started" ? started(r) : !started(r)))
+    .sort((a, b) => {
+      const x = (a as unknown as Record<string, unknown>)[sort.k], y = (b as unknown as Record<string, unknown>)[sort.k];
+      const c = typeof x === "number" && typeof y === "number" ? x - y : String(x ?? "").localeCompare(String(y ?? ""));
+      return (c || a.name.localeCompare(b.name)) * (c ? sort.dir : 1);
+    });
+  const sum = (k: "completed" | "in_progress" | "planned" | "minutes" | "words") => shown.reduce((s, r) => s + r[k], 0);
+  const th = (c: (typeof PCOLS)[number]) => (
+    <th key={c.k} onClick={() => setSort((s) => ({ k: c.k, dir: s.k === c.k ? (s.dir === 1 ? -1 : 1) : c.num ? -1 : 1 }))}
+      className="px-2 py-2 cursor-pointer select-none whitespace-nowrap" style={{ textAlign: c.num ? "right" : "left", position: "sticky", top: 0, background: "var(--ink)", color: "#fff", zIndex: 1 }}>
+      {c.label}{sort.k === c.k ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
+    </th>
+  );
+  return (
+    <div className="rounded-lg border bg-white" style={{ borderColor: C.line }}>
+      <div className="flex items-center gap-2 flex-wrap p-2">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 Name, department, designation" className="text-xs border rounded px-2 py-1.5" style={{ borderColor: C.line, minWidth: 240 }} />
+        {(["all", "started", "none"] as const).map((k) => (
+          <button key={k} onClick={() => setOnly(k)} className="text-xs font-bold rounded px-2 py-1" style={only === k ? { background: C.body, color: "#fff" } : { color: C.sub, border: `1px solid ${C.line}` }}>
+            {k === "all" ? `All · ${rows.length}` : k === "started" ? `Learning · ${rows.filter(started).length}` : `Not started · ${rows.filter((r) => !started(r)).length}`}
+          </button>
+        ))}
+        <div className="flex-1" />
+        <span className="text-xs" style={{ color: C.mute }}>{shown.length} shown · {sum("completed")} completed · {hhmm(sum("minutes"))}</span>
+      </div>
+      <div style={{ maxHeight: 520, overflow: "auto" }}>
+        <table className="w-full text-xs genie-table" style={{ minWidth: 980, borderCollapse: "separate", borderSpacing: 0 }}>
+          <thead><tr>{PCOLS.map(th)}</tr></thead>
+          <tbody>
+            {shown.map((r, i) => (
+              <tr key={r.id} onClick={() => onPick(r.id)} className="cursor-pointer" title="Open their record"
+                style={{ background: r.id === picked ? "#EAF2FF" : i % 2 ? "#FAF9F5" : "#fff", borderTop: "1px solid #EFEDE7" }}>
+                <td className="px-2 py-1.5"><div className="font-bold" style={{ color: C.ink }}>{r.name}</div><div style={{ color: C.faint }}>{r.designation || r.email}</div></td>
+                <td className="px-2 py-1.5" style={{ color: C.sub }}>{r.department || "—"}{r.groups.length ? <div style={{ color: C.faint }}>{r.groups.join(" · ")}</div> : null}</td>
+                <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: r.completed ? C.green : C.faint }}>{r.completed}</td>
+                <td className="px-2 py-1.5 text-right tnum" style={{ color: r.in_progress ? C.amber : C.faint }}>{r.in_progress}</td>
+                <td className="px-2 py-1.5 text-right tnum" style={{ color: r.planned ? C.sub : C.faint }}>{r.planned}</td>
+                <td className="px-2 py-1.5 text-right tnum">{r.minutes ? hhmm(r.minutes) : "—"}</td>
+                <td className="px-2 py-1.5 text-right tnum">{r.words || "—"}</td>
+                <td className="px-2 py-1.5 tnum whitespace-nowrap">{r.last_completed ? fmtFull(r.last_completed) : "—"}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap" style={{ color: r.plan_at ? C.violet : C.faint }}>{r.plan_at ? `✓ ${fmtFull(r.plan_at.slice(0, 10))}` : "none"}</td>
+              </tr>
+            ))}
+            {shown.length === 0 && <tr><td colSpan={PCOLS.length} className="p-4 text-center" style={{ color: C.mute }}>Nobody matches.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ===========================================================================
+// THE LMS ADMIN PAGE (Dr Raghu, 15 Oct 2026: "in LMS make an admin page.
+// Shweta and Raghu are LMS admins for now").
+// ===========================================================================
+type AdminData = {
+  installed: boolean; mayChangeAdmins: boolean;
+  admins: { email: string; name: string; added_by: string | null; added_at: string | null }[];
+  libraries: { id: string; name: string; icon: string | null; active: boolean; audience: string; lessons: number; completions: number; learners: number; last30: number; planned: number }[];
+  untouched: { id: string; title: string; code: string | null }[];
+  top: { id: string; title: string; code: string | null; completions: number }[];
+};
+
+function AdminTab({ ctx }: { ctx: Ctx }) {
+  const [a, setA] = useState<AdminData | null>(null);
+  const [err, setErr] = useState("");
+  const [email, setEmail] = useState("");
+  const load = useCallback(() => { api.get("/api/lms/admin").then(setA).catch((e) => setErr(e instanceof Error ? e.message : String(e))); }, []);
+  useEffect(() => { load(); }, [load]);
+  const change = async (action: "admin.add" | "admin.remove", who: string) => {
+    setErr("");
+    try { await api.post("/api/lms/admin", { action, email: who }); setEmail(""); load(); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+  };
+  const box = { borderColor: C.line } as React.CSSProperties;
+  const head = (t: string, n?: React.ReactNode) => <div className="text-xs font-bold mb-2 flex items-baseline gap-2" style={{ color: C.mute, letterSpacing: 1.1 }}>{t}{n}</div>;
+  return (
+    <div className="flex flex-col gap-3">
+      {err && <div className="text-xs font-bold" style={{ color: C.red }}>{err}</div>}
+      {!a ? <div className="text-xs" style={{ color: C.mute }}>Opening the admin page…</div> : (
+        <>
+          <div className="rounded-lg border bg-white p-3" style={box}>
+            {head("LMS ADMINS", <span style={{ color: C.faint, fontWeight: 400, letterSpacing: 0 }}>write the library, set who sees which library, read everybody&apos;s record</span>)}
+            {!a.installed && <div className="text-xs mb-2" style={{ color: C.amber }}>Run migration <b>0234_lms_admin.sql</b> — until then Genie&apos;s own admins keep the library, and Shweta is not yet an LMS admin.</div>}
+            <div className="flex flex-wrap gap-2">
+              {a.admins.map((m) => (
+                <div key={m.email} className="rounded border px-3 py-2 flex items-center gap-2" style={box}>
+                  <div><div className="text-sm font-bold" style={{ color: C.ink }}>{m.name}</div><div className="text-xs" style={{ color: C.faint }}>{m.email}</div></div>
+                  {a.mayChangeAdmins && m.email !== "raghu@nandan.co.in" && (
+                    <button onClick={() => { if (window.confirm(`Remove ${m.name} as an LMS admin?`)) void change("admin.remove", m.email); }} title="Remove" style={{ color: C.red, fontWeight: 700 }}>×</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {a.mayChangeAdmins && a.installed && (
+              <div className="flex gap-2 mt-2">
+                <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@nandan.co.in" className="text-xs border rounded px-2 py-1.5" style={{ borderColor: C.line, minWidth: 240 }} />
+                <button onClick={() => void change("admin.add", email)} disabled={!email.trim()} className="text-xs font-bold rounded px-3 py-1.5" style={{ background: email.trim() ? "var(--green)" : "var(--line)", color: email.trim() ? "#fff" : C.mute }}>+ Add LMS admin</button>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border bg-white p-3" style={box}>
+            {head("THE LIBRARIES — HOW THEY ARE USED")}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs genie-table" style={{ minWidth: 760 }}>
+                <thead><tr style={{ background: "var(--ink)", color: "#fff" }}>
+                  <th className="px-2 py-2 text-left">Library</th><th className="px-2 py-2 text-left">Who sees it</th>
+                  <th className="px-2 py-2 text-right">Lessons</th><th className="px-2 py-2 text-right">People who finished one</th>
+                  <th className="px-2 py-2 text-right">Completions</th><th className="px-2 py-2 text-right">Last 30 days</th><th className="px-2 py-2 text-right">Planned / under way</th>
+                </tr></thead>
+                <tbody>{a.libraries.map((b, i) => (
+                  <tr key={b.id} style={{ background: i % 2 ? "#FAF9F5" : "#fff", borderTop: "1px solid #EFEDE7", opacity: b.active ? 1 : 0.5 }}>
+                    <td className="px-2 py-1.5 font-bold" style={{ color: C.ink }}><button onClick={() => ctx.openBook(b.id)} className="hover:underline text-left">{b.icon ? `${b.icon} ` : ""}{b.name}</button>{!b.active && " (hidden)"}</td>
+                    <td className="px-2 py-1.5" style={{ color: C.sub }}>{b.audience}</td>
+                    <td className="px-2 py-1.5 text-right tnum">{b.lessons}</td>
+                    <td className="px-2 py-1.5 text-right tnum">{b.learners || "—"}</td>
+                    <td className="px-2 py-1.5 text-right tnum font-bold" style={{ color: b.completions ? C.green : C.faint }}>{b.completions}</td>
+                    <td className="px-2 py-1.5 text-right tnum">{b.last30 || "—"}</td>
+                    <td className="px-2 py-1.5 text-right tnum">{b.planned || "—"}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+            <div className="rounded-lg border bg-white p-3" style={box}>
+              {head("MOST FINISHED")}
+              {a.top.length ? a.top.map((l) => (
+                <button key={l.id} onClick={() => ctx.openLesson(l.id)} className="w-full flex gap-2 text-xs py-1 text-left hover:underline" style={{ borderTop: "1px solid #EFEDE7" }}>
+                  <span style={{ color: C.faint, width: 38 }}>{l.code || ""}</span><span className="flex-1" style={{ color: C.ink }}>{l.title}</span><b className="tnum" style={{ color: C.green }}>{l.completions}</b>
+                </button>)) : <div className="text-xs" style={{ color: C.mute }}>Nothing finished yet.</div>}
+            </div>
+            <div className="rounded-lg border bg-white p-3" style={box}>
+              {head("NOBODY HAS FINISHED", <span style={{ color: C.faint }}>{a.untouched.length}</span>)}
+              <div style={{ maxHeight: 300, overflowY: "auto" }}>
+                {a.untouched.length ? a.untouched.map((l) => (
+                  <button key={l.id} onClick={() => ctx.openLesson(l.id)} className="w-full flex gap-2 text-xs py-1 text-left hover:underline" style={{ borderTop: "1px solid #EFEDE7" }}>
+                    <span style={{ color: C.faint, width: 38 }}>{l.code || ""}</span><span className="flex-1" style={{ color: C.ink }}>{l.title}</span>
+                  </button>)) : <div className="text-xs" style={{ color: C.mute }}>Every lesson has been finished by someone.</div>}
+              </div>
+            </div>
+          </div>
+
+          <PeoplePanel ctx={ctx} startOpen />
+          <div className="text-xs" style={{ color: C.mute }}>Everybody&apos;s learning, one line each, is under <b>My Team</b>. The lessons and libraries are written under <b>Library</b>.</div>
+        </>
+      )}
     </div>
   );
 }

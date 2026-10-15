@@ -6,6 +6,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { teamOf } from "@/lib/team";
 import { MIN_LEARNING_WORDS, wordCount, maySeeBook, LMS_GROUPS, type LessonStatus } from "@/lib/lms";
 import { serviceTeam } from "@/lib/seva-team";
+import { isLmsAdmin } from "@/lib/lms-admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** SERVICE AND LEADERS COUNCIL ARE WORKED OUT, NOT TICKED (12 Oct 2026): the Service roll and profiles.lc open the Service Repairs library. */
@@ -63,9 +64,12 @@ export async function GET(req: Request) {
       lms_groups?: string[] | null; lms_only?: boolean | null;
     };
     const people = ((profRes.data || []) as unknown as Person[]).filter((p) => !p.disabled);
-    const team = teamOf(people, user.id);
+    const isAdmin = await isLmsAdmin(admin, user);
+    /* AN LMS ADMIN SEES EVERYBODY (Dr Raghu, 15 Oct 2026: "show all in this also to me") — the line below a manager otherwise */
+    const team = isAdmin
+      ? people.filter((p) => p.id !== user.id).map((p) => ({ id: p.id, depth: 1 })).sort((a, b) => String(people.find((x) => x.id === a.id)?.display_name || "").localeCompare(String(people.find((x) => x.id === b.id)?.display_name || "")))
+      : teamOf(people, user.id);
     const teamIds = new Set(team.map((m) => m.id));
-    const isAdmin = user.role === "admin" || user.isOwner;
 
     // Whose record is being read. Yours always; your team's if they are under
     // you; anybody's if you are an admin. Anything else is a 403 rather than a
@@ -159,7 +163,7 @@ export async function POST(req: Request) {
     const admin = adminClient();
     const body = await readBody(req, {});
     const action = String(body.action || "");
-    const isAdmin = user.role === "admin" || user.isOwner;
+    const isAdmin = await isLmsAdmin(admin, user);
     const needAuthor = () => {
       if (!isAdmin) throw new HttpError(403, "Only an admin may change the library");
     };

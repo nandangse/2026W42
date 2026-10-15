@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.1.0",
+    date: "2026-10-15",
+    module: "LMS: an Admin page; My Team as one table of everybody",
+    items: [
+      "LMS ADMIN (Dr Raghu, 15 Oct 2026: \u201cin LMS make an admin page. Shweta and Raghu are LMS admins for now\u201d). LMS admins are a list of their own (lms_admin, migration 0234): Dr Raghu and Shweta Bilouhan. They write the library, set who sees which library, and read everybody\u2019s record \u2014 Genie\u2019s general admin role no longer does, once 0234 runs. The Admin tab: the LMS admins (Dr Raghu adds and removes), how each library is used (lessons, people who finished one, completions, last 30 days, planned), the most-finished lessons, the lessons nobody has finished, and Who sees what (moved here from Library, open).",
+      "MY TEAM, EVERYBODY AT ONCE (\u201cshow all in this also to me \u2026 as a table\u201d). One line a person: department and groups, completed, in progress, planned, time, words written, last finished, plan written. Search, All / Learning / Not started, every column sorts, the head stays put. Click a name and their record opens below. An LMS admin sees every active person; a manager, their own line.",
+    ],
+  },
+  {
     v: "6.10.0.11",
     date: "2026-10-14",
     module: "Project book: PCD first \u2014 typed documents filed in the Drive; the Design Section read from Vishwakarma",
