@@ -15,6 +15,7 @@ import { Card, Section, C, type Delta } from "@/components/ceo/ui";
 import { PeopleRoom, ExecutionRoom, CashRoom, ReviewsRoom, ExceptionsRoom } from "@/components/ceo/CeoRooms";
 import { StrategyRoom } from "@/components/ceo/CeoStrategy";
 import { InternalKuberRoom } from "@/components/ceo/InternalKuber";
+import { ApprovalsRoom } from "@/components/ceo/CeoApprovals";
 import { swallow } from "@/lib/swallow";
 
 type Err = { error: string };
@@ -37,6 +38,7 @@ const ROOMS = [
   { key: "reviews", label: "Reviews", icon: "📋" },
   { key: "exceptions", label: "Exceptions", icon: "⚠" },
   { key: "internal", label: "Internal Kuber", icon: "🪙" },
+  { key: "approvals", label: "Approvals", icon: "✅" },
 ] as const;
 
 function Dashboard({ top }: { top: number }) {
@@ -237,7 +239,7 @@ export default function CeoCockpit({ email, displayName, initials, role }: { ema
             ))}
           </nav>
           <main className="flex-1" style={{ minWidth: 0, maxWidth: 1480, padding: "0 20px 20px" }}>
-            {room === "dashboard" || room === "internal" ? null : <div className="pt-5" />}
+            {room === "dashboard" || room === "internal" || room === "approvals" ? null : <div className="pt-5" />}
             {room === "dashboard" && <Dashboard top={top} />}
             {room === "people" && <PeopleRoom />}
             {room === "strategy" && <StrategyRoom />}
@@ -246,6 +248,7 @@ export default function CeoCockpit({ email, displayName, initials, role }: { ema
             {room === "reviews" && <ReviewsRoom />}
             {room === "exceptions" && <ExceptionsRoom />}
             {room === "internal" && <InternalKuberRoom top={top} />}
+            {room === "approvals" && <ApprovalsRoom top={top} />}
             <div className="text-xs mt-6" style={{ color: C.muted }}>Open to three: Dr Raghu, J C Kumar and Tushar Giri. Every figure is read from the module that owns it; click any number for what makes it.</div>
           </main>
         </div>

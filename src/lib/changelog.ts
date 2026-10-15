@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.1.4",
+    date: "2026-10-15",
+    module: "CEO: an Approvals room, and the CEO page as Dr Raghu\u2019s front door",
+    items: [
+      "APPROVALS (Dr Raghu, 15 Oct 2026: \u201cconsolidate all the places that have asked me for approvals \u2014 leave, loan, records, etc. Show as aggregated and then can open in new tab\u201d). A room on the CEO menu that reads every approval queue in Genie as its own screen reads it: changes to people\u2019s records, role definitions, salary decisions, loans and advances, salary queries (HRMS); F&F settlements open; payments planned and awaiting approval (Kuber); service quotations waiting to be sent, and the service team\u2019s claims sent to accounts (Seva); council principles awaiting approval (Leaders Council); vendor registrations to review (Portal). Waiting on you first, then on others; each queue shows its count and money, opens to its lines, and every line and queue opens its own screen in a new tab. Leave has no request table yet, and the page says so.",
+      "THE CEO PAGE AS THE FRONT DOOR (\u201cI intend that CEO should be my default page\u201d). Dr Raghu landing at genie.nandan.co.in goes to /ceo; the Planning door in every module menu still opens the suite. Nobody else is moved.",
+    ],
+  },
+  {
     v: "6.10.1.3",
     date: "2026-10-15",
     module: "Delivery board: totals folded by default; the For Updating table as a PDF",

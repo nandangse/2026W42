@@ -13,10 +13,16 @@ export const dynamic = "force-dynamic";
 
 // Role routing (spec §2, §8): uploader (Shweta) lands on the Morning Update
 // page ONLY; everyone else gets the full suite.
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams?: { home?: string } }) {
   const user = await currentUser();
   if (!user) redirect("/login");
   if (user.disabled) redirect("/login");
+
+  /* THE CEO PAGE IS HIS FRONT DOOR (Dr Raghu, 15 Oct 2026: "I intend that CEO
+     should be my default page"). The owner landing at / goes to /ceo; the
+     Planning door in every module menu carries ?home=1 so it still opens the
+     suite when he asks for it. Nobody else is moved. */
+  if (user.isOwner && !searchParams?.home) redirect("/ceo");
 
   if (user.role === "uploader") {
     return <MorningUpload email={user.email} />;
