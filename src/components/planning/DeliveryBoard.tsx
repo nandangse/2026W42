@@ -13,6 +13,7 @@ import { today, fmt, fmtFull, jobNo, initials, diffDays, addDays, isoWeek, otdCo
 import RunRate, { useRunRatePayload, type Payload } from "../RunRate";
 import { runRate } from "@/lib/run-rate";
 import { deliveryReportHtml } from "@/lib/delivery-report";
+import { updatingSheetHtml } from "@/lib/updating-sheet";
 
 import DeliveryOutlook from "../DeliveryOutlook";
 
@@ -192,9 +193,12 @@ export function DeliveryBoard({
    * Following the tab rather than being remembered per person: the right
    * default is a property of the view, not of the reader. Anyone can open it
    * anywhere, and it stays open until they move to another tab.
+   *
+   * FOLDED BY DEFAULT EVERYWHERE (Dr Raghu, 15 Oct 2026: "by default keep this
+   * collapsed") — the Priority List included. "Show totals" opens them.
    */
-  const [cardsOpen, setCardsOpen] = useState(true);
-  useEffect(() => { setCardsOpen(subTab === "priority"); }, [subTab]);
+  const [cardsOpen, setCardsOpen] = useState(false);
+  useEffect(() => { setCardsOpen(false); }, [subTab]);
   const [outlook, setOutlook] = useState(false);
   const [delOwn, setDelOwn] = useState("all");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -1206,6 +1210,13 @@ function UpdatingTable({ jobs, tasks, V, link, onStat, reload }: {
     catch (e) { setMsg(`${jobNo(j.id)}: ${e instanceof Error ? e.message : String(e)}`); }
     finally { setBusy(""); }
   };
+  /* THE PDF (Dr Raghu, 15 Oct 2026: "help me see a pdf of this") — the same rows, A4 landscape, through the print dialog */
+  const printSheet = () => {
+    const html = updatingSheetHtml(jobs.map((j) => { const t = open.get(j.id); return { id: j.id, tag: j.tag, cust: j.cust, tdd: j.tdd, owner: j.ownerInitials, pct: j.pct, kit: j.kit || 0, tpv: j.tpv || 0, tpp: j.tpp || 0, note: j.note || "", updated_at: j.updated_at, stat: j.stat, tasks: t?.n || 0, late: t?.late || 0, escalation: j.escalation, esc: t?.esc || [] }; }), TODAY, V);
+    const w = window.open("", "_blank"); if (!w) return;
+    w.document.write(html); w.document.close();
+    setTimeout(() => w.print(), 400);
+  };
   const W = { job: 64, tag: 230 };
   const head: React.CSSProperties = { position: "sticky", top: 0, zIndex: 3, background: "var(--ink)", color: "#fff" };
   const left0: React.CSSProperties = { position: "sticky", left: 0, zIndex: 2, minWidth: W.job, width: W.job };
@@ -1215,6 +1226,7 @@ function UpdatingTable({ jobs, tasks, V, link, onStat, reload }: {
       <div className="px-3 pt-2 pb-1 text-xs flex gap-3 flex-wrap" style={{ color: "var(--muted)" }}>
         <span>{jobs.length} jobs, in the Priority List&apos;s order · click a Current Update to write it · the Status saves when chosen</span>
         {msg && <b style={{ color: "var(--red)" }}>{msg}</b>}
+        <button onClick={printSheet} className="ml-auto rounded px-2.5 py-1 font-bold" style={{ background: "var(--accent)", color: "#fff" }} title="A4 landscape — choose Save as PDF in the print dialog">🖨 PDF</button>
       </div>
       <div className="overflow-auto" style={{ maxHeight: "72vh" }}>
         <table className="text-xs genie-table" style={{ minWidth: 1500, borderCollapse: "separate", borderSpacing: 0 }}>

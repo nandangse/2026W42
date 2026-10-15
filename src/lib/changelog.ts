@@ -92,6 +92,15 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.1.3",
+    date: "2026-10-15",
+    module: "Delivery board: totals folded by default; the For Updating table as a PDF",
+    items: [
+      "TOTALS FOLDED (Dr Raghu, 15 Oct 2026: \u201cby default keep this collapsed\u201d). The number cards, the run rate and THE YEAR start folded on every tab of the delivery board, the Priority List included; Show totals opens them.",
+      "THE FOR-UPDATING PDF (\u201chelp me see a pdf of this\u201d). A \U0001f5a8 PDF button on the For Updating tab prints the same rows \u2014 job, customer tag, target delivery, owner, Prod %, Kit %, throughput, T%, current update with its time, status, tasks pending and late, escalations \u2014 on A4 landscape with the head on every page and no row split; Save as PDF is a destination in the print dialog.",
+    ],
+  },
+  {
     v: "6.10.1.2",
     date: "2026-10-15",
     module: "Delivery board: a For Updating tab below the next 30 days",
