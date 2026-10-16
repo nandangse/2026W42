@@ -105,7 +105,7 @@ function ByMonth({ who, onPerson }: { who: string; onPerson: (id: string) => voi
       blurb="Days paid, attendance % and late coming %, per person and per month — read from the muster each payroll run was computed from, never a second copy."
       tools={<>
         <select value={m?.id || ""} onChange={(e) => setSheet(e.target.value)} className="text-xs border rounded px-2 py-1.5" style={{ borderColor: C.line }}>
-          {(d?.months || []).map((x) => <option key={x.id} value={x.id}>{MONTHS[x.month - 1]} {x.year} · {x.people} people{x.status === "Frozen" ? " · ❄" : x.source === "sheet" ? " · HR sheet" : ""}</option>)}
+          {(d?.months || []).map((x) => <option key={x.id} value={x.id}>{MONTHS[x.month - 1]} {x.year} · {x.people} people{x.source === "payroll" ? (x.status === "Frozen" ? " · ❄" : "") : x.source === "sheet" ? " · HR sheet" : " · salary sheet"}</option>)}
         </select>
         <select value={cat} onChange={(e) => setCat(e.target.value)} className="text-xs border rounded px-2 py-1.5" style={{ borderColor: C.line }}>
           <option value="all">All categories</option>{(d?.byCategory || []).map((c) => <option key={c.category} value={c.category}>{c.category} · {c.people}</option>)}
@@ -135,7 +135,7 @@ function ByMonth({ who, onPerson }: { who: string; onPerson: (id: string) => voi
             <Stat k="LATE COMING %" v={pc(T.late_pct)} c={tone(T.late_pct, 5, 20, true)} />
             <div className="ml-auto text-xs" style={{ color: C.faint, maxWidth: 360, lineHeight: 1.5 }}>
               Attendance % = present ÷ (present + absent). Late coming % = late days (the sheet's deduction, in quarter days) ÷ present days. Week-offs and holidays count in neither.
-              {m.source === "sheet" && <> This month was pulled from the HR sheet{m.tab ? ` (tab "${m.tab}")` : ""}, not a payroll run in Genie.</>}
+              {m.source === "sheet" && <> This month was pulled from the HR sheet{m.tab ? ` (tab "${m.tab}")` : ""}, not a payroll run in Genie.</>}{m.source === "salary" && <> This month is built from the uploaded salary sheet: present = its Attendance, days paid = its Paid Days, absent = days in month − days paid, week-offs and holidays undivided under WO. No day marks, no late figure.</>}
             </div>
           </div>
           {cat === "all" && !q && d.byCategory.length > 1 && (
@@ -172,7 +172,7 @@ function ByPerson({ who, initial, onMonths }: { who: string; initial: string | n
   const A = pv?.averages; const P = pv?.person;
   const cols: Column<PersonView["months"][number]>[] = [
     { key: "month", label: "Month", width: 120, value: (r) => r.month.year * 100 + r.month.month, numeric: true, render: (r) => <b>{MONTHS[r.month.month - 1]} {r.month.year}</b> },
-    { key: "src", label: "From", width: 90, value: (r) => (r.month.source === "payroll" ? "Payroll run" : "HR sheet") },
+    { key: "src", label: "From", width: 90, value: (r) => (r.month.source === "payroll" ? "Payroll run" : r.month.source === "sheet" ? "HR sheet" : "Salary sheet") },
     { key: "pay", label: "Days paid", width: 80, align: "right", numeric: true, value: (r) => r.line.pay_days },
     { key: "present", label: "Present", width: 70, align: "right", numeric: true, value: (r) => r.line.present },
     { key: "absent", label: "Absent", width: 70, align: "right", numeric: true, value: (r) => r.line.absent, render: (r) => <span style={{ color: r.line.absent ? "#B3392E" : C.faint, fontWeight: r.line.absent ? 700 : 400 }}>{r.line.absent}</span> },
@@ -183,7 +183,7 @@ function ByPerson({ who, initial, onMonths }: { who: string; initial: string | n
     { key: "latepct", label: "Late coming %", width: 100, align: "right", numeric: true, value: (r) => r.line.late_pct, render: (r) => <b style={{ color: tone(r.line.late_pct, 5, 20, true) }}>{pc(r.line.late_pct)}</b> },
     { key: "compoff", label: "Comp off", width: 70, align: "right", numeric: true, value: (r) => r.line.compoff },
     { key: "et", label: "ET", width: 60, align: "right", numeric: true, value: (r) => r.line.et },
-    { key: "marks", label: "Day by day", width: 820, value: (r) => r.line.days.join(" "), render: (r) => <MarkRow days={r.line.days} sundays={r.sundays} /> },
+    { key: "marks", label: "Day by day", width: 820, value: (r) => r.line.days.join(" "), render: (r) => (r.line.days.length ? <MarkRow days={r.line.days} sundays={r.sundays} /> : <span style={{ color: C.faint }}>no day marks in this source</span>) },
   ];
   const Stat = ({ k, v, c }: { k: string; v: string; c?: string }) => <div><div style={{ fontSize: 10, color: C.faint, fontWeight: 700, letterSpacing: .6 }}>{k}</div><div className="tnum" style={{ fontSize: 17, fontWeight: 800, color: c || "#16232F" }}>{v}</div></div>;
   return (

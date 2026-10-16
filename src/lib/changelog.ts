@@ -92,6 +92,12 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.11.2.3",
+    date: "2026-10-16",
+    module: "Attendance Muster \u2014 every uploaded month since January 2024",
+    items: ["\u201cIt\u2019s there from Jan 2024! All data is available.\u201d Every uploaded salary sheet carries each person\u2019s Attendance and Paid Days, so a month with no muster is now built from them: present = Attendance, days paid = Paid Days, absent = days in the month \u2212 days paid, week-offs and holidays undivided. That puts January\u2013May 2024 and April 2025\u2013July 2026 on the page and on the Genie door today (June 2024\u2013March 2025 have no upload). The payroll run\u2019s muster and a pulled HR-sheet tab still win where they exist, and the HR-sheet pull adds the day marks and late figures when the sheet is shared with Genie\u2019s account."],
+  },
+  {
     v: "6.11.2.2",
     date: "2026-10-16",
     module: "Attendance Muster \u2014 every person in the list; the pull runs on the owner\u2019s Genie key",

@@ -40,7 +40,7 @@ export async function GET(req: Request) {
     if (error) throw new Error(error.message);
     const merged = await musterMonths(admin);
     const data = [...(runs || [])];
-    for (const mo of merged.months) if (mo.source === "sheet" && !data.some((r) => Number(r.year) === mo.year && Number(r.month) === mo.month)) data.push({ id: mo.id, month: mo.month, year: mo.year, status: mo.status, muster: merged.raw.get(mo.id) });
+    for (const mo of merged.months) if (mo.source !== "payroll" && !data.some((r) => Number(r.year) === mo.year && Number(r.month) === mo.month)) data.push({ id: mo.id, month: mo.month, year: mo.year, status: mo.status, muster: merged.raw.get(mo.id) });
     data.sort((a, b) => Number(b.year) - Number(a.year) || Number(b.month) - Number(a.month));
 
     const months: {

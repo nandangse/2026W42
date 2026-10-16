@@ -15,7 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Muster, MusterRow } from "@/lib/muster";
 
-export interface MusterMonth { id: string; month: number; year: number; status: string; people: number; days: number; source: "payroll" | "sheet"; tab?: string }
+export interface MusterMonth { id: string; month: number; year: number; status: string; people: number; days: number; source: "payroll" | "sheet" | "salary"; tab?: string }
 export interface MusterLine {
   employee_id: string; name: string; status: string; category: string; department: string | null; designation: string | null; location: string | null;
   days: string[]; present: number; absent: number; wo: number; mo_st: number; pay_days: number;
@@ -33,7 +33,7 @@ const N = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x :
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
 
 export async function musterMonths(admin: SupabaseClient): Promise<{ months: MusterMonth[]; raw: Map<string, Muster> }> {
-  const { data, error } = await admin.from("hrms_salary_sheet").select("id, month, year, status, muster").order("year", { ascending: false }).order("month", { ascending: false }).limit(60);
+  const { data, error } = await admin.from("hrms_salary_sheet").select("id, month, year, status, muster, rows").order("year", { ascending: false }).order("month", { ascending: false }).limit(60);
   if (error) throw new Error(error.message);
   const months: MusterMonth[] = []; const raw = new Map<string, Muster>(); const have = new Set<string>();
   for (const s of data || []) {
@@ -47,10 +47,36 @@ export async function musterMonths(admin: SupabaseClient): Promise<{ months: Mus
     for (const s of imp || []) {
       if (have.has(`${s.year}-${s.month}`)) continue;
       const m = (s.muster || null) as Muster | null; if (!m || !(m.rows || []).length) continue;
-      const id = `imp:${s.id}`; raw.set(id, m);
+      const id = `imp:${s.id}`; raw.set(id, m); have.add(`${s.year}-${s.month}`);
       months.push({ id, month: Number(s.month), year: Number(s.year), status: "From HR sheet", people: m.rows.length, days: Number(s.days) || m.rows[0]?.days?.length || 0, source: "sheet", tab: String(s.tab) });
     }
   } catch { /* pre-0241 */ }
+  /* THE UPLOADED SALARY SHEETS (Dr Raghu, 16 Oct 2026: "it's there from Jan
+     2024! All data is available"). Every uploaded month carries each person's
+     Attendance (days present) and Paid Days. Where no muster and no pulled
+     tab exists for the month, a muster is built from them: present = the
+     sheet's attendance, days paid = its paid days, absent = days in the month
+     minus days paid (paid days carry the week-offs and holidays, as the
+     musters show), week-offs + holidays = paid minus present, undivided. No
+     day marks and no late figure — the sheet does not carry them. */
+  try {
+    const { data: dept } = await admin.from("hrms_employees").select("id, department, designation, location");
+    const who = new Map<string, { department: string | null; designation: string | null; location: string | null }>();
+    for (const e of (dept || []) as { id: string; department: string | null; designation: string | null; location: string | null }[]) who.set(String(e.id), e);
+    for (const s of data || []) {
+      const key = `${s.year}-${s.month}`; if (have.has(key)) continue;
+      const rows = (Array.isArray(s.rows) ? s.rows : []) as { employee_id?: string | null; name?: string | null; type?: string | null; attendance?: number | null; paid_days?: number | null }[];
+      const usable = rows.filter((r) => r.employee_id && (r.attendance != null || r.paid_days != null)); if (!usable.length) continue;
+      const year = Number(s.year), month = Number(s.month); const dim = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      const m: Muster = { month, year, days: dim, headerRow: 0, columns: {}, unmapped: [], warnings: ["Built from the uploaded salary sheet: present = Attendance, days paid = Paid Days, absent = days in month − paid days; no day marks."],
+        rows: usable.map((r) => { const id = String(r.employee_id); const w = who.get(id); const present = Number(r.attendance) || 0, pay = Number(r.paid_days) || 0; return {
+          employee_id: id, name: String(r.name || ""), status: "", category: String(r.type || "—"), days: [], present, absent: Math.max(0, dim - pay), wo: Math.max(0, pay - present), mo_st: 0, pay_days: pay,
+          attendance: present, compoff: null, ot: null, late: null, lunch: null, loan_taken: null, advance: null, site_allowance: null, leave_encash: null, loan_ded: null, arrears: null, tds: null, other_ded: null,
+          location: w?.location ?? null, designation: w?.designation ?? null, department: w?.department ?? null, mobile: null } as MusterRow; }) };
+      const id = `sal:${s.id}`; raw.set(id, m); have.add(key);
+      months.push({ id, month, year, status: "Salary sheet", people: m.rows.length, days: dim, source: "salary" });
+    }
+  } catch { /* fine — the two real sources still stand */ }
   months.sort((a, b) => b.year - a.year || b.month - a.month);
   return { months, raw };
 }
