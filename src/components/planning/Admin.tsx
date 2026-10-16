@@ -16,6 +16,7 @@ import { fmtFull, initials } from "@/lib/schedule";
 
 import { AdminUser, Board, ErpLogEntry, OWNER_EMAIL, TODAY, asHuman, templateMilestones } from "./shared";
 import { CrewCell } from "./MyWeek";
+import AgentRules from "./AgentRules";
 
 // ============================ Update to ERP ============================
 /**
@@ -514,7 +515,7 @@ export function UpdateToErp({ erpLog, canPush }: { erpLog: ErpLogEntry[]; canPus
 }
 
 // ============================ Admin ============================
-export type AdminTab = "users" | "org" | "milestones" | "setup" | "report" | "updates" | "software" | "genie" | "consult";
+export type AdminTab = "users" | "org" | "milestones" | "setup" | "report" | "updates" | "software" | "agent" | "genie" | "consult";
 
 /**
  * The Name column stays put while the rest scrolls. With department,
@@ -820,7 +821,7 @@ export function ReportPanel() {
 export function AdminTabs({ tab, setTab, owner }: { tab: AdminTab; setTab: (t: AdminTab) => void; owner?: boolean }) {
   return (
     <div className="flex gap-1 rounded p-1 bg-white border flex-wrap" style={{ borderColor: "var(--line)", width: "fit-content" }}>
-      {([["updates", "🗒 Updates"], ["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["report", "📊 Report"], ["software", "📘 Software description"],
+      {([["updates", "🗒 Updates"], ["users", "👥 Users"], ["org", "🧬 Org Chart"], ["milestones", "🏁 Milestones"], ["setup", "⚙ Settings"], ["report", "📊 Report"], ["software", "📘 Software description"], ["agent", "🔌 Agent rules"],
         // the owner's two rooms (Dr Raghu, 30 Aug 2026): usage + the knowledgebase
         ...(owner ? [["genie", "🧞 Genie"], ["consult", "🎓 Consult Dr Raghu"]] as const : [])] as readonly (readonly [AdminTab, string])[]).map(([k, l]) => (
         <button
@@ -1133,6 +1134,17 @@ export function Admin({
       <div className="p-4 space-y-4">
         <AdminTabs tab={adminTab} setTab={setAdminTab} owner={isOwner} />
         <ConsultRaghuPanel />
+      </div>
+    );
+  }
+
+  // Agent rules (Dr Raghu, 16 Oct 2026): what Genie-through-Perisclaw and
+  // every other agent key must obey — admins set them, Genie enforces them.
+  if (adminTab === "agent") {
+    return (
+      <div className="p-4 space-y-4">
+        <AdminTabs tab={adminTab} setTab={setAdminTab} owner={isOwner} />
+        <AgentRules />
       </div>
     );
   }

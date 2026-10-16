@@ -305,6 +305,7 @@ function AccountMenu({ module, user, isAdmin, menu }: { module: ShellModule; use
               )}
             </div>
             <a href="/idp" className="block px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, textDecoration: "none", borderBottom: "1px solid #EEECE6" }}>🪪 My sheet &amp; IDP</a>
+            <a href="/connect" className="block px-3 py-2 text-sm font-semibold hover:bg-gray-50" style={{ color: NAVY, textDecoration: "none", borderBottom: "1px solid #EEECE6" }} title="A key for Perisclaw, Claude or any MCP agent — it sees what you see">🔌 Connect an agent</a>
             {/* CHANGE PASSWORD, SIGNED IN (2 Oct 2026). Until today the only
                 way to a new password was a reset mail nothing could finish —
                 or the SQL editor. */}

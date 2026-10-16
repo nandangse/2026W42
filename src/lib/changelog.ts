@@ -92,6 +92,17 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.11.0.0",
+    date: "2026-10-16",
+    module: "Genie\u2019s MCP door for everyone, across every module; Genie connects to Perisclaw to send WhatsApp itself",
+    items: [
+      "A KEY PER PERSON (Dr Raghu, 16 Oct 2026: \u201cthe Genie should be wired to ALL the modules \u2026 I want it to access the others. This currently is only for me\u201d). Connect an agent (the user menu, /connect): anyone signed in mints a key and gives it to Perisclaw, Claude or any MCP client; the agent sees exactly what that login sees \u2014 the same module doors \u2014 and writes in their name. Keys are shown once, kept as fingerprints, revocable; Dr Raghu sees every key and its last use. Migration 0239.",
+      "TOOLS ACROSS THE MODULES: Planning (jobs, one job, projects, tasks, raise a task, write a job update), the Query Solver, CEO (the company on one page, approvals, Internal Kuber), Kuber (P&L for a period, receivables and payables by party, the payment plan), CRM (find, one company, the pipeline), HRMS (find a person, headcount \u2014 no salaries), Seva (tickets, AMCs, the deployment plan, service orders), Saamaan (live stock, purchase orders, open slips, Kanban red), IMS (documents, non-conformities and CAPA, audits), Leaders Council (Solution Board, check-ins, KPIs), Vishwakarma (design by project), the Portal (clients, their queries) and the LMS (my learning). Each tool stands behind its module\u2019s door.",
+      "GENIE \u2192 PERISCLAW (\u201cI will want Genie to send messages through Perisclaw automatically \u2014 hence that config is also a must\u201d). Genie registers itself with Perisclaw\u2019s MCP server, Dr Raghu allows it once in his browser from /connect, and Genie keeps the key, refreshing it on its own; a test message can be sent from the same page. The sending itself goes into the automations next, as he names them.",
+      "AGENT RULES IN ADMIN (\u201ccurrently Genie and Perisclaw can only be working through Raghu\u2019s commands. In Admin also make the rules that it has to follow\u201d). Admin \u2192 Agent rules: the standing orders every agent reads as binding on each connection (eight rules seeded \u2014 speak only for the key\u2019s holder, read freely, write only when asked and after repeating the details, never approve/pay/release/delete, no salaries over WhatsApp, customers see only their portal, business hours, ask when unsure), and the switches Genie enforces itself whatever the agent was told: agents may read / may write / only these people may write, calls per key per day, Genie\u2019s WhatsApp on/off, staff-only or any number, hours IST, messages per day. Every agent call and every send is logged on the same page. Migration 0240.",
+    ],
+  },
+  {
     v: "6.10.3.2",
     date: "2026-10-16",
     module: "Genie\u2019s MCP door takes the token three ways",
