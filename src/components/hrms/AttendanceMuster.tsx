@@ -168,7 +168,7 @@ function ByPerson({ who, initial, onMonths }: { who: string; initial: string | n
   const [pv, setPv] = useState<PersonView | null>(null); const [msg, setMsg] = useState("");
   useEffect(() => { api.get("/api/hrms/muster?people=1").then((j) => setPeople(j.people || [])).catch((e) => setMsg(e instanceof Error ? e.message : String(e))); }, []);
   useEffect(() => { if (!id) { setPv(null); return; } setPv(null); api.get(`/api/hrms/muster?person=${encodeURIComponent(id)}`).then(setPv).catch((e) => setMsg(e instanceof Error ? e.message : String(e))); }, [id]);
-  const list = useMemo(() => (people || []).filter((p) => !q.trim() || `${p.employee_id} ${p.name} ${p.department || ""}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 60), [people, q]);
+  const list = useMemo(() => (people || []).filter((p) => !q.trim() || `${p.employee_id} ${p.name} ${p.department || ""}`.toLowerCase().includes(q.trim().toLowerCase())), [people, q]);
   const A = pv?.averages; const P = pv?.person;
   const cols: Column<PersonView["months"][number]>[] = [
     { key: "month", label: "Month", width: 120, value: (r) => r.month.year * 100 + r.month.month, numeric: true, render: (r) => <b>{MONTHS[r.month.month - 1]} {r.month.year}</b> },
@@ -199,7 +199,7 @@ function ByPerson({ who, initial, onMonths }: { who: string; initial: string | n
               <div className="text-xs" style={{ color: C.faint }}>{p.department || "—"} · {p.category} · {p.months} month{p.months === 1 ? "" : "s"}</div>
             </button>
           ))}
-          {people && people.length > list.length && <div className="text-xs p-2" style={{ color: C.faint }}>Showing {list.length} of {people.length} — type to narrow.</div>}
+          {people && <div className="text-xs p-2" style={{ color: C.faint }}>{list.length === people.length ? `${people.length} people` : `${list.length} of ${people.length} people`}.</div>}
         </div>
         {id && (
           <div style={{ minWidth: 0 }}>

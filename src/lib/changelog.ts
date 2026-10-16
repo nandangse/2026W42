@@ -92,10 +92,10 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
-    v: "6.11.2.1",
+    v: "6.11.2.2",
     date: "2026-10-16",
-    module: "Attendance Muster \u2014 the pull can be run with the owner\u2019s Genie key",
-    items: ["The pull of the HR sheet\u2019s Muster tabs accepts Dr Raghu\u2019s Genie key as well as his browser, so it can be run for him from a chat."],
+    module: "Attendance Muster \u2014 every person in the list; the pull runs on the owner\u2019s Genie key",
+    items: ["By person lists everyone (\u201cwhy only 60?\u201d \u2014 a cap of 60 is gone; the list scrolls).", "The pull of the HR sheet\u2019s Muster tabs accepts Dr Raghu\u2019s Genie key as well as his browser, so it can be run for him from a chat."],
   },
   {
     v: "6.11.2.0",
