@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     }
     const customers = [...by.values()].map((c) => {
       const org = orgOf(c.name); const people = org ? (users || []).filter((p) => p.org_slug === org.slug) : [];
-      return { ...c, slug: org ? S(org.slug) : null, org_name: org ? S(org.name) : null, door: org ? (org.active !== false ? (people.length ? "live" : "no people") : "inactive") : "none", people: people.length, last_login: people.map((p) => S(p.last_login_at)).filter(Boolean).sort().pop() || null };
+      return { ...c, slug: org ? S(org.slug) : null, org_name: org ? S(org.name) : null, door: org ? (org.active !== false ? "live" : "inactive") : "none", people: people.length, last_login: people.map((p) => S(p.last_login_at)).filter(Boolean).sort().pop() || null };
     }).sort((a, b) => b.open - a.open || b.delivered - a.delivered || a.name.localeCompare(b.name));
     return NextResponse.json({ customers });
   } catch (e) { return errJson(e); }

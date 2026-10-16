@@ -80,14 +80,14 @@ export function LiveClientsView() {
   useEffect(() => { api.get("/api/query-solver?clients=1").then((r) => setRows(r.clients || [])).catch((e) => setErr(String(e.message || e))); }, []);
   if (err) return <div className="text-sm p-4" style={{ color: "var(--red)" }}>{err}</div>;
   if (!rows) return <div className="text-sm p-4" style={{ color: "var(--muted)" }}>Reading the clients…</div>;
-  const isLive = (c: Client) => c.active && c.people > 0;
+  const isLive = (c: Client) => c.active; /* live = the door is open (16 Oct 2026) */
   const shown = rows.filter((c) => !live || isLive(c));
   return (
     <div className="bg-white rounded-lg border" style={{ borderColor: "var(--line)" }}>
       <div className="px-3 py-2 flex items-center gap-2 flex-wrap text-xs">
         <b className="text-sm" style={{ color: "var(--ink)" }}>Clients with a portal door</b>
         {([[true, `Live clients · ${rows.filter(isLive).length}`], [false, `All · ${rows.length}`]] as const).map(([v, l]) => <button key={String(v)} onClick={() => setLive(v)} className="rounded px-2 py-1 font-bold" style={live === v ? { background: "var(--ink)", color: "#fff" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{l}</button>)}
-        <span style={{ color: "var(--muted)" }}>· live = active, with a person who can sign in</span>
+        <span style={{ color: "var(--muted)" }}>· live = the door is open</span>
         <a href="/portal/all/settings" target="_blank" rel="noreferrer" className="ml-auto font-bold underline" style={{ color: "var(--blue)" }}>+ Create a client&apos;s portal ↗</a>
       </div>
       <table className="w-full text-xs genie-table">

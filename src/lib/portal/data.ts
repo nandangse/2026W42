@@ -23,11 +23,12 @@ const S = (v: unknown) => String(v ?? "").trim();
 const N = (v: unknown) => (v == null || v === "" ? null : Number(v));
 export const norm = (s: unknown) => S(s).toLowerCase().replace(/\s+/g, " ");
 
-export interface Org { slug: string; name: string; kind: "customer" | "supplier"; match_names: string[]; intro: string; logo_path: string | null; active: boolean }
+export interface Org { slug: string; name: string; kind: "customer" | "supplier"; match_names: string[]; intro: string; logo_path: string | null; active: boolean; ceo_message?: string | null }
 export interface Scope { kind: "org" | "all" | "locations"; org: Org | null; locations: string[]; commercials: boolean; staff: boolean }
 
 export async function loadOrg(admin: SupabaseClient, slug: string): Promise<Org | null> {
-  const { data } = await admin.from("portal_org").select("slug,name,kind,match_names,intro,logo_path,active").eq("slug", slug).maybeSingle();
+  let { data } = await admin.from("portal_org").select("slug,name,kind,match_names,intro,logo_path,active,ceo_message").eq("slug", slug).maybeSingle();
+  if (!data) ({ data } = await admin.from("portal_org").select("slug,name,kind,match_names,intro,logo_path,active").eq("slug", slug).maybeSingle()); /* before 0238 */
   return (data as Org | null) ?? null;
 }
 

@@ -22,10 +22,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    await requirePortalAdmin();
+    const me = await requirePortalAdmin();
     const admin = adminClient();
     const [orgs, users, locs, audit, custs, sups] = await Promise.all([
-      admin.from("portal_org").select("slug,name,kind,match_names,intro,logo_path,active,created_at,updated_at").order("name"),
+      admin.from("portal_org").select("slug,name,kind,match_names,intro,logo_path,active,created_at,updated_at,ceo_message").order("name").then(async (r) => (r.error && /ceo_message/.test(r.error.message) ? admin.from("portal_org").select("slug,name,kind,match_names,intro,logo_path,active,created_at,updated_at").order("name") : r)),
       admin.from("portal_user").select("id,email,name,phone,role,org_slug,locations,sees_commercials,active,must_change,invite_token,invite_expires,last_login_at,login_count,created_at").order("role").order("name"),
       admin.from("portal_location").select("name,sort_order,active").order("sort_order").order("name"),
       admin.from("portal_audit").select("email,action,detail,at").order("at", { ascending: false }).limit(200),
@@ -34,9 +34,11 @@ export async function GET() {
     ]);
     const firstErr = [orgs, users, locs, audit].find((r) => r.error)?.error;
     if (firstErr) throw firstErr;
-    const customers = Array.from(new Set(((custs.data || []) as { cust: string | null }[]).map((r) => String(r.cust || "").trim()).filter(Boolean))).sort();
+    /* the jobmaster's customer names AND Tally's party names (16 Oct 2026) — the portal's money comes from Tally, whose "Veda Aeronautics (P) Ltd" is not the jobmaster's "Veda Aeronautics Pvt Ltd" */
+    const tally = await admin.from("kuber_bill").select("party").eq("kind", "receivable").limit(5000).then((r) => (r.data || []).map((x) => String(x.party || "").trim()), () => [] as string[]);
+    const customers = Array.from(new Set([...((custs.data || []) as { cust: string | null }[]).map((r) => String(r.cust || "").trim()), ...tally].filter(Boolean))).sort();
     const suppliers = Array.from(new Set(((sups.data || []) as { name: string; supplier_name: string }[]).map((r) => String(r.supplier_name || r.name || "").trim()).filter(Boolean))).sort();
-    return NextResponse.json({ orgs: orgs.data || [], users: users.data || [], locations: locs.data || [], audit: audit.data || [], customers, suppliers });
+    return NextResponse.json({ orgs: orgs.data || [], users: users.data || [], locations: locs.data || [], audit: audit.data || [], customers, suppliers, me: { email: me.email } });
   } catch (e) { return errJson(e); }
 }
 
@@ -57,7 +59,9 @@ export async function POST(req: Request) {
       if (name.length < 2) throw new HttpError(400, "A name, please.");
       const kind = String(b.kind) === "supplier" ? "supplier" : "customer";
       const match_names = Array.from(new Set((Array.isArray(b.match_names) ? (b.match_names as unknown[]) : []).map(norm).filter(Boolean)));
-      const row = { slug, name, kind, match_names, intro: String(b.intro || "").slice(0, 20000), active: b.active !== false, updated_at: now };
+      const row: Record<string, unknown> = { slug, name, kind, match_names, intro: String(b.intro || "").slice(0, 20000), active: b.active !== false, updated_at: now };
+      /* THE CEO'S MESSAGE (16 Oct 2026) — Dr Raghu's words on their landing page; only he writes it */
+      if ("ceo_message" in b) { if (u.email.toLowerCase() !== "raghu@nandan.co.in") throw new HttpError(403, "The CEO's message is Dr Raghu's to write."); row.ceo_message = String(b.ceo_message || "").slice(0, 20000) || null; }
       const { data: cur } = await admin.from("portal_org").select("slug").eq("slug", slug).maybeSingle();
       const { error } = cur
         ? await admin.from("portal_org").update(row).eq("slug", slug)

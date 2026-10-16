@@ -51,6 +51,15 @@ function CustomerHome({ boot, go, arg }: { boot: Boot; go: (t: string, a?: strin
         <H1 sub={boot.org ? `What Nandan holds for ${boot.org.name} today, ${dmy(boot.today)}.` : boot.scope.kind === "locations" ? "The jobs tagged to your locations." : "Every customer's open orders and jobs."}>Orders & jobs</H1>
         <PrintButton />
       </div>
+      {/* THE CEO'S MESSAGE (Dr Raghu, 16 Oct 2026): "Dear <name>, thank you for <organisation> being our valued clients!" then his words — on top, on landing */}
+      {boot.org && boot.org.ceo_message && (
+        <Card>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: P.muted, marginBottom: 6 }}>A MESSAGE FROM THE CEO</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: P.ink }}>Dear {String(boot.me.name || "").split(" ")[0] || "friend"},</div>
+          <div style={{ fontSize: 15, color: P.ink, margin: "2px 0 10px" }}>Thank you for {boot.org.name} being our valued clients!</div>
+          <Markdown text={boot.org.ceo_message} />
+        </Card>
+      )}
       {boot.org?.intro && <Card><Markdown text={boot.org.intro} /></Card>}
       {open.error && <Err e={open.error} />}
       <Card title={`Under delivery${open.data ? ` · ${underDelivery.length}` : ""}`} right={<span>on the shop floor or in progress</span>}>

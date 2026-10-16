@@ -9,7 +9,7 @@ import { api, btn, Card, dmy, Err, H1, input, label, Loading, P, pill, slugOf, u
  */
 type User = { id: string; email: string; name: string; phone: string | null; role: string; org_slug: string | null; locations: string[]; sees_commercials: boolean; active: boolean; must_change: boolean; last_login_at: string | null; login_count: number; invite_expires: string | null };
 type Loc = { name: string; sort_order: number; active: boolean };
-type Admin = { orgs: Org[]; users: User[]; locations: Loc[]; audit: { email: string | null; action: string; detail: Record<string, unknown> | null; at: string }[]; customers: string[]; suppliers: string[] };
+type Admin = { orgs: Org[]; users: User[]; locations: Loc[]; audit: { email: string | null; action: string; detail: Record<string, unknown> | null; at: string }[]; customers: string[]; suppliers: string[]; me?: { email: string } };
 const ROLES: [string, string][] = [["customer", "Customer"], ["supplier", "Supplier"], ["admin", "Admin"], ["national_manager", "National manager"], ["location_manager", "Location manager"], ["location_technician", "Location technician"]];
 
 export default function Settings({ boot, reload }: { boot: Boot; reload: () => void }) {
@@ -47,7 +47,8 @@ function Orgs({ d, refresh, setMsg }: { d: Admin; refresh: () => void; setMsg: (
   const [edit, setEdit] = useState<Partial<Org> | null>(null);
   /* LIVE CLIENTS ONLY, OR ALL (Dr Raghu, 15 Oct 2026: "a button on top showing Live client only or all") — live = active, with at least one person who can sign in */
   const [live, setLive] = useState(true);
-  const isLive = (o: Org) => o.active && d.users.some((u) => u.org_slug === o.slug && u.active);
+  /* live = the door is open (Dr Raghu, 16 Oct 2026: "Veda is live client" — with nobody invited yet) */
+  const isLive = (o: Org) => o.active;
   const shown = d.orgs.filter((o) => !live || isLive(o));
   return (
     <Card title="Organisations — the doors" right={<span style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -68,7 +69,7 @@ function Orgs({ d, refresh, setMsg }: { d: Admin; refresh: () => void; setMsg: (
             <button onClick={() => setEdit(o)} style={btn("ghost", { padding: "3px 9px", fontSize: 12 })}>Edit</button>
           </div>
         ))}
-        {shown.length === 0 && <div style={{ color: P.muted, fontSize: 13 }}>{d.orgs.length ? "No live client yet — a client is live once it is active and has a person who can sign in." : "No organisations yet. Add Veda Aeronautics, Taj SATS, Vama, Safran… the slug is made from the name; give each the names it goes by on the jobmaster."}</div>}
+        {shown.length === 0 && <div style={{ color: P.muted, fontSize: 13 }}>{d.orgs.length ? "No live client yet — a client is live once its door is active." : "No organisations yet. Add Veda Aeronautics, Taj SATS, Vama, Safran… the slug is made from the name; give each the names it goes by on the jobmaster."}</div>}
       </div>
     </Card>
   );
@@ -76,14 +77,15 @@ function Orgs({ d, refresh, setMsg }: { d: Admin; refresh: () => void; setMsg: (
 
 function OrgForm({ d, o, onDone, onCancel, setMsg }: { d: Admin; o: Partial<Org>; onDone: () => void; onCancel: () => void; setMsg: (s: string) => void }) {
   const isNew = !d.orgs.some((x) => x.slug === o.slug);
-  const [f, setF] = useState({ slug: o.slug || "", name: o.name || "", kind: o.kind || "customer", intro: o.intro || "", active: o.active !== false });
+  const [f, setF] = useState({ slug: o.slug || "", name: o.name || "", kind: o.kind || "customer", intro: o.intro || "", active: o.active !== false, ceo_message: (o as Org & { ceo_message?: string | null }).ceo_message || "" });
+  const isRaghu = d.me?.email === "raghu@nandan.co.in";
   const [names, setNames] = useState<string[]>(o.match_names || []);
   const [pick, setPick] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const pool = (f.kind === "supplier" ? d.suppliers : d.customers).filter((n) => !names.includes(n.toLowerCase()) && (!pick || n.toLowerCase().includes(pick.toLowerCase()))).slice(0, 12);
   const save = async () => {
     setErr(null);
-    try { await api("/api/portal/admin", { action: "org_save", ...f, match_names: names }); onDone(); }
+    try { const { ceo_message, ...rest } = f; await api("/api/portal/admin", { action: "org_save", ...rest, ...(isRaghu ? { ceo_message } : {}), match_names: names }); onDone(); }
     catch (e) { setErr(String((e as Error).message || e)); }
   };
   const del = async () => { if (!confirm(`Remove ${f.name} from the portal?`)) return; try { await api("/api/portal/admin", { action: "org_delete", slug: f.slug }); onDone(); setMsg("Organisation deleted."); } catch (e) { setErr(String((e as Error).message || e)); } };
@@ -102,6 +104,10 @@ function OrgForm({ d, o, onDone, onCancel, setMsg }: { d: Admin; o: Partial<Org>
         <input style={input} value={pick} onChange={(e) => setPick(e.target.value)} placeholder={`Type to search ${f.kind === "supplier" ? d.suppliers.length : d.customers.length} names…`} />
         {pick && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>{pool.map((n) => <button key={n} onClick={() => { setNames([...names, n.toLowerCase()]); setPick(""); }} style={btn("ghost", { padding: "3px 9px", fontSize: 12 })}>+ {n}</button>)}{pool.length === 0 && <span style={{ fontSize: 12, color: P.muted }}>No such name on record.</span>}</div>}
       </div>
+      {f.kind === "customer" && (
+        <div><label style={label}>The CEO&apos;s message — on top of their landing page, after &quot;Dear &lt;name&gt;, thank you for &lt;organisation&gt; being our valued clients!&quot; (markdown{isRaghu ? "" : " — Dr Raghu writes this"})</label>
+          <textarea style={{ ...input, minHeight: 120 }} value={f.ceo_message} disabled={!isRaghu} onChange={(e) => setF({ ...f, ceo_message: e.target.value })} placeholder="Dr Raghu's words to this customer…" /></div>
+      )}
       <div><label style={label}>Their front page — what Nandan writes for them (markdown)</label><textarea style={{ ...input, minHeight: 90 }} value={f.intro} onChange={(e) => setF({ ...f, intro: e.target.value })} placeholder="Welcome to your portal. Your account manager is …" /></div>
       <label style={{ fontSize: 13, display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> active — the door opens</label>
       {err && <div style={{ color: P.red, fontSize: 13 }}>{err}</div>}

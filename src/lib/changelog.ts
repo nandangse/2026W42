@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.3.1",
+    date: "2026-10-16",
+    module: "Portal: Commercials \u2014 the whole money story; the CEO\u2019s message on landing; live clients",
+    items: [
+      "COMMERCIALS (Dr Raghu, 16 Oct 2026: \u201cshow total in 12 months \u2026 as a table, % to total order value; on the right Payment anticipated; a tab called Jobs \u00b7 Invoices \u00b7 Payments; 12 months or from\u2013to on top; outstanding invoices always shown\u201d). A period bar (12 months, this FY, from\u2013to). Left: total order value, invoiced, payment received, payment pending, advance received, more payment due, payment due after deliveries \u2014 each with % of order value. Right: Payment anticipated \u2014 items delivered, advance for the order, on delivery \u2014 across TOTAL and eight age columns from overdue > 180 days to due after 90 days. Three tabs: Jobs (the jobmaster\u2019s figures), Invoices (Tally\u2019s sales vouchers and credit notes), Payments (Tally\u2019s receipts). Outstanding invoices sit above the tabs, whatever the period. Tally\u2019s party names are matched on their core (\u2018Veda Aeronautics (P) Ltd\u2019 = \u2018Veda Aeronautics Pvt Ltd\u2019) and Tally\u2019s names join the pick-list on an organisation\u2019s match names.",
+      "THE CEO\u2019S MESSAGE (\u201cshow message from CEO on the top and on landing \u2014 Dear <name>, thank you for <organisation> being our valued clients! \u2026 rich text, editable by Raghu\u201d). Every customer\u2019s landing page opens with the greeting and Dr Raghu\u2019s message; a first message is written in for every door; only Dr Raghu edits it, under the organisation in Settings. Migration 0238.",
+      "LIVE CLIENTS (\u201cVeda is live client\u201d). A client is live once its door is active \u2014 people invited or not \u2014 on Settings, Live Clients and the Customer portal tab alike.",
+    ],
+  },
+  {
     v: "6.10.3.0",
     date: "2026-10-16",
     module: "Genie as an MCP server \u2014 for Perisclaw and any agent; a Modules room on the CEO menu",
