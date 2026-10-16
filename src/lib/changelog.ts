@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.11.0.1",
+    date: "2026-10-16",
+    module: "Agent rules \u2014 staff numbers read from the HRMS records",
+    items: [
+      "Genie\u2019s staff-only WhatsApp rule now checks the HRMS records themselves (personal, company and second mobiles, the WhatsApp field, overrides applied) and profiles\u2019 WhatsApp numbers. Dr Raghu\u2019s test sends were refused because the first cut looked in tables that do not exist.",
+    ],
+  },
+  {
     v: "6.11.0.0",
     date: "2026-10-16",
     module: "Genie\u2019s MCP door for everyone, across every module; Genie connects to Perisclaw to send WhatsApp itself",

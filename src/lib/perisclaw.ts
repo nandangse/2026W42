@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { crmDb, crmConfigured } from "@/crm/db";
 import { adminClient } from "@/lib/supabase/admin";
 import { loadPolicy, whatsAppRefusal, logCall } from "@/lib/mcp/policy";
+import { people } from "@/lib/hrms-wa";
 
 /**
  * GENIE SPEAKS THROUGH PERISCLAW (Dr Raghu, 16 Oct 2026: "I will want Genie
@@ -112,12 +113,16 @@ export async function sendWhatsApp(to: string, text: string, by = "genie"): Prom
   catch (e) { void logCall(admin, { email: by, key_label: "perisclaw", tool: "whatsapp_send", args: { to, chars: text.length }, ok: false, note: e instanceof Error ? e.message : String(e) }); throw e; }
 }
 
-/** Every staff mobile Genie knows (HRMS records + profiles), last 10 digits. */
-async function staffNumbers(admin: ReturnType<typeof adminClient>): Promise<Set<string>> {
+/**
+ * Every staff mobile Genie knows, last 10 digits: the HRMS records (personal
+ * mobile, company mobile, second mobile, WhatsApp — overrides applied, the
+ * same reader the payslip WhatsApp uses) plus profiles.whatsapp_no.
+ */
+export async function staffNumbers(admin: ReturnType<typeof adminClient>): Promise<Set<string>> {
   const out = new Set<string>();
   const take = (v: unknown) => { const d = String(v || "").replace(/\D/g, ""); if (d.length >= 10) out.add(d.slice(-10)); };
-  try { const { data } = await admin.from("hrms_employee").select("mobile, personal_mobile, phone").limit(5000); for (const r of (data || []) as Record<string, unknown>[]) { take(r.mobile); take(r.personal_mobile); take(r.phone); } } catch { /* columns vary */ }
-  try { const { data } = await admin.from("profiles").select("phone, mobile").limit(5000); for (const r of (data || []) as Record<string, unknown>[]) { take(r.phone); take(r.mobile); } } catch { /* fine */ }
+  try { for (const p of await people(admin)) { take(p.phone); take(p.value.company_mobile); take(p.value.personal_mobile_2); take(p.value.whatsapp); } } catch { /* HRMS not installed */ }
+  try { const { data } = await admin.from("profiles").select("whatsapp_no").not("whatsapp_no", "is", null).limit(5000); for (const r of (data || []) as { whatsapp_no?: string }[]) take(r.whatsapp_no); } catch { /* fine */ }
   return out;
 }
 
