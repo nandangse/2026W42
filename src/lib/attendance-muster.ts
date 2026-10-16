@@ -15,7 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Muster, MusterRow } from "@/lib/muster";
 
-export interface MusterMonth { id: string; month: number; year: number; status: string; people: number; days: number }
+export interface MusterMonth { id: string; month: number; year: number; status: string; people: number; days: number; source: "payroll" | "sheet"; tab?: string }
 export interface MusterLine {
   employee_id: string; name: string; status: string; category: string; department: string | null; designation: string | null; location: string | null;
   days: string[]; present: number; absent: number; wo: number; mo_st: number; pay_days: number;
@@ -35,13 +35,54 @@ const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 :
 export async function musterMonths(admin: SupabaseClient): Promise<{ months: MusterMonth[]; raw: Map<string, Muster> }> {
   const { data, error } = await admin.from("hrms_salary_sheet").select("id, month, year, status, muster").order("year", { ascending: false }).order("month", { ascending: false }).limit(60);
   if (error) throw new Error(error.message);
-  const months: MusterMonth[] = []; const raw = new Map<string, Muster>();
+  const months: MusterMonth[] = []; const raw = new Map<string, Muster>(); const have = new Set<string>();
   for (const s of data || []) {
     const m = (s.muster || null) as Muster | null; if (!m || !(m.rows || []).length) continue;
-    const id = String(s.id); raw.set(id, m);
-    months.push({ id, month: Number(s.month), year: Number(s.year), status: String(s.status), people: m.rows.length, days: Number(m.days) || new Date(Date.UTC(Number(s.year), Number(s.month), 0)).getUTCDate() });
+    const id = String(s.id); raw.set(id, m); have.add(`${s.year}-${s.month}`);
+    months.push({ id, month: Number(s.month), year: Number(s.year), status: String(s.status), people: m.rows.length, days: Number(m.days) || new Date(Date.UTC(Number(s.year), Number(s.month), 0)).getUTCDate(), source: "payroll" });
   }
+  // the months pulled from the HR sheet (0241) fill in where no run carries one
+  try {
+    const { data: imp } = await admin.from("hrms_muster_import").select("id, month, year, tab, people, days, muster");
+    for (const s of imp || []) {
+      if (have.has(`${s.year}-${s.month}`)) continue;
+      const m = (s.muster || null) as Muster | null; if (!m || !(m.rows || []).length) continue;
+      const id = `imp:${s.id}`; raw.set(id, m);
+      months.push({ id, month: Number(s.month), year: Number(s.year), status: "From HR sheet", people: m.rows.length, days: Number(s.days) || m.rows[0]?.days?.length || 0, source: "sheet", tab: String(s.tab) });
+    }
+  } catch { /* pre-0241 */ }
+  months.sort((a, b) => b.year - a.year || b.month - a.month);
   return { months, raw };
+}
+
+export interface PersonMonth { month: MusterMonth; sundays: number[]; line: MusterLine }
+export interface PersonView { person: { employee_id: string; name: string; department: string | null; designation: string | null; category: string; location: string | null } | null; months: PersonMonth[]; averages: { attendance_pct: number | null; late_pct: number | null; present: number; absent: number; pay_days: number; months: number } }
+
+/** One person across every month Genie holds a muster for. */
+export async function personView(admin: SupabaseClient, employeeId: string): Promise<PersonView> {
+  const { months, raw } = await musterMonths(admin);
+  const id = String(employeeId).trim();
+  const out: PersonMonth[] = []; let person: PersonView["person"] = null;
+  for (const mo of months) {
+    const r = (raw.get(mo.id)?.rows || []).find((x) => String(x.employee_id).trim() === id); if (!r) continue;
+    const line = lineOf(r);
+    if (!person) person = { employee_id: line.employee_id, name: line.name, department: line.department, designation: line.designation, category: line.category, location: line.location };
+    const sundays: number[] = []; for (let d = 1; d <= mo.days; d++) if (new Date(Date.UTC(mo.year, mo.month - 1, d)).getUTCDay() === 0) sundays.push(d);
+    out.push({ month: mo, sundays, line });
+  }
+  const t = out.reduce((a, x) => ({ present: a.present + x.line.present, absent: a.absent + x.line.absent, pay_days: a.pay_days + x.line.pay_days, late: a.late + (x.line.late || 0) }), { present: 0, absent: 0, pay_days: 0, late: 0 });
+  return { person, months: out, averages: { attendance_pct: pct(t.present, t.present + t.absent), late_pct: pct(t.late, t.present), present: t.present, absent: t.absent, pay_days: t.pay_days, months: out.length } };
+}
+
+/** Everyone who appears in any muster — for the person picker. */
+export async function musterPeople(admin: SupabaseClient): Promise<{ employee_id: string; name: string; department: string | null; category: string; months: number; last: string }[]> {
+  const { months, raw } = await musterMonths(admin);
+  const m = new Map<string, { employee_id: string; name: string; department: string | null; category: string; months: number; last: string }>();
+  for (const mo of months) for (const r of raw.get(mo.id)?.rows || []) {
+    const k = String(r.employee_id).trim(); const cur = m.get(k);
+    if (cur) cur.months += 1; else m.set(k, { employee_id: k, name: String(r.name || ""), department: r.department ?? null, category: String(r.category || "—"), months: 1, last: `${mo.year}-${String(mo.month).padStart(2, "0")}` });
+  }
+  return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function lineOf(r: MusterRow): MusterLine {

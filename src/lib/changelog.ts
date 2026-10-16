@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.11.2.0",
+    date: "2026-10-16",
+    module: "Attendance Muster \u2014 more months, by person, and on the Genie door",
+    items: [
+      "MORE MONTHS (Dr Raghu, 16 Oct 2026: \u201cshould have more months\u201d). The HR sheet carries a Muster tab per month back to April 2024; a button on the page pulls every tab Genie does not already hold (through Genie\u2019s service account \u2014 the sheet must be shared with it as Viewer, the page names the address). The day columns decide which month a tab is, not its name. A payroll run\u2019s own muster always wins over the sheet. Migration 0241.",
+      "BY MONTH / BY PERSON at the top (\u201ccan be able to show one person only \u2026 have a link at top by person, by month\u201d). By person: find anyone who appears in any muster and see every month in one table \u2014 days paid, present, absent, WO, MO/ST, attendance %, late, comp-off, ET and the day marks \u2014 with the averages across months on top. A click on any row of the month view opens that person.",
+      "ON THE GENIE DOOR (\u201cmove this data summary to Perisclaw as needed so questions can be asked\u201d): the tool hrms_attendance, behind the HRMS gate and under the Agent rules \u2014 a month\u2019s summary by category with the most absent, or one person\u2019s months. Never salaries. The per-person attendance in the payroll pages reads the pulled months too.",
+    ],
+  },
+  {
     v: "6.11.1.0",
     date: "2026-10-16",
     module: "HRMS \u2014 the Attendance Muster screen",

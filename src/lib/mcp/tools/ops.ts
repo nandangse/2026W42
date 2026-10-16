@@ -1,6 +1,7 @@
 import type { ToolDef } from "@/lib/mcp/registry";
 import { text, S, N, cr, lim, all } from "@/lib/mcp/registry";
 import { hrmsTables } from "@/lib/hrms";
+import { musterView, personView, musterPeople } from "@/lib/attendance-muster";
 import { liveStock } from "@/lib/saamaan-stock";
 import { liveClients } from "@/lib/query-solver";
 
@@ -21,6 +22,28 @@ export const HRMS_TOOLS: ToolDef[] = [
       const rows = await all<R>((x, y) => admin.from(T.employees).select("department, location").eq("active", true).order("id").range(x, y));
       const by = (k: string) => { const m: Record<string, number> = {}; for (const r of rows) { const v = S(r[k]) || "(blank)"; m[v] = (m[v] || 0) + 1; } return Object.entries(m).sort((p, q) => q[1] - p[1]); };
       return text(`${rows.length} on the roll.\nBy department: ` + by("department").map(([k, v]) => `${k} ${v}`).join(" · ") + `\nBy location: ` + by("location").map(([k, v]) => `${k} ${v}`).join(" · "), { total: rows.length, by_department: by("department"), by_location: by("location") });
+    } },
+  { name: "hrms_attendance", door: "hrms", description: "Attendance from the muster (Dr Raghu, 16 Oct 2026). Without a person: a month's summary — people, days paid, present, absent, attendance % (present ÷ present+absent), late coming % (late days ÷ present), by category, and who was absent most. With a person (employee id or name): their months — days paid, present, absent, week-offs, attendance %, late, and the day marks. month/year pick the month (default: the latest in Genie). Never salaries.", inputSchema: obj({ person: { type: "string", description: "employee id or (part of a) name" }, month: { type: "integer" }, year: { type: "integer" }, limit: { type: "integer", default: 12 } }),
+    run: async ({ admin }, a) => {
+      const MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const pc = (v: number | null) => (v == null ? "—" : `${v}%`);
+      if (S(a.person)) {
+        const q = S(a.person).toLowerCase();
+        const people = await musterPeople(admin);
+        const hits = people.filter((p) => p.employee_id === q || p.name.toLowerCase().includes(q));
+        if (!hits.length) return text(`No muster in Genie carries anyone matching "${S(a.person)}".`);
+        if (hits.length > 1 && !people.some((p) => p.employee_id === q)) return text(`${hits.length} people match "${S(a.person)}" — which one?\n` + hits.slice(0, 15).map((p) => `- ${p.name} (${p.employee_id}) · ${p.department || "—"}`).join("\n"), { candidates: hits.slice(0, 15) });
+        const pv = await personView(admin, (hits.find((p) => p.employee_id === q) || hits[0]).employee_id);
+        const P = pv.person!; const months = pv.months.filter((m) => (!a.month || m.month.month === Number(a.month)) && (!a.year || m.month.year === Number(a.year))).slice(0, lim(a.limit, 12, 36));
+        return text(`${P.name} (${P.employee_id}) · ${P.designation || "—"} · ${P.department || "—"} · ${P.category}\nAcross ${pv.averages.months} months: attendance ${pc(pv.averages.attendance_pct)}, late coming ${pc(pv.averages.late_pct)}, ${pv.averages.present} present / ${pv.averages.absent} absent / ${pv.averages.pay_days} days paid.\n` + months.map((m) => `- ${MO[m.month.month - 1]} ${m.month.year}: paid ${m.line.pay_days}, present ${m.line.present}, absent ${m.line.absent}, WO ${m.line.wo}, MO/ST ${m.line.mo_st}, attendance ${pc(m.line.attendance_pct)}, late ${m.line.late ?? "—"} (${pc(m.line.late_pct)})${m.line.days.length ? ` · marks: ${m.line.days.join(" ")}` : ""}`).join("\n"), { person: P, averages: pv.averages, months: months.map((m) => ({ month: m.month.month, year: m.month.year, source: m.month.source, ...m.line })) });
+      }
+      const v0 = await musterView(admin);
+      const want = a.month || a.year ? v0.months.find((m) => (!a.month || m.month === Number(a.month)) && (!a.year || m.year === Number(a.year))) : v0.month;
+      if (!want) return text(`Genie holds no muster for ${a.month ? MO[Number(a.month) - 1] : ""} ${a.year || ""}. Months in Genie: ${v0.months.map((m) => `${MO[m.month - 1]} ${m.year}`).join(", ")}.`);
+      const v = want.id === v0.month?.id ? v0 : await musterView(admin, want.id);
+      const T = v.totals; const m = v.month!;
+      const worst = [...v.rows].filter((r) => r.absent > 0).sort((p, q) => q.absent - p.absent).slice(0, 10);
+      return text(`Attendance muster · ${MO[m.month - 1]} ${m.year} (${m.source === "payroll" ? "payroll run" : "HR sheet"}) · ${T.people} people.\nDays paid ${T.pay_days} · present ${T.present} · absent ${T.absent} · attendance ${pc(T.attendance_pct)} · late ${T.late} days (${pc(T.late_pct)}).\nBy category: ` + v.byCategory.map((c) => `${c.category} ${c.people} people, attendance ${pc(c.attendance_pct)}, late ${pc(c.late_pct)}`).join(" · ") + (worst.length ? `\nMost absent: ` + worst.map((r) => `${r.name} (${r.employee_id}) ${r.absent}d`).join(", ") : "") + `\nMonths in Genie: ${v.months.map((x) => `${MO[x.month - 1]} ${x.year}`).join(", ")}.`, { month: { month: m.month, year: m.year, source: m.source }, totals: T, by_category: v.byCategory, most_absent: worst.map((r) => ({ employee_id: r.employee_id, name: r.name, absent: r.absent, present: r.present, attendance_pct: r.attendance_pct })) });
     } },
 ];
 

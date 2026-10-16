@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { MONTHS } from "@/lib/salary-sheet";
-import type { MusterView, MusterLine } from "@/lib/attendance-muster";
+import type { MusterView, MusterLine, PersonView } from "@/lib/attendance-muster";
 import { Pane } from "./Pane";
 import DataTable, { type Column } from "./DataTable";
 import { C } from "./RecordFields";
@@ -20,7 +20,45 @@ const MARK: Record<string, { bg: string; fg: string }> = {
 const pc = (v: number | null) => (v == null ? "—" : `${v.toFixed(1)}%`);
 const tone = (v: number | null, good: number, bad: number, invert = false) => { if (v == null) return C.faint; const g = invert ? v <= good : v >= good; const b = invert ? v >= bad : v <= bad; return g ? "#0D6E39" : b ? "#B3392E" : "#8A5B00"; };
 
+type Person = { employee_id: string; name: string; department: string | null; category: string; months: number; last: string };
+type Imp = { sa_email: string | null; sheet_id: string; imports: { year: number; month: number; tab: string; people: number; days: number; imported_at: string }[] };
+
 export default function AttendanceMuster({ who }: { who: string }) {
+  const [mode, setMode] = useState<"month" | "person">("month");
+  const [pick, setPick] = useState<string | null>(null);
+  if (mode === "person") return <ByPerson who={who} initial={pick} onMonths={() => setMode("month")} />;
+  return <ByMonth who={who} onPerson={(id) => { setPick(id); setMode("person"); }} />;
+}
+
+function Switch({ mode, onMode }: { mode: "month" | "person"; onMode: (m: "month" | "person") => void }) {
+  return (
+    <div className="flex gap-1 rounded p-1 bg-white border" style={{ borderColor: "var(--line)", width: "fit-content" }}>
+      {(["month", "person"] as const).map((k) => <button key={k} onClick={() => onMode(k)} className="px-3 py-1 rounded text-sm font-semibold" style={mode === k ? { background: "var(--ink)", color: "#fff" } : { color: "var(--dim)" }}>{k === "month" ? "📅 By month" : "👤 By person"}</button>)}
+    </div>
+  );
+}
+
+function PullMonths({ months }: { months: number }) {
+  const [imp, setImp] = useState<Imp | null>(null); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState("");
+  useEffect(() => { api.get("/api/hrms/muster/import").then(setImp).catch(() => setImp(null)); }, []);
+  const pull = async () => {
+    setBusy(true); setMsg("");
+    try { const r = await api.post("/api/hrms/muster/import", {}); setMsg(`Pulled ${r.imported.length} month${r.imported.length === 1 ? "" : "s"}${r.imported.length ? ": " + r.imported.map((x: { month: number; year: number; people: number }) => `${MONTHS[x.month - 1].slice(0, 3)} ${x.year} (${x.people})`).join(", ") : ""}${r.skipped?.length ? ` · ${r.skipped.length} tab${r.skipped.length === 1 ? "" : "s"} skipped` : ""}. Reload to see them.`); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+  if (!imp) return null;
+  return (
+    <div className="text-xs mt-2 flex items-center gap-2 flex-wrap" style={{ color: C.faint }}>
+      <span>{months} month{months === 1 ? "" : "s"} in Genie · {imp.imports.length} pulled from the HR sheet.</span>
+      <button onClick={pull} disabled={busy} className="font-bold rounded px-2 py-1" style={{ border: `1px solid ${C.line}`, color: "var(--blue)", background: "#fff" }}>{busy ? "Pulling…" : "⤓ Pull the earlier months from the HR sheet"}</button>
+      {imp.sa_email && <span>The sheet must be shared (Viewer) with <b>{imp.sa_email}</b>.</span>}
+      {msg && <span className="font-semibold" style={{ color: /^Pulled/.test(msg) ? "#0D6E39" : C.red }}>{msg}</span>}
+    </div>
+  );
+}
+
+function ByMonth({ who, onPerson }: { who: string; onPerson: (id: string) => void }) {
   const [d, setD] = useState<MusterView | null>(null); const [sheet, setSheet] = useState<string | null>(null);
   const [view, setView] = useState<"summary" | "days">("summary"); const [cat, setCat] = useState("all"); const [q, setQ] = useState(""); const [msg, setMsg] = useState("");
   useEffect(() => { api.get(`/api/hrms/muster${sheet ? `?sheet=${sheet}` : ""}`).then(setD).catch((e) => setMsg(e instanceof Error ? e.message : String(e))); }, [sheet]);
@@ -67,7 +105,7 @@ export default function AttendanceMuster({ who }: { who: string }) {
       blurb="Days paid, attendance % and late coming %, per person and per month — read from the muster each payroll run was computed from, never a second copy."
       tools={<>
         <select value={m?.id || ""} onChange={(e) => setSheet(e.target.value)} className="text-xs border rounded px-2 py-1.5" style={{ borderColor: C.line }}>
-          {(d?.months || []).map((x) => <option key={x.id} value={x.id}>{MONTHS[x.month - 1]} {x.year} · {x.people} people{x.status === "Frozen" ? " · ❄" : ""}</option>)}
+          {(d?.months || []).map((x) => <option key={x.id} value={x.id}>{MONTHS[x.month - 1]} {x.year} · {x.people} people{x.status === "Frozen" ? " · ❄" : x.source === "sheet" ? " · HR sheet" : ""}</option>)}
         </select>
         <select value={cat} onChange={(e) => setCat(e.target.value)} className="text-xs border rounded px-2 py-1.5" style={{ borderColor: C.line }}>
           <option value="all">All categories</option>{(d?.byCategory || []).map((c) => <option key={c.category} value={c.category}>{c.category} · {c.people}</option>)}
@@ -77,6 +115,7 @@ export default function AttendanceMuster({ who }: { who: string }) {
           {(["summary", "days"] as const).map((v) => <button key={v} onClick={() => setView(v)} className="text-xs font-bold px-2.5 py-1.5" style={view === v ? { background: "var(--ink)", color: "#fff" } : { color: C.dim, background: "#fff" }}>{v === "summary" ? "Summary" : "Day by day"}</button>)}
         </div>
       </>}>
+      <div className="flex items-center gap-3 flex-wrap mb-3"><Switch mode="month" onMode={(k) => k === "person" && onPerson("")} />{d && <PullMonths months={d.months.length} />}</div>
       {msg && <div className="text-xs font-semibold mb-2" style={{ color: C.red }}>{msg}</div>}
       {d && !m && (
         <div className="bg-white rounded-lg border p-4" style={{ borderColor: C.line, maxWidth: 640 }}>
@@ -96,7 +135,7 @@ export default function AttendanceMuster({ who }: { who: string }) {
             <Stat k="LATE COMING %" v={pc(T.late_pct)} c={tone(T.late_pct, 5, 20, true)} />
             <div className="ml-auto text-xs" style={{ color: C.faint, maxWidth: 360, lineHeight: 1.5 }}>
               Attendance % = present ÷ (present + absent). Late coming % = late days (the sheet's deduction, in quarter days) ÷ present days. Week-offs and holidays count in neither.
-              {d.months.length < 3 && <> Months before {MONTHS[d.months[d.months.length - 1].month - 1]} {d.months[d.months.length - 1].year} and the 2025 muster are still only in the HR sheet (tab 15).</>}
+              {m.source === "sheet" && <> This month was pulled from the HR sheet{m.tab ? ` (tab "${m.tab}")` : ""}, not a payroll run in Genie.</>}
             </div>
           </div>
           {cat === "all" && !q && d.byCategory.length > 1 && (
@@ -108,12 +147,81 @@ export default function AttendanceMuster({ who }: { who: string }) {
             </div>
           )}
           {view === "summary"
-            ? <DataTable columns={summaryCols} rows={rows} rowKey={(r) => r.employee_id} initialFrozen={2} empty="Nobody matches." />
-            : <DataTable columns={dayCols} rows={rows} rowKey={(r) => r.employee_id} initialFrozen={2} empty="Nobody matches." />}
-          {view === "days" && <div className="text-xs mt-2" style={{ color: C.faint }}>P present · A absent · WO week-off · MO monthly off · ST statutory holiday · S sick/special (paid) · C comp-off · Sundays shaded.</div>}
+            ? <DataTable columns={summaryCols} rows={rows} rowKey={(r) => r.employee_id} initialFrozen={2} empty="Nobody matches." onRowClick={(r) => onPerson(r.employee_id)} />
+            : <DataTable columns={dayCols} rows={rows} rowKey={(r) => r.employee_id} initialFrozen={2} empty="Nobody matches." onRowClick={(r) => onPerson(r.employee_id)} />}
+          <div className="text-xs mt-2" style={{ color: C.faint }}>Click a person for their months. {view === "days" && <>P present · A absent · WO week-off · MO monthly off · ST statutory holiday · S sick/special (paid) · C comp-off · Sundays shaded.</>}</div>
         </>
       )}
       {!d && !msg && <div className="text-sm py-6 text-center" style={{ color: C.faint }}>loading…</div>}
+    </Pane>
+  );
+}
+
+
+const MarkRow = ({ days, sundays }: { days: string[]; sundays: number[] }) => {
+  const sun = new Set(sundays);
+  return <div className="flex flex-wrap" style={{ gap: 2 }}>{days.map((d, i) => { const m = String(d || "").toUpperCase(); const st = MARK[m] || { bg: "", fg: "#16232F" }; return <span key={i} title={`${i + 1}${sun.has(i + 1) ? " · Sunday" : ""}`} style={{ width: 24, height: 20, lineHeight: "20px", textAlign: "center", fontSize: 10, fontWeight: m === "A" ? 700 : 500, borderRadius: 3, background: st.bg || (sun.has(i + 1) ? "#F7F6F2" : "#FBFAF7"), color: st.fg, border: "1px solid #EFEDE7" }}>{m || "·"}</span>; })}</div>;
+};
+
+function ByPerson({ who, initial, onMonths }: { who: string; initial: string | null; onMonths: () => void }) {
+  const [people, setPeople] = useState<Person[] | null>(null); const [q, setQ] = useState(""); const [id, setId] = useState<string | null>(initial || null);
+  const [pv, setPv] = useState<PersonView | null>(null); const [msg, setMsg] = useState("");
+  useEffect(() => { api.get("/api/hrms/muster?people=1").then((j) => setPeople(j.people || [])).catch((e) => setMsg(e instanceof Error ? e.message : String(e))); }, []);
+  useEffect(() => { if (!id) { setPv(null); return; } setPv(null); api.get(`/api/hrms/muster?person=${encodeURIComponent(id)}`).then(setPv).catch((e) => setMsg(e instanceof Error ? e.message : String(e))); }, [id]);
+  const list = useMemo(() => (people || []).filter((p) => !q.trim() || `${p.employee_id} ${p.name} ${p.department || ""}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 60), [people, q]);
+  const A = pv?.averages; const P = pv?.person;
+  const cols: Column<PersonView["months"][number]>[] = [
+    { key: "month", label: "Month", width: 120, value: (r) => r.month.year * 100 + r.month.month, numeric: true, render: (r) => <b>{MONTHS[r.month.month - 1]} {r.month.year}</b> },
+    { key: "src", label: "From", width: 90, value: (r) => (r.month.source === "payroll" ? "Payroll run" : "HR sheet") },
+    { key: "pay", label: "Days paid", width: 80, align: "right", numeric: true, value: (r) => r.line.pay_days },
+    { key: "present", label: "Present", width: 70, align: "right", numeric: true, value: (r) => r.line.present },
+    { key: "absent", label: "Absent", width: 70, align: "right", numeric: true, value: (r) => r.line.absent, render: (r) => <span style={{ color: r.line.absent ? "#B3392E" : C.faint, fontWeight: r.line.absent ? 700 : 400 }}>{r.line.absent}</span> },
+    { key: "wo", label: "WO", width: 50, align: "right", numeric: true, value: (r) => r.line.wo },
+    { key: "mo", label: "MO/ST", width: 60, align: "right", numeric: true, value: (r) => r.line.mo_st },
+    { key: "att", label: "Attendance %", width: 100, align: "right", numeric: true, value: (r) => r.line.attendance_pct, render: (r) => <b style={{ color: tone(r.line.attendance_pct, 95, 80) }}>{pc(r.line.attendance_pct)}</b> },
+    { key: "late", label: "Late (days)", width: 80, align: "right", numeric: true, value: (r) => r.line.late },
+    { key: "latepct", label: "Late coming %", width: 100, align: "right", numeric: true, value: (r) => r.line.late_pct, render: (r) => <b style={{ color: tone(r.line.late_pct, 5, 20, true) }}>{pc(r.line.late_pct)}</b> },
+    { key: "compoff", label: "Comp off", width: 70, align: "right", numeric: true, value: (r) => r.line.compoff },
+    { key: "et", label: "ET", width: 60, align: "right", numeric: true, value: (r) => r.line.et },
+    { key: "marks", label: "Day by day", width: 820, value: (r) => r.line.days.join(" "), render: (r) => <MarkRow days={r.line.days} sundays={r.sundays} /> },
+  ];
+  const Stat = ({ k, v, c }: { k: string; v: string; c?: string }) => <div><div style={{ fontSize: 10, color: C.faint, fontWeight: 700, letterSpacing: .6 }}>{k}</div><div className="tnum" style={{ fontSize: 17, fontWeight: 800, color: c || "#16232F" }}>{v}</div></div>;
+  return (
+    <Pane title="Attendance Muster" who={who} blurb="One person across every month Genie holds a muster for."
+      tools={<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a person by name, id or department…" className="text-xs border rounded px-2 py-1.5" style={{ borderColor: C.line, width: 280 }} autoFocus />}>
+      <div className="mb-3"><Switch mode="person" onMode={(k) => k === "month" && onMonths()} /></div>
+      {msg && <div className="text-xs font-semibold mb-2" style={{ color: C.red }}>{msg}</div>}
+      <div className="grid gap-3" style={{ gridTemplateColumns: id ? "260px 1fr" : "1fr" }}>
+        <div className="bg-white rounded-lg border" style={{ borderColor: C.line, maxHeight: "calc(100vh - 260px)", overflow: "auto" }}>
+          {people === null ? <div className="text-sm p-3" style={{ color: C.faint }}>loading…</div> : list.length === 0 ? <div className="text-sm p-3" style={{ color: C.faint }}>Nobody matches.</div> : list.map((p) => (
+            <button key={p.employee_id} onClick={() => setId(p.employee_id)} className="block w-full text-left px-3 py-2" style={{ borderBottom: `1px solid ${C.line}`, background: id === p.employee_id ? "#F4F2EC" : "#fff" }}>
+              <div className="text-sm font-semibold" style={{ color: "#16232F" }}>{p.name} <span style={{ color: C.faint, fontWeight: 400 }}>· {p.employee_id}</span></div>
+              <div className="text-xs" style={{ color: C.faint }}>{p.department || "—"} · {p.category} · {p.months} month{p.months === 1 ? "" : "s"}</div>
+            </button>
+          ))}
+          {people && people.length > list.length && <div className="text-xs p-2" style={{ color: C.faint }}>Showing {list.length} of {people.length} — type to narrow.</div>}
+        </div>
+        {id && (
+          <div style={{ minWidth: 0 }}>
+            {!pv ? <div className="text-sm p-3" style={{ color: C.faint }}>loading…</div> : !P ? <div className="text-sm p-3" style={{ color: C.faint }}>No muster carries {id}.</div> : (
+              <>
+                <div className="bg-white rounded-lg border px-4 py-3 mb-3 flex gap-6 flex-wrap items-end" style={{ borderColor: C.line }}>
+                  <div><div className="font-bold" style={{ fontSize: 16 }}>{P.name} <span style={{ color: C.faint, fontWeight: 400, fontSize: 12 }}>· {P.employee_id}</span></div><div className="text-xs" style={{ color: C.dim }}>{P.designation || "—"} · {P.department || "—"} · {P.category} · {P.location || "—"}</div></div>
+                  {A && <>
+                    <Stat k="MONTHS" v={String(A.months)} />
+                    <Stat k="DAYS PAID" v={A.pay_days.toLocaleString("en-IN")} />
+                    <Stat k="PRESENT" v={A.present.toLocaleString("en-IN")} />
+                    <Stat k="ABSENT" v={String(A.absent)} c={A.absent ? "#B3392E" : undefined} />
+                    <Stat k="ATTENDANCE %" v={pc(A.attendance_pct)} c={tone(A.attendance_pct, 95, 80)} />
+                    <Stat k="LATE COMING %" v={pc(A.late_pct)} c={tone(A.late_pct, 5, 20, true)} />
+                  </>}
+                </div>
+                <DataTable columns={cols} rows={pv.months} rowKey={(r) => r.month.id} initialFrozen={1} maxHeight="calc(100vh - 380px)" />
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </Pane>
   );
 }

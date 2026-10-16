@@ -3,6 +3,7 @@ import { requireHrms, errJson, HttpError } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import type { Muster, MusterRow } from "@/lib/muster";
 import { weeksOf, type Week } from "@/lib/attendance";
+import { musterMonths } from "@/lib/attendance-muster";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -32,10 +33,15 @@ export async function GET(req: Request) {
     if (!id) throw new HttpError(400, "person required");
     const admin = adminClient();
 
-    const { data, error } = await admin
+    // every payroll run (muster or not) plus the months pulled from the HR sheet (0241)
+    const { data: runs, error } = await admin
       .from("hrms_salary_sheet").select("id, month, year, status, muster")
       .order("year", { ascending: false }).order("month", { ascending: false }).limit(36);
     if (error) throw new Error(error.message);
+    const merged = await musterMonths(admin);
+    const data = [...(runs || [])];
+    for (const mo of merged.months) if (mo.source === "sheet" && !data.some((r) => Number(r.year) === mo.year && Number(r.month) === mo.month)) data.push({ id: mo.id, month: mo.month, year: mo.year, status: mo.status, muster: merged.raw.get(mo.id) });
+    data.sort((a, b) => Number(b.year) - Number(a.year) || Number(b.month) - Number(a.month));
 
     const months: {
       id: string; month: number; year: number; status: string; hasMuster: boolean;
