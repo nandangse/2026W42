@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.11.1.0",
+    date: "2026-10-16",
+    module: "HRMS \u2014 the Attendance Muster screen",
+    items: [
+      "ATTENDANCE MUSTER (Dr Raghu, 16 Oct 2026: \u201cbuild the attendance muster here\u201d). HRMS \u2192 Attendance Muster now has its screen: per person and per month \u2014 days paid, present, absent, week-offs, MO/ST, attendance % (present \u00f7 present + absent), late days (the sheet\u2019s own deduction, in quarter days), late coming % (late days \u00f7 present), comp-off, ET \u2014 frozen Emp Id and Name, every column sortable, a category filter and a name search, a strip of month totals and a table by category. A Day-by-day view shows the 31 marks with Sundays shaded. PDF opens the signed-copy muster print that already existed. It reads the muster each payroll run was computed from (August and September 2026 today); months before that and the 2025 muster are still only in the HR sheet.",
+    ],
+  },
+  {
     v: "6.11.0.1",
     date: "2026-10-16",
     module: "Agent rules \u2014 staff numbers read from the HRMS records",

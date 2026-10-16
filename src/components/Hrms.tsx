@@ -50,6 +50,7 @@ import Payroll from "./hrms/Payroll";
 import Communications from "./hrms/Communications";
 import Handbook from "./hrms/Handbook";
 import SalaryRates from "./hrms/SalaryRates";
+import AttendanceMuster from "./hrms/AttendanceMuster";
 
 export default function Hrms({
   email, initials, displayName, role, isOwner,
@@ -267,6 +268,8 @@ export default function Hrms({
           <SalarySlipsTable who={who} />
         ) : nav.key === "salary.statutory" ? (
           <StatutoryRecords who={who} />
+        ) : nav.key === "muster" ? (
+          <AttendanceMuster who={who} />
         ) : nav.key === "approvals.commercial" ? (
           <ApprovalCommercial who={who} isOwner={isOwner} />
         ) : nav.key === "approvals.salary" ? (

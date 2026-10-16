@@ -260,7 +260,7 @@ export const NAV: NavSection[] = [
     label: "Attendance Muster",
     icon: "📋",
     blurb: "Days paid, attendance %, late coming %.",
-    built: false,
+    built: true,
     source: "Attendance Muster (tab 15), one tab per month, plus the 2025 muster.",
   },
   {
