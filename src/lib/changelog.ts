@@ -92,6 +92,14 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.3.2",
+    date: "2026-10-16",
+    module: "Genie\u2019s MCP door takes the token three ways",
+    items: [
+      "FOR PERISCLAW (Dr Raghu, 16 Oct 2026: \u201clet\u2019s complete the connection of Genie and Perisclaw\u201d). The MCP door now accepts the token as Authorization: Bearer, as an x-api-key header, or as ?token= on the URL \u2014 so a client whose form has no place for a header still connects.",
+    ],
+  },
+  {
     v: "6.10.3.1",
     date: "2026-10-16",
     module: "Portal: Commercials \u2014 the whole money story; the CEO\u2019s message on landing; live clients",

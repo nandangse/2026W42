@@ -44,12 +44,21 @@ const rpc = (id: unknown, result: unknown) => NextResponse.json({ jsonrpc: "2.0"
 const rpcErr = (id: unknown, code: number, message: string, status = 200) => NextResponse.json({ jsonrpc: "2.0", id: id ?? null, error: { code, message } }, { status });
 const text = (s: string, data?: unknown) => ({ content: [{ type: "text", text: s }], ...(data !== undefined ? { structuredContent: data } : {}) });
 
+/**
+ * THE TOKEN MAY COME THREE WAYS: Authorization: Bearer (the proper one), an
+ * x-api-key header, or ?token= on the URL — for a client whose form offers
+ * no place to type a header (16 Oct 2026, Perisclaw's Auth menu). HTTPS keeps
+ * the URL private in transit; it is still the weakest of the three, so a
+ * token seen in a log is a token to rotate.
+ */
 function authed(req: Request): boolean {
   const want = S(process.env.GENIE_MCP_TOKEN);
   if (!want) return false;
   const h = req.headers.get("authorization") || "";
-  const got = /^bearer\s+(.+)$/i.exec(h)?.[1]?.trim() || "";
-  return got.length > 0 && got === want;
+  const bearer = /^bearer\s+(.+)$/i.exec(h)?.[1]?.trim() || "";
+  const key = S(req.headers.get("x-api-key"));
+  const q = S(new URL(req.url).searchParams.get("token"));
+  return [bearer, key, q].some((g) => g.length > 0 && g === want);
 }
 
 export async function GET(req: Request) {
