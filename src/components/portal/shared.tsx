@@ -10,7 +10,7 @@ export const P = {
   accent: "#e8600a", amber: "#f5b32b", red: "#b3261e", green: "#0d7a3f", blue: "#1b3a5c", muted: "#8a94a0", dim: "#5a6672",
 };
 
-export interface Org { slug: string; name: string; kind: "customer" | "supplier"; match_names: string[]; intro: string; logo_path: string | null; active: boolean }
+export interface Org { slug: string; name: string; kind: "customer" | "supplier"; match_names: string[]; intro: string; logo_path: string | null; active: boolean; ceo_message?: string | null }
 export interface Me {
   id: string; email: string; name: string; role: string; org_slug: string | null; locations: string[]; via: "portal" | "genie"; must_change: boolean;
   staff: boolean; admin: boolean; all: boolean; commercials: boolean;
