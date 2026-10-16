@@ -92,6 +92,16 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.10.3.0",
+    date: "2026-10-16",
+    module: "Genie as an MCP server \u2014 for Perisclaw and any agent; a Modules room on the CEO menu",
+    items: [
+      "GENIE'S MCP DOOR (Dr Raghu, 16 Oct 2026: \u201cI want to connect this to Perisclaw \u2026 how can Genie connect to this\u201d). One endpoint, https://genie.nandan.co.in/api/mcp, the Model Context Protocol over Streamable HTTP, behind a bearer token (GENIE_MCP_TOKEN). Eight tools: the company on one page, live jobs, one job in full, open tasks, the Query Solver, approvals waiting, Internal Kuber \u2014 and raise a task, in Dr Raghu\u2019s name. Nothing approves, pays, releases or deletes from here.",
+      "FIXED: the Query Solver views failed on the ERP\u2019s tasks (erp_tasks has no created_at) \u2014 the project book\u2019s tab, Tasking\u2019s Query Solver and the portal\u2019s shared queries read again.",
+      "MODULES (\u201cmake a left menu called Modules, then show all the apps there as buttons on the right\u201d). A room on the CEO menu with every door in Genie as a button, each opening in its own tab.",
+    ],
+  },
+  {
     v: "6.10.2.4",
     date: "2026-10-15",
     module: "LMS: a Google Slides / Doc link on every lesson, shown as the slides themselves",

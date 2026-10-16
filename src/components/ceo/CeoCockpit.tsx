@@ -16,6 +16,7 @@ import { PeopleRoom, ExecutionRoom, CashRoom, ReviewsRoom, ExceptionsRoom } from
 import { StrategyRoom } from "@/components/ceo/CeoStrategy";
 import { InternalKuberRoom } from "@/components/ceo/InternalKuber";
 import { ApprovalsRoom } from "@/components/ceo/CeoApprovals";
+import { MODULES } from "@/components/GenieShell";
 import { swallow } from "@/lib/swallow";
 
 type Err = { error: string };
@@ -39,6 +40,7 @@ const ROOMS = [
   { key: "exceptions", label: "Exceptions", icon: "⚠" },
   { key: "internal", label: "Internal Kuber", icon: "🪙" },
   { key: "approvals", label: "Approvals", icon: "✅" },
+  { key: "modules", label: "Modules", icon: "▦" },
 ] as const;
 
 function Dashboard({ top }: { top: number }) {
@@ -249,10 +251,29 @@ export default function CeoCockpit({ email, displayName, initials, role }: { ema
             {room === "exceptions" && <ExceptionsRoom />}
             {room === "internal" && <InternalKuberRoom top={top} />}
             {room === "approvals" && <ApprovalsRoom top={top} />}
+            {room === "modules" && <ModulesRoom />}
             <div className="text-xs mt-6" style={{ color: C.muted }}>Open to three: Dr Raghu, J C Kumar and Tushar Giri. Every figure is read from the module that owns it; click any number for what makes it.</div>
           </main>
         </div>
       </DrillProvider>
+    </div>
+  );
+}
+
+/** MODULES (Dr Raghu, 16 Oct 2026: "make a left menu called Modules, then show all the apps there as buttons inside on the right") — every door in Genie, one button each, opening in a new tab. */
+function ModulesRoom() {
+  return (
+    <div>
+      <div className="text-xl font-bold" style={{ color: C.ink }}>Modules</div>
+      <div className="text-sm mb-4" style={{ color: C.muted }}>every app in Genie — each opens in its own tab</div>
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+        {MODULES.map((m) => (
+          <a key={m.key} href={m.href} target="_blank" rel="noreferrer" className="rounded-2xl bg-white p-4 flex items-center gap-3 hover:shadow-md" style={{ border: `1px solid ${C.line}`, boxShadow: "0 1px 3px rgba(16,24,40,.06)", color: C.ink, textDecoration: "none" }}>
+            <span style={{ fontSize: 26, width: 44, height: 44, display: "grid", placeItems: "center", background: `${C.brand}14`, borderRadius: 12 }}>{m.icon}</span>
+            <span><div className="font-bold">{m.label}</div><div className="text-xs" style={{ color: C.muted }}>{m.blurb}</div></span>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }

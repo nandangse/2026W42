@@ -26,9 +26,10 @@ const qno = (n: number | null) => (n ? `Q-${String(n).padStart(4, "0")}` : "");
 export const queryLabel = qno;
 
 export async function queryRows(admin: SupabaseClient, opts: { projectId?: string; clientNames?: string[]; sharedOnly?: boolean } = {}): Promise<QueryRow[]> {
-  const pick = "id, job_id, title, detail, who, cat, esc, due, done, created_at, query_no, query_kind, client_shared, raised_on";
+  /* erp_tasks has no created_at — the ERP's ToDos carry no Genie birth date (found 16 Oct 2026) */
+  const pick = "id, job_id, title, detail, who, cat, esc, due, done, query_no, query_kind, client_shared, raised_on";
   const [m, e, jobs, projects] = await Promise.all([
-    admin.from("manual_tasks").select(`${pick}, project`).eq("query_solver", true).limit(5000),
+    admin.from("manual_tasks").select(`${pick}, created_at, project`).eq("query_solver", true).limit(5000),
     admin.from("erp_tasks").select(pick).eq("query_solver", true).limit(5000),
     admin.from("jobs").select("id, tag, cust, proj").limit(10000),
     admin.from("projects").select("id, mgr").limit(5000),
