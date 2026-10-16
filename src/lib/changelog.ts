@@ -92,6 +92,12 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.11.2.4",
+    date: "2026-10-16",
+    module: "Attendance on the Genie door \u2014 names match by sound",
+    items: ["\u201cWhat is Shrinidhi\u2019s attendance\u201d found nobody because the record says Shreenidhi. The attendance tool now matches a name by its consonant skeleton when the exact spelling finds no one."],
+  },
+  {
     v: "6.11.2.3",
     date: "2026-10-16",
     module: "Attendance Muster \u2014 every uploaded month since January 2024",

@@ -30,7 +30,11 @@ export const HRMS_TOOLS: ToolDef[] = [
       if (S(a.person)) {
         const q = S(a.person).toLowerCase();
         const people = await musterPeople(admin);
-        const hits = people.filter((p) => p.employee_id === q || p.name.toLowerCase().includes(q));
+        // spelling-tolerant: Shrinidhi / Shreenidhi / Srinidhi all meet at "srndh"
+        const skel = (x: string) => x.toLowerCase().replace(/sh/g, "s").replace(/ee|ea/g, "i").replace(/[^a-z]/g, "").replace(/[aeiou]/g, "").replace(/(.)\1+/g, "$1");
+        const qs = skel(q);
+        let hits = people.filter((p) => p.employee_id === q || p.name.toLowerCase().includes(q));
+        if (!hits.length && qs.length >= 3) hits = people.filter((p) => p.name.split(/\s+/).some((w) => skel(w) === qs || skel(w).startsWith(qs)) || skel(p.name).includes(qs));
         if (!hits.length) return text(`No muster in Genie carries anyone matching "${S(a.person)}".`);
         if (hits.length > 1 && !people.some((p) => p.employee_id === q)) return text(`${hits.length} people match "${S(a.person)}" — which one?\n` + hits.slice(0, 15).map((p) => `- ${p.name} (${p.employee_id}) · ${p.department || "—"}`).join("\n"), { candidates: hits.slice(0, 15) });
         const pv = await personView(admin, (hits.find((p) => p.employee_id === q) || hits[0]).employee_id);
