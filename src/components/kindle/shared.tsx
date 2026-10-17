@@ -27,6 +27,7 @@ export interface Meeting {
 export interface Attendance { meeting_id: string; member_id: string; status: string; late_min: number; early_min: number; note: string | null }
 export interface Fine { id: string; member_id: string; meeting_id: string | null; rule_code: string | null; amount: number; reason: string | null; levied_on: string; paid_on: string | null; paid_amount: number | null; waived: boolean }
 export interface Family { id: string; member_id: string; relation: string; name: string; birthday: string | null; is_legal: boolean; mail_wishes: boolean }
+export interface Participation { meetings: [number, number]; checkins: [number, number]; one21: [number, number]; feedback: [number, number]; ontime: [number, number]; score: number | null }
 export interface Tally { present: number; absent: number; zoom: number; late: number; late_min: number; out_of: number; year_absent: number }
 export interface Boot {
   me: { id: string; email: string; name: string; short_name: string | null; roles: string[]; is_admin: boolean; must_change: boolean; onboarded: boolean; admin: boolean; treasurer: boolean; via: string; photo_path: string | null };
@@ -34,6 +35,8 @@ export interface Boot {
   constitution: { id: string; version: string; revised_on: string | null; passed_by: string[]; body: string; created_at: string } | null;
   meetings: Meeting[]; attendance: Attendance[]; fines: Fine[]; tally: Record<string, Tally>; due: Record<string, number>;
   next: Meeting | null; last: Meeting | null; birthdays: { who: string; of: string | null; on: string; relation: string }[]; today: string;
+  /** 1.5.0 — each member's participation this calendar year, computed in boot */
+  participation?: Record<string, Participation>;
 }
 
 export const ROLE_LABEL: Record<string, string> = { facilitator: "Facilitator", co_facilitator: "Co-facilitator", treasurer: "Treasurer", scribe: "Scribe", timekeeper: "Time keeper" };

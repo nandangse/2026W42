@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { api, Avatar, btn, Card, dmy, input, K, label, Markdown, pill, serif, type Boot } from "./shared";
 
-interface Topic { id: string; title: string; body: string | null; created_by: string | null; pinned: boolean; closed: boolean; created_at: string; last_post_at: string; posts: number; last_by: string | null; voices: number }
+interface Topic { id: string; title: string; body: string | null; created_by: string | null; pinned: boolean; closed: boolean; created_at: string; last_post_at: string; posts: number; last_by: string | null; voices: number; ai_summary?: string | null; ai_summary_at?: string | null }
 interface Post { id: string; topic_id: string; member_id: string | null; body: string; reply_to: string | null; created_at: string; edited_at: string | null }
 
 /** Message board: topics, threaded replies, pins. Plain text with the little markdown the constitution uses. */
@@ -56,6 +56,9 @@ function TopicView({ boot, topicId, topic, back, name }: { boot: Boot; topicId: 
   const send = async () => { if (!text.trim()) return; setBusy(true); try { await api("/api/kindle/board", { action: "post", topic_id: topicId, body: text, reply_to: replyTo?.id || null }); setText(""); setReplyTo(null); load(); } catch (e) { alert(String((e as Error).message || e)); } setBusy(false); };
   const remove = async (p: Post) => { if (!confirm("Remove this post?")) return; await api("/api/kindle/board", { action: "remove", post_id: p.id }); load(); };
   const admin = boot.me.admin;
+  const [summing, setSumming] = useState(false);
+  /* Kindle 1.5.0 — Genie reads the thread and says where it stands; kept on the topic */
+  const sumUp = async () => { setSumming(true); try { const r = await api<{ summary: string }>("/api/kindle/board", { action: "summarise", topic_id: topicId }); setT((x) => x ? { ...x, ai_summary: r.summary, ai_summary_at: new Date().toISOString() } : x); } catch (e) { alert(String((e as Error).message || e)); } setSumming(false); };
   return (
     <div style={{ display: "grid", gap: 12, maxWidth: 860 }}>
       <button onClick={back} style={{ background: "none", border: "none", color: K.emberDark, fontWeight: 700, cursor: "pointer", textAlign: "left", padding: 0, fontSize: 13 }}>← Message board</button>
@@ -76,6 +79,12 @@ function TopicView({ boot, topicId, topic, back, name }: { boot: Boot; topicId: 
           )}
         </div>
       </Card>
+      {(t?.ai_summary || (posts && posts.length > 0)) && (
+        <Card title="Genie's reading" right={t?.ai_summary_at ? `as of ${dmy(t.ai_summary_at)}` : undefined} style={{ background: K.soft }}>
+          {t?.ai_summary ? <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{t.ai_summary}</p> : <div style={{ fontSize: 13, color: K.muted }}>Where has this conversation reached? Genie reads the thread and says, in a paragraph.</div>}
+          <div style={{ marginTop: 8 }}><button onClick={sumUp} disabled={summing || !(posts && posts.length)} style={btn("ghost", { padding: "5px 10px", fontSize: 12 })}>{summing ? "Reading…" : t?.ai_summary ? "Genie, read it again" : "Genie, sum it up"}</button></div>
+        </Card>
+      )}
       <div style={{ display: "grid", gap: 8 }}>
         {(posts || []).map((p) => { const parent = p.reply_to ? posts?.find((x) => x.id === p.reply_to) : null; return (
           <div key={p.id} style={{ display: "flex", gap: 10, background: "#fff", border: `1px solid ${K.line}`, borderRadius: 12, padding: 12, marginLeft: parent ? 28 : 0 }}>

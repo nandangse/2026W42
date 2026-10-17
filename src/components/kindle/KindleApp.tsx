@@ -22,6 +22,7 @@ const One21 = dynamic(() => import("./One21"));
 const Finances = dynamic(() => import("./Finances"));
 const Exercises = dynamic(() => import("./Exercises"));
 const Presentations = dynamic(() => import("./Presentations"));
+const Learnings = dynamic(() => import("./Learnings"));
 
 /**
  * THE KINDLE SHELL. Left navigation of thirteen sections, the flame on top,
@@ -35,6 +36,7 @@ export const SECTIONS: { key: string; label: string; icon: string; phase: number
   { key: "directory", label: "Directory", icon: "👥", phase: 1 },
   { key: "checkins", label: "Check-ins", icon: "✅", phase: 1 },
   { key: "goals", label: "Goals", icon: "🎯", phase: 1 },
+  { key: "learnings", label: "Learnings", icon: "📖", phase: 1 },
   { key: "meetings", label: "TG Meetings", icon: "📅", phase: 1 },
   { key: "one21", label: "1-2-1s", icon: "🤝", phase: 1 },
   { key: "issues", label: "Burning issues", icon: "🧯", phase: 1 },
@@ -96,6 +98,7 @@ export default function KindleApp({ initialSection, initialArg }: { initialSecti
       case "issues": return <Issues boot={boot} />;
       case "presentations": return <Presentations boot={boot} arg={arg} go={go} />;
       case "goals": return <Goals boot={boot} arg={arg} go={go} />;
+      case "learnings": return <Learnings boot={boot} go={go} />;
       case "one21": return <One21 boot={boot} />;
       case "finances": return <Finances boot={boot} />;
       case "exercises": return <Exercises boot={boot} arg={arg} go={go} />;

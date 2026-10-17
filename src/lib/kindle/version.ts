@@ -9,6 +9,14 @@
  */
 export const KINDLE_UPDATES: { v: string; date: string; items: string[] }[] = [
   {
+    v: "1.5.0", date: "2026-10-17",
+    items: [
+      "Learnings, after Goals: every learning written in a check-in since 2023 and any noted here between meetings, month by month, by person, by year, searchable; your own may be edited or removed.",
+      "Participation this year on Home: meetings attended, check-ins written, 1-2-1s done, feedback given and punctuality, each as done of due for the calendar year, folded into one score; the room's table beneath, sorted. Computed from the record on every open, never typed or stored.",
+      "Genie on the message board: Genie, sum it up on any topic with replies writes where the conversation has reached, what was agreed and what is still open and on whom; kept with the topic and re-made on request (migration 0242).",
+    ],
+  },
+  {
     v: "1.4.1", date: "2026-10-05",
     items: [
       "Online join link: one Google Meet or Zoom link kept in Settings, shown as a green Join online button on Home and on every coming meeting.",

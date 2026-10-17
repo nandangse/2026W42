@@ -1,8 +1,8 @@
 "use client";
 import { KINDLE_VERSION } from "@/lib/kindle/version";
-import { Avatar, Card, dayName, dmy, inr, K, pill, serif, type Boot } from "./shared";
+import { Avatar, Card, dayName, dmy, inr, K, pill, serif, type Boot, type Participation } from "./shared";
 
-/** Home: the next meeting, the room, birthdays this month, fines due, the WhatsApp door. */
+/** Home: the next meeting, the room, birthdays this month, fines due, participation this year, the WhatsApp door. */
 export default function Home({ boot, go }: { boot: Boot; go: (k: string, a?: string | null) => void }) {
   const me = boot.me;
   const hour = new Date().getHours();
@@ -12,6 +12,10 @@ export default function Home({ boot, go }: { boot: Boot; go: (k: string, a?: str
   const myTally = boot.tally[me.id];
   const myDue = boot.due[me.id] || 0;
   const roles = boot.members.filter((m) => m.roles.length || m.is_admin);
+  const part = boot.participation || {};
+  const myPart = part[me.id];
+  const year = String(new Date().getFullYear());
+  const ranked = boot.members.filter((m) => m.active && part[m.id]).map((m) => ({ m, p: part[m.id] })).sort((a, b) => (b.p.score ?? -1) - (a.p.score ?? -1) || a.m.sort_order - b.m.sort_order);
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div>
@@ -34,7 +38,7 @@ export default function Home({ boot, go }: { boot: Boot; go: (k: string, a?: str
             </>
           ) : <div style={{ color: K.muted }}>No meeting planned. The facilitator sets the calendar in January.</div>}
         </Card>
-        <Card title="My year" right={String(new Date().getFullYear())}>
+        <Card title="My year" right={year}>
           {myTally ? (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <Stat n={myTally.present} l="meetings attended" />
@@ -44,6 +48,18 @@ export default function Home({ boot, go }: { boot: Boot; go: (k: string, a?: str
             </div>
           ) : <div style={{ color: K.muted }}>No attendance on record yet.</div>}
           <div style={{ fontSize: 11, color: K.muted, marginTop: 8 }}>Computed from the meeting record, never typed. Two absences a year are allowed; the third carries a fine of ₹15,000.</div>
+        </Card>
+        <Card title="My participation" right={myPart?.score != null ? <span style={{ ...serif, fontSize: 22, color: scoreColor(myPart.score) }}>{myPart.score}</span> : year}>
+          {myPart ? (
+            <div style={{ display: "grid", gap: 6 }}>
+              <Bar l="Meetings attended" v={myPart.meetings} />
+              <Bar l="Check-ins written" v={myPart.checkins} />
+              <Bar l="1-2-1s done" v={myPart.one21} />
+              <Bar l="Feedback given" v={myPart.feedback} />
+              <Bar l="On time" v={myPart.ontime} />
+            </div>
+          ) : <div style={{ color: K.muted }}>Nothing on record this year yet.</div>}
+          <div style={{ fontSize: 11, color: K.muted, marginTop: 8 }}>Done of due this calendar year, folded into one score out of 100. Computed from the record on every open.</div>
         </Card>
         <Card title="Birthdays this month">
           {boot.birthdays.length ? (
@@ -69,6 +85,25 @@ export default function Home({ boot, go }: { boot: Boot; go: (k: string, a?: str
           {roles.map((m) => <span key={m.id} style={{ fontSize: 12, color: K.dim }}><b>{m.short_name || m.name}</b> · {[...m.roles.map((r) => ({ facilitator: "Facilitator", co_facilitator: "Co-facilitator", treasurer: "Treasurer", scribe: "Scribe", timekeeper: "Time keeper" } as Record<string, string>)[r] || r), ...(m.is_admin ? ["Admin"] : [])].join(", ")}</span>)}
         </div>
       </Card>
+      {ranked.length > 0 && (
+        <Card title={`Participation ${year}`} right="done of due · computed, never typed" pad={0}>
+          <div className="genie-scroll" style={{ maxHeight: "none" }}>
+            <table className="genie-table" style={{ width: "100%" }}>
+              <thead><tr><th style={{ background: K.charcoal }}>Member</th><th style={{ background: K.charcoal }}>Meetings</th><th style={{ background: K.charcoal }}>Check-ins</th><th style={{ background: K.charcoal }}>1-2-1s</th><th style={{ background: K.charcoal }}>Feedback</th><th style={{ background: K.charcoal }}>On time</th><th style={{ background: K.charcoal }}>Score</th></tr></thead>
+              <tbody>
+                {ranked.map(({ m, p }) => (
+                  <tr key={m.id} style={{ fontWeight: m.id === me.id ? 700 : 400 }}>
+                    <td><button onClick={() => go("directory", m.id)} style={{ ...lnk, fontWeight: "inherit", color: K.ink }}>{m.short_name || m.name}</button></td>
+                    <td className="num">{frac(p.meetings)}</td><td className="num">{frac(p.checkins)}</td><td className="num">{frac(p.one21)}</td><td className="num">{frac(p.feedback)}</td><td className="num">{frac(p.ontime)}</td>
+                    <td className="num" style={{ color: p.score == null ? K.muted : scoreColor(p.score), fontWeight: 700 }}>{p.score ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ fontSize: 11, color: K.muted, padding: "8px 12px" }}>Meetings and feedback are counted on meetings held this year once attendance is marked; check-ins on the months a meeting was held; 1-2-1s against the pairs planned up to this month, extra ones counting. The score weighs meetings 35, check-ins 25, 1-2-1s 20, feedback 10, punctuality 10.</div>
+        </Card>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
         <Card title="WhatsApp">
           {boot.settings.whatsapp_link ? <a href={boot.settings.whatsapp_link} target="_blank" rel="noreferrer" style={{ ...lnk, display: "inline-block", textDecoration: "none" }}>Open the Kindle group →</a> : <span style={{ color: K.muted }}>Link not set.</span>}
@@ -91,6 +126,17 @@ export default function Home({ boot, go }: { boot: Boot; go: (k: string, a?: str
   );
 }
 const lnk: React.CSSProperties = { background: "none", border: "none", color: K.emberDark, fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0 };
+const frac = ([a, b]: [number, number]) => b > 0 ? `${a} / ${b}` : "—";
+const scoreColor = (s: number) => s >= 80 ? K.green : s >= 50 ? K.amber : K.red;
 function Stat({ n, l, warn }: { n: number | string; l: string; warn?: boolean }) {
   return <div style={{ background: K.soft, borderRadius: 10, padding: "8px 10px" }}><div style={{ ...serif, fontSize: 22, color: warn ? K.red : K.ink }}>{n}</div><div style={{ fontSize: 11, color: K.muted }}>{l}</div></div>;
+}
+function Bar({ l, v }: { l: string; v: Participation["meetings"] }) {
+  const [a, b] = v; const pct = b > 0 ? Math.min(100, Math.round((a / b) * 100)) : null;
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: K.dim }}>{l}</span><span style={{ color: pct == null ? K.muted : K.ink, fontWeight: 600 }}>{frac(v)}</span></div>
+      <div style={{ height: 6, background: K.soft, borderRadius: 999, marginTop: 2, overflow: "hidden" }}>{pct != null && <div style={{ width: `${pct}%`, height: "100%", background: scoreColor(pct), borderRadius: 999 }} />}</div>
+    </div>
+  );
 }
