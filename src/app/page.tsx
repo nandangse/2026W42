@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { currentUser, hasPlanningGrant, RAGHU_EMAIL } from "@/lib/auth";
+import { currentUser, RAGHU_EMAIL } from "@/lib/auth";
 import { resolveSaamaanAccess } from "@/lib/saamaan";
 import { mayUsePlanning } from "@/lib/planning-door";
 import PlanningSuite from "@/components/PlanningSuite";

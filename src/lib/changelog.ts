@@ -92,6 +92,19 @@ export interface UpdateEntry {
 /** Newest first. The top entry's version IS the app's version. */
 export const UPDATES: UpdateEntry[] = [
   {
+    v: "6.11.3.0",
+    date: "2026-10-17",
+    module: "The 9 October audit lands — on the 2026W42 test copy first",
+    items: [
+      "THE FORK (Dr Raghu, 17 Oct 2026: “make a clone … call the fork 2026W42 … keep the main production genie as is”). This version exists on nandangse/2026W42, a copy of production taken today; production stays at 6.11.2.4 until the checks below have been run here and he says so.",
+      "ACCESS CONTROL, after the audit of 9 October (the branch written then, carried forward over the sixty-eight commits since): a login the profile table cannot answer for is shut, not let in as a planner (S2); a learner’s login opens the training library and nothing else (S3); the CFO and Board report prints stand behind Kuber’s tick (S6); delivered value and day-rates read only for the Leadership Circle and Stratcom (S12); crons fired by hand need the owner, Stratcom or the hands named for them (S12); Kindle locks an address after five wrong tries (S13); one signing key for the IDP, Kindle, Portal and slip logins — SESSION_SECRET, never a fixed word (S15).",
+      "WHAT THE BROWSER MAY RUN: a WhatsApp reply is shown as text, never as HTML (S9); landing-page bodies, ERP ticket descriptions and anything rich go through one sanitiser (S10); the ERP file door passes the ERP’s two file folders only; the unused /api/portal/file door is gone; server errors reach the browser as a sentence; a screen never prints “[object Object]” (D2).",
+      "THE DATABASE SIDE, migrations 0209–0212: a sign-up becomes a disabled viewer, never a planner (S0); per-verb policies on tasks (S4, S5); Kuber’s tables revoked from the browser key (S14); row level security on every public table that lacked it — the rule is generic, so the forty-eight tables created since the audit (CEO, Leaders Council, Seva, IMS audit, agent rules, API tokens) are covered on the same run; no SVG served from the public bucket (S15).",
+      "SOFTWARE DESCRIPTION § 15, “Security checks conducted on …”: the sixty-six checks from the audit, each with what a tester does, what must happen, what happened last time and the version that carries the repair. Their dates still read 9–10 October; the next run on this copy will move them.",
+      "The planning-door redirect fix from the audit (S1) is NOT carried: production’s 0214 and the plain StaffHome page (10 Oct) replaced that code. The audit’s own version numbers 6.3.1.0 and 6.3.2.0 fold into this one entry.",
+    ],
+  },
+  {
     v: "6.11.2.4",
     date: "2026-10-16",
     module: "Attendance on the Genie door \u2014 names match by sound",
